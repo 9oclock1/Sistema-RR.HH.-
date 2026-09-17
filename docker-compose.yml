@@ -1,0 +1,179 @@
+services:
+  # BD
+  postgres:
+    image: postgres:16-alpine
+    container_name: rrhh-postgres
+    restart: unless-stopped
+    env_file:
+      - ./database/.env
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init-all.sh:/docker-entrypoint-initdb.d/init-all.sh:ro
+      - ./backend/AuthService/db/init.sql:/init-scripts/auth/init.sql:ro
+      - ./backend/EmployeeService/db/init.sql:/init-scripts/employee/init.sql:ro
+      - ./backend/RecruitmentService/db/init.sql:/init-scripts/recruitment/init.sql:ro
+      - ./backend/AttendanceService/db/init.sql:/init-scripts/attendance/init.sql:ro
+      - ./backend/CompensationService/db/init.sql:/init-scripts/compensation/init.sql:ro
+      - ./backend/PerformanceService/db/init.sql:/init-scripts/performance/init.sql:ro
+      - ./backend/NotificationService/db/init.sql:/init-scripts/notification/init.sql:ro
+    networks:
+      - rrhh-network
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: rrhh-frontend
+    env_file:
+      - ./frontend/.env
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+    networks:
+      - rrhh-network
+
+  # API Gateway
+  nginx-gateway:
+    image: nginx:alpine
+    container_name: rrhh-gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - auth-service
+      - employee-service
+      - recruitment-service
+      - attendance-service
+      - compensation-service
+      - performance-service
+      - notification-service
+    networks:
+      - rrhh-network
+
+  # AuthService
+  auth-service:
+    build:
+      context: ./backend/AuthService
+      dockerfile: Dockerfile.dev
+    container_name: auth-service
+    env_file:
+      - ./backend/AuthService/.env
+    volumes:
+      - ./backend/AuthService:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+    networks:
+      - rrhh-network
+
+  # EmployeeService
+  employee-service:
+    build:
+      context: ./backend/EmployeeService
+      dockerfile: Dockerfile.dev
+    container_name: employee-service
+    env_file:
+      - ./backend/EmployeeService/.env
+    volumes:
+      - ./backend/EmployeeService:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+    networks:
+      - rrhh-network
+
+  # RecruitmentService
+  recruitment-service:
+    build:
+      context: ./backend/RecruitmentService
+      dockerfile: Dockerfile.dev
+    container_name: recruitment-service
+    env_file:
+      - ./backend/RecruitmentService/.env
+    volumes:
+      - ./backend/RecruitmentService:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+    networks:
+      - rrhh-network
+
+  # AttendanceService
+  attendance-service:
+    build:
+      context: ./backend/AttendanceService
+      dockerfile: Dockerfile.dev
+    container_name: attendance-service
+    env_file:
+      - ./backend/AttendanceService/.env
+    volumes:
+      - ./backend/AttendanceService:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+    networks:
+      - rrhh-network
+
+  # CompensationService
+  compensation-service:
+    build:
+      context: ./backend/CompensationService
+      dockerfile: Dockerfile.dev
+    container_name: compensation-service
+    env_file:
+      - ./backend/CompensationService/.env
+    volumes:
+      - ./backend/CompensationService:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+    networks:
+      - rrhh-network
+
+  # PerformanceService
+  performance-service:
+    build:
+      context: ./backend/PerformanceService
+      dockerfile: Dockerfile.dev
+    container_name: performance-service
+    env_file:
+      - ./backend/PerformanceService/.env
+    volumes:
+      - ./backend/PerformanceService:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+    networks:
+      - rrhh-network
+
+  # NotificationService
+  notification-service:
+    build:
+      context: ./backend/NotificationService
+      dockerfile: Dockerfile.dev
+    container_name: notification-service
+    env_file:
+      - ./backend/NotificationService/.env
+    volumes:
+      - ./backend/NotificationService:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+    networks:
+      - rrhh-network
+
+volumes:
+  postgres_data:
+
+networks:
+  rrhh-network:
+    driver: bridge
