@@ -1,10 +1,10 @@
 const express = require("express");
 const cors = require("cors");
-const { Pool } = require("pg");
+const pool = require("./db");
+const cargosRoutes = require("./routes/cargos");
 
 const app = express();
 const PORT = process.env.PORT || 3002;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(cors());
 app.use(express.json());
@@ -43,6 +43,8 @@ app.get("/list", (req, res) => {
     { id: 2, name: "Jose perrita", role: "RRHH", department: "Talento Humano" },
   ]);
 });
+
+app.use("/cargos", cargosRoutes);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`EmployeeService corriendo en http://0.0.0.0:${PORT}`);
