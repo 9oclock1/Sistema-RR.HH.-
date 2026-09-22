@@ -1,8 +1,7 @@
 const express = require("express");
 const cors = require("cors");
-const pool = require("./db");
-const cargosRoutes = require("./routes/cargos");
-
+const pool = require("./src/config/db");
+const cargosRoutes = require('./src/routes/cargos');
 const app = express();
 const PORT = process.env.PORT || 3002;
 
