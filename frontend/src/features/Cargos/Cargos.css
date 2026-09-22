@@ -1,0 +1,127 @@
+.cargos-container {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.cargos-header h2 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.cargos-header p {
+  color: var(--text);
+  margin-bottom: 2rem;
+}
+
+.cargos-layout {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+/* Formularios */
+.cargos-form-section {
+  background: var(--code-bg);
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 0.4rem;
+  color: var(--text-h);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  box-sizing: border-box;
+}
+
+.btn-submit {
+  width: 100%;
+  padding: 0.8rem;
+  background-color: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 1rem;
+}
+
+.btn-submit:hover {
+  opacity: 0.9;
+}
+
+.alert-error {
+  background-color: #fee2e2;
+  color: #991b1b;
+  padding: 0.8rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+/* Tabla */
+.list-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.filter-group select {
+  padding: 0.4rem;
+  margin-left: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.cargos-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg);
+}
+
+.cargos-table th,
+.cargos-table td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.cargos-table th {
+  font-weight: 600;
+  color: var(--text-h);
+  background-color: var(--code-bg);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text);
+}
+
+@media (max-width: 768px) {
+  .cargos-layout {
+    grid-template-columns: 1fr;
+  }
+}
