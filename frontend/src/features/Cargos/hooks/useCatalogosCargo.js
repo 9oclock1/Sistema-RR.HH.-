@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getDepartamentosActivos } from '../../../api/departamentosApi';
+import departamentosApi from '../../../api/departamentosApi';
 import { getNivelesSalariales } from '../../../api/nivelesSalarialesApi';
 
 export function useCatalogosCargo() {
@@ -15,7 +15,7 @@ export function useCatalogosCargo() {
     const controller = new AbortController();
     const opciones = { signal: controller.signal };
 
-    Promise.allSettled([getDepartamentosActivos(opciones), getNivelesSalariales(opciones)]).then(
+    Promise.allSettled([departamentosApi.listarActivas(opciones), getNivelesSalariales(opciones)]).then(
       ([departamentos, niveles]) => {
         if (controller.signal.aborted) return;
         setCatalogos({
