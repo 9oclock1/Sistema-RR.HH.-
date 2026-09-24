@@ -1,7 +1,9 @@
 const express = require("express");
 const cors = require("cors");
-const pool = require("./src/config/db");
-const cargosRoutes = require('./src/routes/cargos');
+const pool = require("./db/pool");
+const cargosRoutes = require("./src/routes/cargos");
+const nivelesSalarialesRoutes = require("./src/routes/nivelesSalariales");
+const errorHandler = require("./src/middlewares/errorHandler");
 const app = express();
 const PORT = process.env.PORT || 3002;
 
@@ -44,6 +46,10 @@ app.get("/list", (req, res) => {
 });
 
 app.use("/cargos", cargosRoutes);
+app.use("/niveles-salariales", nivelesSalarialesRoutes);
+
+// Debe ir después de todas las rutas.
+app.use(errorHandler);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`EmployeeService corriendo en http://0.0.0.0:${PORT}`);

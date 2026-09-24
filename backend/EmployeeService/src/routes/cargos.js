@@ -1,10 +1,11 @@
 const express = require('express');
-const router = express.Router();
 const cargosController = require('../controllers/cargosController');
 
-router.get('/', cargosController.obtenerCargos);
-router.post('/', cargosController.crearCargo);
+const router = express.Router();
+
+router.get('/', cargosController.listarCargos); 
+router.get('/:id', cargosController.obtenerCargo);
+router.post('/', cargosController.crearCargo); 
+router.put('/:id', cargosController.reemplazarCargo); 
 
 module.exports = router;
-
-

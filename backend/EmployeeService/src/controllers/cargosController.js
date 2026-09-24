@@ -1,37 +1,26 @@
 const cargosService = require('../services/cargosService');
+const { validarCargo, validarIdCargo, validarFiltroArea } = require('../validators/cargosValidator');
 
-const obtenerCargos = async (req, res) => {
-    try {
-        const areaId = req.query.area_id ? parseInt(req.query.area_id) : null;
-        const cargos = await cargosService.listarCargos(areaId);
-        res.status(200).json(cargos);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
+
+const listarCargos = async (req, res) => {
+  const idDepartamento = validarFiltroArea(req.query.area_id);
+  res.status(200).json(await cargosService.listarCargos(idDepartamento));
+};
+
+const obtenerCargo = async (req, res) => {
+  const idCargo = validarIdCargo(req.params.id);
+  res.status(200).json(await cargosService.obtenerCargo(idCargo));
 };
 
 const crearCargo = async (req, res) => {
-    try {
-        const { nombre, id_nivel_salarial, id_departamento, perfil_requerido } = req.body;
-
-        if (!nombre || !id_nivel_salarial) {
-            return res.status(400).json({ 
-                error: 'Faltan campos obligatorios', 
-                campos_faltantes: ['nombre', 'id_nivel_salarial'] 
-            });
-        }
-
-        const nuevoCargo = await cargosService.registrarCargo({
-            nombre,
-            id_nivel_salarial,
-            id_departamento,
-            perfil_requerido
-        });
-
-        res.status(201).json(nuevoCargo);
-    } catch (error) {
-        res.status(500).json({ error: 'Error interno del servidor', detalle: error.message });
-    }
+  const cargo = validarCargo(req.body);
+  res.status(201).json(await cargosService.crearCargo(cargo));
 };
 
-module.exports = { obtenerCargos, crearCargo };
+const reemplazarCargo = async (req, res) => {
+  const idCargo = validarIdCargo(req.params.id);
+  const cargo = validarCargo(req.body);
+  res.status(200).json(await cargosService.reemplazarCargo(idCargo, cargo));
+};
+
+module.exports = { listarCargos, obtenerCargo, crearCargo, reemplazarCargo };
