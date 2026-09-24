@@ -191,7 +191,7 @@ CREATE TRIGGER trg_validar_baja_departamento
 -- Vistas de apoyo
 -- ------------------------------------------------------------
 CREATE OR REPLACE VIEW vista_departamentos_activos AS
-SELECT id_departamento, codigo, nombre, tipo, id_departamento_padre, id_sucursal
+SELECT id_departamento, codigo, nombre, tipo, id_departamento_padre, id_sucursal, descripcion
 FROM departamentos
 WHERE activo = TRUE
 ORDER BY nombre;
