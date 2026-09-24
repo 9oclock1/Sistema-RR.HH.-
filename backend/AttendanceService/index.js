@@ -1,10 +1,11 @@
 const express = require("express");
 const cors = require("cors");
-const { Pool } = require("pg");
+const pool = require("./src/config/db");
+const turnosRoutes = require("./src/routes/turnos.routes");
+const manejadorErrores = require("./src/middlewares/manejadorErrores");
 
 const app = express();
 const PORT = process.env.PORT || 3004;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(cors());
 app.use(express.json());
@@ -40,6 +41,9 @@ app.post("/check-in", (req, res) => {
     time: new Date(),
   });
 });
+
+app.use(turnosRoutes);
+app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`AttendanceService corriendo en http://0.0.0.0:${PORT}`);
