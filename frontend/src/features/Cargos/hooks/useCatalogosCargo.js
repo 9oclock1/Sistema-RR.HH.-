@@ -10,6 +10,10 @@ export function useCatalogosCargo() {
     errorDepartamentos: null,
     errorNiveles: null,
   });
+  // Se incrementa cuando otra pantalla crea, edita o da de baja un área.
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => departamentosApi.suscribirCambios(() => setVersion((v) => v + 1)), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -29,7 +33,7 @@ export function useCatalogosCargo() {
     );
 
     return () => controller.abort();
-  }, []);
+  }, [version]);
 
   return catalogos;
 }

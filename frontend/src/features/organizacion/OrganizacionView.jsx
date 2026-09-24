@@ -1,30 +1,35 @@
 // src/features/organizacion/OrganizacionView.jsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import departamentosApi from '../../api/departamentosApi';
 import DepartamentoFormModal from '../../components/DepartamentoFormModal';
 import './OrganizacionView.css';
 
 export default function OrganizacionView() {
   const [areas, setAreas] = useState([]);
+  // Cada cambio en departamentos incrementa la versión y dispara un nuevo GET.
+  const [version, setVersion] = useState(0);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [areaSeleccionada, setAreaSeleccionada] = useState(null);
   const [mensajeBaja, setMensajeBaja] = useState('');
   const [huboErrorBaja, setHuboErrorBaja] = useState(false);
 
-  const cargarAreas = useCallback(async () => {
-    try {
-      const data = await departamentosApi.listarActivas();
-      setAreas(Array.isArray(data) ? data : []);
-    } catch {
-      setAreas([]);
-      setHuboErrorBaja(true);
-      setMensajeBaja('No se pudieron cargar las áreas.');
-    }
-  }, []);
-
   useEffect(() => {
-    cargarAreas();
-  }, [cargarAreas]);
+    const controller = new AbortController();
+
+    departamentosApi
+      .listarActivas({ signal: controller.signal })
+      .then((data) => setAreas(Array.isArray(data) ? data : []))
+      .catch((err) => {
+        if (err.name === 'AbortError') return;
+        setAreas([]);
+        setHuboErrorBaja(true);
+        setMensajeBaja('No se pudieron cargar las áreas.');
+      });
+
+    return () => controller.abort();
+  }, [version]);
+
+  useEffect(() => departamentosApi.suscribirCambios(() => setVersion((v) => v + 1)), []);
 
   function abrirModalNueva() {
     setAreaSeleccionada(null);
@@ -36,9 +41,9 @@ export default function OrganizacionView() {
     setModalAbierto(true);
   }
 
-  async function onGuardado() {
+  // El listado se refresca solo: departamentosApi avisa a los suscriptores tras el POST/PUT.
+  function onGuardado() {
     setModalAbierto(false);
-    await cargarAreas();
   }
 
   async function confirmarBaja(area) {
@@ -51,7 +56,6 @@ export default function OrganizacionView() {
     try {
       await departamentosApi.darDeBaja(area.id_departamento);
       setMensajeBaja(`Área "${area.nombre}" dada de baja correctamente.`);
-      await cargarAreas();
     } catch (err) {
       setHuboErrorBaja(true);
       setMensajeBaja(err.message || 'No se pudo dar de baja el área.');

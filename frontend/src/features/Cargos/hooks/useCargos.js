@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getCargos } from '../../../api/cargosApi';
+import departamentosApi from '../../../api/departamentosApi';
 
 export function useCargos(areaId) {
   const [version, setVersion] = useState(0);
@@ -21,6 +22,9 @@ export function useCargos(areaId) {
   }, [areaId, clave]);
 
   const recargar = useCallback(() => setVersion((v) => v + 1), []);
+
+  // La tabla muestra el nombre del área: si se renombra o da de baja, se vuelve a pedir la lista.
+  useEffect(() => departamentosApi.suscribirCambios(recargar), [recargar]);
 
   return {
     cargos: resultado.cargos,
