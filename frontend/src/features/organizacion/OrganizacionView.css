@@ -1,0 +1,73 @@
+.organizacion-view {
+  padding: 1.5rem;
+  font-family: 'Segoe UI', sans-serif;
+}
+.encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.encabezado h2 {
+  color: #5b4b8a;
+  margin: 0;
+}
+.btn-primario {
+  background: #a78bd1;
+  color: white;
+  border: none;
+  padding: 0.55rem 1.1rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.tabla-areas {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fdf6f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.tabla-areas th,
+.tabla-areas td {
+  padding: 0.65rem 0.9rem;
+  text-align: left;
+  border-bottom: 1px solid #f0e6f6;
+}
+.tabla-areas th {
+  background: #ede3f7;
+  color: #5b4b8a;
+  font-size: 0.85rem;
+}
+.acciones-tabla {
+  display: flex;
+  gap: 0.75rem;
+}
+.btn-link {
+  background: none;
+  border: none;
+  color: #7d5fbf;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.85rem;
+}
+.btn-link.peligro {
+  color: #c0392b;
+}
+.vacio {
+  color: #999;
+  font-style: italic;
+}
+.mensaje-ok {
+  background: #eafaf1;
+  color: #1e7e45;
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+.mensaje-error {
+  background: #fdecea;
+  color: #c0392b;
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
