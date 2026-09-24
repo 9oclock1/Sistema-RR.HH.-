@@ -6,7 +6,7 @@ setup_service_db() {
     local sql_file=$2
 
     echo "Inicializando $db_name..."
-    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
         SELECT 'CREATE DATABASE "$db_name"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$db_name')\gexec
 EOSQL
 
