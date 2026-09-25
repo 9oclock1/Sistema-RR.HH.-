@@ -22,3 +22,14 @@ export const formatearHora = (fecha) => hora.format(new Date(fecha));
 export const formatearHoraConSegundos = (fecha) => horaConSegundos.format(fecha);
 
 export const formatearFechaJornada = (fechaJornada) => fechaLarga.format(new Date(`${fechaJornada}T00:00:00Z`));
+
+export function formatearDuracion(minutos) {
+  const horas = Math.floor(minutos / 60);
+  const resto = minutos % 60;
+  return horas ? `${horas} h ${String(resto).padStart(2, "0")} min` : `${resto} min`;
+}
+
+export const duracionISO = (minutos) => `PT${Math.floor(minutos / 60)}H${minutos % 60}M`;
+
+export const describirOrigen = ({ origen_codigo, codigo_dispositivo }) =>
+  origen_codigo === "BIOMETRICO" ? `Lector biométrico ${codigo_dispositivo}` : "Portal";

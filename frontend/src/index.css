@@ -13,6 +13,8 @@
   --peligro-suave: rgba(192, 43, 43, 0.1);
   --exito: #136430;
   --exito-suave: rgba(19, 100, 48, 0.12);
+  --aviso: #8a4b00;
+  --aviso-suave: rgba(176, 106, 0, 0.12);
   --sombra: 0 12px 32px rgba(15, 23, 42, 0.18);
   --radio: 8px;
   --transicion: 150ms ease-out;
@@ -41,6 +43,8 @@
     --peligro-suave: rgba(242, 139, 130, 0.15);
     --exito: #6fd08c;
     --exito-suave: rgba(111, 208, 140, 0.15);
+    --aviso: #f0b455;
+    --aviso-suave: rgba(240, 180, 85, 0.15);
     --sombra: 0 12px 32px rgba(0, 0, 0, 0.5);
   }
 }

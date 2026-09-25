@@ -1,24 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { consultarJornada, registrarEntrada } from "../../api/marcajes";
+import { consultarJornada, registrarEntrada, registrarSalida } from "../../api/marcajes";
+import DialogoConfirmacion from "../../components/DialogoConfirmacion";
 import IdentificacionEmpleado from "./IdentificacionEmpleado";
+import { IconoConfirmado } from "./Iconos";
 import Reloj from "./Reloj";
-import { formatearFechaJornada, formatearHora } from "./formato";
+import ResumenJornada from "./ResumenJornada";
+import { describirOrigen, formatearFechaJornada, formatearHora } from "./formato";
 import { guardarEmpleado, leerEmpleado, olvidarEmpleado } from "./sesionEmpleado";
 import "./marcaje.css";
 
 const esRechazoDeIdentidad = (error) => error.estado === 401 || error.estado === 403;
-
-const describirOrigen = ({ origen_codigo, codigo_dispositivo }) =>
-  origen_codigo === "BIOMETRICO" ? `Lector biométrico ${codigo_dispositivo}` : "Portal";
-
-function IconoConfirmado() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" />
-      <path d="m8 12.5 2.5 2.5L16 9.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 export default function MarcajePage() {
   const [idInicial] = useState(leerEmpleado);
@@ -27,9 +18,10 @@ export default function MarcajePage() {
   const [cargando, setCargando] = useState(Boolean(idInicial));
   const [errorIdentificacion, setErrorIdentificacion] = useState(null);
   const [errorCarga, setErrorCarga] = useState(null);
-  const [marcando, setMarcando] = useState(false);
+  const [marcando, setMarcando] = useState(null);
+  const [confirmandoSalida, setConfirmandoSalida] = useState(false);
   const [aviso, setAviso] = useState(null);
-  const [recienMarcado, setRecienMarcado] = useState(false);
+  const [marcajesRealizados, setMarcajesRealizados] = useState(0);
   const [enfocarIdentificacion, setEnfocarIdentificacion] = useState(false);
   const refConfirmacion = useRef(null);
 
@@ -62,8 +54,8 @@ export default function MarcajePage() {
   }, [cargar, idInicial]);
 
   useEffect(() => {
-    if (recienMarcado) refConfirmacion.current?.focus();
-  }, [recienMarcado]);
+    if (marcajesRealizados) refConfirmacion.current?.focus();
+  }, [marcajesRealizados]);
 
   const identificar = (id) => {
     setErrorIdentificacion(null);
@@ -83,38 +75,44 @@ export default function MarcajePage() {
     setIdEmpleado(null);
     setJornada(null);
     setAviso(null);
-    setRecienMarcado(false);
     setEnfocarIdentificacion(true);
   };
 
-  const marcar = async () => {
-    setMarcando(true);
+  const marcar = async (tipo) => {
+    setMarcando(tipo);
     setAviso(null);
     try {
-      const entrada = await registrarEntrada(idEmpleado);
-      setJornada((actual) => ({ ...actual, fecha_jornada: entrada.fecha_jornada, entrada }));
-      setRecienMarcado(true);
+      if (tipo === "entrada") {
+        const entrada = await registrarEntrada(idEmpleado);
+        setJornada((actual) => ({ ...actual, fecha_jornada: entrada.fecha_jornada, entrada }));
+      } else {
+        const resumen = await registrarSalida(idEmpleado);
+        setJornada((actual) => ({ ...actual, ...resumen }));
+      }
+      setMarcajesRealizados((total) => total + 1);
     } catch (error) {
       if (error.estado === 409) {
         await consultarJornada(idEmpleado).then(setJornada, () => {});
         setAviso({ tipo: "info", texto: error.message });
-        setRecienMarcado(true);
+        setMarcajesRealizados((total) => total + 1);
       } else {
         setAviso({ tipo: "error", texto: error.message });
       }
     } finally {
-      setMarcando(false);
+      setMarcando(null);
+      setConfirmandoSalida(false);
     }
   };
 
   const entrada = jornada?.entrada;
+  const salida = jornada?.salida;
 
   return (
     <section className="marcaje" aria-labelledby="marcaje-titulo">
       <div className="pagina-encabezado">
         <div>
           <h1 id="marcaje-titulo">Marcaje de asistencia</h1>
-          <p className="subtitulo">Registre el inicio de su jornada laboral.</p>
+          <p className="subtitulo">Registre el inicio y el fin de su jornada laboral.</p>
         </div>
       </div>
 
@@ -173,33 +171,90 @@ export default function MarcajePage() {
             )}
           </div>
 
-          {entrada ? (
-            <div className="confirmacion" ref={refConfirmacion} tabIndex={-1}>
-              <IconoConfirmado />
-              <div>
-                <p className="confirmacion-titulo">Entrada registrada</p>
-                <p className="confirmacion-hora">
-                  <time dateTime={entrada.fecha_hora_marcaje}>{formatearHora(entrada.fecha_hora_marcaje)}</time>
-                </p>
-                <p className="confirmacion-detalle">Origen: {describirOrigen(entrada)}</p>
+          {salida ? (
+            <ResumenJornada jornada={jornada} ref={refConfirmacion} />
+          ) : entrada ? (
+            <>
+              <div className="confirmacion" ref={refConfirmacion} tabIndex={-1}>
+                <IconoConfirmado />
+                <div>
+                  <p className="confirmacion-titulo">Entrada registrada</p>
+                  <p className="confirmacion-hora">
+                    <time dateTime={entrada.fecha_hora_marcaje}>{formatearHora(entrada.fecha_hora_marcaje)}</time>
+                  </p>
+                  <p className="confirmacion-detalle">Origen: {describirOrigen(entrada)}</p>
+                </div>
               </div>
-            </div>
+              <div className="marcaje-accion">
+                <button
+                  type="button"
+                  className="boton boton-primario boton-grande"
+                  onClick={() => setConfirmandoSalida(true)}
+                  disabled={Boolean(marcando)}
+                  aria-describedby="salida-nota"
+                >
+                  Marcar salida
+                </button>
+                <p id="salida-nota" className="campo-ayuda">
+                  Al marcar la salida se cierra su jornada.
+                </p>
+              </div>
+            </>
           ) : (
-            <div className="marcaje-accion">
-              <button
-                type="button"
-                className="boton boton-primario boton-grande"
-                onClick={marcar}
-                disabled={marcando}
-                aria-describedby="marcaje-nota"
-              >
-                {marcando ? "Registrando…" : "Marcar entrada"}
-              </button>
-              <p id="marcaje-nota" className="campo-ayuda">
-                Se guarda la hora del servidor en el momento de marcar.
-              </p>
-            </div>
+            <>
+              <div className="marcaje-accion">
+                <button
+                  type="button"
+                  className="boton boton-primario boton-grande"
+                  onClick={() => marcar("entrada")}
+                  disabled={Boolean(marcando)}
+                  aria-describedby="marcaje-nota"
+                >
+                  {marcando === "entrada" ? "Registrando…" : "Marcar entrada"}
+                </button>
+                <p id="marcaje-nota" className="campo-ayuda">
+                  Se guarda la hora del servidor en el momento de marcar.
+                </p>
+              </div>
+              <div className="marcaje-alternativa">
+                <p id="salida-sin-entrada-nota">¿Olvidó marcar su entrada y ya termina su jornada?</p>
+                <button
+                  type="button"
+                  className="boton"
+                  onClick={() => setConfirmandoSalida(true)}
+                  disabled={Boolean(marcando)}
+                  aria-describedby="salida-sin-entrada-nota"
+                >
+                  Marcar salida
+                </button>
+              </div>
+            </>
           )}
+
+          <DialogoConfirmacion
+            abierto={confirmandoSalida}
+            titulo={entrada ? "¿Registrar su salida?" : "Salida sin entrada registrada"}
+            variante={entrada ? "primario" : "peligro"}
+            textoConfirmar={entrada ? "Marcar salida" : "Registrar salida"}
+            textoProcesando="Registrando…"
+            procesando={marcando === "salida"}
+            onConfirmar={() => marcar("salida")}
+            onCancelar={() => setConfirmandoSalida(false)}
+          >
+            {entrada ? (
+              <p>
+                Se guardará la hora actual como fin de la jornada que inició a las{" "}
+                <strong>{formatearHora(entrada.fecha_hora_marcaje)}</strong>. Después no podrá volver a marcar en
+                esta jornada.
+              </p>
+            ) : (
+              <p>
+                No tiene entrada registrada en esta jornada. La salida quedará{" "}
+                <strong>pendiente de justificación</strong> y no podrá marcar entrada después. Si está iniciando su
+                jornada, cancele y use «Marcar entrada».
+              </p>
+            )}
+          </DialogoConfirmacion>
         </div>
       )}
     </section>

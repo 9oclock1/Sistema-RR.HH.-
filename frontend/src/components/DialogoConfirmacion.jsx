@@ -7,6 +7,7 @@ export default function DialogoConfirmacion({
   textoConfirmar,
   textoProcesando,
   procesando,
+  variante = "peligro",
   onConfirmar,
   onCancelar,
 }) {
@@ -32,7 +33,12 @@ export default function DialogoConfirmacion({
         <button type="button" className="boton" onClick={cancelar} disabled={procesando}>
           Cancelar
         </button>
-        <button type="button" className="boton boton-peligro-solido" onClick={onConfirmar} disabled={procesando}>
+        <button
+          type="button"
+          className={`boton ${variante === "primario" ? "boton-primario" : "boton-peligro-solido"}`}
+          onClick={onConfirmar}
+          disabled={procesando}
+        >
           {procesando ? textoProcesando : textoConfirmar}
         </button>
       </div>
