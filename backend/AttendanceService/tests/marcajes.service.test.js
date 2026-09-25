@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const modelo = require("../src/models/marcajes.model");
 const empleados = require("../src/services/empleados.service");
 const servicio = require("../src/services/marcajes.service");
-const { ORIGEN_MARCAJE, TIPO_MARCAJE } = require("../src/utils/marcajes");
+const { ORIGEN_MARCAJE, TIPO_MARCAJE, ESTADO_MARCAJE } = require("../src/utils/marcajes");
 
 const ANA = "4192f252-acf0-4522-a109-e051cad9a50b";
 const entradaDeAna = {
@@ -29,6 +29,7 @@ test("registra la entrada del portal con el tipo y origen correctos", async () =
     idEmpleado: ANA,
     idTipo: TIPO_MARCAJE.ENTRADA,
     idOrigen: ORIGEN_MARCAJE.PORTAL,
+    idEstado: ESTADO_MARCAJE.REGISTRADO,
     codigoDispositivo: undefined,
   });
 });
@@ -91,6 +92,7 @@ test("el marcaje biométrico usa el mismo registro con origen y dispositivo", as
     idEmpleado: ANA,
     idTipo: TIPO_MARCAJE.ENTRADA,
     idOrigen: ORIGEN_MARCAJE.BIOMETRICO,
+    idEstado: ESTADO_MARCAJE.REGISTRADO,
     codigoDispositivo: "BIO-01",
   });
 });

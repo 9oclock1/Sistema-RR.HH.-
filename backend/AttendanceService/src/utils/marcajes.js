@@ -3,6 +3,7 @@ const { horaBolivia } = require("./jornada");
 
 const TIPO_MARCAJE = { ENTRADA: 1, SALIDA: 2 };
 const ORIGEN_MARCAJE = { PORTAL: 1, BIOMETRICO: 2 };
+const ESTADO_MARCAJE = { REGISTRADO: 1, PENDIENTE_JUSTIFICACION: 2 };
 
 const HORA_MS = 60 * 60 * 1000;
 // Una entrada del día anterior sigue abierta hasta este límite (turnos que cruzan la medianoche).
@@ -63,11 +64,18 @@ const entradaDuplicada = (marcaje) => new ErrorApp(409, `Ya registró su entrada
 
 const salidaDuplicada = (marcaje) => new ErrorApp(409, `Ya registró su salida de hoy${aLas(marcaje)}.`);
 
-const sinEntrada = () => new ErrorApp(409, "No tiene una entrada registrada en la jornada.");
+const jornadaCerrada = (salida) =>
+  new ErrorApp(409, `La jornada ya está cerrada: registró su salida a las ${horaBolivia(salida.fecha_hora_marcaje)}.`);
+
+const describirInconsistencia = (salida) =>
+  salida?.estado_codigo === "PENDIENTE_JUSTIFICACION"
+    ? "No tiene entrada registrada en la jornada. La salida quedó pendiente de justificación."
+    : null;
 
 module.exports = {
   TIPO_MARCAJE,
   ORIGEN_MARCAJE,
+  ESTADO_MARCAJE,
   esEntrada,
   esSalida,
   jornadaEnCurso,
@@ -75,5 +83,6 @@ module.exports = {
   verificarEmpleadoActivo,
   entradaDuplicada,
   salidaDuplicada,
-  sinEntrada,
+  jornadaCerrada,
+  describirInconsistencia,
 };

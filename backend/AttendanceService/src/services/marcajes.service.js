@@ -6,12 +6,14 @@ const { minutosTrabajados } = require("../utils/jornada");
 const {
   TIPO_MARCAJE,
   ORIGEN_MARCAJE,
+  ESTADO_MARCAJE,
   jornadaEnCurso,
   salidaRegistrada,
   verificarEmpleadoActivo,
   entradaDuplicada,
   salidaDuplicada,
-  sinEntrada,
+  jornadaCerrada,
+  describirInconsistencia,
 } = require("../utils/marcajes");
 
 async function verificarEmpleado(idEmpleado) {
@@ -30,6 +32,7 @@ const resumir = ({ fecha_jornada, entrada, salida }) => ({
   entrada,
   salida,
   minutos_trabajados: minutosTrabajados(entrada, salida),
+  inconsistencia: describirInconsistencia(salida),
 });
 
 async function consultarJornada(idEmpleado) {
@@ -42,9 +45,16 @@ async function registrarEntrada(idEmpleado, { idOrigen = ORIGEN_MARCAJE.PORTAL, 
   await verificarEmpleado(idEmpleado);
   const { jornada } = await leerJornada(idEmpleado);
   if (jornada.entrada) throw entradaDuplicada(jornada.entrada);
+  if (jornada.salida) throw jornadaCerrada(jornada.salida);
 
   try {
-    return await modelo.registrar({ idEmpleado, idTipo: TIPO_MARCAJE.ENTRADA, idOrigen, codigoDispositivo });
+    return await modelo.registrar({
+      idEmpleado,
+      idTipo: TIPO_MARCAJE.ENTRADA,
+      idOrigen,
+      idEstado: ESTADO_MARCAJE.REGISTRADO,
+      codigoDispositivo,
+    });
   } catch (error) {
     if (error.code !== "23505") throw error;
     throw entradaDuplicada((await leerJornada(idEmpleado)).jornada.entrada);
@@ -56,13 +66,14 @@ async function registrarSalida(idEmpleado, { idOrigen = ORIGEN_MARCAJE.PORTAL, c
   const { ahora, marcajes, jornada } = await leerJornada(idEmpleado);
   const previa = salidaRegistrada(jornada, marcajes, ahora);
   if (previa) throw salidaDuplicada(previa);
-  if (!jornada.entrada) throw sinEntrada();
 
   try {
     const salida = await modelo.registrar({
       idEmpleado,
       idTipo: TIPO_MARCAJE.SALIDA,
       idOrigen,
+      // Sin entrada en la jornada, la salida se guarda igual para dejar constancia, pendiente de justificación.
+      idEstado: jornada.entrada ? ESTADO_MARCAJE.REGISTRADO : ESTADO_MARCAJE.PENDIENTE_JUSTIFICACION,
       codigoDispositivo,
       fechaJornada: jornada.fecha_jornada,
     });

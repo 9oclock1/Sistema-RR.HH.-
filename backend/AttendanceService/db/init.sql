@@ -53,12 +53,21 @@ CREATE TABLE CATALOGOS_ORIGEN_MARCAJE (
     CONSTRAINT CATALOGOS_ORIGEN_MARCAJE_pk PRIMARY KEY (id_origen_marcaje),
     CONSTRAINT uq_origen_marcaje_codigo UNIQUE (codigo)
 );
+-- Tabla: CATALOGOS_ESTADO_MARCAJE
+CREATE TABLE CATALOGOS_ESTADO_MARCAJE (
+    id_estado_marcaje SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_ESTADO_MARCAJE_pk PRIMARY KEY (id_estado_marcaje),
+    CONSTRAINT uq_estado_marcaje_codigo UNIQUE (codigo)
+);
 -- Tabla: MARCAJES
 CREATE TABLE MARCAJES (
     id_marcaje UUID NOT NULL DEFAULT gen_random_uuid(),
     id_empleado UUID NOT NULL,
     id_tipo_marcaje SMALLINT NOT NULL,
     id_origen_marcaje SMALLINT NOT NULL,
+    id_estado_marcaje SMALLINT NOT NULL DEFAULT 1,
     fecha_hora_marcaje TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     fecha_jornada date NOT NULL,
     codigo_dispositivo varchar(40) NULL,
@@ -79,6 +88,9 @@ ADD CONSTRAINT MARCAJES_CATALOGOS_TIPO_MARCAJE FOREIGN KEY (id_tipo_marcaje) REF
 -- Referencia: MARCAJES_CATALOGOS_ORIGEN_MARCAJE (tabla: MARCAJES)
 ALTER TABLE MARCAJES
 ADD CONSTRAINT MARCAJES_CATALOGOS_ORIGEN_MARCAJE FOREIGN KEY (id_origen_marcaje) REFERENCES CATALOGOS_ORIGEN_MARCAJE (id_origen_marcaje) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: MARCAJES_CATALOGOS_ESTADO_MARCAJE (tabla: MARCAJES)
+ALTER TABLE MARCAJES
+ADD CONSTRAINT MARCAJES_CATALOGOS_ESTADO_MARCAJE FOREIGN KEY (id_estado_marcaje) REFERENCES CATALOGOS_ESTADO_MARCAJE (id_estado_marcaje) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- datos iniciales
 INSERT INTO CATALOGOS_TIPO_JORNADA (id_tipo_jornada, codigo, nombre) VALUES
     (1, 'DIURNO', 'Diurno'),
@@ -90,4 +102,7 @@ INSERT INTO CATALOGOS_TIPO_MARCAJE (id_tipo_marcaje, codigo, nombre) VALUES
 INSERT INTO CATALOGOS_ORIGEN_MARCAJE (id_origen_marcaje, codigo, nombre) VALUES
     (1, 'PORTAL', 'Portal'),
     (2, 'BIOMETRICO', 'Biométrico');
+INSERT INTO CATALOGOS_ESTADO_MARCAJE (id_estado_marcaje, codigo, nombre) VALUES
+    (1, 'REGISTRADO', 'Registrado'),
+    (2, 'PENDIENTE_JUSTIFICACION', 'Pendiente de justificación');
 -- Fin del archivo.

@@ -15,9 +15,9 @@ const duracion = (minutos) => `${Math.floor(minutos / 60)} h ${String(minutos % 
 const describir = {
   entrada: (entrada) =>
     `Entrada registrada a las ${hora(entrada)} (jornada ${entrada.fecha_jornada}, dispositivo ${entrada.codigo_dispositivo}).`,
-  salida: ({ salida, fecha_jornada, minutos_trabajados }) =>
+  salida: ({ salida, fecha_jornada, minutos_trabajados, inconsistencia }) =>
     `Salida registrada a las ${hora(salida)} (jornada ${fecha_jornada}, dispositivo ${salida.codigo_dispositivo}). ` +
-    `Horas trabajadas: ${duracion(minutos_trabajados)}.`,
+    (inconsistencia ?? `Horas trabajadas: ${duracion(minutos_trabajados)}.`),
 };
 
 async function main() {
