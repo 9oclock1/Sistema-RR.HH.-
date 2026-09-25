@@ -29,4 +29,10 @@ function evaluarPuntualidad(turno, fechaJornada, marcaje) {
 
 const horaBolivia = (fecha) => new Date(fecha.getTime() - DESFASE_UTC_MS).toISOString().slice(11, 16);
 
-module.exports = { minutosDuracion, minutosEfectivos, evaluarPuntualidad, horaBolivia };
+const aMinutos = (fecha) => Math.floor(new Date(fecha).getTime() / 60000);
+
+// Minutos completos entre las horas HH:MM de entrada y salida, como se muestran al empleado.
+const minutosTrabajados = (entrada, salida) =>
+  entrada && salida ? aMinutos(salida.fecha_hora_marcaje) - aMinutos(entrada.fecha_hora_marcaje) : null;
+
+module.exports = { minutosDuracion, minutosEfectivos, evaluarPuntualidad, horaBolivia, minutosTrabajados };

@@ -9,31 +9,32 @@ const conCatalogos = (origen) => `
   JOIN catalogos_tipo_marcaje t USING (id_tipo_marcaje)
   JOIN catalogos_origen_marcaje o USING (id_origen_marcaje)`;
 
-async function registrar({ idEmpleado, idTipo, idOrigen, codigoDispositivo = null }) {
+async function registrar({ idEmpleado, idTipo, idOrigen, codigoDispositivo = null, fechaJornada = null }) {
   const { rows } = await pool.query(
     `WITH nuevo AS (
        INSERT INTO marcajes (id_empleado, id_tipo_marcaje, id_origen_marcaje, fecha_jornada, codigo_dispositivo)
-       VALUES ($1, $2, $3, ${HOY_BOLIVIA}, $4)
+       VALUES ($1, $2, $3, COALESCE($5::date, ${HOY_BOLIVIA}), $4)
        RETURNING *
      ) ${conCatalogos("nuevo")}`,
-    [idEmpleado, idTipo, idOrigen, codigoDispositivo]
+    [idEmpleado, idTipo, idOrigen, codigoDispositivo, fechaJornada]
   );
   return rows[0];
 }
 
-async function listarDeHoy(idEmpleado) {
+// Marcajes de la jornada de hoy y de la anterior.
+async function listarRecientes(idEmpleado, hoy) {
   const { rows } = await pool.query(
     `${conCatalogos("marcajes")}
-     WHERE m.id_empleado = $1 AND m.fecha_jornada = ${HOY_BOLIVIA}
+     WHERE m.id_empleado = $1 AND m.fecha_jornada >= $2::date - 1
      ORDER BY m.fecha_hora_marcaje`,
-    [idEmpleado]
+    [idEmpleado, hoy]
   );
   return rows;
 }
 
-async function fechaJornadaActual() {
-  const { rows } = await pool.query(`SELECT ${HOY_BOLIVIA} AS fecha`);
-  return rows[0].fecha;
+async function momentoActual() {
+  const { rows } = await pool.query(`SELECT CURRENT_TIMESTAMP AS ahora, ${HOY_BOLIVIA} AS hoy`);
+  return rows[0];
 }
 
-module.exports = { registrar, listarDeHoy, fechaJornadaActual };
+module.exports = { registrar, listarRecientes, momentoActual };

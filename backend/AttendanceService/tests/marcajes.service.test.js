@@ -9,6 +9,7 @@ const ANA = "4192f252-acf0-4522-a109-e051cad9a50b";
 const entradaDeAna = {
   id_empleado: ANA,
   tipo_codigo: "ENTRADA",
+  fecha_jornada: "2026-09-24",
   fecha_hora_marcaje: new Date("2026-09-24T12:03:00Z"),
 };
 
@@ -17,8 +18,8 @@ let registrar;
 beforeEach(() => {
   mock.restoreAll();
   mock.method(empleados, "obtener", async (id) => (id === ANA ? { nombres: "Ana", apellidos: "Quispe", activo: true } : null));
-  mock.method(modelo, "listarDeHoy", async () => []);
-  mock.method(modelo, "fechaJornadaActual", async () => "2026-09-24");
+  mock.method(modelo, "listarRecientes", async () => []);
+  mock.method(modelo, "momentoActual", async () => ({ ahora: new Date("2026-09-24T21:10:00Z"), hoy: "2026-09-24" }));
   registrar = mock.method(modelo, "registrar", async (datos) => ({ ...entradaDeAna, ...datos }));
 });
 
@@ -45,7 +46,7 @@ test("no guarda la entrada de un empleado inactivo", async () => {
 });
 
 test("rechaza la segunda entrada de la jornada sin guardarla", async () => {
-  modelo.listarDeHoy.mock.mockImplementation(async () => [entradaDeAna]);
+  modelo.listarRecientes.mock.mockImplementation(async () => [entradaDeAna]);
   await assert.rejects(servicio.registrarEntrada(ANA), {
     estado: 409,
     message: "Ya registró su entrada de hoy a las 08:03.",
@@ -55,7 +56,7 @@ test("rechaza la segunda entrada de la jornada sin guardarla", async () => {
 
 test("dos marcajes simultáneos: el que choca con la restricción única recibe 409", async () => {
   let consultas = 0;
-  modelo.listarDeHoy.mock.mockImplementation(async () => (consultas++ === 0 ? [] : [entradaDeAna]));
+  modelo.listarRecientes.mock.mockImplementation(async () => (consultas++ === 0 ? [] : [entradaDeAna]));
   registrar.mock.mockImplementation(async () => {
     throw Object.assign(new Error("duplicate key"), { code: "23505" });
   });
@@ -73,7 +74,7 @@ test("otros errores de base de datos no se ocultan como duplicado", async () => 
 });
 
 test("la consulta de jornada devuelve la hora de ingreso registrada", async () => {
-  modelo.listarDeHoy.mock.mockImplementation(async () => [entradaDeAna]);
+  modelo.listarRecientes.mock.mockImplementation(async () => [entradaDeAna]);
   const jornada = await servicio.consultarJornada(ANA);
   assert.equal(jornada.fecha_jornada, "2026-09-24");
   assert.deepEqual(jornada.empleado, { id_empleado: ANA, nombres: "Ana", apellidos: "Quispe" });
