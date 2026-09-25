@@ -1,0 +1,162 @@
+.turnos {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.avisos:empty {
+  margin-top: -24px;
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+
+.formulario h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.campos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.resumen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--radio);
+  background: var(--acento-suave);
+}
+
+.resumen dt {
+  font-size: 13px;
+  color: var(--texto-suave);
+}
+
+.resumen dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.formulario-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.tabla-contenedor {
+  position: relative;
+  overflow-x: auto;
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tabla th,
+.tabla td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--borde);
+  white-space: nowrap;
+}
+
+.tabla th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--texto-suave);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tabla tbody tr {
+  transition: background-color var(--transicion);
+}
+
+.tabla tbody tr:hover {
+  background: var(--fondo);
+}
+
+.tabla tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tabla .fila-editando {
+  background: var(--acento-suave);
+}
+
+.tabla .fila-editando td:first-child {
+  box-shadow: inset 3px 0 0 var(--acento);
+}
+
+.tabla-nombre {
+  font-weight: 500;
+}
+
+.tabla-numero {
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla-acciones {
+  text-align: right;
+}
+
+.acciones-fila {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.insignia {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--borde);
+  border-radius: 999px;
+  background: var(--fondo);
+  color: var(--texto-suave);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.insignia-activo {
+  border-color: transparent;
+  background: var(--exito-suave);
+  color: var(--exito);
+}
+
+.estado-vacio {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 32px 24px;
+  text-align: center;
+  color: var(--texto-suave);
+}
+
+.estado-vacio-titulo {
+  font-weight: 600;
+  color: var(--texto);
+}
+
+@media (max-width: 640px) {
+  .campos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .formulario {
+    padding: 16px;
+  }
+
+  .formulario-acciones .boton {
+    flex: 1;
+  }
+}
