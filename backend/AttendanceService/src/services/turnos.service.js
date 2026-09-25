@@ -2,8 +2,8 @@ const modelo = require("../models/turnos.model");
 const { ErrorApp } = require("../utils/errores");
 const { validarTurno } = require("../utils/validarTurno");
 const { minutosDuracion, minutosEfectivos, evaluarPuntualidad } = require("../utils/jornada");
+const { UUID_RE } = require("../utils/formatos");
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 const FECHA_HORA_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
 

@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const pool = require("./src/config/db");
 const turnosRoutes = require("./src/routes/turnos.routes");
+const marcajesRoutes = require("./src/routes/marcajes.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 
 const app = express();
@@ -33,16 +34,8 @@ app.get("/health", async (req, res) => {
   }
 });
 
-app.post("/check-in", (req, res) => {
-  const { employeeId } = req.body;
-  res.json({
-    message: "Registro de entrada exitoso",
-    employeeId: employeeId || 1,
-    time: new Date(),
-  });
-});
-
 app.use(turnosRoutes);
+app.use(marcajesRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {

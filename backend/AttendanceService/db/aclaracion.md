@@ -19,3 +19,9 @@
 - `fecha_jornada` es la fecha en hora de Bolivia al momento del marcaje.
 - Un empleado tiene como máximo un marcaje por tipo (entrada o salida) en cada jornada (`uq_marcaje_empleado_tipo_jornada`).
 - El origen indica cómo se tomó la marca: portal o biométrico. `codigo_dispositivo` solo se llena en marcajes biométricos.
+
+## Verificación del empleado
+
+- Antes de marcar se consulta `GET /empleados/:id` en EmployeeService (`EMPLOYEE_SERVICE_URL`). Se espera `{ id_empleado, nombres, apellidos, activo }` y 404 si el empleado no existe.
+- Solo se permite marcar si `activo` es `true`. Si EmployeeService no responde, el marcaje se rechaza (503) y no se guarda nada.
+- Con `EMPLEADOS_SIMULADOS=true` se usa la lista fija de `src/config/empleadosSimulados.js`, mientras EmployeeService no exponga ese endpoint.
