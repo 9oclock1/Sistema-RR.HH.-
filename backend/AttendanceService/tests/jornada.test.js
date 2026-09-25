@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { minutosDuracion, minutosEfectivos, evaluarPuntualidad } = require("../src/utils/jornada");
+const { minutosDuracion, minutosEfectivos, evaluarPuntualidad, minutosTrabajados } = require("../src/utils/jornada");
 
 const diurno = { hora_inicio: "08:00:00", hora_fin: "16:00:00", minutos_refrigerio: 60, minutos_tolerancia: 5 };
 const nocturno = { hora_inicio: "22:00:00", hora_fin: "06:00:00", minutos_refrigerio: 30, minutos_tolerancia: 10 };
@@ -59,4 +59,19 @@ test("turno nocturno: la jornada es la del día de inicio", () => {
   const tarde = marcar(nocturno, "2026-09-23", "2026-09-24T00:05:00-04:00");
   assert.equal(tarde.puntual, false);
   assert.equal(tarde.minutos_atraso, 125);
+});
+
+const marca = (fechaHora) => ({ fecha_hora_marcaje: new Date(fechaHora) });
+
+test("horas trabajadas en minutos completos, como las horas mostradas", () => {
+  assert.equal(minutosTrabajados(marca("2026-09-24T08:03:40-04:00"), marca("2026-09-24T17:10:10-04:00")), 547);
+});
+
+test("horas trabajadas de un turno que cruza la medianoche", () => {
+  assert.equal(minutosTrabajados(marca("2026-09-23T22:00:00-04:00"), marca("2026-09-24T06:00:59-04:00")), 480);
+});
+
+test("sin entrada o sin salida no hay horas trabajadas", () => {
+  assert.equal(minutosTrabajados(null, marca("2026-09-24T17:10:00-04:00")), null);
+  assert.equal(minutosTrabajados(marca("2026-09-24T08:00:00-04:00"), null), null);
 });
