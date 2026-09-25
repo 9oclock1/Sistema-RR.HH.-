@@ -148,3 +148,271 @@ select {
     padding: 24px 16px;
   }
 }
+
+.pagina-encabezado {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pagina-encabezado h1 {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.subtitulo,
+.nota {
+  color: var(--texto-suave);
+}
+
+.tarjeta {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--borde-control);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  cursor: pointer;
+  transition: background-color var(--transicion), border-color var(--transicion), color var(--transicion),
+    filter var(--transicion);
+}
+
+.boton:hover:not(:disabled) {
+  background: var(--fondo);
+}
+
+.boton:active:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+.boton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.boton-primario {
+  background: var(--acento);
+  border-color: var(--acento);
+  color: var(--acento-texto);
+  font-weight: 500;
+}
+
+.boton-primario:hover:not(:disabled) {
+  background: var(--acento);
+  filter: brightness(1.08);
+}
+
+.boton-peligro-solido {
+  background: var(--peligro);
+  border-color: var(--peligro);
+  color: var(--peligro-texto);
+  font-weight: 500;
+}
+
+.boton-peligro-solido:hover:not(:disabled) {
+  background: var(--peligro);
+  filter: brightness(1.08);
+}
+
+.boton-texto {
+  padding: 0 8px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--acento);
+}
+
+.boton-texto:hover:not(:disabled) {
+  background: var(--acento-suave);
+}
+
+.boton-peligro {
+  color: var(--peligro);
+}
+
+.boton-peligro:hover:not(:disabled) {
+  background: var(--peligro-suave);
+}
+
+.boton-compacto {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.alerta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid currentColor;
+  border-radius: var(--radio);
+}
+
+.alerta > :first-child {
+  flex: 1;
+}
+
+.alerta-titulo {
+  font-weight: 600;
+}
+
+.alerta ul {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+
+.alerta a {
+  color: inherit;
+}
+
+.alerta-error {
+  color: var(--peligro);
+  background: var(--peligro-suave);
+}
+
+.alerta-exito {
+  color: var(--exito);
+  background: var(--exito-suave);
+}
+
+.alerta-info {
+  color: var(--acento);
+  background: var(--acento-suave);
+}
+
+.alerta-cerrar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radio);
+  background: none;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--transicion);
+}
+
+.alerta-cerrar:hover {
+  background: var(--superficie);
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.campo label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.campo input,
+.campo select {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--borde-control);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  transition: border-color var(--transicion);
+}
+
+.campo [aria-invalid="true"] {
+  border-color: var(--peligro);
+  box-shadow: inset 0 0 0 1px var(--peligro);
+}
+
+.campo-ayuda {
+  font-size: 13px;
+  color: var(--texto-suave);
+}
+
+.campo-error {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--peligro);
+}
+
+.campo-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  cursor: pointer;
+}
+
+.campo-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--acento);
+}
+
+.dialogo {
+  width: min(440px, calc(100vw - 32px));
+  padding: 24px;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  background: var(--superficie);
+  color: var(--texto);
+  box-shadow: var(--sombra);
+}
+
+.dialogo::backdrop {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.dialogo h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.dialogo-cuerpo {
+  margin: 8px 0 24px;
+  color: var(--texto-suave);
+}
+
+.dialogo-cuerpo strong {
+  color: var(--texto);
+}
+
+.dialogo-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (pointer: coarse) {
+  .boton,
+  .boton-compacto,
+  .campo input,
+  .campo select,
+  .campo-check {
+    min-height: 44px;
+  }
+
+  .alerta-cerrar {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (max-width: 640px) {
+  .dialogo-acciones .boton {
+    flex: 1;
+  }
+}

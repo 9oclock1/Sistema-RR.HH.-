@@ -8,12 +8,12 @@ export class ErrorApi extends Error {
   }
 }
 
-export async function solicitar(ruta, { metodo = "GET", cuerpo } = {}) {
+export async function solicitar(ruta, { metodo = "GET", cuerpo, cabeceras } = {}) {
   let respuesta;
   try {
     respuesta = await fetch(`${BASE_URL}${ruta}`, {
       method: metodo,
-      headers: cuerpo ? { "Content-Type": "application/json" } : undefined,
+      headers: { ...(cuerpo && { "Content-Type": "application/json" }), ...cabeceras },
       body: cuerpo ? JSON.stringify(cuerpo) : undefined,
     });
   } catch {

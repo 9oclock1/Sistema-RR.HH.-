@@ -1,0 +1,110 @@
+.marcaje {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 560px;
+}
+
+.marcaje-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+}
+
+.marcaje-tarjeta h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.marcaje-empleado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.marcaje-etiqueta {
+  font-size: 14px;
+  color: var(--texto-suave);
+}
+
+.reloj {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px 0;
+  border-block: 1px solid var(--borde);
+}
+
+.reloj-hora {
+  font-size: 48px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.reloj-fecha {
+  color: var(--texto-suave);
+}
+
+.marcaje-avisos:empty {
+  margin-top: -20px;
+}
+
+.marcaje-accion {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.boton-grande {
+  width: 100%;
+  min-height: 52px;
+  font-size: 18px;
+}
+
+.confirmacion {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--exito);
+  border-radius: var(--radio);
+  background: var(--exito-suave);
+}
+
+.confirmacion svg {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  color: var(--exito);
+}
+
+.confirmacion-titulo {
+  font-weight: 600;
+  color: var(--exito);
+}
+
+.confirmacion-hora {
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.confirmacion-detalle {
+  color: var(--texto-suave);
+}
+
+@media (max-width: 640px) {
+  .marcaje-tarjeta {
+    padding: 16px;
+  }
+
+  .reloj-hora {
+    font-size: 40px;
+  }
+}

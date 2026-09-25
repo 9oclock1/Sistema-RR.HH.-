@@ -6,6 +6,7 @@ export default function MainLayout() {
       <header className="app-encabezado">
         <span className="app-titulo">Sistema RR.HH.</span>
         <nav className="app-nav">
+          <NavLink to="/asistencia/marcaje">Marcaje</NavLink>
           <NavLink to="/asistencia/turnos">Turnos</NavLink>
         </nav>
       </header>
