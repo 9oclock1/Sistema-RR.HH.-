@@ -8,4 +8,8 @@ async function registrarEntrada(req, res) {
   res.status(201).json(await servicio.registrarEntrada(req.idEmpleado));
 }
 
-module.exports = { consultarJornada, registrarEntrada };
+async function registrarEntradaBiometrica(req, res) {
+  res.status(201).json(await servicio.registrarEntradaBiometrica(req.body, req.codigoDispositivo));
+}
+
+module.exports = { consultarJornada, registrarEntrada, registrarEntradaBiometrica };
