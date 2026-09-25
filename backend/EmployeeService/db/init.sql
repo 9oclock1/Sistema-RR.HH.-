@@ -1,0 +1,241 @@
+-- Created by Redgate Data Modeler (https://datamodeler.redgate-platform.com)
+-- Last modification date: 2026-09-25 14:25:14.162
+-- tables
+-- Table: CAPACITACIONES_CERTIFICACION
+CREATE TABLE CAPACITACIONES_CERTIFICACION (
+    id_capacitacion UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    id_curso UUID NOT NULL,
+    institucion_emisora varchar(120) NOT NULL,
+    fecha_emision date NOT NULL,
+    fecha_vencimiento date NULL,
+    certificado_adjunto_url varchar(255) NULL,
+    registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT CAPACITACIONES_CERTIFICACION_pk PRIMARY KEY (id_capacitacion)
+);
+-- Table: CARGOS
+CREATE TABLE CARGOS (
+    id_cargo UUID NOT NULL,
+    id_departamento UUID NOT NULL,
+    id_cargo_jefe_directo UUID NULL,
+    codigo varchar(20) NOT NULL,
+    nombre varchar(100) NOT NULL,
+    nivel_jerarquico SMALLINT NOT NULL,
+    salario_base_referencial numeric(12, 2) NOT NULL,
+    funciones_clave text NOT NULL,
+    requisitos_minimos text NOT NULL,
+    esta_activo boolean NOT NULL DEFAULT TRUE,
+    CONSTRAINT CARGOS_pk PRIMARY KEY (id_cargo)
+);
+-- Table: CONTRATOS
+CREATE TABLE CONTRATOS (
+    id_contrato UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    id_tipo_contrato SMALLINT NOT NULL,
+    id_tipo_jornada SMALLINT NOT NULL,
+    numero_contrato varchar(40) NOT NULL,
+    periodo_vigencia daterange NOT NULL,
+    haber_mensual_pactado numeric(12, 2) NOT NULL,
+    documento_adjunto_url varchar(255) NULL,
+    es_adenda boolean NOT NULL DEFAULT FALSE,
+    motivo_adenda text NULL,
+    registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT CONTRATOS_pk PRIMARY KEY (id_contrato)
+);
+-- Table: CONVOCATORIAS_ASCENSO
+CREATE TABLE CONVOCATORIAS_ASCENSO (
+    id_convocatoria UUID NOT NULL,
+    id_cargo UUID NOT NULL,
+    id_sucursal UUID NOT NULL,
+    titulo varchar(120) NOT NULL,
+    descripcion_requisitos text NOT NULL,
+    meses_antiguedad_minima int NOT NULL DEFAULT 6,
+    nota_minima_desempeno numeric(4, 2) NOT NULL,
+    fecha_inicio_postulacion date NOT NULL,
+    fecha_cierre_postulacion date NOT NULL,
+    esta_abierta boolean NOT NULL DEFAULT true,
+    CONSTRAINT CONVOCATORIAS_ASCENSO_pk PRIMARY KEY (id_convocatoria)
+);
+-- Table: CURSOS_CAPACITACION
+CREATE TABLE CURSOS_CAPACITACION (
+    id_curso UUID NOT NULL,
+    codigo varchar(30) NOT NULL DEFAULT true,
+    nombre varchar(150) NOT NULL,
+    descripcion text NULL,
+    horas_academicas int NOT NULL,
+    esta_activo boolean NOT NULL DEFAULT TRUE,
+    CONSTRAINT CURSOS_CAPACITACION_pk PRIMARY KEY (id_curso)
+);
+-- Table: DEPARTAMENTOS
+CREATE TABLE DEPARTAMENTOS (
+    id_departamento UUID NOT NULL,
+    id_departamento_padre UUID NULL,
+    codigo varchar(20) NOT NULL,
+    nombre varchar(100) NOT NULL,
+    descripcion varchar(255) NULL,
+    esta_activo boolean NOT NULL DEFAULT TRUE,
+    CONSTRAINT DEPARTAMENTOS_pk PRIMARY KEY (id_departamento)
+);
+-- Table: EMPLEADOS
+CREATE TABLE EMPLEADOS (
+    id_empleado UUID NOT NULL,
+    numero_documento varchar(20) NOT NULL,
+    complemento_documento varchar(5) NULL,
+    nombres varchar(70) NOT NULL,
+    primer_apellido varchar(50) NOT NULL,
+    segundo_apellido varchar(50) NULL,
+    fecha_nacimiento date NOT NULL,
+    genero varchar(20) NOT NULL,
+    telefono_celular varchar(20) NOT NULL,
+    correo_personal varchar(120) NOT NULL,
+    direccion_domicilio varchar(255) NOT NULL,
+    fecha_ingreso DATE NOT NULL,
+    id_cargo_actual UUID NOT NULL,
+    id_sucursal_actual UUID NOT NULL,
+    id_estado_empleado SMALLINT NOT NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT EMPLEADOS_pk PRIMARY KEY (id_empleado)
+);
+-- Table: ESTADOS_EMPLEADO
+CREATE TABLE ESTADOS_EMPLEADO (
+    id_estado_empleado SMALLINT NOT NULL,
+    codigo varchar(20) NOT NULL,
+    nombre varchar(50) NOT NULL,
+    permite_acceso boolean NOT NULL,
+    CONSTRAINT ESTADOS_EMPLEADO_pk PRIMARY KEY (id_estado_empleado)
+);
+-- Table: MEMORANDUMS
+CREATE TABLE MEMORANDUMS (
+    id_memorandum UUID NOT NULL,
+    id_empleado_receptor UUID NOT NULL,
+    id_tipo_memo SMALLINT NOT NULL,
+    id_empleado_emisor UUID NOT NULL,
+    codigo_cite varchar(40) NOT NULL,
+    asunto varchar(150) NOT NULL,
+    contenido_descripcion text NOT NULL,
+    fecha_emision date NOT NULL,
+    fue_notificado boolean NOT NULL DEFAULT false,
+    fecha_hora_notificacion TIMESTAMPTZ NULL,
+    acuse_recibo_firmado boolean NOT NULL DEFAULT false,
+    fecha_hora_acuse TIMESTAMPTZ NULL,
+    CONSTRAINT MEMORANDUMS_pk PRIMARY KEY (id_memorandum)
+);
+-- Table: POSTULACIONES_ASCENSO
+CREATE TABLE POSTULACIONES_ASCENSO (
+    id_postulacion UUID NOT NULL,
+    id_convocatoria UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    fecha_postulacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    cumple_antiguedad boolean NOT NULL,
+    cumple_nota_evaluacion boolean NOT NULL,
+    estado_postulacion varchar(30) NOT NULL,
+    fecha_formalizacion_ascenso date NULL,
+    observaciones_resolucion text NULL,
+    CONSTRAINT POSTULACIONES_ASCENSO_pk PRIMARY KEY (id_postulacion) CONSTRAINT uq_postulacion_convocatoria_empleado UNIQUE (id_convocatoria, id_empleado)
+);
+-- Table: REQUISITOS_CAPACITACION_CARGO
+CREATE TABLE REQUISITOS_CAPACITACION_CARGO (
+    id_requisito_cargo UUID NOT NULL,
+    id_cargo UUID NOT NULL,
+    id_curso UUID NOT NULL,
+    es_obligatorio boolean NOT NULL DEFAULT TRUE,
+    meses_validez_requerida int NULL,
+    CONSTRAINT REQUISITOS_CAPACITACION_CARGO_pk PRIMARY KEY (id_requisito_cargo) CONSTRAINT uq_requisito_cargo_curso UNIQUE (id_cargo, id_curso)
+);
+-- Table: SUCURSALES
+CREATE TABLE SUCURSALES (
+    id_sucursal UUID NOT NULL,
+    codigo_sucursal varchar(20) NOT NULL,
+    nombre varchar(100) NOT NULL,
+    direccion varchar(255) NOT NULL,
+    ciudad varchar(50) NOT NULL DEFAULT 'La Paz',
+    telefono_contacto varchar(20) NULL,
+    esta_activa boolean NOT NULL DEFAULT TRUE,
+    CONSTRAINT SUCURSALES_pk PRIMARY KEY (id_sucursal)
+);
+-- Table: TIPOS_CONTRATO
+CREATE TABLE TIPOS_CONTRATO (
+    id_tipo_contrato SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT TIPOS_CONTRATO_pk PRIMARY KEY (id_tipo_contrato)
+);
+-- Table: TIPOS_JORNADA
+CREATE TABLE TIPOS_JORNADA (
+    id_tipo_jornada SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    horas_semanales int NOT NULL,
+    CONSTRAINT TIPOS_JORNADA_pk PRIMARY KEY (id_tipo_jornada)
+);
+-- Table: TIPOS_MEMORANDUM
+CREATE TABLE TIPOS_MEMORANDUM (
+    id_tipo_memo SMALLINT NOT NULL,
+    clasificacion varchar(30) NOT NULL,
+    nombre varchar(80) NOT NULL,
+    descripcion varchar(255) NOT NULL,
+    CONSTRAINT TIPOS_MEMORANDUM_pk PRIMARY KEY (id_tipo_memo)
+);
+-- foreign keys
+-- Reference: CAPACITACIONES_CERTIFICACION_CURSOS_CAPACITACION (table: CAPACITACIONES_CERTIFICACION)
+ALTER TABLE CAPACITACIONES_CERTIFICACION
+ADD CONSTRAINT CAPACITACIONES_CERTIFICACION_CURSOS_CAPACITACION FOREIGN KEY (id_curso) REFERENCES CURSOS_CAPACITACION (id_curso) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CAPACITACIONES_CERTIFICACION_EMPLEADOS (table: CAPACITACIONES_CERTIFICACION)
+ALTER TABLE CAPACITACIONES_CERTIFICACION
+ADD CONSTRAINT CAPACITACIONES_CERTIFICACION_EMPLEADOS FOREIGN KEY (id_empleado) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CARGOS_CARGOS (table: CARGOS)
+ALTER TABLE CARGOS
+ADD CONSTRAINT CARGOS_CARGOS FOREIGN KEY (id_cargo_jefe_directo) REFERENCES CARGOS (id_cargo) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CARGOS_DEPARTAMENTOS (table: CARGOS)
+ALTER TABLE CARGOS
+ADD CONSTRAINT CARGOS_DEPARTAMENTOS FOREIGN KEY (id_departamento) REFERENCES DEPARTAMENTOS (id_departamento) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONTRATOS_EMPLEADOS (table: CONTRATOS)
+ALTER TABLE CONTRATOS
+ADD CONSTRAINT CONTRATOS_EMPLEADOS FOREIGN KEY (id_empleado) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONTRATOS_TIPOS_CONTRATO (table: CONTRATOS)
+ALTER TABLE CONTRATOS
+ADD CONSTRAINT CONTRATOS_TIPOS_CONTRATO FOREIGN KEY (id_tipo_contrato) REFERENCES TIPOS_CONTRATO (id_tipo_contrato) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONTRATOS_TIPOS_JORNADA (table: CONTRATOS)
+ALTER TABLE CONTRATOS
+ADD CONSTRAINT CONTRATOS_TIPOS_JORNADA FOREIGN KEY (id_tipo_jornada) REFERENCES TIPOS_JORNADA (id_tipo_jornada) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONVOCATORIAS_ASCENSO_CARGOS (table: CONVOCATORIAS_ASCENSO)
+ALTER TABLE CONVOCATORIAS_ASCENSO
+ADD CONSTRAINT CONVOCATORIAS_ASCENSO_CARGOS FOREIGN KEY (id_cargo) REFERENCES CARGOS (id_cargo) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONVOCATORIAS_ASCENSO_SUCURSALES (table: CONVOCATORIAS_ASCENSO)
+ALTER TABLE CONVOCATORIAS_ASCENSO
+ADD CONSTRAINT CONVOCATORIAS_ASCENSO_SUCURSALES FOREIGN KEY (id_sucursal) REFERENCES SUCURSALES (id_sucursal) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: DEPARTAMENTOS_DEPARTAMENTOS (table: DEPARTAMENTOS)
+ALTER TABLE DEPARTAMENTOS
+ADD CONSTRAINT DEPARTAMENTOS_DEPARTAMENTOS FOREIGN KEY (id_departamento_padre) REFERENCES DEPARTAMENTOS (id_departamento) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: EMPLEADOS_CARGOS (table: EMPLEADOS)
+ALTER TABLE EMPLEADOS
+ADD CONSTRAINT EMPLEADOS_CARGOS FOREIGN KEY (id_cargo_actual) REFERENCES CARGOS (id_cargo) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: EMPLEADOS_ESTADOS_EMPLEADO (table: EMPLEADOS)
+ALTER TABLE EMPLEADOS
+ADD CONSTRAINT EMPLEADOS_ESTADOS_EMPLEADO FOREIGN KEY (id_estado_empleado) REFERENCES ESTADOS_EMPLEADO (id_estado_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: EMPLEADOS_SUCURSALES (table: EMPLEADOS)
+ALTER TABLE EMPLEADOS
+ADD CONSTRAINT EMPLEADOS_SUCURSALES FOREIGN KEY (id_sucursal_actual) REFERENCES SUCURSALES (id_sucursal) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: MEMORANDUMS_EMPLEADOS (table: MEMORANDUMS)
+ALTER TABLE MEMORANDUMS
+ADD CONSTRAINT MEMORANDUMS_EMPLEADOS FOREIGN KEY (id_empleado_receptor) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: MEMORANDUMS_EMPLEADOS_EMISOR (table: MEMORANDUMS)
+ALTER TABLE MEMORANDUMS
+ADD CONSTRAINT MEMORANDUMS_EMPLEADOS_EMISOR FOREIGN KEY (id_empleado_emisor) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: MEMORANDUMS_TIPOS_MEMORANDUM (table: MEMORANDUMS)
+ALTER TABLE MEMORANDUMS
+ADD CONSTRAINT MEMORANDUMS_TIPOS_MEMORANDUM FOREIGN KEY (id_tipo_memo) REFERENCES TIPOS_MEMORANDUM (id_tipo_memo) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: POSTULACIONES_ASCENSO_CONVOCATORIAS_ASCENSO (table: POSTULACIONES_ASCENSO)
+ALTER TABLE POSTULACIONES_ASCENSO
+ADD CONSTRAINT POSTULACIONES_ASCENSO_CONVOCATORIAS_ASCENSO FOREIGN KEY (id_convocatoria) REFERENCES CONVOCATORIAS_ASCENSO (id_convocatoria) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: POSTULACIONES_ASCENSO_EMPLEADOS (table: POSTULACIONES_ASCENSO)
+ALTER TABLE POSTULACIONES_ASCENSO
+ADD CONSTRAINT POSTULACIONES_ASCENSO_EMPLEADOS FOREIGN KEY (id_empleado) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: REQUISITOS_CAPACITACION_CARGO_CARGOS (table: REQUISITOS_CAPACITACION_CARGO)
+ALTER TABLE REQUISITOS_CAPACITACION_CARGO
+ADD CONSTRAINT REQUISITOS_CAPACITACION_CARGO_CARGOS FOREIGN KEY (id_cargo) REFERENCES CARGOS (id_cargo) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: REQUISITOS_CAPACITACION_CARGO_CURSOS_CAPACITACION (table: REQUISITOS_CAPACITACION_CARGO)
+ALTER TABLE REQUISITOS_CAPACITACION_CARGO
+ADD CONSTRAINT REQUISITOS_CAPACITACION_CARGO_CURSOS_CAPACITACION FOREIGN KEY (id_curso) REFERENCES CURSOS_CAPACITACION (id_curso) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- End of file.
