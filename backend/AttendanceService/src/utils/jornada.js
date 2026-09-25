@@ -27,4 +27,6 @@ function evaluarPuntualidad(turno, fechaJornada, marcaje) {
   };
 }
 
-module.exports = { minutosDuracion, minutosEfectivos, evaluarPuntualidad };
+const horaBolivia = (fecha) => new Date(fecha.getTime() - DESFASE_UTC_MS).toISOString().slice(11, 16);
+
+module.exports = { minutosDuracion, minutosEfectivos, evaluarPuntualidad, horaBolivia };

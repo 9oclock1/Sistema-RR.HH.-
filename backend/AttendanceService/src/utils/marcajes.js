@@ -1,7 +1,10 @@
 const { ErrorApp } = require("./errores");
+const { horaBolivia } = require("./jornada");
 
 const TIPO_MARCAJE = { ENTRADA: 1, SALIDA: 2 };
 const ORIGEN_MARCAJE = { PORTAL: 1, BIOMETRICO: 2 };
+
+const esEntrada = (marcaje) => marcaje.tipo_codigo === "ENTRADA";
 
 function verificarEmpleadoActivo(empleado) {
   if (!empleado) {
@@ -13,4 +16,9 @@ function verificarEmpleadoActivo(empleado) {
   return empleado;
 }
 
-module.exports = { TIPO_MARCAJE, ORIGEN_MARCAJE, verificarEmpleadoActivo };
+function entradaDuplicada(marcaje) {
+  const hora = marcaje ? ` a las ${horaBolivia(marcaje.fecha_hora_marcaje)}` : "";
+  return new ErrorApp(409, `Ya registró su entrada de hoy${hora}.`);
+}
+
+module.exports = { TIPO_MARCAJE, ORIGEN_MARCAJE, esEntrada, verificarEmpleadoActivo, entradaDuplicada };
