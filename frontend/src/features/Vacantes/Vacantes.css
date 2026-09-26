@@ -114,3 +114,31 @@
   font-family: var(--font-mono);
   font-size: 12px;
 }
+
+/* ---------- Tabla de vacantes: estados ---------- */
+.vacantes-badge--cerrada {
+  color: var(--text-muted);
+}
+
+.vacantes-falta {
+  max-width: 180px;
+  margin-top: 4px;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.vacantes-listo {
+  color: var(--success);
+}
+
+.vacantes-requisitos {
+  margin-bottom: 6px;
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Publicar/Cerrar son botones con texto: la columna fija necesita más ancho que solo iconos. */
+.vacantes .ui-table__actions {
+  min-width: 132px;
+}
