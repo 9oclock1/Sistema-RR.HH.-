@@ -1,10 +1,9 @@
 const asignacionesModel = require('../models/asignacionesModel');
 const empleadosModel = require('../models/empleadosModel');
 const sucursalesModel = require('../models/sucursalesModel');
+const empleadosService = require('./empleadosService');
 const HttpError = require('../utils/HttpError');
 const { withTransaction } = require('../utils/transaction');
-
-const empleadoNoEncontrado = () => new HttpError(404, 'El empleado solicitado no existe.');
 
 const validarReglas = async (client, asignacion, empleado, vigente, hoy) => {
   const errores = [];
@@ -50,7 +49,7 @@ const validarReglas = async (client, asignacion, empleado, vigente, hoy) => {
 const crearAsignacion = (datos) =>
   withTransaction(async (client) => {
     const empleado = await empleadosModel.bloquearPorId(client, datos.id_empleado);
-    if (!empleado) throw empleadoNoEncontrado();
+    if (!empleado) throw empleadosService.noEncontrado();
 
     const hoy = await asignacionesModel.fechaActual(client);
     const asignacion = { ...datos, fecha_inicio: datos.fecha_inicio ?? hoy };
@@ -62,10 +61,7 @@ const crearAsignacion = (datos) =>
     await asignacionesModel.insertarVigente(client, asignacion);
     await empleadosModel.actualizarAsignacionActual(client, asignacion.id_empleado, asignacion);
 
-    return {
-      id_empleado: asignacion.id_empleado,
-      historial: await asignacionesModel.listarPorEmpleado(client, asignacion.id_empleado),
-    };
+    return empleadosService.construirFicha(client, asignacion.id_empleado);
   });
 
 module.exports = { crearAsignacion };

@@ -1,3 +1,4 @@
+import AsignacionesView from './features/Asignaciones/AsignacionesView';
 import CargosList from './features/Cargos/CargosList';
 import OrganizacionView from './features/organizacion/OrganizacionView';
 import VacantesView from './features/Vacantes/VacantesView';
@@ -8,6 +9,7 @@ function App() {
     <main className="app">
       <OrganizacionView />
       <CargosList />
+      <AsignacionesView />
       <VacantesView />
     </main>
   );

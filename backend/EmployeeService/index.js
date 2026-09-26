@@ -3,6 +3,7 @@ const cors = require("cors");
 const pool = require("./db/pool");
 const departamentosRoutes = require("./src/routes/departamentos.routes");
 const cargosRoutes = require("./src/routes/cargos");
+const empleadosRoutes = require("./src/routes/empleados");
 const asignacionesRoutes = require("./src/routes/asignaciones");
 const errorHandler = require("./src/middlewares/errorHandler");
 
@@ -35,6 +36,7 @@ app.get("/health", async (req, res) => {
 
 app.use("/departamentos", departamentosRoutes);
 app.use("/cargos", cargosRoutes);
+app.use("/empleados", empleadosRoutes);
 app.use("/asignaciones", asignacionesRoutes);
 
 app.use(errorHandler);

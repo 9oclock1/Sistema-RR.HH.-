@@ -1,0 +1,160 @@
+/* ---------- Ficha del empleado ---------- */
+.asig-ficha .ui-card__header .ui-filter .ui-select {
+  max-width: 260px;
+}
+
+.asig-vacio {
+  padding: 32px 0 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.asig-identidad {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.asig-avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--accent-ring);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.asig-identidad__texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.asig-identidad__nombre {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asig-badge--inactivo {
+  color: var(--text-muted);
+}
+
+.asig-bloque {
+  padding-top: 18px;
+}
+
+.asig-bloque__titulo {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.asig-bloque__nota {
+  color: var(--text-subtle);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.asig-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.asig-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.asig-tile__label {
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+
+.asig-tile__valor {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asig-tile__nota {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.asig-tile__alerta {
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.asig-datos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 16px;
+  margin: 0;
+}
+
+.asig-dato {
+  min-width: 0;
+}
+
+.asig-dato dt {
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+
+.asig-dato dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+/* El historial cierra la tarjeta: su tabla va a ras de los bordes, como las demás tablas. */
+.asig-bloque--ultimo .ui-table__scroll {
+  margin-top: 4px;
+}
+
+.asig-historial {
+  min-width: 480px;
+}
+
+.asig-esqueleto {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .asig-tiles,
+  .asig-datos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
