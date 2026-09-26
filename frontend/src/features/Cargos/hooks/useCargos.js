@@ -23,7 +23,6 @@ export function useCargos(areaId) {
 
   const recargar = useCallback(() => setVersion((v) => v + 1), []);
 
-  // La tabla muestra el nombre del área: si se renombra o da de baja, se vuelve a pedir la lista.
   useEffect(() => departamentosApi.suscribirCambios(recargar), [recargar]);
 
   return {

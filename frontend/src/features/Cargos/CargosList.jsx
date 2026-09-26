@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { createCargo, updateCargo } from '../../api/cargosApi';
+import { useDepartamentosActivos } from '../../hooks/useDepartamentosActivos';
 import CargoForm from './components/CargoForm';
 import CargosTable from './components/CargosTable';
 import { useCargos } from './hooks/useCargos';
-import { useCatalogosCargo } from './hooks/useCatalogosCargo';
 import './Cargos.css';
 
 const DURACION_AVISO_MS = 4000;
@@ -11,7 +11,7 @@ const DURACION_AVISO_MS = 4000;
 export default function CargosList() {
   const [areaFiltro, setAreaFiltro] = useState('');
   const { cargos, cargando, error, recargar } = useCargos(areaFiltro);
-  const catalogos = useCatalogosCargo();
+  const areas = useDepartamentosActivos();
 
   const [cargoEnEdicion, setCargoEnEdicion] = useState(null);
   const [formKey, setFormKey] = useState(0);
@@ -46,24 +46,22 @@ export default function CargosList() {
   };
 
   return (
-    <section className="cargos" aria-labelledby="cargos-titulo">
-      <header className="cargos__header">
-        <p className="cargos__eyebrow">Organización estructural</p>
-        <h2 id="cargos-titulo" className="cargos__title">
+    <section className="ui-section" aria-labelledby="cargos-titulo">
+      <header className="ui-section__header">
+        <p className="ui-eyebrow">Organización estructural</p>
+        <h2 id="cargos-titulo" className="ui-section__title">
           Catálogo de cargos
         </h2>
       </header>
 
-      <div className="cargos__layout">
-        <div ref={formRef} className="cargos__form-col">
+      <div className="ui-split">
+        <div ref={formRef} className="ui-split__aside">
           <CargoForm
             key={formKey}
             cargo={cargoEnEdicion}
-            departamentos={catalogos.departamentos}
-            niveles={catalogos.niveles}
-            errorDepartamentos={catalogos.errorDepartamentos}
-            errorNiveles={catalogos.errorNiveles}
-            cargandoCatalogos={catalogos.cargando}
+            departamentos={areas.departamentos}
+            errorDepartamentos={areas.error}
+            cargandoCatalogos={areas.cargando}
             aviso={aviso?.texto}
             onGuardar={guardar}
             onCancelar={() => abrirFormulario(null)}
@@ -77,9 +75,8 @@ export default function CargosList() {
           onReintentar={recargar}
           areaId={areaFiltro}
           onCambiarArea={setAreaFiltro}
-          departamentos={catalogos.departamentos}
-          errorDepartamentos={catalogos.errorDepartamentos}
-          niveles={catalogos.niveles}
+          departamentos={areas.departamentos}
+          errorDepartamentos={areas.error}
           idEnEdicion={cargoEnEdicion?.id_cargo}
           onEditar={iniciarEdicion}
         />

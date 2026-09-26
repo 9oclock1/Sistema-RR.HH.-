@@ -1,83 +1,124 @@
 // src/models/departamentos.model.js
-const pool = require('../../db/pool'); // EmployeeService/db/pool.js
+const { randomUUID } = require('node:crypto');
 
-/**
- * Criterio 1: registrar un área con nombre y descripción
- */
-async function crear({ codigo, nombre, tipo, descripcion, id_departamento_padre, id_sucursal }) {
-  const query = `
-    INSERT INTO departamentos (codigo, nombre, tipo, descripcion, id_departamento_padre, id_sucursal)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING *;
-  `;
-  const values = [codigo, nombre, tipo || 'departamento', descripcion, id_departamento_padre || null, id_sucursal || null];
-  const { rows } = await pool.query(query, values);
-  return rows[0];
-}
+const SELECT_DEPARTAMENTO = `
+  SELECT
+    d.id_departamento,
+    d.codigo,
+    d.nombre,
+    d.descripcion,
+    d.id_departamento_padre,
+    p.nombre AS departamento_padre,
+    d.esta_activo
+  FROM departamentos d
+  LEFT JOIN departamentos p ON p.id_departamento = d.id_departamento_padre
+`;
 
-/**
- * Criterio 1: listado de áreas activas
- */
-async function listarActivas() {
-  const { rows } = await pool.query(
-    `SELECT * FROM vista_departamentos_activos;`
-  );
+async function listarActivos(db) {
+  const { rows } = await db.query(`${SELECT_DEPARTAMENTO} WHERE d.esta_activo = TRUE ORDER BY d.nombre ASC`);
   return rows;
 }
 
-async function obtenerPorId(id_departamento) {
-  const { rows } = await pool.query(
-    `SELECT * FROM departamentos WHERE id_departamento = $1;`,
-    [id_departamento]
+async function obtenerPorId(db, idDepartamento) {
+  const { rows } = await db.query(`${SELECT_DEPARTAMENTO} WHERE d.id_departamento = $1`, [idDepartamento]);
+  return rows[0] || null;
+}
+
+async function bloquearPorId(db, idDepartamento) {
+  const { rows } = await db.query(
+    'SELECT nombre, esta_activo FROM departamentos WHERE id_departamento = $1 FOR UPDATE',
+    [idDepartamento]
   );
   return rows[0] || null;
 }
 
-/**
- * Criterio 2: modificar nombre o descripción, conservando el id
- */
-async function actualizar(id_departamento, { nombre, descripcion }) {
-  const query = `
-    UPDATE departamentos
-    SET nombre = COALESCE($2, nombre),
-        descripcion = COALESCE($3, descripcion)
-    WHERE id_departamento = $1
-    RETURNING *;
-  `;
-  const { rows } = await pool.query(query, [id_departamento, nombre, descripcion]);
-  return rows[0] || null;
-}
-
-/**
- * Criterios 3 y 4: dar de baja.
- * La validación real (cargos/empleados activos) vive en el trigger
- * trg_validar_baja_departamento; aquí solo propagamos el resultado
- * o el error que lanza la base de datos.
- */
-async function darDeBaja(id_departamento) {
-  const query = `
-    UPDATE departamentos
-    SET activo = FALSE
-    WHERE id_departamento = $1
-    RETURNING *;
-  `;
-  const { rows } = await pool.query(query, [id_departamento]);
-  return rows[0] || null;
-}
-
-async function reactivar(id_departamento) {
-  const { rows } = await pool.query(
-    `UPDATE departamentos SET activo = TRUE WHERE id_departamento = $1 RETURNING *;`,
-    [id_departamento]
+async function obtenerEstadoPadre(db, idDepartamento) {
+  const { rows } = await db.query(
+    'SELECT esta_activo FROM departamentos WHERE id_departamento = $1 FOR SHARE',
+    [idDepartamento]
   );
   return rows[0] || null;
+}
+
+
+async function insertar(db, { codigo, nombre, descripcion, id_departamento_padre }) {
+  const { rows } = await db.query(
+    `INSERT INTO departamentos (id_departamento, id_departamento_padre, codigo, nombre, descripcion)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id_departamento`,
+    [randomUUID(), id_departamento_padre, codigo, nombre, descripcion]
+  );
+  return rows[0].id_departamento;
+}
+
+async function reemplazar(db, idDepartamento, { codigo, nombre, descripcion, id_departamento_padre }) {
+  await db.query(
+    `UPDATE departamentos
+        SET codigo = $1,
+            nombre = $2,
+            descripcion = $3,
+            id_departamento_padre = $4
+      WHERE id_departamento = $5`,
+    [codigo, nombre, descripcion, id_departamento_padre, idDepartamento]
+  );
+}
+
+async function existeCodigoActivo(db, codigo, idDepartamentoExcluido = null) {
+  const { rows } = await db.query(
+    `SELECT 1 FROM departamentos
+      WHERE esta_activo = TRUE
+        AND lower(codigo) = lower($1)
+        AND ($2::uuid IS NULL OR id_departamento <> $2::uuid)
+      LIMIT 1`,
+    [codigo, idDepartamentoExcluido]
+  );
+  return rows.length > 0;
+}
+
+async function esDescendiente(db, idDepartamento, idPosibleDescendiente) {
+  const { rows } = await db.query(
+    `WITH RECURSIVE descendientes AS (
+       SELECT id_departamento FROM departamentos WHERE id_departamento_padre = $1
+       UNION
+       SELECT d.id_departamento FROM departamentos d
+         JOIN descendientes x ON d.id_departamento_padre = x.id_departamento
+     )
+     SELECT 1 FROM descendientes WHERE id_departamento = $2 LIMIT 1`,
+    [idDepartamento, idPosibleDescendiente]
+  );
+  return rows.length > 0;
+}
+
+async function contarDependencias(db, idDepartamento) {
+  const { rows } = await db.query(
+    `SELECT
+       (SELECT COUNT(*) FROM empleados e
+          JOIN cargos c           ON c.id_cargo = e.id_cargo_actual
+          JOIN estados_empleado s ON s.id_estado_empleado = e.id_estado_empleado
+         WHERE c.id_departamento = $1
+           AND s.permite_acceso = TRUE)::int                                         AS empleados,
+       (SELECT COUNT(*) FROM cargos
+         WHERE id_departamento = $1 AND esta_activo = TRUE)::int                     AS cargos,
+       (SELECT COUNT(*) FROM departamentos
+         WHERE id_departamento_padre = $1 AND esta_activo = TRUE)::int               AS subareas`,
+    [idDepartamento]
+  );
+  return rows[0];
+}
+
+async function darDeBaja(db, idDepartamento) {
+  await db.query('UPDATE departamentos SET esta_activo = FALSE WHERE id_departamento = $1', [idDepartamento]);
 }
 
 module.exports = {
-  crear,
-  listarActivas,
+  listarActivos,
   obtenerPorId,
-  actualizar,
+  bloquearPorId,
+  obtenerEstadoPadre,
+  insertar,
+  reemplazar,
+  existeCodigoActivo,
+  esDescendiente,
+  contarDependencias,
   darDeBaja,
-  reactivar,
 };

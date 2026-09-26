@@ -9,5 +9,4 @@ export const getCargos = (areaId, { signal } = {}) => {
 
 export const createCargo = (cargo) => request(BASE, { method: 'POST', body: cargo });
 
-// PUT reemplaza el cargo completo: `cargo` debe traer todos los campos editables.
 export const updateCargo = (idCargo, cargo) => request(`${BASE}/${idCargo}`, { method: 'PUT', body: cargo });

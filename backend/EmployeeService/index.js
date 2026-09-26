@@ -3,7 +3,6 @@ const cors = require("cors");
 const pool = require("./db/pool");
 const departamentosRoutes = require("./src/routes/departamentos.routes");
 const cargosRoutes = require("./src/routes/cargos");
-const nivelesSalarialesRoutes = require("./src/routes/nivelesSalariales");
 const errorHandler = require("./src/middlewares/errorHandler");
 
 const app = express();
@@ -33,15 +32,12 @@ app.get("/health", async (req, res) => {
   }
 });
 
-// RF-16 a RF-20: departamentos, cargos, organigrama
-// El gateway NGINX ya resuelve el prefijo /api/empl externamente;
-// puertas adentro, este servicio responde directo en su raíz.
-// Si tu NGINX reenvía el prefijo tal cual, usa:
-// app.use('/api/empl', departamentosRoutes);
-app.use(departamentosRoutes);
-
+// RF-16 a RF-20: departamentos, cargos, organigrama.
+// NGINX recorta el prefijo /api/empl, así que aquí las rutas cuelgan de la raíz.
+// Todos los ids son UUID (texto); solo se consultan tablas de EmployeeDB. Si se necesitan datos de otro
+// dominio (p. ej. bandas salariales de CompensationService), se piden a su endpoint, nunca a su base de datos.
+app.use("/departamentos", departamentosRoutes);
 app.use("/cargos", cargosRoutes);
-app.use("/niveles-salariales", nivelesSalarialesRoutes);
 
 // Debe ir después de todas las rutas.
 app.use(errorHandler);

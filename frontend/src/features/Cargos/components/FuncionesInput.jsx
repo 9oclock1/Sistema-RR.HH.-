@@ -1,6 +1,6 @@
 import { useState } from 'react';
+import { IconoCerrar, IconoMas } from '../../../components/Iconos';
 import { nuevaFuncion } from '../utils/cargoFormulario';
-import { IconoCerrar, IconoMas } from './Iconos';
 
 export default function FuncionesInput({ funciones, onChange, error, errorId }) {
   const [enfocarId, setEnfocarId] = useState(null);
@@ -22,9 +22,9 @@ export default function FuncionesInput({ funciones, onChange, error, errorId }) 
   };
 
   return (
-    <fieldset className="cargos-field cargos-funciones" aria-describedby={error ? errorId : undefined}>
-      <legend className="cargos-field__label">
-        Funciones clave <span className="cargos-field__optional">opcional</span>
+    <fieldset className="ui-field cargos-funciones" aria-describedby={error ? errorId : undefined}>
+      <legend className="ui-field__label">
+        Funciones clave <span className="ui-field__required" aria-hidden="true">*</span>
       </legend>
 
       {funciones.length === 0 ? (
@@ -38,7 +38,7 @@ export default function FuncionesInput({ funciones, onChange, error, errorId }) 
               </span>
               <input
                 type="text"
-                className="cargos-input"
+                className="ui-input"
                 value={funcion.texto}
                 placeholder="Ej. Atender la caja registradora"
                 aria-label={`Función ${indice + 1}`}
@@ -49,7 +49,7 @@ export default function FuncionesInput({ funciones, onChange, error, errorId }) 
               />
               <button
                 type="button"
-                className="cargos-icon-btn"
+                className="ui-icon-btn"
                 aria-label={`Quitar función ${indice + 1}`}
                 title="Quitar"
                 onClick={() => quitar(funcion.id)}
@@ -61,12 +61,12 @@ export default function FuncionesInput({ funciones, onChange, error, errorId }) 
         </ol>
       )}
 
-      <button type="button" className="cargos-btn cargos-btn--dashed" onClick={agregar}>
+      <button type="button" className="ui-btn ui-btn--dashed" onClick={agregar}>
         <IconoMas size={14} /> Agregar función
       </button>
 
       {error && (
-        <p id={errorId} className="cargos-field__error">
+        <p id={errorId} className="ui-field__error">
           {error}
         </p>
       )}

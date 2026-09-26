@@ -9,7 +9,10 @@ const errorHandler = (err, req, res, next) => {
     return res.status(400).json({ error: 'El cuerpo de la petición no es un JSON válido.' });
   }
 
-  
+  if (err.code === '22P02') {
+    return res.status(400).json({ error: 'Algún identificador enviado no es un UUID válido.', campos_faltantes: [], errores: [] });
+  }
+
   if (err.code === '23503') {
     const [, campo, valor] = /Key \((\w+)\)=\(([^)]*)\)/.exec(err.detail || '') || [];
     const mensaje = campo ? `No existe un registro con ${campo} = ${valor}.` : 'Referencia a un registro inexistente.';

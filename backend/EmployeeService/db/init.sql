@@ -101,7 +101,7 @@ CREATE TABLE EMPLEADOS (
 CREATE TABLE ESTADOS_EMPLEADO (
     id_estado_empleado SMALLINT NOT NULL,
     codigo varchar(20) NOT NULL,
-    nombre varchar(50) NOT NULL,
+    nombre varchar(50) NOT NULL,    
     permite_acceso boolean NOT NULL,
     CONSTRAINT ESTADOS_EMPLEADO_pk PRIMARY KEY (id_estado_empleado)
 );
@@ -132,7 +132,8 @@ CREATE TABLE POSTULACIONES_ASCENSO (
     estado_postulacion varchar(30) NOT NULL,
     fecha_formalizacion_ascenso date NULL,
     observaciones_resolucion text NULL,
-    CONSTRAINT POSTULACIONES_ASCENSO_pk PRIMARY KEY (id_postulacion) CONSTRAINT uq_postulacion_convocatoria_empleado UNIQUE (id_convocatoria, id_empleado)
+    CONSTRAINT POSTULACIONES_ASCENSO_pk PRIMARY KEY (id_postulacion),
+    CONSTRAINT uq_postulacion_convocatoria_empleado UNIQUE (id_convocatoria, id_empleado)
 );
 -- Table: REQUISITOS_CAPACITACION_CARGO
 CREATE TABLE REQUISITOS_CAPACITACION_CARGO (
@@ -141,7 +142,8 @@ CREATE TABLE REQUISITOS_CAPACITACION_CARGO (
     id_curso UUID NOT NULL,
     es_obligatorio boolean NOT NULL DEFAULT TRUE,
     meses_validez_requerida int NULL,
-    CONSTRAINT REQUISITOS_CAPACITACION_CARGO_pk PRIMARY KEY (id_requisito_cargo) CONSTRAINT uq_requisito_cargo_curso UNIQUE (id_cargo, id_curso)
+    CONSTRAINT REQUISITOS_CAPACITACION_CARGO_pk PRIMARY KEY (id_requisito_cargo),
+    CONSTRAINT uq_requisito_cargo_curso UNIQUE (id_cargo, id_curso)
 );
 -- Table: SUCURSALES
 CREATE TABLE SUCURSALES (

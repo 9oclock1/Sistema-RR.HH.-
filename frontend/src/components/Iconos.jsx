@@ -1,4 +1,3 @@
-// Íconos de trazo simples (heredan el color del texto con currentColor).
 const Icono = ({ children, size = 16 }) => (
   <svg
     width={size}
@@ -45,5 +44,13 @@ export const IconoAlerta = (props) => (
 export const IconoCheck = (props) => (
   <Icono {...props}>
     <path d="m5 12.5 4.5 4.5L19 7.5" />
+  </Icono>
+);
+
+// Dar de baja (archivar): el registro no se borra, queda inactivo.
+export const IconoArchivar = (props) => (
+  <Icono {...props}>
+    <rect x="3" y="4" width="18" height="4" rx="1" />
+    <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8M10 12h4" />
   </Icono>
 );

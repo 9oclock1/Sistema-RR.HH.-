@@ -1,134 +1,113 @@
-// src/features/organizacion/OrganizacionView.jsx
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import departamentosApi from '../../api/departamentosApi';
-import DepartamentoFormModal from '../../components/DepartamentoFormModal';
+import { useDepartamentosActivos } from '../../hooks/useDepartamentosActivos';
+import DepartamentoForm from './components/DepartamentoForm';
+import DepartamentosTable from './components/DepartamentosTable';
 import './OrganizacionView.css';
 
+const DURACION_AVISO_MS = 4000;
+
 export default function OrganizacionView() {
-  const [areas, setAreas] = useState([]);
-  // Cada cambio en departamentos incrementa la versión y dispara un nuevo GET.
-  const [version, setVersion] = useState(0);
-  const [modalAbierto, setModalAbierto] = useState(false);
-  const [areaSeleccionada, setAreaSeleccionada] = useState(null);
-  const [mensajeBaja, setMensajeBaja] = useState('');
-  const [huboErrorBaja, setHuboErrorBaja] = useState(false);
+  const { departamentos: areas, cargando, error, recargar } = useDepartamentosActivos();
+
+  const [areaEnEdicion, setAreaEnEdicion] = useState(null);
+  const [formKey, setFormKey] = useState(0);
+  const [aviso, setAviso] = useState(null);
+  const formRef = useRef(null);
+
+  const [idConfirmandoBaja, setIdConfirmandoBaja] = useState(null);
+  const [bajaEnCurso, setBajaEnCurso] = useState(false);
+  const [alertaBaja, setAlertaBaja] = useState(null);
+  useEffect(() => {
+    if (!aviso) return undefined;
+    const timer = setTimeout(() => setAviso(null), DURACION_AVISO_MS);
+    return () => clearTimeout(timer);
+  }, [aviso]);
 
   useEffect(() => {
-    const controller = new AbortController();
+    if (alertaBaja?.tipo !== 'success') return undefined;
+    const timer = setTimeout(() => setAlertaBaja(null), DURACION_AVISO_MS);
+    return () => clearTimeout(timer);
+  }, [alertaBaja]);
 
-    departamentosApi
-      .listarActivas({ signal: controller.signal })
-      .then((data) => setAreas(Array.isArray(data) ? data : []))
-      .catch((err) => {
-        if (err.name === 'AbortError') return;
-        setAreas([]);
-        setHuboErrorBaja(true);
-        setMensajeBaja('No se pudieron cargar las áreas.');
-      });
+  const abrirFormulario = (area) => {
+    setAreaEnEdicion(area);
+    setFormKey((k) => k + 1);
+  };
 
-    return () => controller.abort();
-  }, [version]);
+  const iniciarEdicion = (area) => {
+    setAviso(null);
+    setIdConfirmandoBaja(null);
+    abrirFormulario(area);
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
 
-  useEffect(() => departamentosApi.suscribirCambios(() => setVersion((v) => v + 1)), []);
+  const guardar = async (payload) => {
+    const guardada = areaEnEdicion
+      ? await departamentosApi.actualizar(areaEnEdicion.id_departamento, payload)
+      : await departamentosApi.crear(payload);
 
-  function abrirModalNueva() {
-    setAreaSeleccionada(null);
-    setModalAbierto(true);
-  }
+    setAviso({ texto: `Área «${guardada.nombre}» ${areaEnEdicion ? 'actualizada' : 'creada'}.` });
+    abrirFormulario(null);
+  };
 
-  function abrirModalEditar(area) {
-    setAreaSeleccionada(area);
-    setModalAbierto(true);
-  }
+  const pedirBaja = (area) => {
+    setAlertaBaja(null);
+    setIdConfirmandoBaja(area.id_departamento);
+  };
 
-  // El listado se refresca solo: departamentosApi avisa a los suscriptores tras el POST/PUT.
-  function onGuardado() {
-    setModalAbierto(false);
-  }
-
-  async function confirmarBaja(area) {
-    setMensajeBaja('');
-    setHuboErrorBaja(false);
-
-    const confirmado = window.confirm(`¿Dar de baja el área "${area.nombre}"?`);
-    if (!confirmado) return;
-
+  const confirmarBaja = async (area) => {
+    setBajaEnCurso(true);
     try {
       await departamentosApi.darDeBaja(area.id_departamento);
-      setMensajeBaja(`Área "${area.nombre}" dada de baja correctamente.`);
+      setAlertaBaja({ tipo: 'success', texto: `Área «${area.nombre}» dada de baja.` });
+      if (areaEnEdicion?.id_departamento === area.id_departamento) abrirFormulario(null);
     } catch (err) {
-      setHuboErrorBaja(true);
-      setMensajeBaja(err.message || 'No se pudo dar de baja el área.');
+      setAlertaBaja({ tipo: 'error', texto: err.message || 'No se pudo dar de baja el área.' });
+    } finally {
+      setBajaEnCurso(false);
+      setIdConfirmandoBaja(null);
     }
-  }
+  };
 
   return (
-    <section className="organizacion-view">
-      <header className="encabezado">
-        <h2>Áreas y departamentos</h2>
-        <button className="btn-primario" onClick={abrirModalNueva}>
-          + Nueva área
-        </button>
+    <section className="ui-section organizacion" aria-labelledby="organizacion-titulo">
+      <header className="ui-section__header">
+        <p className="ui-eyebrow">Organización estructural</p>
+        <h2 id="organizacion-titulo" className="ui-section__title">
+          Áreas y departamentos
+        </h2>
       </header>
 
-      {mensajeBaja && (
-        <p className={huboErrorBaja ? 'mensaje-error' : 'mensaje-ok'}>
-          {mensajeBaja}
-        </p>
-      )}
+      <div className="ui-split">
+        <div ref={formRef} className="ui-split__aside">
+          <DepartamentoForm
+            key={formKey}
+            area={areaEnEdicion}
+            areas={areas}
+            errorAreas={error}
+            cargandoAreas={cargando}
+            aviso={aviso?.texto}
+            onGuardar={guardar}
+            onCancelar={() => abrirFormulario(null)}
+          />
+        </div>
 
-      {areas.length ? (
-        <table className="tabla-areas">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Tipo</th>
-              <th>Descripción</th>
-              <th></th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {areas.map((area) => (
-              <tr key={area.id_departamento}>
-                <td>{area.nombre}</td>
-                <td>
-                  {area.tipo === 'departamento'
-                    ? 'Departamento'
-                    : 'Sección operativa'}
-                </td>
-                <td>{area.descripcion || '—'}</td>
-
-                <td className="acciones-tabla">
-                  <button
-                    className="btn-link"
-                    onClick={() => abrirModalEditar(area)}
-                  >
-                    Editar
-                  </button>
-
-                  <button
-                    className="btn-link peligro"
-                    onClick={() => confirmarBaja(area)}
-                  >
-                    Dar de baja
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p className="vacio">No hay áreas activas registradas.</p>
-      )}
-
-      {modalAbierto && (
-        <DepartamentoFormModal
-          area={areaSeleccionada}
-          onGuardado={onGuardado}
-          onCerrar={() => setModalAbierto(false)}
+        <DepartamentosTable
+          areas={areas}
+          cargando={cargando}
+          error={error}
+          onReintentar={recargar}
+          alerta={alertaBaja}
+          idEnEdicion={areaEnEdicion?.id_departamento}
+          idConfirmandoBaja={idConfirmandoBaja}
+          bajaEnCurso={bajaEnCurso}
+          onEditar={iniciarEdicion}
+          onPedirBaja={pedirBaja}
+          onCancelarBaja={() => setIdConfirmandoBaja(null)}
+          onConfirmarBaja={confirmarBaja}
         />
-      )}
+      </div>
     </section>
   );
 }

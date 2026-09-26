@@ -1,36 +1,59 @@
 import { useId, useRef, useState } from 'react';
 import { IconoAlerta, IconoCheck, IconoCerrar } from '../../../components/Iconos';
 import { mapearErroresApi } from '../../../utils/erroresApi';
-import {
-  CAMPOS_DEL_FORMULARIO,
-  cargoAFormulario,
-  formularioAPayload,
-  formularioVacio,
-  validarFormulario,
-} from '../utils/cargoFormulario';
-import { formatearMonto } from '../utils/formato';
-import FuncionesInput from './FuncionesInput';
 
-export default function CargoForm({
-  cargo,
-  departamentos,
-  errorDepartamentos,
-  cargandoCatalogos,
-  aviso,
-  onGuardar,
-  onCancelar,
-}) {
-  const esEdicion = Boolean(cargo);
+const MAX_DESCRIPCION = 255;
+
+const CAMPOS_DEL_FORMULARIO = ['nombre', 'codigo', 'id_departamento_padre', 'descripcion'];
+
+const areaAFormulario = (area) => ({
+  nombre: area?.nombre ?? '',
+  codigo: area?.codigo ?? '',
+  id_departamento_padre: area?.id_departamento_padre ?? '',
+  descripcion: area?.descripcion ?? '',
+});
+
+const formularioAPayload = (valores) => ({
+  nombre: valores.nombre.trim(),
+  codigo: valores.codigo.trim(),
+  id_departamento_padre: valores.id_departamento_padre || null,
+  descripcion: valores.descripcion.trim() || null,
+});
+
+const validarFormulario = (valores) => {
+  const errores = {};
+  if (!valores.nombre.trim()) errores.nombre = 'El nombre del área es obligatorio.';
+  if (!valores.codigo.trim()) errores.codigo = 'El código es obligatorio.';
+  return errores;
+};
+
+const idsExcluidos = (area, areas) => {
+  if (!area) return new Set();
+  const excluidos = new Set([area.id_departamento]);
+  let agregados = true;
+  while (agregados) {
+    agregados = false;
+    for (const a of areas) {
+      if (!excluidos.has(a.id_departamento) && excluidos.has(a.id_departamento_padre)) {
+        excluidos.add(a.id_departamento);
+        agregados = true;
+      }
+    }
+  }
+  return excluidos;
+};
+
+export default function DepartamentoForm({ area, areas, errorAreas, cargandoAreas, aviso, onGuardar, onCancelar }) {
+  const esEdicion = Boolean(area);
   const uid = useId();
   const idCampo = (campo) => `${uid}-${campo}`;
   const idError = (campo) => `${uid}-${campo}-error`;
 
-  const [valores, setValores] = useState(() => (cargo ? cargoAFormulario(cargo) : formularioVacio()));
+  const [valores, setValores] = useState(() => areaAFormulario(area));
   const [errores, setErrores] = useState({});
   const [errorGeneral, setErrorGeneral] = useState(null);
   const [guardando, setGuardando] = useState(false);
 
-  // Controles enfocables por nombre de campo, para llevar el foco al primer error.
   const controles = useRef({});
   const registrar = (campo) => (elemento) => {
     controles.current[campo] = elemento;
@@ -72,10 +95,10 @@ export default function CargoForm({
     }
   };
 
-  // Si el cargo en edición pertenece a un área dada de baja, se conserva como opción para no perder el dato.
-  const departamentoFaltante =
-    valores.id_departamento && !departamentos.some((d) => d.id_departamento === valores.id_departamento);
-  const salarioValido = /^\d{1,10}(\.\d{1,2})?$/.test(valores.salario_base_referencial.trim());
+  const excluidos = idsExcluidos(area, areas);
+  const opcionesPadre = areas.filter((a) => !excluidos.has(a.id_departamento));
+  const padreFaltante =
+    valores.id_departamento_padre && !areas.some((a) => a.id_departamento === valores.id_departamento_padre);
 
   const propsCampo = (campo) => ({
     id: idCampo(campo),
@@ -101,10 +124,10 @@ export default function CargoForm({
       <header className="ui-card__header">
         <div>
           <h3 id={idCampo('titulo')} className="ui-card__title">
-            {esEdicion ? 'Editar cargo' : 'Nuevo cargo'}
+            {esEdicion ? 'Editar área' : 'Nueva área'}
           </h3>
           <p className="ui-card__subtitle">
-            {esEdicion ? `Modificando «${cargo.nombre}»` : 'Define el puesto, su nivel, su salario y sus funciones.'}
+            {esEdicion ? `Modificando «${area.nombre}»` : 'Registra un departamento o una sección operativa.'}
           </p>
         </div>
         {esEdicion && (
@@ -128,14 +151,14 @@ export default function CargoForm({
       <div className="ui-form__body">
         <div className="ui-field">
           <label htmlFor={idCampo('nombre')} className="ui-field__label">
-            Nombre del cargo <span className="ui-field__required" aria-hidden="true">*</span>
+            Nombre del área <span className="ui-field__required" aria-hidden="true">*</span>
           </label>
           <input
             type="text"
             className="ui-input"
             value={valores.nombre}
             maxLength={100}
-            placeholder="Ej. Cajero"
+            placeholder="Ej. Panadería"
             required
             onChange={(e) => actualizarCampo('nombre', e.target.value)}
             {...propsCampo('nombre')}
@@ -153,7 +176,7 @@ export default function CargoForm({
               className="ui-input"
               value={valores.codigo}
               maxLength={20}
-              placeholder="Ej. CAJ-01"
+              placeholder="Ej. PAN"
               required
               onChange={(e) => actualizarCampo('codigo', e.target.value)}
               {...propsCampo('codigo')}
@@ -162,96 +185,53 @@ export default function CargoForm({
           </div>
 
           <div className="ui-field">
-            <label htmlFor={idCampo('id_departamento')} className="ui-field__label">
-              Área <span className="ui-field__required" aria-hidden="true">*</span>
+            <label htmlFor={idCampo('id_departamento_padre')} className="ui-field__label">
+              Depende de
             </label>
             <select
               className="ui-input ui-select"
-              value={valores.id_departamento}
-              required
-              disabled={cargandoCatalogos}
-              onChange={(e) => actualizarCampo('id_departamento', e.target.value)}
-              {...propsCampo('id_departamento')}
+              value={valores.id_departamento_padre}
+              disabled={cargandoAreas}
+              onChange={(e) => actualizarCampo('id_departamento_padre', e.target.value)}
+              {...propsCampo('id_departamento_padre')}
             >
-              <option value="">{cargandoCatalogos ? 'Cargando…' : 'Selecciona un área'}</option>
-              {departamentos.map((d) => (
-                <option key={d.id_departamento} value={d.id_departamento}>
-                  {d.nombre}
+              <option value="">{cargandoAreas ? 'Cargando…' : 'Ninguna'}</option>
+              {opcionesPadre.map((a) => (
+                <option key={a.id_departamento} value={a.id_departamento}>
+                  {a.nombre}
                 </option>
               ))}
-              {departamentoFaltante && <option value={valores.id_departamento}>{cargo?.departamento ?? 'Área inactiva'}</option>}
+              {padreFaltante && (
+                <option value={valores.id_departamento_padre}>{area?.departamento_padre ?? 'Área inactiva'}</option>
+              )}
             </select>
-            {errores.id_departamento
-              ? mensajeError('id_departamento')
-              : errorDepartamentos && <p className="ui-field__hint is-warning">No se pudieron cargar las áreas.</p>}
-          </div>
-        </div>
-
-        <div className="ui-form__row">
-          <div className="ui-field">
-            <label htmlFor={idCampo('nivel_jerarquico')} className="ui-field__label">
-              Nivel jerárquico <span className="ui-field__required" aria-hidden="true">*</span>
-            </label>
-            <input
-              type="number"
-              className="ui-input"
-              value={valores.nivel_jerarquico}
-              min={1}
-              step={1}
-              placeholder="Ej. 3"
-              required
-              onChange={(e) => actualizarCampo('nivel_jerarquico', e.target.value)}
-              {...propsCampo('nivel_jerarquico')}
-            />
-            {errores.nivel_jerarquico ? mensajeError('nivel_jerarquico') : <p className="ui-field__hint">1 es el nivel más alto.</p>}
-          </div>
-
-          <div className="ui-field">
-            <label htmlFor={idCampo('salario_base_referencial')} className="ui-field__label">
-              Salario base <span className="ui-field__required" aria-hidden="true">*</span>
-            </label>
-            <input
-              type="text"
-              inputMode="decimal"
-              className="ui-input"
-              value={valores.salario_base_referencial}
-              placeholder="Ej. 3500.00"
-              required
-              onChange={(e) => actualizarCampo('salario_base_referencial', e.target.value)}
-              {...propsCampo('salario_base_referencial')}
-            />
-            {errores.salario_base_referencial ? (
-              mensajeError('salario_base_referencial')
-            ) : (
-              <p className="ui-field__hint">
-                {salarioValido ? formatearMonto(valores.salario_base_referencial) : 'Referencial, en bolivianos.'}
-              </p>
-            )}
+            {errores.id_departamento_padre
+              ? mensajeError('id_departamento_padre')
+              : errorAreas && <p className="ui-field__hint is-warning">No se pudieron cargar las áreas.</p>}
           </div>
         </div>
 
         <div className="ui-field">
-          <label htmlFor={idCampo('requisitos_minimos')} className="ui-field__label">
-            Requisitos mínimos <span className="ui-field__required" aria-hidden="true">*</span>
+          <label htmlFor={idCampo('descripcion')} className="ui-field__label">
+            Descripción <span className="ui-field__optional">opcional</span>
           </label>
           <textarea
             className="ui-input ui-textarea"
             rows={3}
-            value={valores.requisitos_minimos}
-            placeholder="Formación, experiencia y habilidades esperadas"
-            required
-            onChange={(e) => actualizarCampo('requisitos_minimos', e.target.value)}
-            {...propsCampo('requisitos_minimos')}
+            value={valores.descripcion}
+            maxLength={MAX_DESCRIPCION}
+            placeholder="Qué hace esta área y qué la distingue"
+            onChange={(e) => actualizarCampo('descripcion', e.target.value)}
+            {...propsCampo('descripcion')}
           />
-          {mensajeError('requisitos_minimos')}
+          {errores.descripcion ? (
+            mensajeError('descripcion')
+          ) : (
+            <p className="ui-field__hint">
+              {valores.descripcion.length}/{MAX_DESCRIPCION}
+            </p>
+          )}
         </div>
-
-        <FuncionesInput
-          funciones={valores.funciones}
-          onChange={(funciones) => actualizarCampo('funciones', funciones)}
-          error={errores.funciones}
-          errorId={idError('funciones')}
-        />
       </div>
 
       <footer className="ui-form__footer">
@@ -261,7 +241,7 @@ export default function CargoForm({
           </button>
         )}
         <button type="submit" className="ui-btn ui-btn--primary" disabled={guardando}>
-          {guardando ? 'Guardando…' : esEdicion ? 'Guardar cambios' : 'Crear cargo'}
+          {guardando ? 'Guardando…' : esEdicion ? 'Guardar cambios' : 'Crear área'}
         </button>
       </footer>
     </form>

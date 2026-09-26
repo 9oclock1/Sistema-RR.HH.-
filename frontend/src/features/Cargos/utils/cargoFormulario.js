@@ -2,55 +2,62 @@ let siguienteId = 0;
 export const nuevaFuncion = (texto = '') => ({ id: `f${++siguienteId}`, texto });
 
 export const formularioVacio = () => ({
+  codigo: '',
   nombre: '',
-  id_nivel_salarial: '',
   id_departamento: '',
-  perfil_requerido: '',
-  id_cargo_superior: null,
+  nivel_jerarquico: '',
+  salario_base_referencial: '',
+  requisitos_minimos: '',
+  id_cargo_jefe_directo: null,
   funciones: [nuevaFuncion()],
-});
-
+})
 export const cargoAFormulario = (cargo) => ({
+  codigo: cargo.codigo ?? '',
   nombre: cargo.nombre ?? '',
-  id_nivel_salarial: cargo.id_nivel_salarial ? String(cargo.id_nivel_salarial) : '',
-  id_departamento: cargo.id_departamento ? String(cargo.id_departamento) : '',
-  perfil_requerido: cargo.perfil_requerido ?? '',
-  id_cargo_superior: cargo.id_cargo_superior ?? null,
+  id_departamento: cargo.id_departamento ?? '',
+  nivel_jerarquico: cargo.nivel_jerarquico != null ? String(cargo.nivel_jerarquico) : '',
+  salario_base_referencial: cargo.salario_base_referencial != null ? String(cargo.salario_base_referencial) : '',
+  requisitos_minimos: cargo.requisitos_minimos ?? '',
+  id_cargo_jefe_directo: cargo.id_cargo_jefe_directo ?? null,
   funciones: cargo.funciones?.length ? cargo.funciones.map((texto) => nuevaFuncion(texto)) : [nuevaFuncion()],
 });
 
-// Objeto completo que esperan POST /cargos y PUT /cargos/:id.
 export const formularioAPayload = (valores) => ({
+  codigo: valores.codigo.trim(),
   nombre: valores.nombre.trim(),
-  id_nivel_salarial: Number(valores.id_nivel_salarial),
-  id_departamento: valores.id_departamento ? Number(valores.id_departamento) : null,
-  perfil_requerido: valores.perfil_requerido.trim() || null,
-  id_cargo_superior: valores.id_cargo_superior,
+  id_departamento: valores.id_departamento,
+  nivel_jerarquico: Number(valores.nivel_jerarquico),
+  salario_base_referencial: valores.salario_base_referencial.trim(),
+  requisitos_minimos: valores.requisitos_minimos.trim(),
+  id_cargo_jefe_directo: valores.id_cargo_jefe_directo,
   funciones: valores.funciones.map((f) => f.texto.trim()).filter(Boolean),
 });
 
+const MONTO_REGEX = /^\d{1,10}(\.\d{1,2})?$/;
+
 export const validarFormulario = (valores) => {
   const errores = {};
+  const nivel = Number(valores.nivel_jerarquico);
+
   if (!valores.nombre.trim()) errores.nombre = 'El nombre del cargo es obligatorio.';
-  if (!valores.id_nivel_salarial) errores.id_nivel_salarial = 'Selecciona un nivel salarial.';
+  if (!valores.codigo.trim()) errores.codigo = 'El código es obligatorio.';
+  if (!valores.id_departamento) errores.id_departamento = 'Selecciona un área.';
+  if (!valores.nivel_jerarquico) errores.nivel_jerarquico = 'Indica el nivel.';
+  else if (!Number.isInteger(nivel) || nivel < 1 || nivel > 32767) errores.nivel_jerarquico = 'Debe ser un entero desde 1.';
+  if (!valores.salario_base_referencial.trim()) errores.salario_base_referencial = 'Indica el salario.';
+  else if (!MONTO_REGEX.test(valores.salario_base_referencial.trim()))
+    errores.salario_base_referencial = 'Monto positivo, hasta 2 decimales.';
+  if (!valores.requisitos_minimos.trim()) errores.requisitos_minimos = 'Los requisitos mínimos son obligatorios.';
+  if (!valores.funciones.some((f) => f.texto.trim())) errores.funciones = 'Agrega al menos una función clave.';
   return errores;
 };
 
-const CAMPOS_DEL_FORMULARIO = ['nombre', 'id_nivel_salarial', 'id_departamento', 'perfil_requerido', 'funciones'];
-
-// Reparte los errores del backend ([{ campo, mensaje }]) entre los campos; lo que no tiene campo visible va al banner general.
-export const mapearErroresApi = (errores) => {
-  const porCampo = {};
-  const generales = [];
-
-  errores.forEach(({ campo, mensaje }) => {
-    const clave = campo?.startsWith('funciones') ? 'funciones' : campo;
-    if (CAMPOS_DEL_FORMULARIO.includes(clave)) {
-      porCampo[clave] ??= mensaje;
-    } else {
-      generales.push(mensaje);
-    }
-  });
-
-  return { porCampo, generales };
-};
+export const CAMPOS_DEL_FORMULARIO = [
+  'nombre',
+  'codigo',
+  'id_departamento',
+  'nivel_jerarquico',
+  'salario_base_referencial',
+  'requisitos_minimos',
+  'funciones',
+];

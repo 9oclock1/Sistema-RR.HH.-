@@ -1,73 +1,104 @@
 // src/services/departamentos.service.js
+const pool = require('../../db/pool');
 const repo = require('../models/departamentos.model');
+const HttpError = require('../utils/HttpError');
+const { withTransaction } = require('../utils/transaction');
 
-// Código de error que definimos en el trigger fn_validar_baja_departamento
-const ERRCODE_BAJA_RECHAZADA = '23514'; // Postgres mapea 'check_violation' a este SQLSTATE
+const noEncontrado = () => new HttpError(404, 'El área no existe.');
 
-class DepartamentoError extends Error {
-  constructor(mensaje, status = 400) {
-    super(mensaje);
-    this.status = status;
+const plural = (cantidad, singular, varios) => `${cantidad} ${cantidad === 1 ? singular : varios}`;
+
+const validarReferencias = async (client, datos, idActual = null) => {
+  const errores = [];
+
+  if (await repo.existeCodigoActivo(client, datos.codigo, idActual)) {
+    errores.push({ campo: 'codigo', mensaje: `Ya existe un área activa con el código «${datos.codigo}».` });
   }
+
+  const idPadre = datos.id_departamento_padre;
+  if (idPadre) {
+    if (idPadre === idActual) {
+      errores.push({ campo: 'id_departamento_padre', mensaje: 'Un área no puede depender de sí misma.' });
+    } else {
+      const padre = await repo.obtenerEstadoPadre(client, idPadre);
+      if (!padre) {
+        errores.push({ campo: 'id_departamento_padre', mensaje: 'El área superior seleccionada no existe.' });
+      } else if (!padre.esta_activo) {
+        errores.push({ campo: 'id_departamento_padre', mensaje: 'El área superior seleccionada está dada de baja.' });
+      } else if (idActual && (await repo.esDescendiente(client, idActual, idPadre))) {
+        errores.push({
+          campo: 'id_departamento_padre',
+          mensaje: 'El área superior no puede ser una sub-área de esta (se formaría un ciclo).',
+        });
+      }
+    }
+  }
+
+  if (errores.length > 0) {
+    throw new HttpError(400, errores.map((e) => e.mensaje).join(' '), { campos_faltantes: [], errores });
+  }
+};
+
+async function listarAreasActivas() {
+  return repo.listarActivos(pool);
 }
 
 /**
  * Criterio 1
  */
-async function registrarArea(datos) {
-  if (!datos.nombre || !datos.nombre.trim()) {
-    throw new DepartamentoError('El área requiere un nombre.', 422);
-  }
-  const area = await repo.crear(datos);
-  return area;
-}
-
-async function listarAreasActivas() {
-  return repo.listarActivas();
+function registrarArea(datos) {
+  return withTransaction(async (client) => {
+    await validarReferencias(client, datos);
+    const id = await repo.insertar(client, datos);
+    return repo.obtenerPorId(client, id);
+  });
 }
 
 /**
- * Criterio 2: conserva el identificador (el UPDATE nunca toca la PK)
+ * Criterio 2: PUT reemplaza los campos editables y conserva el identificador.
  */
-async function modificarArea(id_departamento, cambios) {
-  const existente = await repo.obtenerPorId(id_departamento);
-  if (!existente) {
-    throw new DepartamentoError('El área no existe.', 404);
-  }
-  if (!cambios.nombre && !cambios.descripcion) {
-    throw new DepartamentoError('Debes enviar al menos nombre o descripción para modificar.', 422);
-  }
-  return repo.actualizar(id_departamento, cambios);
+function modificarArea(idDepartamento, datos) {
+  return withTransaction(async (client) => {
+    const existente = await repo.bloquearPorId(client, idDepartamento);
+    if (!existente) throw noEncontrado();
+    if (!existente.esta_activo) throw new HttpError(409, 'No se puede modificar un área dada de baja.');
+
+    await validarReferencias(client, datos, idDepartamento);
+    await repo.reemplazar(client, idDepartamento, datos);
+    return repo.obtenerPorId(client, idDepartamento);
+  });
 }
 
 /**
- * Criterios 3 y 4
+ * Criterios 3 y 4: solo se da de baja si no tiene empleados activos, cargos activos ni sub-áreas activas.
+ * La fila queda bloqueada durante la verificación para que nadie le asigne un cargo a la vez.
  */
-async function darDeBajaArea(id_departamento) {
-  const existente = await repo.obtenerPorId(id_departamento);
-  if (!existente) {
-    throw new DepartamentoError('El área no existe.', 404);
-  }
-  if (!existente.activo) {
-    throw new DepartamentoError('El área ya está inactiva.', 409);
-  }
+function darDeBajaArea(idDepartamento) {
+  return withTransaction(async (client) => {
+    const existente = await repo.bloquearPorId(client, idDepartamento);
+    if (!existente) throw noEncontrado();
+    if (!existente.esta_activo) throw new HttpError(409, 'El área ya está inactiva.');
 
-  try {
-    const actualizado = await repo.darDeBaja(id_departamento);
-    return actualizado; // Criterio 3: se marcó inactiva
-  } catch (err) {
-    // Criterio 4: el trigger rechazó la baja por dependencias activas
-    if (err.code === ERRCODE_BAJA_RECHAZADA) {
-      throw new DepartamentoError(err.message, 409);
+    const { empleados, cargos, subareas } = await repo.contarDependencias(client, idDepartamento);
+    const motivos = [];
+    if (empleados > 0) motivos.push(plural(empleados, 'empleado activo asignado', 'empleados activos asignados'));
+    if (cargos > 0) motivos.push(plural(cargos, 'cargo activo', 'cargos activos'));
+    if (subareas > 0) motivos.push(plural(subareas, 'sub-área activa', 'sub-áreas activas'));
+
+    if (motivos.length > 0) {
+      throw new HttpError(409, `No se puede dar de baja el área «${existente.nombre}»: tiene ${motivos.join(', ')}.`, {
+        dependencias: { empleados, cargos, subareas },
+      });
     }
-    throw err;
-  }
+
+    await repo.darDeBaja(client, idDepartamento);
+    return repo.obtenerPorId(client, idDepartamento);
+  });
 }
 
 module.exports = {
-  DepartamentoError,
-  registrarArea,
   listarAreasActivas,
+  registrarArea,
   modificarArea,
   darDeBajaArea,
 };
