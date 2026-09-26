@@ -39,6 +39,10 @@ app.get("/vacancies", (req, res) => {
   ]);
 });
 
+// === RF-09: Applicant Registration Routes ===
+const applicantRoutes = require("./src/routes/applicantRoutes");
+app.use("/applicants", applicantRoutes);
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RecruitmentService corriendo en http://0.0.0.0:${PORT}`);
 });
