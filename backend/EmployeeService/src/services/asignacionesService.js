@@ -1,5 +1,6 @@
 const asignacionesModel = require('../models/asignacionesModel');
 const empleadosModel = require('../models/empleadosModel');
+const sucursalesModel = require('../models/sucursalesModel');
 const HttpError = require('../utils/HttpError');
 const { withTransaction } = require('../utils/transaction');
 
@@ -7,6 +8,20 @@ const empleadoNoEncontrado = () => new HttpError(404, 'El empleado solicitado no
 
 const validarReglas = async (client, asignacion, empleado, vigente, hoy) => {
   const errores = [];
+
+  const cargo = await asignacionesModel.obtenerEstadoCargo(client, asignacion.id_cargo);
+  if (!cargo) {
+    errores.push({ campo: 'id_cargo', mensaje: 'El cargo seleccionado no existe.' });
+  } else if (!cargo.esta_activo) {
+    errores.push({ campo: 'id_cargo', mensaje: `El cargo «${cargo.nombre}» no está activo: no admite nuevas asignaciones.` });
+  }
+
+  const sucursal = await sucursalesModel.obtenerEstado(client, asignacion.id_sucursal);
+  if (!sucursal) {
+    errores.push({ campo: 'id_sucursal', mensaje: 'La sucursal seleccionada no existe.' });
+  } else if (!sucursal.esta_activa) {
+    errores.push({ campo: 'id_sucursal', mensaje: `La sucursal «${sucursal.nombre}» no está activa.` });
+  }
 
   const { fecha_inicio: fechaInicio } = asignacion;
   if (fechaInicio > hoy) {

@@ -5,6 +5,11 @@ const fechaActual = async (db) => {
   return rows[0].hoy;
 };
 
+const obtenerEstadoCargo = async (db, idCargo) => {
+  const { rows } = await db.query('SELECT nombre, esta_activo FROM cargos WHERE id_cargo = $1 FOR SHARE', [idCargo]);
+  return rows[0] || null;
+};
+
 const obtenerVigente = async (db, idEmpleado) => {
   const { rows } = await db.query(
     `SELECT id_asignacion, id_cargo, id_sucursal, fecha_inicio
@@ -55,4 +60,4 @@ const listarPorEmpleado = async (db, idEmpleado) => {
   return rows;
 };
 
-module.exports = { fechaActual, obtenerVigente, cerrar, insertarVigente, listarPorEmpleado };
+module.exports = { fechaActual, obtenerEstadoCargo, obtenerVigente, cerrar, insertarVigente, listarPorEmpleado };
