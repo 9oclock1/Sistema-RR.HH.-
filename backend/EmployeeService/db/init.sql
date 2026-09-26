@@ -1,246 +1,241 @@
--- ============================================================
--- EmployeeService — init.sql
--- Se ejecuta automáticamente por el contenedor 'postgres' la
--- primera vez que levanta (docker-entrypoint-initdb.d), siempre
--- que el volumen de datos esté vacío.
--- EmployeeService — Esquema de Organización Estructural
--- Cubre RF-16, RF-17, RF-18, RF-19, RF-20
--- Consolidado: Regina (RF-16) + Ian (RF-17) + validaciones
--- ============================================================
-
--- ------------------------------------------------------------
--- 0. SUCURSALES (necesarias para RF-19)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS sucursales (
-    id_sucursal      SERIAL PRIMARY KEY,
-    nombre           VARCHAR(100) NOT NULL,
-    direccion        VARCHAR(255),
-    ciudad           VARCHAR(100),
-    activa           BOOLEAN NOT NULL DEFAULT TRUE,
-    fecha_apertura   DATE
+-- Created by Redgate Data Modeler (https://datamodeler.redgate-platform.com)
+-- Last modification date: 2026-09-25 14:25:14.162
+-- tables
+-- Table: CAPACITACIONES_CERTIFICACION
+CREATE TABLE CAPACITACIONES_CERTIFICACION (
+    id_capacitacion UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    id_curso UUID NOT NULL,
+    institucion_emisora varchar(120) NOT NULL,
+    fecha_emision date NOT NULL,
+    fecha_vencimiento date NULL,
+    certificado_adjunto_url varchar(255) NULL,
+    registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT CAPACITACIONES_CERTIFICACION_pk PRIMARY KEY (id_capacitacion)
 );
-
--- ------------------------------------------------------------
--- RF-16: Gestión de áreas y departamentos
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS departamentos (
-    id_departamento       SERIAL PRIMARY KEY,
-    codigo                VARCHAR(20) UNIQUE,
-    nombre                VARCHAR(100) NOT NULL,
-    tipo                  VARCHAR(30) NOT NULL DEFAULT 'departamento'
-                          CHECK (tipo IN ('departamento', 'seccion_operativa')),
-    id_departamento_padre INTEGER REFERENCES departamentos(id_departamento),
-    id_sucursal           INTEGER REFERENCES sucursales(id_sucursal),
-    descripcion           TEXT,
-    activo                BOOLEAN NOT NULL DEFAULT TRUE,
-    fecha_creacion        TIMESTAMP NOT NULL DEFAULT now(),
-    fecha_baja            TIMESTAMP
+-- Table: CARGOS
+CREATE TABLE CARGOS (
+    id_cargo UUID NOT NULL,
+    id_departamento UUID NOT NULL,
+    id_cargo_jefe_directo UUID NULL,
+    codigo varchar(20) NOT NULL,
+    nombre varchar(100) NOT NULL,
+    nivel_jerarquico SMALLINT NOT NULL,
+    salario_base_referencial numeric(12, 2) NOT NULL,
+    funciones_clave text NOT NULL,
+    requisitos_minimos text NOT NULL,
+    esta_activo boolean NOT NULL DEFAULT TRUE,
+    CONSTRAINT CARGOS_pk PRIMARY KEY (id_cargo)
 );
-
-CREATE INDEX IF NOT EXISTS idx_departamentos_padre ON departamentos(id_departamento_padre);
-CREATE INDEX IF NOT EXISTS idx_departamentos_sucursal ON departamentos(id_sucursal);
-
--- ------------------------------------------------------------
--- RF-17: Gestión del catálogo de cargos
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS niveles_salariales (
-    id_nivel        SERIAL PRIMARY KEY,
-    nombre          VARCHAR(50) NOT NULL,
-    salario_base    NUMERIC(10,2) NOT NULL,
-    salario_max     NUMERIC(10,2)
+-- Table: CONTRATOS
+CREATE TABLE CONTRATOS (
+    id_contrato UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    id_tipo_contrato SMALLINT NOT NULL,
+    id_tipo_jornada SMALLINT NOT NULL,
+    numero_contrato varchar(40) NOT NULL,
+    periodo_vigencia daterange NOT NULL,
+    haber_mensual_pactado numeric(12, 2) NOT NULL,
+    documento_adjunto_url varchar(255) NULL,
+    es_adenda boolean NOT NULL DEFAULT FALSE,
+    motivo_adenda text NULL,
+    registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT CONTRATOS_pk PRIMARY KEY (id_contrato)
 );
-
-CREATE TABLE IF NOT EXISTS cargos (
-    id_cargo            SERIAL PRIMARY KEY,
-    nombre              VARCHAR(100) NOT NULL,
-    id_nivel_salarial   INTEGER NOT NULL REFERENCES niveles_salariales(id_nivel),
-    id_departamento     INTEGER REFERENCES departamentos(id_departamento),
-    perfil_requerido    TEXT,
-    id_cargo_superior   INTEGER REFERENCES cargos(id_cargo),
-    activo              BOOLEAN NOT NULL DEFAULT TRUE,
-    fecha_creacion      TIMESTAMP NOT NULL DEFAULT now(),
-    fecha_modificacion  TIMESTAMP NOT NULL DEFAULT now() -- Criterio 2, KAN-102
+-- Table: CONVOCATORIAS_ASCENSO
+CREATE TABLE CONVOCATORIAS_ASCENSO (
+    id_convocatoria UUID NOT NULL,
+    id_cargo UUID NOT NULL,
+    id_sucursal UUID NOT NULL,
+    titulo varchar(120) NOT NULL,
+    descripcion_requisitos text NOT NULL,
+    meses_antiguedad_minima int NOT NULL DEFAULT 6,
+    nota_minima_desempeno numeric(4, 2) NOT NULL,
+    fecha_inicio_postulacion date NOT NULL,
+    fecha_cierre_postulacion date NOT NULL,
+    esta_abierta boolean NOT NULL DEFAULT true,
+    CONSTRAINT CONVOCATORIAS_ASCENSO_pk PRIMARY KEY (id_convocatoria)
 );
-
-CREATE INDEX IF NOT EXISTS idx_cargos_superior ON cargos(id_cargo_superior);
-CREATE INDEX IF NOT EXISTS idx_cargos_departamento ON cargos(id_departamento);
-
-CREATE TABLE IF NOT EXISTS funciones_cargo (
-    id_funcion      SERIAL PRIMARY KEY,
-    id_cargo        INTEGER NOT NULL REFERENCES cargos(id_cargo) ON DELETE CASCADE,
-    descripcion     TEXT NOT NULL,
-    orden           SMALLINT DEFAULT 1
+-- Table: CURSOS_CAPACITACION
+CREATE TABLE CURSOS_CAPACITACION (
+    id_curso UUID NOT NULL,
+    codigo varchar(30) NOT NULL DEFAULT true,
+    nombre varchar(150) NOT NULL,
+    descripcion text NULL,
+    horas_academicas int NOT NULL,
+    esta_activo boolean NOT NULL DEFAULT TRUE,
+    CONSTRAINT CURSOS_CAPACITACION_pk PRIMARY KEY (id_curso)
 );
-
--- Trigger KAN-102: actualizar fecha_modificacion al cambiar el nivel salarial
-CREATE OR REPLACE FUNCTION fn_actualizar_fecha_modificacion_cargo()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF NEW.id_nivel_salarial IS DISTINCT FROM OLD.id_nivel_salarial THEN
-        NEW.fecha_modificacion = now();
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_cargos_fecha_modificacion ON cargos;
-CREATE TRIGGER trg_cargos_fecha_modificacion
-    BEFORE UPDATE ON cargos
-    FOR EACH ROW
-    EXECUTE FUNCTION fn_actualizar_fecha_modificacion_cargo();
-
--- ------------------------------------------------------------
--- RF-18: Jerarquías y dependencias (tipo de supervisión, opcional)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS relaciones_supervision (
-    id_relacion          SERIAL PRIMARY KEY,
-    id_cargo_subordinado INTEGER NOT NULL REFERENCES cargos(id_cargo),
-    id_cargo_supervisor  INTEGER NOT NULL REFERENCES cargos(id_cargo),
-    tipo_relacion        VARCHAR(30) NOT NULL DEFAULT 'directa'
-                          CHECK (tipo_relacion IN ('directa', 'funcional', 'matricial')),
-    UNIQUE (id_cargo_subordinado, id_cargo_supervisor, tipo_relacion)
+-- Table: DEPARTAMENTOS
+CREATE TABLE DEPARTAMENTOS (
+    id_departamento UUID NOT NULL,
+    id_departamento_padre UUID NULL,
+    codigo varchar(20) NOT NULL,
+    nombre varchar(100) NOT NULL,
+    descripcion varchar(255) NULL,
+    esta_activo boolean NOT NULL DEFAULT TRUE,
+    CONSTRAINT DEPARTAMENTOS_pk PRIMARY KEY (id_departamento)
 );
-
--- ------------------------------------------------------------
--- Empleados
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS empleados (
-    id_empleado     SERIAL PRIMARY KEY,
-    nombres         VARCHAR(100) NOT NULL,
-    apellidos       VARCHAR(100) NOT NULL,
-    ci              VARCHAR(20) UNIQUE NOT NULL,
-    email           VARCHAR(150) UNIQUE,
-    telefono        VARCHAR(20),
-    fecha_ingreso   DATE NOT NULL DEFAULT CURRENT_DATE,
-    activo          BOOLEAN NOT NULL DEFAULT TRUE
+-- Table: EMPLEADOS
+CREATE TABLE EMPLEADOS (
+    id_empleado UUID NOT NULL,
+    numero_documento varchar(20) NOT NULL,
+    complemento_documento varchar(5) NULL,
+    nombres varchar(70) NOT NULL,
+    primer_apellido varchar(50) NOT NULL,
+    segundo_apellido varchar(50) NULL,
+    fecha_nacimiento date NOT NULL,
+    genero varchar(20) NOT NULL,
+    telefono_celular varchar(20) NOT NULL,
+    correo_personal varchar(120) NOT NULL,
+    direccion_domicilio varchar(255) NOT NULL,
+    fecha_ingreso DATE NOT NULL,
+    id_cargo_actual UUID NOT NULL,
+    id_sucursal_actual UUID NOT NULL,
+    id_estado_empleado SMALLINT NOT NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT EMPLEADOS_pk PRIMARY KEY (id_empleado)
 );
-
--- ------------------------------------------------------------
--- RF-19: Asignación de empleado a cargo y sucursal
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS asignaciones_empleado (
-    id_asignacion       SERIAL PRIMARY KEY,
-    id_empleado         INTEGER NOT NULL REFERENCES empleados(id_empleado),
-    id_cargo            INTEGER NOT NULL REFERENCES cargos(id_cargo),
-    id_departamento     INTEGER REFERENCES departamentos(id_departamento),
-    id_sucursal         INTEGER NOT NULL REFERENCES sucursales(id_sucursal),
-    fecha_inicio        DATE NOT NULL DEFAULT CURRENT_DATE,
-    fecha_fin           DATE,
-    es_vigente          BOOLEAN NOT NULL DEFAULT TRUE,
-    motivo_cambio       VARCHAR(150)
+-- Table: ESTADOS_EMPLEADO
+CREATE TABLE ESTADOS_EMPLEADO (
+    id_estado_empleado SMALLINT NOT NULL,
+    codigo varchar(20) NOT NULL,
+    nombre varchar(50) NOT NULL,
+    permite_acceso boolean NOT NULL,
+    CONSTRAINT ESTADOS_EMPLEADO_pk PRIMARY KEY (id_estado_empleado)
 );
-
-CREATE INDEX IF NOT EXISTS idx_asignaciones_empleado ON asignaciones_empleado(id_empleado);
-CREATE INDEX IF NOT EXISTS idx_asignaciones_vigentes ON asignaciones_empleado(es_vigente) WHERE es_vigente = TRUE;
-
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_indexes WHERE indexname = 'uq_una_asignacion_vigente'
-    ) THEN
-        CREATE UNIQUE INDEX uq_una_asignacion_vigente
-            ON asignaciones_empleado(id_empleado)
-            WHERE es_vigente = TRUE;
-    END IF;
-END $$;
-
--- ------------------------------------------------------------
--- RF-16, criterios 3 y 4: validar baja de un departamento
--- ------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_validar_baja_departamento()
-RETURNS TRIGGER AS $$
-DECLARE
-    v_cargos_activos     INTEGER;
-    v_empleados_vigentes INTEGER;
-BEGIN
-    IF OLD.activo = TRUE AND NEW.activo = FALSE THEN
-
-        SELECT COUNT(*) INTO v_cargos_activos
-        FROM cargos
-        WHERE id_departamento = OLD.id_departamento AND activo = TRUE;
-
-        SELECT COUNT(*) INTO v_empleados_vigentes
-        FROM asignaciones_empleado
-        WHERE id_departamento = OLD.id_departamento AND es_vigente = TRUE;
-
-        IF v_cargos_activos > 0 OR v_empleados_vigentes > 0 THEN
-            RAISE EXCEPTION
-                'No se puede dar de baja el área "%": tiene % cargo(s) activo(s) y % empleado(s) asignado(s).',
-                OLD.nombre, v_cargos_activos, v_empleados_vigentes
-                USING ERRCODE = 'check_violation';
-        END IF;
-
-        NEW.fecha_baja := now();
-    END IF;
-
-    IF OLD.activo = FALSE AND NEW.activo = TRUE THEN
-        NEW.fecha_baja := NULL;
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_validar_baja_departamento ON departamentos;
-CREATE TRIGGER trg_validar_baja_departamento
-    BEFORE UPDATE ON departamentos
-    FOR EACH ROW
-    EXECUTE FUNCTION fn_validar_baja_departamento();
-
--- ------------------------------------------------------------
--- Vistas de apoyo
--- ------------------------------------------------------------
-CREATE OR REPLACE VIEW vista_departamentos_activos AS
-SELECT id_departamento, codigo, nombre, tipo, id_departamento_padre, id_sucursal, descripcion
-FROM departamentos
-WHERE activo = TRUE
-ORDER BY nombre;
-
--- RF-20: Organigrama completo (recursivo)
-CREATE OR REPLACE VIEW vista_organigrama AS
-WITH RECURSIVE arbol_cargos AS (
-    SELECT
-        c.id_cargo,
-        c.nombre            AS cargo,
-        c.id_cargo_superior,
-        c.id_departamento,
-        1                   AS nivel,
-        ARRAY[c.id_cargo]   AS ruta
-    FROM cargos c
-    WHERE c.id_cargo_superior IS NULL
-      AND c.activo = TRUE
-
-    UNION ALL
-
-    SELECT
-        c.id_cargo,
-        c.nombre,
-        c.id_cargo_superior,
-        c.id_departamento,
-        a.nivel + 1,
-        a.ruta || c.id_cargo
-    FROM cargos c
-    JOIN arbol_cargos a ON c.id_cargo_superior = a.id_cargo
-    WHERE c.activo = TRUE
-)
-SELECT
-    a.id_cargo,
-    a.cargo,
-    a.id_cargo_superior,
-    d.nombre AS departamento,
-    a.nivel,
-    a.ruta,
-    e.id_empleado,
-    e.nombres || ' ' || e.apellidos AS empleado_actual,
-    s.nombre AS sucursal
-FROM arbol_cargos a
-LEFT JOIN departamentos d ON d.id_departamento = a.id_departamento
-LEFT JOIN asignaciones_empleado ae
-    ON ae.id_cargo = a.id_cargo AND ae.es_vigente = TRUE
-LEFT JOIN empleados e ON e.id_empleado = ae.id_empleado
-LEFT JOIN sucursales s ON s.id_sucursal = ae.id_sucursal
-ORDER BY a.ruta;
-
--- Ejemplos de uso:
--- SELECT * FROM vista_organigrama WHERE sucursal = 'Sucursal Central';
--- UPDATE departamentos SET activo = FALSE WHERE id_departamento = <id>;  -- prueba criterios 3/4
+-- Table: MEMORANDUMS
+CREATE TABLE MEMORANDUMS (
+    id_memorandum UUID NOT NULL,
+    id_empleado_receptor UUID NOT NULL,
+    id_tipo_memo SMALLINT NOT NULL,
+    id_empleado_emisor UUID NOT NULL,
+    codigo_cite varchar(40) NOT NULL,
+    asunto varchar(150) NOT NULL,
+    contenido_descripcion text NOT NULL,
+    fecha_emision date NOT NULL,
+    fue_notificado boolean NOT NULL DEFAULT false,
+    fecha_hora_notificacion TIMESTAMPTZ NULL,
+    acuse_recibo_firmado boolean NOT NULL DEFAULT false,
+    fecha_hora_acuse TIMESTAMPTZ NULL,
+    CONSTRAINT MEMORANDUMS_pk PRIMARY KEY (id_memorandum)
+);
+-- Table: POSTULACIONES_ASCENSO
+CREATE TABLE POSTULACIONES_ASCENSO (
+    id_postulacion UUID NOT NULL,
+    id_convocatoria UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    fecha_postulacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    cumple_antiguedad boolean NOT NULL,
+    cumple_nota_evaluacion boolean NOT NULL,
+    estado_postulacion varchar(30) NOT NULL,
+    fecha_formalizacion_ascenso date NULL,
+    observaciones_resolucion text NULL,
+    CONSTRAINT POSTULACIONES_ASCENSO_pk PRIMARY KEY (id_postulacion) CONSTRAINT uq_postulacion_convocatoria_empleado UNIQUE (id_convocatoria, id_empleado)
+);
+-- Table: REQUISITOS_CAPACITACION_CARGO
+CREATE TABLE REQUISITOS_CAPACITACION_CARGO (
+    id_requisito_cargo UUID NOT NULL,
+    id_cargo UUID NOT NULL,
+    id_curso UUID NOT NULL,
+    es_obligatorio boolean NOT NULL DEFAULT TRUE,
+    meses_validez_requerida int NULL,
+    CONSTRAINT REQUISITOS_CAPACITACION_CARGO_pk PRIMARY KEY (id_requisito_cargo) CONSTRAINT uq_requisito_cargo_curso UNIQUE (id_cargo, id_curso)
+);
+-- Table: SUCURSALES
+CREATE TABLE SUCURSALES (
+    id_sucursal UUID NOT NULL,
+    codigo_sucursal varchar(20) NOT NULL,
+    nombre varchar(100) NOT NULL,
+    direccion varchar(255) NOT NULL,
+    ciudad varchar(50) NOT NULL DEFAULT 'La Paz',
+    telefono_contacto varchar(20) NULL,
+    esta_activa boolean NOT NULL DEFAULT TRUE,
+    CONSTRAINT SUCURSALES_pk PRIMARY KEY (id_sucursal)
+);
+-- Table: TIPOS_CONTRATO
+CREATE TABLE TIPOS_CONTRATO (
+    id_tipo_contrato SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT TIPOS_CONTRATO_pk PRIMARY KEY (id_tipo_contrato)
+);
+-- Table: TIPOS_JORNADA
+CREATE TABLE TIPOS_JORNADA (
+    id_tipo_jornada SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    horas_semanales int NOT NULL,
+    CONSTRAINT TIPOS_JORNADA_pk PRIMARY KEY (id_tipo_jornada)
+);
+-- Table: TIPOS_MEMORANDUM
+CREATE TABLE TIPOS_MEMORANDUM (
+    id_tipo_memo SMALLINT NOT NULL,
+    clasificacion varchar(30) NOT NULL,
+    nombre varchar(80) NOT NULL,
+    descripcion varchar(255) NOT NULL,
+    CONSTRAINT TIPOS_MEMORANDUM_pk PRIMARY KEY (id_tipo_memo)
+);
+-- foreign keys
+-- Reference: CAPACITACIONES_CERTIFICACION_CURSOS_CAPACITACION (table: CAPACITACIONES_CERTIFICACION)
+ALTER TABLE CAPACITACIONES_CERTIFICACION
+ADD CONSTRAINT CAPACITACIONES_CERTIFICACION_CURSOS_CAPACITACION FOREIGN KEY (id_curso) REFERENCES CURSOS_CAPACITACION (id_curso) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CAPACITACIONES_CERTIFICACION_EMPLEADOS (table: CAPACITACIONES_CERTIFICACION)
+ALTER TABLE CAPACITACIONES_CERTIFICACION
+ADD CONSTRAINT CAPACITACIONES_CERTIFICACION_EMPLEADOS FOREIGN KEY (id_empleado) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CARGOS_CARGOS (table: CARGOS)
+ALTER TABLE CARGOS
+ADD CONSTRAINT CARGOS_CARGOS FOREIGN KEY (id_cargo_jefe_directo) REFERENCES CARGOS (id_cargo) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CARGOS_DEPARTAMENTOS (table: CARGOS)
+ALTER TABLE CARGOS
+ADD CONSTRAINT CARGOS_DEPARTAMENTOS FOREIGN KEY (id_departamento) REFERENCES DEPARTAMENTOS (id_departamento) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONTRATOS_EMPLEADOS (table: CONTRATOS)
+ALTER TABLE CONTRATOS
+ADD CONSTRAINT CONTRATOS_EMPLEADOS FOREIGN KEY (id_empleado) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONTRATOS_TIPOS_CONTRATO (table: CONTRATOS)
+ALTER TABLE CONTRATOS
+ADD CONSTRAINT CONTRATOS_TIPOS_CONTRATO FOREIGN KEY (id_tipo_contrato) REFERENCES TIPOS_CONTRATO (id_tipo_contrato) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONTRATOS_TIPOS_JORNADA (table: CONTRATOS)
+ALTER TABLE CONTRATOS
+ADD CONSTRAINT CONTRATOS_TIPOS_JORNADA FOREIGN KEY (id_tipo_jornada) REFERENCES TIPOS_JORNADA (id_tipo_jornada) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONVOCATORIAS_ASCENSO_CARGOS (table: CONVOCATORIAS_ASCENSO)
+ALTER TABLE CONVOCATORIAS_ASCENSO
+ADD CONSTRAINT CONVOCATORIAS_ASCENSO_CARGOS FOREIGN KEY (id_cargo) REFERENCES CARGOS (id_cargo) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONVOCATORIAS_ASCENSO_SUCURSALES (table: CONVOCATORIAS_ASCENSO)
+ALTER TABLE CONVOCATORIAS_ASCENSO
+ADD CONSTRAINT CONVOCATORIAS_ASCENSO_SUCURSALES FOREIGN KEY (id_sucursal) REFERENCES SUCURSALES (id_sucursal) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: DEPARTAMENTOS_DEPARTAMENTOS (table: DEPARTAMENTOS)
+ALTER TABLE DEPARTAMENTOS
+ADD CONSTRAINT DEPARTAMENTOS_DEPARTAMENTOS FOREIGN KEY (id_departamento_padre) REFERENCES DEPARTAMENTOS (id_departamento) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: EMPLEADOS_CARGOS (table: EMPLEADOS)
+ALTER TABLE EMPLEADOS
+ADD CONSTRAINT EMPLEADOS_CARGOS FOREIGN KEY (id_cargo_actual) REFERENCES CARGOS (id_cargo) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: EMPLEADOS_ESTADOS_EMPLEADO (table: EMPLEADOS)
+ALTER TABLE EMPLEADOS
+ADD CONSTRAINT EMPLEADOS_ESTADOS_EMPLEADO FOREIGN KEY (id_estado_empleado) REFERENCES ESTADOS_EMPLEADO (id_estado_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: EMPLEADOS_SUCURSALES (table: EMPLEADOS)
+ALTER TABLE EMPLEADOS
+ADD CONSTRAINT EMPLEADOS_SUCURSALES FOREIGN KEY (id_sucursal_actual) REFERENCES SUCURSALES (id_sucursal) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: MEMORANDUMS_EMPLEADOS (table: MEMORANDUMS)
+ALTER TABLE MEMORANDUMS
+ADD CONSTRAINT MEMORANDUMS_EMPLEADOS FOREIGN KEY (id_empleado_receptor) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: MEMORANDUMS_EMPLEADOS_EMISOR (table: MEMORANDUMS)
+ALTER TABLE MEMORANDUMS
+ADD CONSTRAINT MEMORANDUMS_EMPLEADOS_EMISOR FOREIGN KEY (id_empleado_emisor) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: MEMORANDUMS_TIPOS_MEMORANDUM (table: MEMORANDUMS)
+ALTER TABLE MEMORANDUMS
+ADD CONSTRAINT MEMORANDUMS_TIPOS_MEMORANDUM FOREIGN KEY (id_tipo_memo) REFERENCES TIPOS_MEMORANDUM (id_tipo_memo) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: POSTULACIONES_ASCENSO_CONVOCATORIAS_ASCENSO (table: POSTULACIONES_ASCENSO)
+ALTER TABLE POSTULACIONES_ASCENSO
+ADD CONSTRAINT POSTULACIONES_ASCENSO_CONVOCATORIAS_ASCENSO FOREIGN KEY (id_convocatoria) REFERENCES CONVOCATORIAS_ASCENSO (id_convocatoria) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: POSTULACIONES_ASCENSO_EMPLEADOS (table: POSTULACIONES_ASCENSO)
+ALTER TABLE POSTULACIONES_ASCENSO
+ADD CONSTRAINT POSTULACIONES_ASCENSO_EMPLEADOS FOREIGN KEY (id_empleado) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: REQUISITOS_CAPACITACION_CARGO_CARGOS (table: REQUISITOS_CAPACITACION_CARGO)
+ALTER TABLE REQUISITOS_CAPACITACION_CARGO
+ADD CONSTRAINT REQUISITOS_CAPACITACION_CARGO_CARGOS FOREIGN KEY (id_cargo) REFERENCES CARGOS (id_cargo) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: REQUISITOS_CAPACITACION_CARGO_CURSOS_CAPACITACION (table: REQUISITOS_CAPACITACION_CARGO)
+ALTER TABLE REQUISITOS_CAPACITACION_CARGO
+ADD CONSTRAINT REQUISITOS_CAPACITACION_CARGO_CURSOS_CAPACITACION FOREIGN KEY (id_curso) REFERENCES CURSOS_CAPACITACION (id_curso) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- End of file.
