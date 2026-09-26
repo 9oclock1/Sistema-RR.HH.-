@@ -11,12 +11,29 @@
 const API_BASE = `${import.meta.env.VITE_API_URL || "/api"}/recr`;
 
 /**
+ * Safely parses a response as JSON.
+ * If the body is not valid JSON (e.g. an HTML error page), returns a
+ * fallback object so callers never crash on `response.json()`.
+ */
+async function safeJson(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      success: false,
+      message: `Error inesperado del servidor (HTTP ${response.status}).`,
+    };
+  }
+}
+
+/**
  * Fetches all active job openings for the dropdown selector.
  * @returns {Promise<Array>}
  */
 export async function fetchActiveJobOpenings() {
   const response = await fetch(`${API_BASE}/applicants/job-openings`);
-  const data = await response.json();
+  const data = await safeJson(response);
   if (!response.ok) {
     throw new Error(data.message || "Error al obtener las convocatorias.");
   }
@@ -34,7 +51,7 @@ export async function registerApplicant(applicantData) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(applicantData),
   });
-  const data = await response.json();
+  const data = await safeJson(response);
   if (!response.ok) {
     const error = new Error(data.message || "Error al registrar el postulante.");
     error.status = response.status;
@@ -54,7 +71,7 @@ export async function fetchApplicantsByJobOpening(id_convocatoria) {
   const response = await fetch(
     `${API_BASE}/applicants/by-opening/${id_convocatoria}`
   );
-  const data = await response.json();
+  const data = await safeJson(response);
   if (!response.ok) {
     throw new Error(data.message || "Error al obtener los postulantes.");
   }

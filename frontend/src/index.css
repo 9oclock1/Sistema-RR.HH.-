@@ -40,7 +40,8 @@
   --surface: #f6f4ef;
   --surface-hover: #f2f0ea;
   --surface-bg: #eeeade;
-  --border: rgba(0, 0, 0, 0.04);
+  /* Border: bumped from 0.04 to 0.25 for WCAG 3:1 contrast against --surface-bg */
+  --border: rgba(0, 0, 0, 0.25);
   --border-focus: var(--color-1);
 
   /* Text — black */
@@ -87,7 +88,8 @@
     --surface: #1e1d18;
     --surface-hover: #26251e;
     --surface-bg: #141310;
-    --border: rgba(255, 255, 255, 0.05);
+    /* Border: bumped for dark mode too — 3:1 contrast against --surface */
+    --border: rgba(255, 255, 255, 0.2);
     --text: #f0f0f0;
     --text-secondary: #d0d0d0;
     --text-muted: #888888;

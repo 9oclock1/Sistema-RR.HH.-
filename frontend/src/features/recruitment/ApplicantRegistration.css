@@ -2,7 +2,7 @@
  * RF-09: Applicant Registration Styles
  *
  * Warm, minimal design. Black text.
- * Cards blend with background. Borders nearly invisible.
+ * Cards blend with background.
  */
 
 /* ========== Container ========== */
@@ -15,6 +15,8 @@
   background: var(--surface-bg);
   min-height: 100vh;
   box-sizing: border-box;
+  /* Prevent horizontal overflow on narrow viewports */
+  overflow-x: hidden;
 }
 
 /* ========== Header ========== */
@@ -89,6 +91,8 @@
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
   transition: box-shadow var(--transition);
+  /* Prevent children from blowing out width */
+  min-width: 0;
 }
 
 .rf09-section:hover {
@@ -122,7 +126,8 @@
 /* ========== Content Layout ========== */
 .rf09-content {
   display: grid;
-  grid-template-columns: 1fr 1.2fr;
+  /* Give the form slightly more room so inputs aren't squished at 1280px */
+  grid-template-columns: 1.1fr 1fr;
   gap: 24px;
   align-items: start;
 }
@@ -131,17 +136,23 @@
   padding: 28px;
   position: sticky;
   top: 24px;
+  /* Prevent form from overflowing its grid cell */
+  min-width: 0;
 }
 
 .rf09-list-section {
   padding: 28px;
+  /* Prevent table from overflowing its grid cell */
+  min-width: 0;
+  overflow: hidden;
 }
 
 .rf09-list-section--full {
   grid-column: 1 / -1;
 }
 
-@media (max-width: 1100px) {
+/* Stack to single column earlier — at 1200px instead of 1100px */
+@media (max-width: 1200px) {
   .rf09-content {
     grid-template-columns: 1fr;
   }
@@ -187,7 +198,9 @@
 .rf09-input,
 .rf09-select {
   width: 100%;
-  padding: 10px 14px;
+  /* Padding bumped so computed height meets 44px minimum touch target */
+  padding: 12px 14px;
+  min-height: 44px;
   font-size: 14px;
   font-family: var(--font);
   color: var(--text);
@@ -292,6 +305,8 @@
 .rf09-form-group {
   display: flex;
   flex-direction: column;
+  /* Prevent long placeholder text from blowing out grid */
+  min-width: 0;
 }
 
 .rf09-form-group--small {
@@ -319,7 +334,9 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 11px 24px;
+  /* Ensure 44px minimum touch target */
+  padding: 12px 24px;
+  min-height: 44px;
   font-size: 14px;
   font-weight: 600;
   font-family: var(--font);
@@ -422,19 +439,29 @@
   margin: 0;
 }
 
+/* Close button: 44×44px minimum touch target (WCAG 2.5.8) */
 .rf09-notification-close {
   background: none;
   border: none;
-  font-size: 20px;
+  font-size: 22px;
   cursor: pointer;
   color: var(--text-muted);
-  padding: 0 4px;
+  /* Ensure 44×44 touch target via min-width/height + centering */
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   line-height: 1;
-  transition: opacity var(--transition);
+  border-radius: var(--radius-xs);
+  transition: opacity var(--transition), background var(--transition);
+  flex-shrink: 0;
 }
 
 .rf09-notification-close:hover {
   color: var(--text);
+  background: rgba(0, 0, 0, 0.05);
 }
 
 /* ========== Loading & Empty States ========== */
@@ -541,6 +568,8 @@
   overflow-x: auto;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
+  /* Let the wrapper scroll horizontally instead of blowing out the card */
+  max-width: 100%;
 }
 
 .rf09-table {
@@ -682,5 +711,21 @@
 
   .rf09-btn {
     width: 100%;
+  }
+}
+
+/* Extra-small: ensure nothing escapes the viewport */
+@media (max-width: 480px) {
+  .rf09-container {
+    padding: 12px 8px;
+  }
+
+  .rf09-selector-section {
+    padding: 14px 16px;
+  }
+
+  .rf09-form-section,
+  .rf09-list-section {
+    padding: 16px;
   }
 }

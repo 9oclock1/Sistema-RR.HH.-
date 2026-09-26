@@ -74,8 +74,22 @@ async function registerApplicant(data) {
         },
       };
     }
+
+    // 4. Update the applicant's profile with the latest submitted data
+    //    so a returning applicant can correct their name, email, etc.
+    applicant = await applicantModel.updateApplicant(
+      applicant.id_postulante,
+      {
+        nombres,
+        apellidos,
+        correo_electronico,
+        telefono_contacto,
+        direccion_residencia,
+        ciudad,
+      }
+    );
   } else {
-    // 4. Check email uniqueness before creating
+    // 5. Check email uniqueness before creating
     const existingByEmail = await applicantModel.findByEmail(correo_electronico);
     if (existingByEmail) {
       return {
@@ -85,7 +99,7 @@ async function registerApplicant(data) {
       };
     }
 
-    // 5. Create the applicant record
+    // 6. Create the applicant record
     applicant = await applicantModel.createApplicant({
       numero_documento,
       nombres,
@@ -97,8 +111,10 @@ async function registerApplicant(data) {
     });
   }
 
-  // 6. Create the application (association between applicant ↔ convocatoria)
+  // 7. Create the application (association between applicant ↔ convocatoria)
   //    Default stage id_etapa = 1 (first stage in the workflow)
+  //    TODO: cv_archivo_url is hardcoded to "pending" until a file-upload
+  //    endpoint is implemented. See POSTULACIONES.cv_archivo_url varchar(255).
   const application = await applicationModel.createApplication({
     id_convocatoria,
     id_postulante: applicant.id_postulante,

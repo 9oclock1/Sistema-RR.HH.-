@@ -96,9 +96,53 @@ async function findByEmail(correo_electronico) {
   return result.rows[0] || null;
 }
 
+/**
+ * Updates an existing applicant's profile data.
+ * Used when a returning applicant applies to a new vacancy with updated info.
+ * @param {string} id_postulante
+ * @param {Object} data - Fields to update
+ * @returns {Object} The updated applicant row
+ */
+async function updateApplicant(id_postulante, data) {
+  const {
+    nombres,
+    apellidos,
+    correo_electronico,
+    telefono_contacto,
+    direccion_residencia,
+    ciudad,
+  } = data;
+
+  const query = `
+    UPDATE POSTULANTES SET
+      nombres = $2,
+      apellidos = $3,
+      correo_electronico = $4,
+      telefono_contacto = $5,
+      direccion_residencia = $6,
+      ciudad = $7
+    WHERE id_postulante = $1
+    RETURNING *;
+  `;
+
+  const values = [
+    id_postulante,
+    String(nombres).trim(),
+    String(apellidos).trim(),
+    String(correo_electronico).trim().toLowerCase(),
+    String(telefono_contacto).trim(),
+    direccion_residencia ? String(direccion_residencia).trim() : null,
+    ciudad ? String(ciudad).trim() : "La Paz",
+  ];
+
+  const result = await pool.query(query, values);
+  return result.rows[0];
+}
+
 module.exports = {
   createApplicant,
   findByDocumentNumber,
   findById,
   findByEmail,
+  updateApplicant,
 };

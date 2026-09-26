@@ -4,6 +4,10 @@ import { useState, useCallback } from "react";
  * Custom hook for managing the applicant registration form state.
  * Encapsulates form data, validation, field errors, and reset logic.
  * Kept separate from the UI component for testability and reuse.
+ *
+ * Validation mirrors the backend middleware (validationMiddleware.js).
+ * Each field produces at most ONE error (first that fails):
+ *   type → required → format / length
  */
 
 const INITIAL_FORM_STATE = {
@@ -42,9 +46,12 @@ export function useApplicantForm() {
   const validateForm = useCallback(() => {
     const errors = {};
 
+    // ── id_convocatoria ──
     if (!formData.id_convocatoria) {
       errors.id_convocatoria = "Debe seleccionar una convocatoria.";
     }
+
+    // ── numero_documento — required, 5-20 chars ──
     if (!formData.numero_documento.trim()) {
       errors.numero_documento = "El número de documento es obligatorio.";
     } else if (
@@ -54,14 +61,27 @@ export function useApplicantForm() {
       errors.numero_documento =
         "El documento debe tener entre 5 y 20 caracteres.";
     }
+
+    // ── nombres — required, max 70 chars ──
     if (!formData.nombres.trim()) {
       errors.nombres = "Los nombres son obligatorios.";
+    } else if (formData.nombres.trim().length > 70) {
+      errors.nombres = "Los nombres no deben exceder 70 caracteres.";
     }
+
+    // ── apellidos — required, max 100 chars ──
     if (!formData.apellidos.trim()) {
       errors.apellidos = "Los apellidos son obligatorios.";
+    } else if (formData.apellidos.trim().length > 100) {
+      errors.apellidos = "Los apellidos no deben exceder 100 caracteres.";
     }
+
+    // ── correo_electronico — required, max 120, email format ──
     if (!formData.correo_electronico.trim()) {
       errors.correo_electronico = "El correo electrónico es obligatorio.";
+    } else if (formData.correo_electronico.trim().length > 120) {
+      errors.correo_electronico =
+        "El correo electrónico no debe exceder 120 caracteres.";
     } else {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.correo_electronico.trim())) {
@@ -69,16 +89,32 @@ export function useApplicantForm() {
           "El formato del correo electrónico no es válido.";
       }
     }
+
+    // ── telefono_contacto — required, digits only, 7-20 digits ──
     if (!formData.telefono_contacto.trim()) {
       errors.telefono_contacto = "El teléfono de contacto es obligatorio.";
     } else {
-      const phone = formData.telefono_contacto
+      const digits = formData.telefono_contacto
         .trim()
         .replace(/[\s\-+()]/g, "");
-      if (phone.length < 7 || phone.length > 20) {
+      if (!/^\d+$/.test(digits)) {
+        errors.telefono_contacto =
+          "El teléfono solo debe contener dígitos (y opcionalmente +, -, paréntesis o espacios).";
+      } else if (digits.length < 7 || digits.length > 20) {
         errors.telefono_contacto =
           "El teléfono debe tener entre 7 y 20 dígitos.";
       }
+    }
+
+    // ── direccion_residencia — optional, max 255 ──
+    if (formData.direccion_residencia.trim().length > 255) {
+      errors.direccion_residencia =
+        "La dirección no debe exceder 255 caracteres.";
+    }
+
+    // ── ciudad — optional, max 50 ──
+    if (formData.ciudad.trim().length > 50) {
+      errors.ciudad = "La ciudad no debe exceder 50 caracteres.";
     }
 
     setFieldErrors(errors);
@@ -93,7 +129,11 @@ export function useApplicantForm() {
     if (!Array.isArray(backendErrors)) return;
     const errors = {};
     for (const err of backendErrors) {
-      errors[err.field] = err.message;
+      // Only keep the FIRST error per field (backend sends at most one,
+      // but guard against future changes)
+      if (!errors[err.field]) {
+        errors[err.field] = err.message;
+      }
     }
     setFieldErrors(errors);
   }, []);
