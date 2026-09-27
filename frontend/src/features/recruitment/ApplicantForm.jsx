@@ -21,8 +21,21 @@ export default function ApplicantForm({
   onSubmit,
   submitting,
 }) {
+  const hasErrors = Object.keys(fieldErrors).length > 0;
+
   return (
     <form className="rf09-form" onSubmit={onSubmit} noValidate>
+      {/* Accessible Error Summary for Screen Readers */}
+      {hasErrors && (
+        <div
+          className="rf09-field-summary-alert"
+          role="alert"
+          aria-live="assertive"
+        >
+          <span>El formulario contiene {Object.keys(fieldErrors).length} error(es). Por favor, revise los campos marcados.</span>
+        </div>
+      )}
+
       {/* Información Personal */}
       <fieldset className="rf09-fieldset">
         <legend className="rf09-legend">
@@ -50,9 +63,19 @@ export default function ApplicantForm({
               placeholder="Ej: 12345678"
               maxLength={20}
               autoComplete="off"
+              aria-required="true"
+              aria-invalid={fieldErrors.numero_documento ? "true" : "false"}
+              aria-describedby={
+                fieldErrors.numero_documento ? "rf09-doc-error" : undefined
+              }
             />
             {fieldErrors.numero_documento && (
-              <span className="rf09-field-error">
+              <span
+                id="rf09-doc-error"
+                className="rf09-field-error"
+                role="alert"
+                aria-live="polite"
+              >
                 {fieldErrors.numero_documento}
               </span>
             )}
@@ -75,9 +98,21 @@ export default function ApplicantForm({
               onChange={onChange}
               placeholder="Ej: Juan Carlos"
               maxLength={70}
+              aria-required="true"
+              aria-invalid={fieldErrors.nombres ? "true" : "false"}
+              aria-describedby={
+                fieldErrors.nombres ? "rf09-nombres-error" : undefined
+              }
             />
             {fieldErrors.nombres && (
-              <span className="rf09-field-error">{fieldErrors.nombres}</span>
+              <span
+                id="rf09-nombres-error"
+                className="rf09-field-error"
+                role="alert"
+                aria-live="polite"
+              >
+                {fieldErrors.nombres}
+              </span>
             )}
           </div>
 
@@ -96,9 +131,21 @@ export default function ApplicantForm({
               onChange={onChange}
               placeholder="Ej: Pérez García"
               maxLength={100}
+              aria-required="true"
+              aria-invalid={fieldErrors.apellidos ? "true" : "false"}
+              aria-describedby={
+                fieldErrors.apellidos ? "rf09-apellidos-error" : undefined
+              }
             />
             {fieldErrors.apellidos && (
-              <span className="rf09-field-error">{fieldErrors.apellidos}</span>
+              <span
+                id="rf09-apellidos-error"
+                className="rf09-field-error"
+                role="alert"
+                aria-live="polite"
+              >
+                {fieldErrors.apellidos}
+              </span>
             )}
           </div>
         </div>
@@ -130,9 +177,23 @@ export default function ApplicantForm({
               onChange={onChange}
               placeholder="Ej: juan.perez@email.com"
               maxLength={120}
+              aria-required="true"
+              aria-invalid={
+                fieldErrors.correo_electronico ? "true" : "false"
+              }
+              aria-describedby={
+                fieldErrors.correo_electronico
+                  ? "rf09-email-error"
+                  : undefined
+              }
             />
             {fieldErrors.correo_electronico && (
-              <span className="rf09-field-error">
+              <span
+                id="rf09-email-error"
+                className="rf09-field-error"
+                role="alert"
+                aria-live="polite"
+              >
                 {fieldErrors.correo_electronico}
               </span>
             )}
@@ -153,9 +214,23 @@ export default function ApplicantForm({
               onChange={onChange}
               placeholder="Ej: +591 71234567"
               maxLength={20}
+              aria-required="true"
+              aria-invalid={
+                fieldErrors.telefono_contacto ? "true" : "false"
+              }
+              aria-describedby={
+                fieldErrors.telefono_contacto
+                  ? "rf09-phone-error"
+                  : undefined
+              }
             />
             {fieldErrors.telefono_contacto && (
-              <span className="rf09-field-error">
+              <span
+                id="rf09-phone-error"
+                className="rf09-field-error"
+                role="alert"
+                aria-live="polite"
+              >
                 {fieldErrors.telefono_contacto}
               </span>
             )}
@@ -182,12 +257,32 @@ export default function ApplicantForm({
               id="rf09-address"
               type="text"
               name="direccion_residencia"
-              className="rf09-input"
+              className={`rf09-input ${
+                fieldErrors.direccion_residencia ? "rf09-input--error" : ""
+              }`}
               value={formData.direccion_residencia}
               onChange={onChange}
               placeholder="Ej: Av. 6 de Agosto #1234, Zona Sopocachi"
               maxLength={255}
+              aria-invalid={
+                fieldErrors.direccion_residencia ? "true" : "false"
+              }
+              aria-describedby={
+                fieldErrors.direccion_residencia
+                  ? "rf09-address-error"
+                  : undefined
+              }
             />
+            {fieldErrors.direccion_residencia && (
+              <span
+                id="rf09-address-error"
+                className="rf09-field-error"
+                role="alert"
+                aria-live="polite"
+              >
+                {fieldErrors.direccion_residencia}
+              </span>
+            )}
           </div>
 
           <div className="rf09-form-group rf09-form-group--small">
@@ -198,12 +293,28 @@ export default function ApplicantForm({
               id="rf09-city"
               type="text"
               name="ciudad"
-              className="rf09-input"
+              className={`rf09-input ${
+                fieldErrors.ciudad ? "rf09-input--error" : ""
+              }`}
               value={formData.ciudad}
               onChange={onChange}
               placeholder="Ej: La Paz"
               maxLength={50}
+              aria-invalid={fieldErrors.ciudad ? "true" : "false"}
+              aria-describedby={
+                fieldErrors.ciudad ? "rf09-city-error" : undefined
+              }
             />
+            {fieldErrors.ciudad && (
+              <span
+                id="rf09-city-error"
+                className="rf09-field-error"
+                role="alert"
+                aria-live="polite"
+              >
+                {fieldErrors.ciudad}
+              </span>
+            )}
           </div>
         </div>
       </fieldset>

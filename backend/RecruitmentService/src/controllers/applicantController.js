@@ -21,40 +21,48 @@ async function registerApplicant(req, res) {
     if (error.code === "23505") {
       // PostgreSQL unique_violation
       if (error.constraint === "uq_postulacion_convocatoria_postulante") {
+        const msg = "El postulante ya se encuentra registrado en esta convocatoria.";
         return res.status(409).json({
           success: false,
-          message:
-            "El postulante ya se encuentra registrado en esta convocatoria.",
+          message: msg,
+          error: msg,
         });
       }
       if (error.constraint === "uq_postulante_correo") {
+        const msg = "El correo electrónico ya se encuentra registrado con otro postulante.";
         return res.status(409).json({
           success: false,
-          message: "El correo electrónico ya se encuentra registrado.",
+          message: msg,
+          error: msg,
         });
       }
     }
 
     // Handle FK violations (e.g., invalid id_etapa)
     if (error.code === "23503") {
+      const msg = "Referencia inválida. Verifique que la convocatoria y la etapa existan.";
       return res.status(400).json({
         success: false,
-        message:
-          "Referencia inválida. Verifique que la convocatoria y la etapa existan.",
+        message: msg,
+        error: msg,
       });
     }
 
     // Handle invalid UUID or data syntax (PostgreSQL 22P02)
     if (error.code === "22P02") {
+      const msg = "Formato de identificador o dato inválido.";
       return res.status(400).json({
         success: false,
-        message: "Formato de identificador o dato inválido.",
+        message: msg,
+        error: msg,
       });
     }
 
+    const msg500 = "Error interno del servidor al registrar el postulante.";
     return res.status(500).json({
       success: false,
-      message: "Error interno del servidor al registrar el postulante.",
+      message: msg500,
+      error: msg500,
     });
   }
 }
@@ -71,9 +79,11 @@ async function getApplicantsByJobOpening(req, res) {
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(id_convocatoria)) {
+      const msg = "El ID de la convocatoria no tiene un formato UUID válido.";
       return res.status(400).json({
         success: false,
-        message: "El ID de la convocatoria no tiene un formato UUID válido.",
+        message: msg,
+        error: msg,
       });
     }
 
@@ -86,9 +96,11 @@ async function getApplicantsByJobOpening(req, res) {
       "[ApplicantController] getApplicantsByJobOpening error:",
       error
     );
+    const msg = "Error interno del servidor al obtener los postulantes.";
     return res.status(500).json({
       success: false,
-      message: "Error interno del servidor al obtener los postulantes.",
+      message: msg,
+      error: msg,
     });
   }
 }
@@ -106,9 +118,11 @@ async function getActiveJobOpenings(req, res) {
       "[ApplicantController] getActiveJobOpenings error:",
       error
     );
+    const msg = "Error interno del servidor al obtener las convocatorias.";
     return res.status(500).json({
       success: false,
-      message: "Error interno del servidor al obtener las convocatorias.",
+      message: msg,
+      error: msg,
     });
   }
 }

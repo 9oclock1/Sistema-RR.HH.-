@@ -18,7 +18,7 @@ const INITIAL_FORM_STATE = {
   correo_electronico: "",
   telefono_contacto: "",
   direccion_residencia: "",
-  ciudad: "La Paz",
+  ciudad: "",
 };
 
 export function useApplicantForm() {

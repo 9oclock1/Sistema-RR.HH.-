@@ -42,35 +42,69 @@ app.get("/vacancies", (req, res) => {
 // === RF-09: Applicant Registration Routes ===
 const applicantRoutes = require("./src/routes/applicantRoutes");
 app.use("/applicants", applicantRoutes);
+app.use("/postulantes", applicantRoutes);
+
+// ── Stage Catalog Auto-Seed Self-Healing ──
+async function initDbSeed() {
+  try {
+    await pool.query(`
+      INSERT INTO CATALOGOS_ETAPA_POSTULACION (id_etapa, codigo, nombre, orden_flujo) VALUES
+      (1, 'POSTULADO', 'Postulación Recibida', 1),
+      (2, 'REVISION_CV', 'Revisión Curricular', 2),
+      (3, 'ENTREVISTA', 'Entrevista', 3),
+      (4, 'EVALUACION', 'Evaluación Técnica', 4),
+      (5, 'FINALISTA', 'Finalista / Oferta', 5),
+      (6, 'CONTRATADO', 'Contratado', 6),
+      (7, 'RECHAZADO', 'No Seleccionado', 7)
+      ON CONFLICT (id_etapa) DO NOTHING;
+    `);
+    console.log("[DB] Catálogo de etapas inicializado/verificado correctamente.");
+  } catch (err) {
+    console.warn("[DB] Advertencia al verificar catálogo de etapas:", err.message);
+  }
+}
 
 // ── Global Error-Handling Middleware ──
 // Catches malformed JSON bodies (SyntaxError from express.json())
 // and any other unhandled errors so the client always gets JSON, never HTML.
 // eslint-disable-next-line no-unused-vars
-app.use((err, req, res, _next) => {
+app.use((err, req, res, next) => {
+  if (res.headersSent) {
+    return next(err);
+  }
+
   // Malformed JSON body
   if (err.type === "entity.parse.failed" || err instanceof SyntaxError) {
+    const msg = "El cuerpo de la solicitud no es JSON válido.";
     return res.status(400).json({
       success: false,
-      message: "El cuerpo de la solicitud no es JSON válido.",
+      message: msg,
+      error: msg,
     });
   }
 
   // Payload too large
   if (err.type === "entity.too.large") {
+    const msg = "El cuerpo de la solicitud es demasiado grande.";
     return res.status(413).json({
       success: false,
-      message: "El cuerpo de la solicitud es demasiado grande.",
+      message: msg,
+      error: msg,
     });
   }
 
   console.error("[GlobalErrorHandler]", err);
-  return res.status(500).json({
+  const status = err.statusCode || err.status || 500;
+  const msg = status === 500 ? "Error interno del servidor." : (err.message || "Error interno del servidor.");
+  return res.status(status).json({
     success: false,
-    message: "Error interno del servidor.",
+    message: msg,
+    error: msg,
   });
 });
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RecruitmentService corriendo en http://0.0.0.0:${PORT}`);
+  initDbSeed();
 });
+

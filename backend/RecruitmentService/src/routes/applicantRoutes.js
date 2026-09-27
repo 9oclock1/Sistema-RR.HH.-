@@ -22,14 +22,30 @@ router.post(
   validateApplicantRegistration,
   applicantController.registerApplicant
 );
+router.post(
+  "/registro",
+  validateApplicantRegistration,
+  applicantController.registerApplicant
+);
+router.post(
+  "/registrar",
+  validateApplicantRegistration,
+  applicantController.registerApplicant
+);
 
 // List all applicants for a specific job opening
 router.get(
   "/by-opening/:id_convocatoria",
   applicantController.getApplicantsByJobOpening
 );
+router.get(
+  "/por-convocatoria/:id_convocatoria",
+  applicantController.getApplicantsByJobOpening
+);
 
 // Get all active job openings (for dropdown/select)
 router.get("/job-openings", applicantController.getActiveJobOpenings);
+router.get("/convocatorias-activas", applicantController.getActiveJobOpenings);
 
 module.exports = router;
+

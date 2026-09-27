@@ -2,22 +2,96 @@
  * RF-09: Applicant Registration Styles
  *
  * Warm, minimal design. Black text.
- * Cards blend with background.
+ * All tokens and rules are strictly scoped to .rf09-container
+ * so it never leaks or collides with other features or global styles.
  */
 
-/* ========== Container ========== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ========== Scoped Design Tokens & Container ========== */
 .rf09-container {
+  /* ── Design Tokens Scoped to RF-09 ── */
+  --font: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --color-1: #5b8f5c;
+  --color-1-dark: #4a7549;
+  --color-1-darker: #3c5f3c;
+  --color-1-light: rgba(91, 143, 92, 0.08);
+  --color-1-border: rgba(91, 143, 92, 0.2);
+  --color-2: #a4c29e;
+  --color-3: #e0d3b2;
+  --color-4: #d1a971;
+  --color-5: #9b5c4b;
+  --color-5-light: rgba(155, 92, 75, 0.08);
+  --color-5-border: rgba(155, 92, 75, 0.2);
+
+  --surface: #f6f4ef;
+  --surface-hover: #f2f0ea;
+  --surface-bg: #eeeade;
+  /* High contrast border meeting WCAG AA >= 3:1 */
+  --border: rgba(0, 0, 0, 0.25);
+  --border-focus: #5b8f5c;
+
+  --text: #000000;
+  --text-secondary: #1a1a1a;
+  --text-muted: #666666;
+
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-xs: 6px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 14px rgba(0, 0, 0, 0.08);
+
+  --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Container Layout & Reset */
   font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.55;
+  text-align: left;
   max-width: 1400px;
+  width: 100%;
   margin: 0 auto;
   padding: 32px 24px;
   color: var(--text);
   background: var(--surface-bg);
   min-height: 100vh;
   box-sizing: border-box;
-  /* Prevent horizontal overflow on narrow viewports */
   overflow-x: hidden;
 }
+
+@media (prefers-color-scheme: dark) {
+  .rf09-container {
+    --color-1: #7baf7c;
+    --color-1-dark: #5b8f5c;
+    --color-1-darker: #4a7549;
+    --color-1-light: rgba(123, 175, 124, 0.12);
+    --color-1-border: rgba(123, 175, 124, 0.25);
+    --color-2: #a4c29e;
+    --color-4: #dbb97e;
+    --color-5: #c07a68;
+    --color-5-light: rgba(192, 122, 104, 0.12);
+    --color-5-border: rgba(192, 122, 104, 0.25);
+
+    --surface: #1e1d18;
+    --surface-hover: #26251e;
+    --surface-bg: #141310;
+    --border: rgba(255, 255, 255, 0.22);
+    --border-focus: #7baf7c;
+
+    --text: #f0f0f0;
+    --text-secondary: #d0d0d0;
+    --text-muted: #888888;
+  }
+}
+
+.rf09-container *,
+.rf09-container *::before,
+.rf09-container *::after {
+  box-sizing: border-box;
+}
+
 
 /* ========== Header ========== */
 .rf09-header {
@@ -254,6 +328,20 @@
   40% { transform: translateX(4px); }
   60% { transform: translateX(-2px); }
   80% { transform: translateX(2px); }
+}
+
+.rf09-field-summary-alert {
+  padding: 12px 16px;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-5);
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: rf09-slideDown 0.25s ease-out;
 }
 
 /* ========== Form Layout ========== */

@@ -238,6 +238,11 @@ export default function ApplicantRegistration() {
             }`}
             value={formData.id_convocatoria}
             onChange={handleOpeningChange}
+            aria-required="true"
+            aria-invalid={fieldErrors.id_convocatoria ? "true" : "false"}
+            aria-describedby={
+              fieldErrors.id_convocatoria ? "rf09-opening-error" : undefined
+            }
           >
             <option value="">— Seleccione una convocatoria —</option>
             {jobOpenings.map((opening) => (
@@ -251,7 +256,14 @@ export default function ApplicantRegistration() {
           </select>
         )}
         {fieldErrors.id_convocatoria && (
-          <span className="rf09-field-error">{fieldErrors.id_convocatoria}</span>
+          <span
+            id="rf09-opening-error"
+            className="rf09-field-error"
+            role="alert"
+            aria-live="polite"
+          >
+            {fieldErrors.id_convocatoria}
+          </span>
         )}
         {jobOpenings.length === 0 && !loadingOpenings && (
           <p className="rf09-empty-state">
@@ -262,7 +274,11 @@ export default function ApplicantRegistration() {
 
       {/* Notification */}
       {notification && (
-        <div className={`rf09-notification rf09-notification--${notification.type}`}>
+        <div
+          className={`rf09-notification rf09-notification--${notification.type}`}
+          role="alert"
+          aria-live="assertive"
+        >
           <div className="rf09-notification-icon">
             {notification.type === "success" && (
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

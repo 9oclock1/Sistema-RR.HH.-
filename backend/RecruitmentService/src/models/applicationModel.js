@@ -14,9 +14,10 @@ const { v4: uuidv4 } = require("uuid");
 /**
  * Creates a new application linking an applicant to a job opening.
  * @param {Object} data
+ * @param {Object} [dbClient=pool] - Optional client for transaction support
  * @returns {Object} The created application row
  */
-async function createApplication(data) {
+async function createApplication(data, dbClient = pool) {
   const {
     id_convocatoria,
     id_postulante,
@@ -48,7 +49,7 @@ async function createApplication(data) {
     cv_formato_mimetype || "application/pdf",
   ];
 
-  const result = await pool.query(query, values);
+  const result = await dbClient.query(query, values);
   return result.rows[0];
 }
 
@@ -57,11 +58,13 @@ async function createApplication(data) {
  * Leverages the UNIQUE constraint (id_convocatoria, id_postulante).
  * @param {string} id_convocatoria
  * @param {string} id_postulante
+ * @param {Object} [dbClient=pool]
  * @returns {Object|null}
  */
 async function findByConvocatoriaAndPostulante(
   id_convocatoria,
-  id_postulante
+  id_postulante,
+  dbClient = pool
 ) {
   const query = `
     SELECT p.*, pos.nombres, pos.apellidos, pos.numero_documento
@@ -69,7 +72,7 @@ async function findByConvocatoriaAndPostulante(
     JOIN POSTULANTES pos ON pos.id_postulante = p.id_postulante
     WHERE p.id_convocatoria = $1 AND p.id_postulante = $2;
   `;
-  const result = await pool.query(query, [id_convocatoria, id_postulante]);
+  const result = await dbClient.query(query, [id_convocatoria, id_postulante]);
   return result.rows[0] || null;
 }
 

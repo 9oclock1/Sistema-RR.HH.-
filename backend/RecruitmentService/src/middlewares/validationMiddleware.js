@@ -212,10 +212,14 @@ function validateApplicantRegistration(req, res, next) {
   }
 
   if (errors.length > 0) {
+    const errorMsg = "Faltan campos obligatorios o contienen datos inválidos.";
     return res.status(400).json({
       success: false,
-      message: "Faltan campos obligatorios o contienen datos inválidos.",
+      message: errorMsg,
+      error: errorMsg,
       errors,
+      errores: errors.map((e) => ({ campo: e.field, mensaje: e.message })),
+      campos_faltantes: errors.map((e) => e.field),
     });
   }
 
