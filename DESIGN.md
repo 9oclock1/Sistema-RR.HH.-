@@ -79,7 +79,7 @@ Están en `frontend/src/styles/tokens.css` y se cargan en `main.jsx`. En CSS se 
 | Texto | `--color-text`, `--color-text-secondary`, `--color-text-subtle`, `--color-text-inverse`, `--color-text-selected` |
 | Fondos | `--color-bg-surface`, `--color-bg-page`, `--color-bg-hover`, `--color-bg-pressed`, `--color-bg-neutral`, `--color-bg-selected`, `--color-bg-overlay` |
 | Bordes | `--color-border`, `--color-border-hover`, `--color-border-input`, `--color-border-focus` |
-| Estados | `--color-success`, `--color-warning`, `--color-danger`, `--color-info`, `--color-purple` y sus variantes `-text`; `--color-danger-hover`, `--color-danger-pressed`, `--color-on-danger` |
+| Estados | `--color-success`, `--color-warning`, `--color-danger`, `--color-info`, `--color-purple` y sus variantes `-text` y `-bg` (`--color-info-bg`, `--color-success-bg`, `--color-warning-bg`, `--color-danger-bg`); `--color-danger-hover`, `--color-danger-pressed`, `--color-on-danger` |
 | Avatares y carga | `--color-avatar-1` … `--color-avatar-6`, `--color-on-avatar`, `--color-skeleton`, `--color-skeleton-shine` |
 | Tipografía | `--font-family`, `--font-family-mono`, `--font-size-body`, `--line-height-body`, `--font-size-small`, `--line-height-small`, `--font-size-title`, `--line-height-title`, `--font-size-section`, `--line-height-section`, `--font-size-input-touch`, `--font-weight-regular`, `--font-weight-medium`, `--font-weight-semibold` |
 | Espaciado | `--space-1` (4), `--space-2` (8), `--space-3` (12), `--space-4` (16), `--space-6` (24), `--space-8` (32), `--space-content` |
@@ -103,16 +103,19 @@ import { Boton, CampoTexto, Tabla, useAvisos } from "../../components/ui";
 | `Boton` | Con `href` se pinta como enlace. `variante`: `primario` \| `predeterminado` \| `sutil` \| `peligro`; `tamano`: `md` \| `sm`; `icono`, `soloIcono` (requiere `aria-label`), `cargando`, `disabled` |
 | `CampoTexto` | Input con `etiqueta`, `ayuda`, `error`, `requerido` y el resto de atributos de `<input>` |
 | `Selector` | `<select>` con las mismas props de campo más `opciones` `[{ valor, etiqueta }]` y `textoVacio` |
+| `Casilla` | Checkbox con `etiqueta` y `ayuda`; el resto de atributos van al `<input>` |
 | `Campo` | Envoltorio de etiqueta, ayuda y error para crear otros controles |
-| `Tarjeta` | `titulo`, `acciones`, `interactiva`, `seleccionada`; con `onClick` se vuelve botón |
+| `Tarjeta` | `titulo`, `nivelTitulo` (3 por defecto), `acciones`, `interactiva`, `seleccionada`; con `onClick` se vuelve botón |
 | `Etiqueta` | `tono`: `neutral` \| `exito` \| `aviso` \| `peligro` \| `info` \| `morado`; `icono` |
+| `Alerta` | Mensaje en línea que permanece: `tono` (`info` \| `exito` \| `aviso` \| `peligro`), `titulo`, `acciones`, `onCerrar`. Con `role="alert"` para errores; con `tabIndex={-1}` y `ref` para llevar el foco (resumen de errores de un formulario) |
 | `Contador` | Píldora gris para cantidades |
 | `Avatar` | `nombre` (genera iniciales y color), `tamano`: `md` \| `lg`, `decorativo` |
 | `Modal` | `abierto`, `titulo`, `onCerrar`, `pie`, `tamano`: `md` \| `sm`, `bloqueado` |
 | `ModalConfirmacion` | Confirmación de acciones destructivas: `titulo`, `textoConfirmar`, `procesando`, `onConfirmar`, `onCancelar` |
-| `ProveedorAvisos` + `useAvisos` | Ya envuelve la app en `main.jsx`. `const avisar = useAvisos(); avisar({ tono, titulo, mensaje })` |
+| `ProveedorAvisos` + `useAvisos` | Avisos flotantes que se cierran solos, para confirmar una acción; lo que el usuario debe leer o resolver va en `Alerta`. Ya envuelve la app en `main.jsx`. `const avisar = useAvisos(); avisar({ tono, titulo, mensaje })` |
 | `Tabla` | `columnas` `[{ clave, titulo, ancho, alinear, celda }]`, `filas`, `cargando`, `vacio` |
 | `Pestanas` | `pestanas` `[{ id, etiqueta, contador, contenido }]`, `activa`, `onCambiar`, `etiqueta` |
+| `EncabezadoPagina` | Migas → título con `acciones` → `descripcion` → pestañas (`children`). `migas` `[{ etiqueta, href? }]`; `enlace={Link}` para usar el router |
 | `ElementoNavegacion` | Elemento de la barra lateral: `as={NavLink}` + `to` (marca el activo solo), o `href`, o `onClick` + `activo`; `icono`, `etiqueta`, `contador` |
 | `Esqueleto` | `forma`: `texto` \| `circulo` \| `bloque`; `ancho`, `alto` |
 | `EstadoVacio` | `icono`, `titulo`, `mensaje`, `accion` |

@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 import { actualizarTurno, crearTurno, eliminarTurno, listarTiposJornada, listarTurnos } from "../../api/turnos";
-import DialogoConfirmacion from "../../components/DialogoConfirmacion";
+import { Alerta, Boton, EncabezadoPagina, ModalConfirmacion, Tarjeta, useAvisos } from "../../components/ui";
 import TablaTurnos from "./TablaTurnos";
 import TurnoFormulario from "./TurnoFormulario";
 import "./turnos.css";
-
-const DURACION_AVISO_MS = 4000;
 
 const datosTurno = (turno) => ({
   nombre: turno.nombre,
@@ -17,11 +16,12 @@ const datosTurno = (turno) => ({
 });
 
 export default function TurnosPage() {
+  const avisar = useAvisos();
   const [turnos, setTurnos] = useState([]);
   const [tipos, setTipos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
-  const [aviso, setAviso] = useState(null);
+  const [alerta, setAlerta] = useState(null);
   const [formulario, setFormulario] = useState(null);
   const [porEliminar, setPorEliminar] = useState(null);
   const [eliminando, setEliminando] = useState(false);
@@ -43,12 +43,6 @@ export default function TurnosPage() {
     cargar();
   }, [cargar]);
 
-  useEffect(() => {
-    if (aviso?.tipo !== "exito") return;
-    const temporizador = setTimeout(() => setAviso(null), DURACION_AVISO_MS);
-    return () => clearTimeout(temporizador);
-  }, [aviso]);
-
   const reintentar = () => {
     setCargando(true);
     setErrorCarga(null);
@@ -56,7 +50,7 @@ export default function TurnosPage() {
   };
 
   const abrirFormulario = (turno) => {
-    setAviso(null);
+    setAlerta(null);
     setFormulario({ turno });
   };
 
@@ -66,17 +60,17 @@ export default function TurnosPage() {
     else await crearTurno(datos);
     setFormulario(null);
     await cargar();
-    setAviso({ tipo: "exito", texto: turno ? "Turno actualizado." : "Turno creado." });
+    avisar({ tono: "exito", titulo: turno ? "Turno actualizado" : "Turno creado", mensaje: datos.nombre });
   };
 
   const desactivar = async (turno) => {
-    setAviso(null);
+    setAlerta(null);
     try {
       await actualizarTurno(turno.id_turno, { ...datosTurno(turno), esta_activo: false });
       await cargar();
-      setAviso({ tipo: "exito", texto: `Turno "${turno.nombre}" desactivado.` });
+      avisar({ tono: "exito", titulo: "Turno desactivado", mensaje: turno.nombre });
     } catch (error) {
-      setAviso({ tipo: "error", texto: error.message });
+      setAlerta({ titulo: "No se pudo desactivar el turno", texto: error.message });
     }
   };
 
@@ -85,13 +79,12 @@ export default function TurnosPage() {
     setEliminando(true);
     try {
       await eliminarTurno(turno.id_turno);
-      if (formulario?.turno?.id_turno === turno.id_turno) setFormulario(null);
       await cargar();
-      setAviso({ tipo: "exito", texto: `Turno "${turno.nombre}" eliminado.` });
+      avisar({ tono: "exito", titulo: "Turno eliminado", mensaje: turno.nombre });
     } catch (error) {
       const puedeDesactivar = error.estado === 409 && turno.esta_activo;
-      setAviso({
-        tipo: "error",
+      setAlerta({
+        titulo: `No se pudo eliminar «${turno.nombre}»`,
         texto: error.message,
         accion: puedeDesactivar ? { texto: "Desactivar turno", ejecutar: () => desactivar(turno) } : null,
       });
@@ -101,35 +94,64 @@ export default function TurnosPage() {
     }
   };
 
+  const botonNuevo = (
+    <Boton variante="primario" icono={Plus} onClick={() => abrirFormulario(null)}>
+      Nuevo turno
+    </Boton>
+  );
+
   return (
     <section className="turnos" aria-labelledby="turnos-titulo">
-      <div className="pagina-encabezado">
-        <div>
-          <h1 id="turnos-titulo">Turnos</h1>
-          <p className="subtitulo">Horarios, refrigerios y tolerancias de atraso.</p>
-        </div>
-        {!formulario && (
-          <button type="button" className="boton boton-primario" onClick={() => abrirFormulario(null)}>
-            Nuevo turno
-          </button>
-        )}
-      </div>
+      <EncabezadoPagina
+        migas={[{ etiqueta: "Asistencia" }]}
+        titulo="Turnos"
+        idTitulo="turnos-titulo"
+        descripcion="Horarios, refrigerios y tolerancias de atraso."
+        acciones={!errorCarga && turnos.length > 0 && botonNuevo}
+      />
 
-      <div className="avisos" aria-live="polite">
-        {aviso && (
-          <div className={`alerta alerta-${aviso.tipo}`} role={aviso.tipo === "error" ? "alert" : undefined}>
-            <p>{aviso.texto}</p>
-            {aviso.accion && (
-              <button type="button" className="boton boton-compacto" onClick={aviso.accion.ejecutar}>
-                {aviso.accion.texto}
-              </button>
-            )}
-            <button type="button" className="alerta-cerrar" aria-label="Cerrar aviso" onClick={() => setAviso(null)}>
-              ×
-            </button>
-          </div>
-        )}
-      </div>
+      {alerta && (
+        <Alerta
+          tono="peligro"
+          role="alert"
+          titulo={alerta.titulo}
+          onCerrar={() => setAlerta(null)}
+          acciones={
+            alerta.accion && (
+              <Boton tamano="sm" onClick={alerta.accion.ejecutar}>
+                {alerta.accion.texto}
+              </Boton>
+            )
+          }
+        >
+          {alerta.texto}
+        </Alerta>
+      )}
+
+      {errorCarga ? (
+        <Alerta
+          tono="peligro"
+          role="alert"
+          titulo="No se pudieron cargar los turnos"
+          acciones={
+            <Boton tamano="sm" onClick={reintentar}>
+              Reintentar
+            </Boton>
+          }
+        >
+          {errorCarga}
+        </Alerta>
+      ) : (
+        <Tarjeta className="turnos-tarjeta">
+          <TablaTurnos
+            turnos={turnos}
+            cargando={cargando}
+            accionVacia={botonNuevo}
+            onEditar={abrirFormulario}
+            onEliminar={setPorEliminar}
+          />
+        </Tarjeta>
+      )}
 
       {formulario && (
         <TurnoFormulario
@@ -141,41 +163,16 @@ export default function TurnosPage() {
         />
       )}
 
-      {cargando && (
-        <p className="nota" role="status">
-          Cargando turnos…
-        </p>
-      )}
-      {!cargando && errorCarga && (
-        <div className="alerta alerta-error" role="alert">
-          <p>{errorCarga}</p>
-          <button type="button" className="boton boton-compacto" onClick={reintentar}>
-            Reintentar
-          </button>
-        </div>
-      )}
-      {!cargando && !errorCarga && (
-        <TablaTurnos
-          turnos={turnos}
-          idEditando={formulario?.turno?.id_turno}
-          onEditar={abrirFormulario}
-          onEliminar={setPorEliminar}
-        />
-      )}
-
-      <DialogoConfirmacion
+      <ModalConfirmacion
         abierto={Boolean(porEliminar)}
-        titulo="¿Eliminar turno?"
+        titulo="¿Eliminar el turno?"
         textoConfirmar="Eliminar"
-        textoProcesando="Eliminando…"
         procesando={eliminando}
         onConfirmar={confirmarEliminacion}
         onCancelar={() => setPorEliminar(null)}
       >
-        <p>
-          Se eliminará el turno <strong>{porEliminar?.nombre}</strong>. Esta acción no se puede deshacer.
-        </p>
-      </DialogoConfirmacion>
+        Se eliminará el turno <strong>{porEliminar?.nombre}</strong>. Esta acción no se puede deshacer.
+      </ModalConfirmacion>
     </section>
   );
 }

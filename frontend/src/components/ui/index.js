@@ -1,9 +1,12 @@
+export { default as Alerta } from "./Alerta";
 export { default as Avatar } from "./Avatar";
 export { default as Boton } from "./Boton";
 export { default as Campo } from "./Campo";
 export { default as CampoTexto } from "./CampoTexto";
+export { default as Casilla } from "./Casilla";
 export { default as Contador } from "./Contador";
 export { default as ElementoNavegacion } from "./ElementoNavegacion";
+export { default as EncabezadoPagina } from "./EncabezadoPagina";
 export { default as Esqueleto } from "./Esqueleto";
 export { default as EstadoVacio } from "./EstadoVacio";
 export { default as Etiqueta } from "./Etiqueta";

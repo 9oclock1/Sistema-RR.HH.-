@@ -5,6 +5,7 @@ import "./Tarjeta.css";
 // Con onClick la tarjeta es un botón completo; si tiene controles dentro, usa acciones en su lugar.
 export default function Tarjeta({
   titulo,
+  nivelTitulo = 3,
   acciones,
   seleccionada = false,
   interactiva = false,
@@ -35,7 +36,7 @@ export default function Tarjeta({
       {(titulo || acciones) && (
         <div className="ds-tarjeta__encabezado">
           {titulo && (
-            <TextoTruncado as={esBoton ? "span" : "h3"} className="ds-tarjeta__titulo">
+            <TextoTruncado as={esBoton ? "span" : `h${nivelTitulo}`} className="ds-tarjeta__titulo">
               {titulo}
             </TextoTruncado>
           )}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Alerta, Boton, CampoTexto, Casilla, Modal, Selector } from "../../components/ui";
 import { cruzaMedianoche, formatearMinutos, horaCorta, minutosDuracion, sumarMinutos } from "./jornada";
 
 const ETIQUETAS = {
@@ -34,41 +35,21 @@ const desdeTurno = (turno) =>
       }
     : VACIO;
 
-const AYUDA_REFRIGERIO = "Se descuenta de las horas efectivas.";
-const AYUDA_TOLERANCIA = "Minutos después del inicio en que el marcaje sigue siendo puntual.";
-
+const ID_FORMULARIO = "turno-formulario";
 const idCampo = (campo) => `turno-${campo}`;
 const aNumero = (valor) => (valor === "" ? null : Number(valor));
-
-function Campo({ campo, ayuda, error, children }) {
-  const id = idCampo(campo);
-  return (
-    <div className="campo">
-      <label htmlFor={id}>{ETIQUETAS[campo]}</label>
-      {children}
-      {ayuda && (
-        <p id={`${id}-ayuda`} className="campo-ayuda">
-          {ayuda}
-        </p>
-      )}
-      {error && (
-        <p id={`${id}-error`} className="campo-error">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
 
 export default function TurnoFormulario({ tipos, turno, onGuardar, onCancelar }) {
   const [valores, setValores] = useState(() => desdeTurno(turno));
   const [error, setError] = useState(null);
   const [enviando, setEnviando] = useState(false);
+  const [enviosFallidos, setEnviosFallidos] = useState(0);
   const refResumen = useRef(null);
 
+  // Solo tras un envío fallido: corregir un campo no debe mover el foco.
   useEffect(() => {
-    if (error) refResumen.current?.focus();
-  }, [error]);
+    if (enviosFallidos) refResumen.current?.focus();
+  }, [enviosFallidos]);
 
   const cambiar = (evento) => {
     const { name, type, value, checked } = evento.target;
@@ -95,21 +76,19 @@ export default function TurnoFormulario({ tipos, turno, onGuardar, onCancelar })
     } catch (errorGuardado) {
       const campos = Object.fromEntries((errorGuardado.detalles ?? []).map((d) => [d.campo, d.mensaje]));
       setError({ general: Object.keys(campos).length ? null : errorGuardado.message, campos });
+      setEnviosFallidos((total) => total + 1);
       setEnviando(false);
     }
   };
 
-  const propsCampo = (campo, ayuda) => {
-    const descripciones = [ayuda && `${idCampo(campo)}-ayuda`, error?.campos[campo] && `${idCampo(campo)}-error`];
-    return {
-      id: idCampo(campo),
-      name: campo,
-      value: valores[campo],
-      onChange: cambiar,
-      "aria-invalid": error?.campos[campo] ? true : undefined,
-      "aria-describedby": descripciones.filter(Boolean).join(" ") || undefined,
-    };
-  };
+  const propsCampo = (campo) => ({
+    id: idCampo(campo),
+    name: campo,
+    etiqueta: ETIQUETAS[campo],
+    value: valores[campo],
+    onChange: cambiar,
+    error: error?.campos[campo],
+  });
 
   const enfocar = (evento, campo) => {
     evento.preventDefault();
@@ -123,13 +102,31 @@ export default function TurnoFormulario({ tipos, turno, onGuardar, onCancelar })
   const efectivos = duracion - (Number(valores.minutos_refrigerio) || 0);
 
   return (
-    <form className="tarjeta formulario" onSubmit={enviar} noValidate>
-      <h2>{turno ? "Editar turno" : "Nuevo turno"}</h2>
-
-      {mostrarResumen && (
-        <div ref={refResumen} className="alerta alerta-error" role="alert" tabIndex={-1}>
-          <div>
-            <p className="alerta-titulo">{error.general ?? "Revise los campos marcados."}</p>
+    <Modal
+      abierto
+      titulo={turno ? "Editar turno" : "Nuevo turno"}
+      onCerrar={onCancelar}
+      bloqueado={enviando}
+      pie={
+        <>
+          <Boton variante="sutil" onClick={onCancelar} disabled={enviando}>
+            Cancelar
+          </Boton>
+          <Boton variante="primario" type="submit" form={ID_FORMULARIO} cargando={enviando}>
+            {enviando ? "Guardando…" : "Guardar"}
+          </Boton>
+        </>
+      }
+    >
+      <form id={ID_FORMULARIO} className="turno-formulario" onSubmit={enviar} noValidate>
+        {mostrarResumen && (
+          <Alerta
+            ref={refResumen}
+            tabIndex={-1}
+            tono="peligro"
+            role="alert"
+            titulo={error.general ?? "Revise los campos marcados."}
+          >
             {erroresCampos.length > 0 && (
               <ul>
                 {erroresCampos.map(([campo, mensaje]) => (
@@ -141,73 +138,75 @@ export default function TurnoFormulario({ tipos, turno, onGuardar, onCancelar })
                 ))}
               </ul>
             )}
-          </div>
+          </Alerta>
+        )}
+
+        <div className="turno-formulario__campos">
+          <CampoTexto
+            {...propsCampo("nombre")}
+            className="turno-formulario__ancho"
+            requerido
+            maxLength={60}
+            autoComplete="off"
+            data-autofocus
+          />
+          <Selector
+            {...propsCampo("id_tipo_jornada")}
+            className="turno-formulario__ancho"
+            requerido
+            textoVacio="Seleccione…"
+            opciones={tipos.map((tipo) => ({ valor: tipo.id_tipo_jornada, etiqueta: tipo.nombre }))}
+          />
+          <CampoTexto {...propsCampo("hora_inicio")} type="time" requerido />
+          <CampoTexto {...propsCampo("hora_fin")} type="time" requerido />
+          <CampoTexto
+            {...propsCampo("minutos_refrigerio")}
+            type="number"
+            inputMode="numeric"
+            min="0"
+            step="1"
+            ayuda="Se descuenta de las horas efectivas."
+          />
+          <CampoTexto
+            {...propsCampo("minutos_tolerancia")}
+            type="number"
+            inputMode="numeric"
+            min="0"
+            step="1"
+            ayuda="Minutos después del inicio en que el marcaje sigue siendo puntual."
+          />
         </div>
-      )}
 
-      <div className="campos">
-        <Campo campo="nombre" error={error?.campos.nombre}>
-          <input {...propsCampo("nombre")} maxLength={60} autoComplete="off" autoFocus />
-        </Campo>
-        <Campo campo="id_tipo_jornada" error={error?.campos.id_tipo_jornada}>
-          <select {...propsCampo("id_tipo_jornada")}>
-            <option value="">Seleccione…</option>
-            {tipos.map((tipo) => (
-              <option key={tipo.id_tipo_jornada} value={tipo.id_tipo_jornada}>
-                {tipo.nombre}
-              </option>
-            ))}
-          </select>
-        </Campo>
-        <Campo campo="hora_inicio" error={error?.campos.hora_inicio}>
-          <input type="time" {...propsCampo("hora_inicio")} />
-        </Campo>
-        <Campo campo="hora_fin" error={error?.campos.hora_fin}>
-          <input type="time" {...propsCampo("hora_fin")} />
-        </Campo>
-        <Campo campo="minutos_refrigerio" ayuda={AYUDA_REFRIGERIO} error={error?.campos.minutos_refrigerio}>
-          <input type="number" inputMode="numeric" min="0" step="1" {...propsCampo("minutos_refrigerio", AYUDA_REFRIGERIO)} />
-        </Campo>
-        <Campo campo="minutos_tolerancia" ayuda={AYUDA_TOLERANCIA} error={error?.campos.minutos_tolerancia}>
-          <input type="number" inputMode="numeric" min="0" step="1" {...propsCampo("minutos_tolerancia", AYUDA_TOLERANCIA)} />
-        </Campo>
-      </div>
+        {turno && (
+          <Casilla
+            name="esta_activo"
+            etiqueta="Activo"
+            ayuda="Disponible para asignar a los empleados."
+            checked={valores.esta_activo}
+            onChange={cambiar}
+          />
+        )}
 
-      {turno && (
-        <label className="campo-check">
-          <input type="checkbox" name="esta_activo" checked={valores.esta_activo} onChange={cambiar} />
-          <span>Activo (disponible para asignación)</span>
-        </label>
-      )}
-
-      {duracion > 0 && (
-        <dl className="resumen">
-          <div>
-            <dt>Duración</dt>
-            <dd>
-              {formatearMinutos(duracion)}
-              {cruzaMedianoche(hora_inicio, hora_fin) && " · cruza la medianoche"}
-            </dd>
-          </div>
-          <div>
-            <dt>Horas efectivas</dt>
-            <dd>{efectivos > 0 ? formatearMinutos(efectivos) : "—"}</dd>
-          </div>
-          <div>
-            <dt>Puntual hasta</dt>
-            <dd>{sumarMinutos(hora_inicio, Number(valores.minutos_tolerancia) || 0)}</dd>
-          </div>
-        </dl>
-      )}
-
-      <div className="formulario-acciones">
-        <button type="button" className="boton" onClick={onCancelar} disabled={enviando}>
-          Cancelar
-        </button>
-        <button type="submit" className="boton boton-primario" disabled={enviando}>
-          {enviando ? "Guardando…" : "Guardar"}
-        </button>
-      </div>
-    </form>
+        {duracion > 0 && (
+          <dl className="turno-resumen">
+            <div>
+              <dt>Duración</dt>
+              <dd>
+                {formatearMinutos(duracion)}
+                {cruzaMedianoche(hora_inicio, hora_fin) && <span className="turnos-nota">cruza la medianoche</span>}
+              </dd>
+            </div>
+            <div>
+              <dt>Horas efectivas</dt>
+              <dd>{efectivos > 0 ? formatearMinutos(efectivos) : "—"}</dd>
+            </div>
+            <div>
+              <dt>Puntual hasta</dt>
+              <dd>{sumarMinutos(hora_inicio, Number(valores.minutos_tolerancia) || 0)}</dd>
+            </div>
+          </dl>
+        )}
+      </form>
+    </Modal>
   );
 }

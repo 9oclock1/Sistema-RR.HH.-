@@ -1,0 +1,47 @@
+.ds-casilla {
+  display: grid;
+  grid-template-columns: var(--size-icon) minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: center;
+  font-family: var(--font-family);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.ds-casilla__control {
+  width: var(--size-icon);
+  height: var(--size-icon);
+  margin: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.ds-casilla__control:disabled {
+  cursor: not-allowed;
+}
+
+.ds-casilla__etiqueta {
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.ds-casilla__control:disabled + .ds-casilla__etiqueta {
+  color: var(--color-text-subtle);
+  cursor: not-allowed;
+}
+
+.ds-casilla__ayuda {
+  grid-column: 2;
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+@media (pointer: coarse) {
+  .ds-casilla__etiqueta {
+    display: flex;
+    align-items: center;
+    min-height: var(--size-touch);
+  }
+}

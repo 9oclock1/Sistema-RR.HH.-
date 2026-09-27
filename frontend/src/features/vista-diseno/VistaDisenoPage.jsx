@@ -6,6 +6,7 @@ import {
   Download,
   LoaderCircle,
   Menu,
+  MessageSquareWarning,
   MousePointerClick,
   Palette,
   PanelsTopLeft,
@@ -23,11 +24,14 @@ import {
   X,
 } from "lucide-react";
 import {
+  Alerta,
   Avatar,
   Boton,
   CampoTexto,
+  Casilla,
   Contador,
   ElementoNavegacion,
+  EncabezadoPagina,
   Esqueleto,
   EstadoVacio,
   Etiqueta,
@@ -52,6 +56,7 @@ const SECCIONES = [
   { id: "tabla", etiqueta: "Tabla", icono: IconoTabla },
   { id: "navegacion", etiqueta: "Pestañas y navegación", icono: PanelsTopLeft },
   { id: "carga", etiqueta: "Carga y vacío", icono: LoaderCircle },
+  { id: "alertas", etiqueta: "Alertas en línea", icono: MessageSquareWarning },
   { id: "superposiciones", etiqueta: "Modales y avisos", icono: Bell },
 ];
 
@@ -275,24 +280,21 @@ export default function VistaDisenoPage() {
       <div className="vd-velo" aria-hidden="true" onClick={() => setMenuAbierto(false)} />
 
       <main className="vd-contenido">
-        <nav className="vd-migas" aria-label="Ruta">
-          <ol>
-            <li>
-              <a href="/">Sistema RR.HH.</a>
-            </li>
-            <li aria-current="page">Sistema de diseño</li>
-          </ol>
-        </nav>
-        <div className="vd-encabezado">
-          <h1 className="vd-encabezado__titulo">Vista previa del sistema de diseño</h1>
-          <Boton variante="predeterminado" icono={ArrowLeft} href="/">
-            Volver al sistema
-          </Boton>
-        </div>
-        <p className="vd-encabezado__descripcion">
-          Todos los componentes y tokens de <code>DESIGN.md</code>. El tema claro u oscuro sigue la configuración del
-          sistema operativo.
-        </p>
+        <EncabezadoPagina
+          migas={[{ etiqueta: "Sistema RR.HH.", href: "/" }]}
+          titulo="Vista previa del sistema de diseño"
+          descripcion={
+            <>
+              Todos los componentes y tokens de <code>DESIGN.md</code>. El tema claro u oscuro sigue la configuración
+              del sistema operativo.
+            </>
+          }
+          acciones={
+            <Boton variante="predeterminado" icono={ArrowLeft} href="/">
+              Volver al sistema
+            </Boton>
+          }
+        />
 
         <Seccion id="colores" titulo="Colores" descripcion="Tokens semánticos. Los valores cambian con el tema.">
           {COLORES.map((grupo) => (
@@ -443,6 +445,8 @@ export default function VistaDisenoPage() {
                 requerido
                 opciones={[{ valor: "centro", etiqueta: "Sucursal Centro" }]}
               />
+              <Casilla etiqueta="Turno activo" ayuda="Disponible para asignar a empleados." defaultChecked />
+              <Casilla etiqueta="Casilla deshabilitada" disabled />
             </div>
           </Tarjeta>
         </Seccion>
@@ -602,6 +606,35 @@ export default function VistaDisenoPage() {
                 }
               />
             </Tarjeta>
+          </div>
+        </Seccion>
+
+        <Seccion
+          id="alertas"
+          titulo="Alertas en línea"
+          descripcion="Mensajes que permanecen en la página: errores de carga, resúmenes de formulario o avisos que piden una acción."
+        >
+          <div className="vd-filas">
+            <Alerta tono="info" titulo="Uso temporal">
+              El identificador de empleado se pedirá hasta que exista el inicio de sesión.
+            </Alerta>
+            <Alerta tono="exito" titulo="Entrada registrada">
+              08:02 · Portal
+            </Alerta>
+            <Alerta tono="aviso" titulo="Salida pendiente de justificación" onCerrar={() => {}}>
+              No se encontró una entrada para esta jornada.
+            </Alerta>
+            <Alerta
+              tono="peligro"
+              titulo="No se pudieron cargar los turnos"
+              acciones={
+                <Boton tamano="sm" onClick={() => avisar({ tono: "info", titulo: "Reintentando…" })}>
+                  Reintentar
+                </Boton>
+              }
+            >
+              No se pudo conectar con el servidor.
+            </Alerta>
           </div>
         </Seccion>
 

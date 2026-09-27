@@ -1,0 +1,164 @@
+/* Estructura de la aplicación: barra superior, barra lateral y contenido. Ver DESIGN.md. */
+
+.app {
+  min-height: 100dvh;
+}
+
+.app-saltar {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: var(--z-toast);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-overlay);
+  color: var(--color-link);
+  font-weight: var(--font-weight-medium);
+}
+
+.app-saltar:not(:focus) {
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Barra superior */
+.app-barra {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sidebar);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--size-topbar);
+  padding: 0 var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background: var(--color-bg-surface);
+}
+
+.app-barra__nombre {
+  flex: none;
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.app-barra__busqueda {
+  position: relative;
+  flex: 1;
+  max-width: var(--size-search-max);
+  margin: 0 auto;
+}
+
+.app-barra__busqueda .ds-control {
+  padding-left: calc(var(--space-2) * 2 + var(--size-icon));
+}
+
+.app-barra__lupa {
+  position: absolute;
+  top: 50%;
+  left: var(--space-2);
+  color: var(--color-text-subtle);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.app-barra__acciones {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Barra lateral */
+.app-lateral {
+  position: fixed;
+  top: var(--size-topbar);
+  bottom: 0;
+  left: 0;
+  z-index: var(--z-sidebar);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: var(--size-sidebar);
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-2);
+  border-right: var(--border-width) solid var(--color-border);
+  background: var(--color-bg-surface);
+  visibility: hidden;
+  transform: translateX(-100%);
+  transition: transform var(--transition), visibility var(--transition);
+}
+
+.app--lateral-visible .app-lateral {
+  visibility: visible;
+  transform: none;
+}
+
+.app-lateral__titulo {
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-2);
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  font-weight: var(--font-weight-semibold);
+}
+
+.app-lateral__lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-lateral__vacio {
+  padding: 0 var(--space-2);
+  color: var(--color-text-subtle);
+}
+
+.app-velo {
+  position: fixed;
+  inset: var(--size-topbar) 0 0;
+  z-index: calc(var(--z-sidebar) - 1);
+  background: var(--color-bg-overlay);
+}
+
+/* Contenido */
+.app-contenido {
+  min-width: 0;
+  padding: var(--space-content);
+}
+
+.app-contenido:focus {
+  outline: none;
+}
+
+@media (min-width: 1024px) {
+  .app--lateral-visible .app-contenido {
+    margin-left: var(--size-sidebar);
+  }
+}
+
+@media (max-width: 1023px) {
+  .app--lateral-visible .app-lateral {
+    box-shadow: var(--shadow-overlay);
+  }
+}
+
+@media (max-width: 640px) {
+  .app-barra__nombre {
+    display: none;
+  }
+
+  .app-contenido {
+    padding: var(--space-4);
+  }
+}
