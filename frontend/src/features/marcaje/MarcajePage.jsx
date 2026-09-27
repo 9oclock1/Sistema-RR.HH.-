@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowLeftRight, LogIn, LogOut } from "lucide-react";
 import { consultarJornada, registrarEntrada, registrarSalida } from "../../api/marcajes";
-import DialogoConfirmacion from "../../components/DialogoConfirmacion";
+import {
+  Alerta,
+  Avatar,
+  Boton,
+  EncabezadoPagina,
+  Esqueleto,
+  ModalConfirmacion,
+  Tarjeta,
+} from "../../components/ui";
 import IdentificacionEmpleado from "./IdentificacionEmpleado";
-import { IconoConfirmado } from "./Iconos";
 import Reloj from "./Reloj";
 import ResumenJornada from "./ResumenJornada";
 import { describirOrigen, formatearFechaJornada, formatearHora } from "./formato";
@@ -10,6 +18,24 @@ import { guardarEmpleado, leerEmpleado, olvidarEmpleado } from "./sesionEmpleado
 import "./marcaje.css";
 
 const esRechazoDeIdentidad = (error) => error.estado === 401 || error.estado === 403;
+
+function CargandoJornada() {
+  return (
+    <Tarjeta className="marcaje-tarjeta" aria-busy="true">
+      <p className="ds-solo-lector" role="status">
+        Verificando empleado…
+      </p>
+      <div className="marcaje-empleado">
+        <Esqueleto forma="circulo" ancho="var(--size-avatar-lg)" alto="var(--size-avatar-lg)" />
+        <div className="marcaje-empleado__datos">
+          <Esqueleto ancho="30%" />
+          <Esqueleto ancho="55%" />
+        </div>
+      </div>
+      <Esqueleto forma="bloque" />
+    </Tarjeta>
+  );
+}
 
 export default function MarcajePage() {
   const [idInicial] = useState(leerEmpleado);
@@ -93,10 +119,10 @@ export default function MarcajePage() {
     } catch (error) {
       if (error.estado === 409) {
         await consultarJornada(idEmpleado).then(setJornada, () => {});
-        setAviso({ tipo: "info", texto: error.message });
+        setAviso({ tono: "info", texto: error.message });
         setMarcajesRealizados((total) => total + 1);
       } else {
-        setAviso({ tipo: "error", texto: error.message });
+        setAviso({ tono: "peligro", texto: error.message });
       }
     } finally {
       setMarcando(null);
@@ -106,157 +132,157 @@ export default function MarcajePage() {
 
   const entrada = jornada?.entrada;
   const salida = jornada?.salida;
+  const nombre = jornada ? `${jornada.empleado.nombres} ${jornada.empleado.apellidos}` : "";
 
   return (
     <section className="marcaje" aria-labelledby="marcaje-titulo">
-      <div className="pagina-encabezado">
-        <div>
-          <h1 id="marcaje-titulo">Marcaje de asistencia</h1>
-          <p className="subtitulo">Registre el inicio y el fin de su jornada laboral.</p>
-        </div>
+      <EncabezadoPagina
+        migas={[{ etiqueta: "Asistencia" }]}
+        titulo="Marcaje de asistencia"
+        idTitulo="marcaje-titulo"
+        descripcion="Registre el inicio y el fin de su jornada laboral."
+      />
+
+      <div className="marcaje-columna">
+        {errorCarga && (
+          <Alerta
+            tono="peligro"
+            role="alert"
+            titulo="No se pudo consultar la jornada"
+            acciones={
+              idEmpleado && (
+                <Boton tamano="sm" onClick={reintentar} cargando={cargando}>
+                  Reintentar
+                </Boton>
+              )
+            }
+          >
+            {errorCarga}
+          </Alerta>
+        )}
+
+        {idEmpleado && !jornada && cargando && <CargandoJornada />}
+
+        {!idEmpleado && (
+          <IdentificacionEmpleado
+            error={errorIdentificacion}
+            procesando={cargando}
+            enfocar={enfocarIdentificacion}
+            onIdentificar={identificar}
+            onEditar={() => setErrorIdentificacion(null)}
+          />
+        )}
+
+        {jornada && (
+          <Tarjeta className="marcaje-tarjeta">
+            <div className="marcaje-empleado">
+              <Avatar nombre={nombre} tamano="lg" decorativo />
+              <div className="marcaje-empleado__datos">
+                <p className="marcaje-etiqueta">Empleado</p>
+                <h2 className="marcaje-empleado__nombre">{nombre}</h2>
+              </div>
+              <Boton variante="sutil" icono={ArrowLeftRight} onClick={cambiarEmpleado}>
+                Cambiar empleado
+              </Boton>
+            </div>
+
+            <div className="marcaje-reloj">
+              <p className="marcaje-etiqueta">Hora actual en Bolivia</p>
+              <Reloj />
+              <p className="marcaje-reloj__fecha">Jornada del {formatearFechaJornada(jornada.fecha_jornada)}</p>
+            </div>
+
+            <div className="marcaje-avisos" aria-live="polite">
+              {aviso && (
+                <Alerta tono={aviso.tono} role={aviso.tono === "peligro" ? "alert" : undefined}>
+                  {aviso.texto}
+                </Alerta>
+              )}
+            </div>
+
+            {salida ? (
+              <ResumenJornada jornada={jornada} ref={refConfirmacion} />
+            ) : entrada ? (
+              <>
+                <Alerta ref={refConfirmacion} tabIndex={-1} tono="exito" titulo="Entrada registrada">
+                  <p>
+                    <time className="marcaje-hora" dateTime={entrada.fecha_hora_marcaje}>
+                      {formatearHora(entrada.fecha_hora_marcaje)}
+                    </time>
+                  </p>
+                  <p>Origen: {describirOrigen(entrada)}</p>
+                </Alerta>
+                <div className="marcaje-accion">
+                  <Boton
+                    variante="primario"
+                    icono={LogOut}
+                    onClick={() => setConfirmandoSalida(true)}
+                    disabled={Boolean(marcando)}
+                    aria-describedby="salida-nota"
+                  >
+                    Marcar salida
+                  </Boton>
+                  <p id="salida-nota" className="marcaje-nota">
+                    Al marcar la salida se cierra su jornada.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="marcaje-accion">
+                  <Boton
+                    variante="primario"
+                    icono={LogIn}
+                    onClick={() => marcar("entrada")}
+                    cargando={marcando === "entrada"}
+                    disabled={Boolean(marcando)}
+                    aria-describedby="marcaje-nota"
+                  >
+                    {marcando === "entrada" ? "Registrando…" : "Marcar entrada"}
+                  </Boton>
+                  <p id="marcaje-nota" className="marcaje-nota">
+                    Se guarda la hora del servidor en el momento de marcar.
+                  </p>
+                </div>
+                <div className="marcaje-alternativa">
+                  <p id="salida-sin-entrada-nota">¿Olvidó marcar su entrada y ya termina su jornada?</p>
+                  <Boton
+                    icono={LogOut}
+                    onClick={() => setConfirmandoSalida(true)}
+                    disabled={Boolean(marcando)}
+                    aria-describedby="salida-sin-entrada-nota"
+                  >
+                    Marcar salida
+                  </Boton>
+                </div>
+              </>
+            )}
+          </Tarjeta>
+        )}
       </div>
 
-      {errorCarga && (
-        <div className="alerta alerta-error" role="alert">
-          <p>{errorCarga}</p>
-          {idEmpleado && (
-            <button type="button" className="boton boton-compacto" onClick={reintentar} disabled={cargando}>
-              Reintentar
-            </button>
-          )}
-        </div>
-      )}
-
-      {idEmpleado && !jornada && cargando && (
-        <p className="nota" role="status">
-          Verificando empleado…
-        </p>
-      )}
-
-      {!idEmpleado && (
-        <IdentificacionEmpleado
-          error={errorIdentificacion}
-          procesando={cargando}
-          enfocar={enfocarIdentificacion}
-          onIdentificar={identificar}
-          onEditar={() => setErrorIdentificacion(null)}
-        />
-      )}
-
-      {jornada && (
-        <div className="tarjeta marcaje-tarjeta">
-          <div className="marcaje-empleado">
-            <div>
-              <p className="marcaje-etiqueta">Empleado</p>
-              <h2>
-                {jornada.empleado.nombres} {jornada.empleado.apellidos}
-              </h2>
-            </div>
-            <button type="button" className="boton boton-texto" onClick={cambiarEmpleado}>
-              Cambiar empleado
-            </button>
-          </div>
-
-          <div className="reloj">
-            <p className="marcaje-etiqueta">Hora actual en Bolivia</p>
-            <Reloj />
-            <p className="reloj-fecha">Jornada del {formatearFechaJornada(jornada.fecha_jornada)}</p>
-          </div>
-
-          <div className="marcaje-avisos" aria-live="polite">
-            {aviso && (
-              <div className={`alerta alerta-${aviso.tipo}`} role={aviso.tipo === "error" ? "alert" : undefined}>
-                <p>{aviso.texto}</p>
-              </div>
-            )}
-          </div>
-
-          {salida ? (
-            <ResumenJornada jornada={jornada} ref={refConfirmacion} />
-          ) : entrada ? (
-            <>
-              <div className="confirmacion" ref={refConfirmacion} tabIndex={-1}>
-                <IconoConfirmado />
-                <div>
-                  <p className="confirmacion-titulo">Entrada registrada</p>
-                  <p className="confirmacion-hora">
-                    <time dateTime={entrada.fecha_hora_marcaje}>{formatearHora(entrada.fecha_hora_marcaje)}</time>
-                  </p>
-                  <p className="confirmacion-detalle">Origen: {describirOrigen(entrada)}</p>
-                </div>
-              </div>
-              <div className="marcaje-accion">
-                <button
-                  type="button"
-                  className="boton boton-primario boton-grande"
-                  onClick={() => setConfirmandoSalida(true)}
-                  disabled={Boolean(marcando)}
-                  aria-describedby="salida-nota"
-                >
-                  Marcar salida
-                </button>
-                <p id="salida-nota" className="campo-ayuda">
-                  Al marcar la salida se cierra su jornada.
-                </p>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="marcaje-accion">
-                <button
-                  type="button"
-                  className="boton boton-primario boton-grande"
-                  onClick={() => marcar("entrada")}
-                  disabled={Boolean(marcando)}
-                  aria-describedby="marcaje-nota"
-                >
-                  {marcando === "entrada" ? "Registrando…" : "Marcar entrada"}
-                </button>
-                <p id="marcaje-nota" className="campo-ayuda">
-                  Se guarda la hora del servidor en el momento de marcar.
-                </p>
-              </div>
-              <div className="marcaje-alternativa">
-                <p id="salida-sin-entrada-nota">¿Olvidó marcar su entrada y ya termina su jornada?</p>
-                <button
-                  type="button"
-                  className="boton"
-                  onClick={() => setConfirmandoSalida(true)}
-                  disabled={Boolean(marcando)}
-                  aria-describedby="salida-sin-entrada-nota"
-                >
-                  Marcar salida
-                </button>
-              </div>
-            </>
-          )}
-
-          <DialogoConfirmacion
-            abierto={confirmandoSalida}
-            titulo={entrada ? "¿Registrar su salida?" : "Salida sin entrada registrada"}
-            variante={entrada ? "primario" : "peligro"}
-            textoConfirmar={entrada ? "Marcar salida" : "Registrar salida"}
-            textoProcesando="Registrando…"
-            procesando={marcando === "salida"}
-            onConfirmar={() => marcar("salida")}
-            onCancelar={() => setConfirmandoSalida(false)}
-          >
-            {entrada ? (
-              <p>
-                Se guardará la hora actual como fin de la jornada que inició a las{" "}
-                <strong>{formatearHora(entrada.fecha_hora_marcaje)}</strong>. Después no podrá volver a marcar en
-                esta jornada.
-              </p>
-            ) : (
-              <p>
-                No tiene entrada registrada en esta jornada. La salida quedará{" "}
-                <strong>pendiente de justificación</strong> y no podrá marcar entrada después. Si está iniciando su
-                jornada, cancele y use «Marcar entrada».
-              </p>
-            )}
-          </DialogoConfirmacion>
-        </div>
-      )}
+      <ModalConfirmacion
+        abierto={confirmandoSalida}
+        titulo={entrada ? "¿Registrar su salida?" : "Salida sin entrada registrada"}
+        variante={entrada ? "primario" : "peligro"}
+        textoConfirmar={entrada ? "Marcar salida" : "Registrar salida"}
+        procesando={marcando === "salida"}
+        onConfirmar={() => marcar("salida")}
+        onCancelar={() => setConfirmandoSalida(false)}
+      >
+        {entrada ? (
+          <>
+            Se guardará la hora actual como fin de la jornada que inició a las{" "}
+            <strong>{formatearHora(entrada.fecha_hora_marcaje)}</strong>. Después no podrá volver a marcar en esta
+            jornada.
+          </>
+        ) : (
+          <>
+            No tiene entrada registrada en esta jornada. La salida quedará <strong>pendiente de justificación</strong> y
+            no podrá marcar entrada después. Si está iniciando su jornada, cancele y use «Marcar entrada».
+          </>
+        )}
+      </ModalConfirmacion>
     </section>
   );
 }

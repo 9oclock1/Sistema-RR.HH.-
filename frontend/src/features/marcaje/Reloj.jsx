@@ -10,7 +10,7 @@ export default function Reloj() {
   }, []);
 
   return (
-    <time className="reloj-hora" dateTime={ahora.toISOString()}>
+    <time className="marcaje-reloj__hora" dateTime={ahora.toISOString()}>
       {formatearHoraConSegundos(ahora)}
     </time>
   );
