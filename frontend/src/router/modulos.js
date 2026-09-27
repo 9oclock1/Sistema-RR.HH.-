@@ -1,6 +1,7 @@
-import { CalendarClock, Fingerprint } from "lucide-react";
+import { CalendarClock, Fingerprint, UserPlus } from "lucide-react";
 import MarcajePage from "../features/marcaje/MarcajePage";
 import TurnosPage from "../features/turnos/TurnosPage";
+import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import { puedeAcceder } from "../utils/permisos";
 
 // Módulos del sistema: alimentan el inicio, la barra lateral y las rutas.
@@ -26,6 +27,19 @@ export const SECCIONES = [
         icono: CalendarClock,
         roles: ["admin"],
         pagina: TurnosPage,
+      },
+    ],
+  },
+  {
+    titulo: "Reclutamiento",
+    modulos: [
+      {
+        ruta: "/reclutamiento/postulantes",
+        etiqueta: "Postulantes",
+        descripcion: "Registro de candidatos y postulaciones por convocatoria.",
+        icono: UserPlus,
+        roles: ["reclutador"],
+        pagina: ApplicantRegistration,
       },
     ],
   },

@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router";
 import MainLayout from "../layouts/MainLayout";
 import InicioPage from "../features/inicio/InicioPage";
 import PaginaModulo from "../features/inicio/PaginaModulo";
@@ -16,6 +16,12 @@ export const router = createBrowserRouter([
   {
     path: "/",
     element: <MainLayout />,
-    children: [{ index: true, element: <InicioPage /> }, ...rutasModulos, { path: "*", element: <PaginaNoEncontrada /> }],
+    children: [
+      { index: true, element: <InicioPage /> },
+      ...rutasModulos,
+      { path: "postulantes", element: <Navigate to="/reclutamiento/postulantes" replace /> },
+      { path: "recruitment", element: <Navigate to="/reclutamiento/postulantes" replace /> },
+      { path: "*", element: <PaginaNoEncontrada /> },
+    ],
   },
 ]);

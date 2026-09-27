@@ -1,79 +1,64 @@
-/**
- * API Client for RecruitmentService — RF-09 Applicant Registration
- *
- * Uses the nginx gateway at /api/recr/ which proxies to
- * recruitment-service:3003/
- *
- * All functions return the parsed JSON response.
- * Errors are thrown with the server's message when available.
- */
+import { solicitar, ErrorApi } from "./cliente";
 
-const API_BASE = `${import.meta.env.VITE_API_URL || "/api"}/recr`;
+const RUTA_BASE = "/recr/applicants";
 
 /**
- * Safely parses a response as JSON.
- * If the body is not valid JSON (e.g. an HTML error page), returns a
- * fallback object so callers never crash on `response.json()`.
+ * Normaliza los errores lanzados por la API para mantener compatibilidad
+ * con la convención del sistema (ErrorApi con `estado` y `detalles`) y
+ * con el código anterior de postulantes (`status` y `errors`).
  */
-async function safeJson(response) {
-  const text = await response.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    return {
-      success: false,
-      message: `Error inesperado del servidor (HTTP ${response.status}).`,
-    };
+function adaptarError(error) {
+  if (error instanceof ErrorApi) {
+    error.status = error.estado;
+    error.errors = Array.isArray(error.detalles) ? error.detalles : [];
   }
+  return error;
 }
 
 /**
- * Fetches all active job openings for the dropdown selector.
- * @returns {Promise<Array>}
+ * Obtiene todas las convocatorias activas para el selector.
+ * @returns {Promise<Array>} Lista de convocatorias
  */
 export async function fetchActiveJobOpenings() {
-  const response = await fetch(`${API_BASE}/applicants/job-openings`);
-  const data = await safeJson(response);
-  if (!response.ok) {
-    throw new Error(data.message || "Error al obtener las convocatorias.");
+  try {
+    const respuesta = await solicitar(`${RUTA_BASE}/job-openings`);
+    return respuesta?.data ?? respuesta ?? [];
+  } catch (error) {
+    throw adaptarError(error);
   }
-  return data.data;
 }
 
 /**
- * Registers a new applicant for a job opening.
- * @param {Object} applicantData - The full registration payload
- * @returns {Promise<Object>} The success response with postulante + postulacion
+ * Registra un nuevo postulante y su postulación a una convocatoria.
+ * @param {Object} applicantData - Datos personales y de contacto del postulante
+ * @returns {Promise<Object>} Respuesta con mensaje y datos de la postulación
  */
 export async function registerApplicant(applicantData) {
-  const response = await fetch(`${API_BASE}/applicants/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(applicantData),
-  });
-  const data = await safeJson(response);
-  if (!response.ok) {
-    const error = new Error(data.message || "Error al registrar el postulante.");
-    error.status = response.status;
-    error.errors = data.errors || [];
-    error.data = data.data || null;
-    throw error;
+  try {
+    return await solicitar(`${RUTA_BASE}/register`, {
+      metodo: "POST",
+      cuerpo: applicantData,
+    });
+  } catch (error) {
+    throw adaptarError(error);
   }
-  return data;
 }
 
 /**
- * Fetches all applicants associated with a job opening.
- * @param {string} id_convocatoria - UUID of the job opening
+ * Obtiene la lista de postulantes de una convocatoria específica.
+ * @param {string} id_convocatoria - UUID de la convocatoria
  * @returns {Promise<Object>} { convocatoria, total_postulantes, postulantes }
  */
 export async function fetchApplicantsByJobOpening(id_convocatoria) {
-  const response = await fetch(
-    `${API_BASE}/applicants/by-opening/${id_convocatoria}`
-  );
-  const data = await safeJson(response);
-  if (!response.ok) {
-    throw new Error(data.message || "Error al obtener los postulantes.");
+  try {
+    const respuesta = await solicitar(`${RUTA_BASE}/by-opening/${id_convocatoria}`);
+    return respuesta?.data ?? respuesta ?? { postulantes: [] };
+  } catch (error) {
+    throw adaptarError(error);
   }
-  return data.data;
 }
+
+// Alias en español para coherencia con el diseño del sistema
+export const listarConvocatoriasActivas = fetchActiveJobOpenings;
+export const registrarPostulante = registerApplicant;
+export const listarPostulantesPorConvocatoria = fetchApplicantsByJobOpening;

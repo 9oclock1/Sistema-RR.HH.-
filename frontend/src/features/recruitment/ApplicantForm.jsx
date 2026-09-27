@@ -1,348 +1,152 @@
-import "./ApplicantRegistration.css";
+import { UserPlus } from "lucide-react";
+import { Alerta, Boton, CampoTexto } from "../../components/ui";
 
 /**
  * ApplicantForm Component
- *
- * Renders the registration form for a new applicant.
- * All field-level errors are displayed inline beneath each input
- * (acceptance criteria #3: indicate which data is missing).
- *
- * Props:
- *  - formData: current form values
- *  - fieldErrors: object of field → error message
- *  - onChange: handler for input changes
- *  - onSubmit: handler for form submission
- *  - submitting: boolean loading state
+ * Formulario de registro de postulante alineado con el sistema de diseño.
+ * Usa los componentes base CampoTexto, Boton y Alerta.
+ * Muestra errores de validación en línea debajo de cada campo según DESIGN.md.
  */
 export default function ApplicantForm({
   formData,
-  fieldErrors,
+  fieldErrors = {},
   onChange,
   onSubmit,
-  submitting,
+  onCancel,
+  submitting = false,
 }) {
-  const hasErrors = Object.keys(fieldErrors).length > 0;
+  const totalErrores = Object.keys(fieldErrors).length;
 
   return (
-    <form className="rf09-form" onSubmit={onSubmit} noValidate>
-      {/* Accessible Error Summary for Screen Readers */}
-      {hasErrors && (
-        <div
-          className="rf09-field-summary-alert"
-          role="alert"
-          aria-live="assertive"
-        >
-          <span>El formulario contiene {Object.keys(fieldErrors).length} error(es). Por favor, revise los campos marcados.</span>
-        </div>
+    <form className="postulante-formulario" onSubmit={onSubmit} noValidate>
+      {totalErrores > 0 && (
+        <Alerta tono="peligro" role="alert">
+          El formulario contiene {totalErrores} campo(s) con error. Por favor revise los campos marcados.
+        </Alerta>
       )}
 
-      {/* Información Personal */}
-      <fieldset className="rf09-fieldset">
-        <legend className="rf09-legend">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="rf09-legend-icon">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-          Información Personal
-        </legend>
-
-        <div className="rf09-form-row">
-          <div className="rf09-form-group">
-            <label htmlFor="rf09-doc" className="rf09-label">
-              Número de Documento <span className="rf09-required">*</span>
-            </label>
-            <input
-              id="rf09-doc"
-              type="text"
-              name="numero_documento"
-              className={`rf09-input ${
-                fieldErrors.numero_documento ? "rf09-input--error" : ""
-              }`}
-              value={formData.numero_documento}
-              onChange={onChange}
-              placeholder="Ej: 12345678"
-              maxLength={20}
-              autoComplete="off"
-              aria-required="true"
-              aria-invalid={fieldErrors.numero_documento ? "true" : "false"}
-              aria-describedby={
-                fieldErrors.numero_documento ? "rf09-doc-error" : undefined
-              }
-            />
-            {fieldErrors.numero_documento && (
-              <span
-                id="rf09-doc-error"
-                className="rf09-field-error"
-                role="alert"
-                aria-live="polite"
-              >
-                {fieldErrors.numero_documento}
-              </span>
-            )}
-          </div>
+      <div className="postulante-formulario__seccion">
+        <h3 className="postulante-formulario__subtitulo">Información personal</h3>
+        <div className="postulante-formulario__cuadricula">
+          <CampoTexto
+            id="rf-numero-documento"
+            name="numero_documento"
+            etiqueta="Número de documento"
+            placeholder="Ej: 12345678"
+            maxLength={20}
+            requerido
+            value={formData.numero_documento}
+            onChange={onChange}
+            error={fieldErrors.numero_documento}
+            disabled={submitting}
+          />
+          <CampoTexto
+            id="rf-nombres"
+            name="nombres"
+            etiqueta="Nombres"
+            placeholder="Ej: Juan Carlos"
+            maxLength={70}
+            requerido
+            value={formData.nombres}
+            onChange={onChange}
+            error={fieldErrors.nombres}
+            disabled={submitting}
+          />
+          <CampoTexto
+            id="rf-apellidos"
+            name="apellidos"
+            etiqueta="Apellidos"
+            placeholder="Ej: Pérez Rodríguez"
+            maxLength={100}
+            requerido
+            value={formData.apellidos}
+            onChange={onChange}
+            error={fieldErrors.apellidos}
+            disabled={submitting}
+          />
         </div>
+      </div>
 
-        <div className="rf09-form-row">
-          <div className="rf09-form-group">
-            <label htmlFor="rf09-nombres" className="rf09-label">
-              Nombres <span className="rf09-required">*</span>
-            </label>
-            <input
-              id="rf09-nombres"
-              type="text"
-              name="nombres"
-              className={`rf09-input ${
-                fieldErrors.nombres ? "rf09-input--error" : ""
-              }`}
-              value={formData.nombres}
-              onChange={onChange}
-              placeholder="Ej: Juan Carlos"
-              maxLength={70}
-              aria-required="true"
-              aria-invalid={fieldErrors.nombres ? "true" : "false"}
-              aria-describedby={
-                fieldErrors.nombres ? "rf09-nombres-error" : undefined
-              }
-            />
-            {fieldErrors.nombres && (
-              <span
-                id="rf09-nombres-error"
-                className="rf09-field-error"
-                role="alert"
-                aria-live="polite"
-              >
-                {fieldErrors.nombres}
-              </span>
-            )}
-          </div>
-
-          <div className="rf09-form-group">
-            <label htmlFor="rf09-apellidos" className="rf09-label">
-              Apellidos <span className="rf09-required">*</span>
-            </label>
-            <input
-              id="rf09-apellidos"
-              type="text"
-              name="apellidos"
-              className={`rf09-input ${
-                fieldErrors.apellidos ? "rf09-input--error" : ""
-              }`}
-              value={formData.apellidos}
-              onChange={onChange}
-              placeholder="Ej: Pérez García"
-              maxLength={100}
-              aria-required="true"
-              aria-invalid={fieldErrors.apellidos ? "true" : "false"}
-              aria-describedby={
-                fieldErrors.apellidos ? "rf09-apellidos-error" : undefined
-              }
-            />
-            {fieldErrors.apellidos && (
-              <span
-                id="rf09-apellidos-error"
-                className="rf09-field-error"
-                role="alert"
-                aria-live="polite"
-              >
-                {fieldErrors.apellidos}
-              </span>
-            )}
-          </div>
+      <div className="postulante-formulario__seccion">
+        <h3 className="postulante-formulario__subtitulo">Datos de contacto</h3>
+        <div className="postulante-formulario__cuadricula">
+          <CampoTexto
+            id="rf-correo"
+            name="correo_electronico"
+            type="email"
+            etiqueta="Correo electrónico"
+            placeholder="ejemplo@correo.com"
+            maxLength={120}
+            requerido
+            value={formData.correo_electronico}
+            onChange={onChange}
+            error={fieldErrors.correo_electronico}
+            disabled={submitting}
+          />
+          <CampoTexto
+            id="rf-telefono"
+            name="telefono_contacto"
+            type="tel"
+            etiqueta="Teléfono de contacto"
+            placeholder="Ej: +591 71234567"
+            maxLength={20}
+            requerido
+            value={formData.telefono_contacto}
+            onChange={onChange}
+            error={fieldErrors.telefono_contacto}
+            disabled={submitting}
+          />
         </div>
-      </fieldset>
+      </div>
 
-      {/* Datos de Contacto */}
-      <fieldset className="rf09-fieldset">
-        <legend className="rf09-legend">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="rf09-legend-icon">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-            <polyline points="22,6 12,13 2,6" />
-          </svg>
-          Datos de Contacto
-        </legend>
-
-        <div className="rf09-form-row">
-          <div className="rf09-form-group">
-            <label htmlFor="rf09-email" className="rf09-label">
-              Correo Electrónico <span className="rf09-required">*</span>
-            </label>
-            <input
-              id="rf09-email"
-              type="email"
-              name="correo_electronico"
-              className={`rf09-input ${
-                fieldErrors.correo_electronico ? "rf09-input--error" : ""
-              }`}
-              value={formData.correo_electronico}
-              onChange={onChange}
-              placeholder="Ej: juan.perez@email.com"
-              maxLength={120}
-              aria-required="true"
-              aria-invalid={
-                fieldErrors.correo_electronico ? "true" : "false"
-              }
-              aria-describedby={
-                fieldErrors.correo_electronico
-                  ? "rf09-email-error"
-                  : undefined
-              }
-            />
-            {fieldErrors.correo_electronico && (
-              <span
-                id="rf09-email-error"
-                className="rf09-field-error"
-                role="alert"
-                aria-live="polite"
-              >
-                {fieldErrors.correo_electronico}
-              </span>
-            )}
-          </div>
-
-          <div className="rf09-form-group">
-            <label htmlFor="rf09-phone" className="rf09-label">
-              Teléfono de Contacto <span className="rf09-required">*</span>
-            </label>
-            <input
-              id="rf09-phone"
-              type="tel"
-              name="telefono_contacto"
-              className={`rf09-input ${
-                fieldErrors.telefono_contacto ? "rf09-input--error" : ""
-              }`}
-              value={formData.telefono_contacto}
-              onChange={onChange}
-              placeholder="Ej: +591 71234567"
-              maxLength={20}
-              aria-required="true"
-              aria-invalid={
-                fieldErrors.telefono_contacto ? "true" : "false"
-              }
-              aria-describedby={
-                fieldErrors.telefono_contacto
-                  ? "rf09-phone-error"
-                  : undefined
-              }
-            />
-            {fieldErrors.telefono_contacto && (
-              <span
-                id="rf09-phone-error"
-                className="rf09-field-error"
-                role="alert"
-                aria-live="polite"
-              >
-                {fieldErrors.telefono_contacto}
-              </span>
-            )}
-          </div>
+      <div className="postulante-formulario__seccion">
+        <h3 className="postulante-formulario__subtitulo">Residencia</h3>
+        <div className="postulante-formulario__cuadricula">
+          <CampoTexto
+            id="rf-ciudad"
+            name="ciudad"
+            etiqueta="Ciudad"
+            placeholder="Ej: La Paz"
+            maxLength={50}
+            value={formData.ciudad}
+            onChange={onChange}
+            error={fieldErrors.ciudad}
+            disabled={submitting}
+          />
+          <CampoTexto
+            id="rf-direccion"
+            name="direccion_residencia"
+            etiqueta="Dirección de residencia"
+            placeholder="Ej: Av. 6 de Agosto #2450, Sopocachi"
+            maxLength={255}
+            className="postulante-formulario__ancho"
+            value={formData.direccion_residencia}
+            onChange={onChange}
+            error={fieldErrors.direccion_residencia}
+            disabled={submitting}
+          />
         </div>
-      </fieldset>
+      </div>
 
-      {/* Antecedentes Básicos */}
-      <fieldset className="rf09-fieldset">
-        <legend className="rf09-legend">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="rf09-legend-icon">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-            <circle cx="12" cy="10" r="3" />
-          </svg>
-          Antecedentes Básicos
-        </legend>
-
-        <div className="rf09-form-row">
-          <div className="rf09-form-group">
-            <label htmlFor="rf09-address" className="rf09-label">
-              Dirección de Residencia
-            </label>
-            <input
-              id="rf09-address"
-              type="text"
-              name="direccion_residencia"
-              className={`rf09-input ${
-                fieldErrors.direccion_residencia ? "rf09-input--error" : ""
-              }`}
-              value={formData.direccion_residencia}
-              onChange={onChange}
-              placeholder="Ej: Av. 6 de Agosto #1234, Zona Sopocachi"
-              maxLength={255}
-              aria-invalid={
-                fieldErrors.direccion_residencia ? "true" : "false"
-              }
-              aria-describedby={
-                fieldErrors.direccion_residencia
-                  ? "rf09-address-error"
-                  : undefined
-              }
-            />
-            {fieldErrors.direccion_residencia && (
-              <span
-                id="rf09-address-error"
-                className="rf09-field-error"
-                role="alert"
-                aria-live="polite"
-              >
-                {fieldErrors.direccion_residencia}
-              </span>
-            )}
-          </div>
-
-          <div className="rf09-form-group rf09-form-group--small">
-            <label htmlFor="rf09-city" className="rf09-label">
-              Ciudad
-            </label>
-            <input
-              id="rf09-city"
-              type="text"
-              name="ciudad"
-              className={`rf09-input ${
-                fieldErrors.ciudad ? "rf09-input--error" : ""
-              }`}
-              value={formData.ciudad}
-              onChange={onChange}
-              placeholder="Ej: La Paz"
-              maxLength={50}
-              aria-invalid={fieldErrors.ciudad ? "true" : "false"}
-              aria-describedby={
-                fieldErrors.ciudad ? "rf09-city-error" : undefined
-              }
-            />
-            {fieldErrors.ciudad && (
-              <span
-                id="rf09-city-error"
-                className="rf09-field-error"
-                role="alert"
-                aria-live="polite"
-              >
-                {fieldErrors.ciudad}
-              </span>
-            )}
-          </div>
-        </div>
-      </fieldset>
-
-      {/* Submit */}
-      <div className="rf09-form-actions">
-        <button
+      <div className="postulante-formulario__acciones">
+        {onCancel && (
+          <Boton
+            type="button"
+            variante="predeterminado"
+            onClick={onCancel}
+            disabled={submitting}
+          >
+            Cancelar
+          </Boton>
+        )}
+        <Boton
           type="submit"
-          className="rf09-btn rf09-btn--primary"
-          disabled={submitting}
+          variante="primario"
+          icono={UserPlus}
+          cargando={submitting}
         >
-          {submitting ? (
-            <>
-              <div className="rf09-spinner rf09-spinner--small" />
-              Registrando...
-            </>
-          ) : (
-            <>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="rf09-btn-icon">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <line x1="19" y1="8" x2="19" y2="14" />
-                <line x1="22" y1="11" x2="16" y2="11" />
-              </svg>
-              Registrar Postulante
-            </>
-          )}
-        </button>
+          {submitting ? "Registrando postulante…" : "Registrar postulante"}
+        </Boton>
       </div>
     </form>
   );

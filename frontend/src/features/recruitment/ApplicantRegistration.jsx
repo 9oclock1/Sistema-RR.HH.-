@@ -1,40 +1,58 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router";
+import { Briefcase, Calendar, Plus, RefreshCw, UserPlus, Users, X } from "lucide-react";
 import {
   fetchActiveJobOpenings,
   registerApplicant,
   fetchApplicantsByJobOpening,
 } from "../../api/recruitmentApi";
 import { useApplicantForm } from "../../hooks/useApplicantForm";
+import {
+  Alerta,
+  Boton,
+  Contador,
+  EncabezadoPagina,
+  Esqueleto,
+  Etiqueta,
+  Selector,
+  Tarjeta,
+  useAvisos,
+} from "../../components/ui";
 import ApplicantForm from "./ApplicantForm";
 import ApplicantList from "./ApplicantList";
 import "./ApplicantRegistration.css";
 
 /**
- * RF-09: Applicant Registration Page
- *
- * Main container component that orchestrates:
- *  - Job opening selection
- *  - Applicant registration form (always visible)
- *  - Applicant list for the selected opening
+ * RF-09: Pantalla de Registro de Postulantes
+ * Adaptada a la arquitectura y sistema de diseño Jira / Atlassian (DESIGN.md).
+ * Orquesta:
+ *  - Selección de convocatoria activa
+ *  - Visualización del resumen de la convocatoria
+ *  - Formulario accesible de postulación
+ *  - Tabla densa de postulantes registrados
  */
 export default function ApplicantRegistration() {
-  // State: job openings
+  const avisar = useAvisos();
+
+  // Estado: convocatorias
   const [jobOpenings, setJobOpenings] = useState([]);
   const [loadingOpenings, setLoadingOpenings] = useState(true);
   const [selectedOpening, setSelectedOpening] = useState(null);
+  const [errorCargaOpenings, setErrorCargaOpenings] = useState(null);
 
-  // State: applicant list
+  // Estado: postulantes
   const [applicants, setApplicants] = useState([]);
   const [loadingApplicants, setLoadingApplicants] = useState(false);
+  const [errorApplicants, setErrorApplicants] = useState(null);
 
-  // State: submission
+  // Estado: envío y notificaciones en página
   const [submitting, setSubmitting] = useState(false);
-  const [notification, setNotification] = useState(null);
+  const [alerta, setAlerta] = useState(null);
 
-  // State: toggle form visibility
+  // Estado: alternar visualización del formulario
   const [showForm, setShowForm] = useState(false);
 
-  // Form hook
+  // Hook del formulario
   const {
     formData,
     fieldErrors,
@@ -45,110 +63,122 @@ export default function ApplicantRegistration() {
     setFormData,
   } = useApplicantForm();
 
-  // Load active job openings on mount
-  useEffect(() => {
-    let cancelled = false;
-    async function loadOpenings() {
-      try {
-        const data = await fetchActiveJobOpenings();
-        if (!cancelled) setJobOpenings(data);
-      } catch (err) {
-        if (!cancelled) {
-          setNotification({
-            type: "error",
-            message: err.message,
-          });
-        }
-      } finally {
-        if (!cancelled) setLoadingOpenings(false);
-      }
-    }
-    loadOpenings();
-    return () => {
-      cancelled = true;
-    };
+  // Cargar convocatorias activas al montar
+  const cargarConvocatorias = useCallback(() => {
+    return fetchActiveJobOpenings()
+      .then((data) => {
+        setJobOpenings(Array.isArray(data) ? data : []);
+        setErrorCargaOpenings(null);
+      })
+      .catch((err) => {
+        setErrorCargaOpenings(err.message || "Error al obtener las convocatorias activas.");
+      })
+      .finally(() => {
+        setLoadingOpenings(false);
+      });
   }, []);
 
-  // Load applicants when a job opening is selected
   useEffect(() => {
-    if (!selectedOpening) return;
-    let cancelled = false;
-    async function loadApplicants() {
-      setLoadingApplicants(true);
-      try {
-        const data = await fetchApplicantsByJobOpening(
-          selectedOpening.id_convocatoria
-        );
-        if (!cancelled) setApplicants(data.postulantes);
-      } catch (err) {
-        if (!cancelled) {
-          setNotification({ type: "error", message: err.message });
-        }
-      } finally {
-        if (!cancelled) setLoadingApplicants(false);
-      }
-    }
-    loadApplicants();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedOpening]);
+    cargarConvocatorias();
+  }, [cargarConvocatorias]);
 
-  // Handle job opening selection change
+  const reintentarCargarConvocatorias = () => {
+    setErrorCargaOpenings(null);
+    setLoadingOpenings(true);
+    cargarConvocatorias();
+  };
+
+  // Cargar postulantes de la convocatoria seleccionada
+  const cargarPostulantes = useCallback((idConvocatoria) => {
+    if (!idConvocatoria) {
+      setApplicants([]);
+      return Promise.resolve();
+    }
+    setErrorApplicants(null);
+    return fetchApplicantsByJobOpening(idConvocatoria)
+      .then((data) => {
+        setApplicants(Array.isArray(data?.postulantes) ? data.postulantes : []);
+      })
+      .catch((err) => {
+        setErrorApplicants(err.message || "Error al obtener los postulantes de la convocatoria.");
+      })
+      .finally(() => {
+        setLoadingApplicants(false);
+      });
+  }, []);
+
+  // Manejar cambio en el selector de convocatoria
   function handleOpeningChange(e) {
     const openingId = e.target.value;
-    const opening = jobOpenings.find(
-      (o) => o.id_convocatoria === openingId
-    );
-    setSelectedOpening(opening || null);
-    if (!opening) setApplicants([]);
+    const opening = jobOpenings.find((o) => o.id_convocatoria === openingId) || null;
+    setSelectedOpening(opening);
     setFormData((prev) => ({ ...prev, id_convocatoria: openingId }));
-    setNotification(null);
+    setAlerta(null);
+    if (opening) {
+      setLoadingApplicants(true);
+      cargarPostulantes(opening.id_convocatoria);
+    } else {
+      setApplicants([]);
+    }
   }
 
-  // Handle form submission
+  // Alternar visualización del formulario
+  function handleToggleForm() {
+    setShowForm((prev) => !prev);
+    setAlerta(null);
+  }
+
+  // Envío del formulario
   async function handleSubmit(e) {
     e.preventDefault();
-    setNotification(null);
+    setAlerta(null);
 
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      return;
+    }
 
     setSubmitting(true);
     try {
-      const result = await registerApplicant(formData);
-      setNotification({
-        type: "success",
-        message: result.message,
+      await registerApplicant(formData);
+      
+      // Notificación flotante del sistema de diseño
+      avisar({
+        tono: "exito",
+        titulo: "Postulante registrado",
+        mensaje: `${formData.nombres} ${formData.apellidos} fue registrado correctamente.`,
       });
+
+      // Limpiar formulario preservando la convocatoria activa
       resetForm();
-      // Keep the convocatoria selected
-      setFormData((prev) => ({
-        ...prev,
-        id_convocatoria: selectedOpening?.id_convocatoria || "",
-      }));
-      // Refresh the applicant list
       if (selectedOpening) {
-        const data = await fetchApplicantsByJobOpening(
-          selectedOpening.id_convocatoria
-        );
-        setApplicants(data.postulantes);
+        setFormData((prev) => ({
+          ...prev,
+          id_convocatoria: selectedOpening.id_convocatoria,
+        }));
+        await cargarPostulantes(selectedOpening.id_convocatoria);
       }
+
     } catch (err) {
-      if (err.status === 409) {
-        setNotification({
-          type: "warning",
-          message: err.message,
+      const estado = err.status || err.estado;
+      if (estado === 409) {
+        setAlerta({
+          tono: "aviso",
+          titulo: "Postulación duplicada",
+          mensaje: err.message,
         });
-      } else if (err.status === 400 && err.errors?.length > 0) {
-        setBackendErrors(err.errors);
-        setNotification({
-          type: "error",
-          message: err.message,
+      } else if (estado === 400 && (err.errors?.length > 0 || err.detalles?.length > 0)) {
+        const errores = err.errors || err.detalles;
+        setBackendErrors(errores);
+        setAlerta({
+          tono: "peligro",
+          titulo: "Datos incompletos o inválidos",
+          mensaje: err.message || "Por favor revise los campos señalados en el formulario.",
         });
       } else {
-        setNotification({
-          type: "error",
-          message: err.message,
+        setAlerta({
+          tono: "peligro",
+          titulo: "Error al registrar",
+          mensaje: err.message || "Ocurrió un error inesperado al registrar el postulante.",
         });
       }
     } finally {
@@ -156,203 +186,186 @@ export default function ApplicantRegistration() {
     }
   }
 
-  // Auto-dismiss success notifications after 5 seconds
-  useEffect(() => {
-    if (notification?.type === "success") {
-      const timer = setTimeout(() => setNotification(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification]);
+  // Opciones para el selector de convocatorias
+  const opcionesConvocatorias = jobOpenings.map((opening) => ({
+    valor: opening.id_convocatoria,
+    etiqueta: `${opening.codigo_convocatoria || "CONV"} — ${opening.titulo_puesto}`,
+  }));
 
-  // Toggle form
-  function handleToggleForm() {
-    setShowForm((prev) => !prev);
-  }
+  const botonAccionHeader = selectedOpening && (
+    <Boton
+      variante={showForm ? "predeterminado" : "primario"}
+      icono={showForm ? X : Plus}
+      onClick={handleToggleForm}
+    >
+      {showForm ? "Cerrar formulario" : "Agregar postulante"}
+    </Boton>
+  );
 
   return (
-    <div className="rf09-container">
-      {/* Header */}
-      <header className="rf09-header">
-        <div className="rf09-header-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <line x1="19" y1="8" x2="19" y2="14" />
-            <line x1="22" y1="11" x2="16" y2="11" />
-          </svg>
-        </div>
-        <div>
-          <h1 className="rf09-title">Registro de Postulantes</h1>
-          <p className="rf09-subtitle">
-            Ingrese la información personal, datos de contacto y antecedentes
-            del postulante.
-          </p>
-        </div>
-        <div className="rf09-header-action">
-          <button
-            type="button"
-            className={`rf09-btn ${showForm ? 'rf09-btn--secondary' : 'rf09-btn--primary'}`}
-            onClick={handleToggleForm}
-          >
-            {showForm ? (
-              <>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="rf09-btn-icon">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-                Cerrar Formulario
-              </>
-            ) : (
-              <>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="rf09-btn-icon">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Agregar Postulante
-              </>
-            )}
-          </button>
-        </div>
-      </header>
+    <section className="postulantes" aria-labelledby="postulantes-titulo">
+      <EncabezadoPagina
+        migas={[{ etiqueta: "Inicio", href: "/" }, { etiqueta: "Reclutamiento" }]}
+        enlace={Link}
+        titulo="Registro de postulantes"
+        idTitulo="postulantes-titulo"
+        descripcion="Gestión de convocatorias activas y recepción de candidaturas para selección de personal."
+        acciones={botonAccionHeader}
+      />
 
-      {/* Job Opening Selector — always visible */}
-      <section className="rf09-section rf09-selector-section">
-        <label htmlFor="rf09-opening-select" className="rf09-label rf09-label--prominent">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="rf09-label-icon">
-            <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-          </svg>
-          Seleccionar Convocatoria
-        </label>
-        {loadingOpenings ? (
-          <div className="rf09-loading">
-            <div className="rf09-spinner" />
-            <span>Cargando convocatorias...</span>
-          </div>
-        ) : (
-          <select
-            id="rf09-opening-select"
-            name="id_convocatoria"
-            className={`rf09-select ${
-              fieldErrors.id_convocatoria ? "rf09-input--error" : ""
-            }`}
-            value={formData.id_convocatoria}
-            onChange={handleOpeningChange}
-            aria-required="true"
-            aria-invalid={fieldErrors.id_convocatoria ? "true" : "false"}
-            aria-describedby={
-              fieldErrors.id_convocatoria ? "rf09-opening-error" : undefined
-            }
-          >
-            <option value="">— Seleccione una convocatoria —</option>
-            {jobOpenings.map((opening) => (
-              <option
-                key={opening.id_convocatoria}
-                value={opening.id_convocatoria}
-              >
-                {opening.codigo_convocatoria} — {opening.titulo_puesto}
-              </option>
-            ))}
-          </select>
-        )}
-        {fieldErrors.id_convocatoria && (
-          <span
-            id="rf09-opening-error"
-            className="rf09-field-error"
-            role="alert"
-            aria-live="polite"
-          >
-            {fieldErrors.id_convocatoria}
-          </span>
-        )}
-        {jobOpenings.length === 0 && !loadingOpenings && (
-          <p className="rf09-empty-state">
-            No hay convocatorias activas disponibles en este momento.
-          </p>
-        )}
-      </section>
-
-      {/* Notification */}
-      {notification && (
-        <div
-          className={`rf09-notification rf09-notification--${notification.type}`}
-          role="alert"
-          aria-live="assertive"
+      {/* Alerta de notificación en página */}
+      {alerta && (
+        <Alerta
+          tono={alerta.tono}
+          titulo={alerta.titulo}
+          role={alerta.tono === "peligro" ? "alert" : undefined}
+          onCerrar={() => setAlerta(null)}
         >
-          <div className="rf09-notification-icon">
-            {notification.type === "success" && (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-            )}
-            {notification.type === "error" && (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="15" y1="9" x2="9" y2="15" />
-                <line x1="9" y1="9" x2="15" y2="15" />
-              </svg>
-            )}
-            {notification.type === "warning" && (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-            )}
-          </div>
-          <p>{notification.message}</p>
-          <button
-            className="rf09-notification-close"
-            onClick={() => setNotification(null)}
-            aria-label="Cerrar notificación"
-          >
-            ×
-          </button>
-        </div>
+          {alerta.mensaje}
+        </Alerta>
       )}
 
-      {/* Two-column layout: Form + List — form shows via toggle button */}
-      <div className="rf09-content">
-        {showForm && (
-          <section className="rf09-section rf09-form-section">
-            <h2 className="rf09-section-title">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="rf09-section-icon">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-              Datos del Postulante
-            </h2>
-            <ApplicantForm
-              formData={formData}
-              fieldErrors={fieldErrors}
-              onChange={handleChange}
-              onSubmit={handleSubmit}
-              submitting={submitting}
-            />
-          </section>
-        )}
+      {/* Error de carga de convocatorias */}
+      {errorCargaOpenings && (
+        <Alerta
+          tono="peligro"
+          role="alert"
+          titulo="No se pudieron cargar las convocatorias"
+          acciones={
+            <Boton tamano="sm" onClick={reintentarCargarConvocatorias} icono={RefreshCw}>
+              Reintentar
+            </Boton>
+          }
+        >
+          {errorCargaOpenings}
+        </Alerta>
+      )}
 
-        {selectedOpening && (
-          <section className={`rf09-section rf09-list-section ${!showForm ? 'rf09-list-section--full' : ''}`}>
-            <h2 className="rf09-section-title">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="rf09-section-icon">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-              Postulantes Registrados
-              <span className="rf09-badge">{applicants.length}</span>
-            </h2>
-            <ApplicantList
-              applicants={applicants}
-              loading={loadingApplicants}
-              openingTitle={selectedOpening?.titulo_puesto}
+      {/* Tarjeta del selector de convocatoria */}
+      <Tarjeta className="postulantes-selector-tarjeta">
+        <div className="postulantes-selector-fila">
+          {loadingOpenings ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", width: "100%" }}>
+              <Esqueleto ancho="160px" alto="16px" />
+              <Esqueleto ancho="100%" alto="32px" />
+            </div>
+          ) : (
+            <Selector
+              id="selector-convocatoria"
+              etiqueta="Convocatoria activa"
+              textoVacio="— Seleccione una convocatoria activa —"
+              opciones={opcionesConvocatorias}
+              value={formData.id_convocatoria}
+              onChange={handleOpeningChange}
+              error={fieldErrors.id_convocatoria}
+              ayuda={jobOpenings.length === 0 ? "No hay convocatorias activas disponibles actualmente." : undefined}
             />
-          </section>
+          )}
+
+          {selectedOpening && !showForm && (
+            <Boton
+              variante="primario"
+              icono={UserPlus}
+              onClick={handleToggleForm}
+            >
+              Registrar postulante
+            </Boton>
+          )}
+        </div>
+
+        {/* Resumen de la convocatoria seleccionada */}
+        {selectedOpening && (
+          <div className="postulantes-convocatoria-resumen">
+            <div className="postulantes-metrica">
+              <span className="postulantes-metrica__etiqueta">Puesto</span>
+              <span className="postulantes-metrica__valor">
+                <Briefcase className="ds-icono" aria-hidden="true" />
+                {selectedOpening.titulo_puesto}
+              </span>
+            </div>
+            <div className="postulantes-metrica">
+              <span className="postulantes-metrica__etiqueta">Vacantes</span>
+              <span className="postulantes-metrica__valor">
+                <Users className="ds-icono" aria-hidden="true" />
+                {selectedOpening.cantidad_vacantes ?? 1}
+              </span>
+            </div>
+            <div className="postulantes-metrica">
+              <span className="postulantes-metrica__etiqueta">Fecha límite</span>
+              <span className="postulantes-metrica__valor">
+                <Calendar className="ds-icono" aria-hidden="true" />
+                {selectedOpening.fecha_limite_postulacion
+                  ? new Date(selectedOpening.fecha_limite_postulacion).toLocaleDateString("es-BO")
+                  : "Abierta"}
+              </span>
+            </div>
+            <div className="postulantes-metrica">
+              <span className="postulantes-metrica__etiqueta">Estado</span>
+              <span className="postulantes-metrica__valor">
+                <Etiqueta tono="exito">Convocatoria activa</Etiqueta>
+              </span>
+            </div>
+          </div>
         )}
-      </div>
-    </div>
+      </Tarjeta>
+
+      {/* Formulario de registro (colapsable o visible a demanda) */}
+      {showForm && selectedOpening && (
+        <Tarjeta
+          titulo={`Nuevo postulante: ${selectedOpening.titulo_puesto}`}
+          acciones={
+            <Boton variante="sutil" soloIcono icono={X} aria-label="Cerrar formulario" onClick={handleToggleForm} />
+          }
+        >
+          <ApplicantForm
+            formData={formData}
+            fieldErrors={fieldErrors}
+            onChange={handleChange}
+            onSubmit={handleSubmit}
+            onCancel={handleToggleForm}
+            submitting={submitting}
+          />
+        </Tarjeta>
+      )}
+
+      {/* Error de carga de postulantes */}
+      {errorApplicants && (
+        <Alerta
+          tono="peligro"
+          role="alert"
+          titulo="Error al consultar los postulantes"
+          acciones={
+            <Boton
+              tamano="sm"
+              onClick={() => cargarPostulantes(selectedOpening?.id_convocatoria)}
+              icono={RefreshCw}
+            >
+              Reintentar
+            </Boton>
+          }
+        >
+          {errorApplicants}
+        </Alerta>
+      )}
+
+      {/* Tabla de postulantes registrados */}
+      {selectedOpening && (
+        <Tarjeta
+          titulo="Postulantes registrados"
+          acciones={
+            <Contador aria-label={`${applicants.length} postulantes registrados`}>
+              {applicants.length}
+            </Contador>
+          }
+        >
+          <ApplicantList
+            applicants={applicants}
+            loading={loadingApplicants}
+            openingTitle={selectedOpening.titulo_puesto}
+            onRegistrarPrimerPostulante={handleToggleForm}
+          />
+        </Tarjeta>
+      )}
+    </section>
   );
 }
