@@ -117,7 +117,59 @@
   color: var(--color-text-secondary);
 }
 
+/* Resumen de la jornada cerrada */
+.jornada-cierre {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.resumen-jornada {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.resumen-dato {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.resumen-dato dt,
+.resumen-detalle {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.resumen-dato dd {
+  margin: 0;
+}
+
+.resumen-valor {
+  color: var(--color-text);
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.resumen-vacio {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-regular);
+}
+
 @media (max-width: 640px) {
+  .resumen-jornada {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .marcaje-empleado {
     flex-wrap: wrap;
   }

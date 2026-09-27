@@ -1,4 +1,4 @@
-import { IconoAviso, IconoConfirmado } from "./Iconos";
+import { Alerta } from "../../components/ui";
 import { describirOrigen, duracionISO, formatearDuracion, formatearHora } from "./formato";
 
 function DatoMarcaje({ titulo, marcaje }) {
@@ -25,15 +25,14 @@ export default function ResumenJornada({ jornada, ref }) {
 
   return (
     <div className="jornada-cierre">
-      <div className={`confirmacion${pendiente ? " confirmacion-aviso" : ""}`} ref={ref} tabIndex={-1}>
-        {pendiente ? <IconoAviso /> : <IconoConfirmado />}
-        <div>
-          <p className="confirmacion-titulo">
-            {pendiente ? "Salida pendiente de justificación" : "Jornada completada"}
-          </p>
-          <p className="confirmacion-detalle">{inconsistencia ?? "Se registraron su entrada y su salida."}</p>
-        </div>
-      </div>
+      <Alerta
+        ref={ref}
+        tabIndex={-1}
+        tono={pendiente ? "aviso" : "exito"}
+        titulo={pendiente ? "Salida pendiente de justificación" : "Jornada completada"}
+      >
+        {inconsistencia ?? "Se registraron su entrada y su salida."}
+      </Alerta>
 
       <dl className="resumen-jornada">
         <DatoMarcaje titulo="Entrada" marcaje={entrada} />
