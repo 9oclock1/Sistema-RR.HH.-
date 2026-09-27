@@ -3,6 +3,7 @@ import "./utilidades.css";
 import "./Boton.css";
 
 export default function Boton({
+  as: Enlace,
   variante = "predeterminado",
   tamano = "md",
   icono: Icono,
@@ -35,12 +36,13 @@ export default function Boton({
     .filter(Boolean)
     .join(" ");
 
-  // Con href se pinta como enlace con aspecto de botón.
-  if (props.href) {
+  // Con href, o con "as" (p. ej. Link del router) y "to", se pinta como enlace con aspecto de botón.
+  if (Enlace || props.href) {
+    const Base = Enlace ?? "a";
     return (
-      <a className={clases} {...props}>
+      <Base className={clases} {...props}>
         {contenido}
-      </a>
+      </Base>
     );
   }
 

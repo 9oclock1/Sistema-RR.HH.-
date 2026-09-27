@@ -20,6 +20,10 @@ button.ds-tarjeta {
   cursor: pointer;
 }
 
+a.ds-tarjeta {
+  text-decoration: none;
+}
+
 .ds-tarjeta--interactiva:hover {
   border-color: var(--color-border-hover);
 }

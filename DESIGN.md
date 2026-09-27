@@ -98,12 +98,12 @@ import { Boton, CampoTexto, Tabla, useAvisos } from "../../components/ui";
 
 | Componente | Uso principal |
 |---|---|
-| `Boton` | Con `href` se pinta como enlace. `variante`: `primario` \| `predeterminado` \| `sutil` \| `peligro`; `tamano`: `md` \| `sm`; `icono`, `soloIcono` (requiere `aria-label`), `cargando`, `disabled` |
+| `Boton` | Con `href`, o con `as={Link}` + `to`, se pinta como enlace. `variante`: `primario` \| `predeterminado` \| `sutil` \| `peligro`; `tamano`: `md` \| `sm`; `icono`, `soloIcono` (requiere `aria-label`), `cargando`, `disabled` |
 | `CampoTexto` | Input con `etiqueta`, `ayuda`, `error`, `requerido` y el resto de atributos de `<input>` |
 | `Selector` | `<select>` con las mismas props de campo más `opciones` `[{ valor, etiqueta }]` y `textoVacio` |
 | `Casilla` | Checkbox con `etiqueta` y `ayuda`; el resto de atributos van al `<input>` |
 | `Campo` | Envoltorio de etiqueta, ayuda y error para crear otros controles |
-| `Tarjeta` | `titulo`, `nivelTitulo` (3 por defecto), `acciones`, `interactiva`, `seleccionada`; con `onClick` se vuelve botón |
+| `Tarjeta` | `titulo`, `nivelTitulo` (3 por defecto), `acciones`, `interactiva`, `seleccionada`; con `onClick` se vuelve botón y con `as={Link}` + `to`, enlace |
 | `Etiqueta` | `tono`: `neutral` \| `exito` \| `aviso` \| `peligro` \| `info` \| `morado`; `icono` |
 | `Alerta` | Mensaje en línea que permanece: `tono` (`info` \| `exito` \| `aviso` \| `peligro`), `titulo`, `acciones`, `onCerrar`. Con `role="alert"` para errores; con `tabIndex={-1}` y `ref` para llevar el foco (resumen de errores de un formulario) |
 | `Contador` | Píldora gris para cantidades |
@@ -133,3 +133,14 @@ import { Clock } from "lucide-react";
 - Ningún color, fuente, espaciado ni radio escrito a mano: siempre tokens.
 - Si falta un componente, se crea en `frontend/src/components/ui/` siguiendo este documento y se exporta en `index.js`.
 - Las clases de los componentes base usan el prefijo `ds-` para no chocar con estilos de cada módulo.
+
+## Integración de módulos
+
+A cada pantalla se entra desde el inicio (`/`) o la barra lateral, no escribiendo la URL.
+
+- Los módulos están en `frontend/src/router/modulos.js`, agrupados por sección: `ruta`, `etiqueta`, `descripcion`, `icono`, `roles` y `pagina`. Cada módulo aparece automáticamente en el inicio, la barra lateral, el buscador y las rutas.
+- Para integrar una historia, agrega su módulo con su página en la sección que le corresponde (o crea la sección).
+- `roles`: roles con acceso. La jerarquía está en `frontend/src/utils/permisos.js`: el administrador incluye al gerente y al reclutador, el gerente al supervisor, y el supervisor y el reclutador al empleado. Un rol sin acceso no ve el módulo; si entra por la URL, ve «Acceso restringido».
+- Permisos dentro de una pantalla: `puedeAcceder(useRol(), ["supervisor"])` (`useRol` está en `context/sesion.js`).
+- Hasta que exista el inicio de sesión, el rol se elige en «Rol de prueba», al pie de la barra lateral.
+- Las páginas empiezan con `EncabezadoPagina` y las migas `Inicio / <Sección>`, con `enlace={Link}`.

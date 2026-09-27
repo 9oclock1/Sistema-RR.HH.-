@@ -2,8 +2,10 @@ import TextoTruncado from "./TextoTruncado";
 import "./utilidades.css";
 import "./Tarjeta.css";
 
-// Con onClick la tarjeta es un botón completo; si tiene controles dentro, usa acciones en su lugar.
+// Con onClick la tarjeta es un botón completo; con "as" (p. ej. Link del router) y "to", un enlace completo.
+// Si tiene controles dentro, usa acciones en su lugar.
 export default function Tarjeta({
+  as: Enlace,
   titulo,
   nivelTitulo = 3,
   acciones,
@@ -14,13 +16,14 @@ export default function Tarjeta({
   children,
   ...props
 }) {
-  const esBoton = Boolean(onClick);
-  const Elemento = esBoton ? "button" : "div";
+  const esBoton = !Enlace && Boolean(onClick);
+  const esEnlace = Boolean(Enlace);
+  const Elemento = Enlace ?? (esBoton ? "button" : "div");
   const clases = [
     "ds-tarjeta",
-    (interactiva || esBoton) && "ds-tarjeta--interactiva",
+    (interactiva || esBoton || esEnlace) && "ds-tarjeta--interactiva",
     seleccionada && "ds-tarjeta--seleccionada",
-    esBoton && "ds-foco",
+    (esBoton || esEnlace) && "ds-foco",
     className,
   ]
     .filter(Boolean)

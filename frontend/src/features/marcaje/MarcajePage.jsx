@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
 import { ArrowLeftRight, LogIn, LogOut } from "lucide-react";
 import { consultarJornada, registrarEntrada, registrarSalida } from "../../api/marcajes";
 import {
@@ -137,7 +138,8 @@ export default function MarcajePage() {
   return (
     <section className="marcaje" aria-labelledby="marcaje-titulo">
       <EncabezadoPagina
-        migas={[{ etiqueta: "Asistencia" }]}
+        migas={[{ etiqueta: "Inicio", href: "/" }, { etiqueta: "Asistencia" }]}
+        enlace={Link}
         titulo="Marcaje de asistencia"
         idTitulo="marcaje-titulo"
         descripcion="Registre el inicio y el fin de su jornada laboral."

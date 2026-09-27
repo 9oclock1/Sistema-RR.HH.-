@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router";
 import { Plus } from "lucide-react";
 import { actualizarTurno, crearTurno, eliminarTurno, listarTiposJornada, listarTurnos } from "../../api/turnos";
 import { Alerta, Boton, EncabezadoPagina, ModalConfirmacion, Tarjeta, useAvisos } from "../../components/ui";
@@ -103,7 +104,8 @@ export default function TurnosPage() {
   return (
     <section className="turnos" aria-labelledby="turnos-titulo">
       <EncabezadoPagina
-        migas={[{ etiqueta: "Asistencia" }]}
+        migas={[{ etiqueta: "Inicio", href: "/" }, { etiqueta: "Asistencia" }]}
+        enlace={Link}
         titulo="Turnos"
         idTitulo="turnos-titulo"
         descripcion="Horarios, refrigerios y tolerancias de atraso."

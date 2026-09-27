@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
-import { Menu, Search } from "lucide-react";
-import { Boton, ElementoNavegacion } from "../components/ui";
-import { SECCIONES_NAVEGACION } from "./navegacion";
+import { House, Menu, Search } from "lucide-react";
+import { Boton, ElementoNavegacion, Selector, useAvisos } from "../components/ui";
+import { cambiarRol, useRol } from "../context/sesion";
+import { seccionesPara } from "../router/modulos";
+import { ROLES } from "../utils/permisos";
 import "./MainLayout.css";
 
 const CONSULTA_ESCRITORIO = "(min-width: 1024px)";
@@ -34,14 +36,18 @@ function guardarPlegado(plegado) {
 
 const normalizar = (texto) => texto.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
-function filtrarSecciones(consulta) {
-  if (!consulta) return SECCIONES_NAVEGACION;
-  return SECCIONES_NAVEGACION.map((seccion) => ({
-    ...seccion,
-    elementos: seccion.elementos.filter(
-      (elemento) => normalizar(elemento.etiqueta).includes(consulta) || normalizar(seccion.titulo).includes(consulta),
-    ),
-  })).filter((seccion) => seccion.elementos.length > 0);
+const OPCIONES_ROL = Object.entries(ROLES).map(([valor, rol]) => ({ valor, etiqueta: rol.nombre }));
+
+function filtrarSecciones(secciones, consulta) {
+  if (!consulta) return secciones;
+  return secciones
+    .map((seccion) => ({
+      ...seccion,
+      modulos: seccion.modulos.filter(
+        (modulo) => normalizar(modulo.etiqueta).includes(consulta) || normalizar(seccion.titulo).includes(consulta),
+      ),
+    }))
+    .filter((seccion) => seccion.modulos.length > 0);
 }
 
 export default function MainLayout() {
@@ -53,10 +59,12 @@ export default function MainLayout() {
   const { pathname } = useLocation();
   const rutaAnterior = useRef(pathname);
   const navegar = useNavigate();
+  const avisar = useAvisos();
+  const rol = useRol();
 
   const consulta = normalizar(busqueda.trim());
-  const secciones = filtrarSecciones(consulta);
-  const resultados = secciones.flatMap((seccion) => seccion.elementos);
+  const secciones = filtrarSecciones(seccionesPara(rol), consulta);
+  const resultados = secciones.flatMap((seccion) => seccion.modulos);
   const menuVisible = escritorio ? !plegado : abiertoMovil;
   const lateralVisible = menuVisible || Boolean(consulta);
   const superpuesto = !escritorio && lateralVisible;
@@ -92,6 +100,12 @@ export default function MainLayout() {
   const cerrarSuperpuesto = () => {
     setAbiertoMovil(false);
     setBusqueda("");
+  };
+
+  const alCambiarRol = (evento) => {
+    const nuevo = evento.target.value;
+    cambiarRol(nuevo);
+    avisar({ tono: "info", titulo: "Rol de prueba cambiado", mensaje: ROLES[nuevo].nombre });
   };
 
   const alPresionarEnBusqueda = (evento) => {
@@ -137,34 +151,49 @@ export default function MainLayout() {
         </div>
       </header>
 
-      <nav id="app-lateral" className="app-lateral" aria-label="Módulos">
-        {secciones.map((seccion) => (
-          <div key={seccion.titulo} className="app-lateral__seccion">
-            <p className="app-lateral__titulo" id={`nav-${seccion.titulo}`}>
-              {seccion.titulo}
-            </p>
-            <ul className="app-lateral__lista" aria-labelledby={`nav-${seccion.titulo}`}>
-              {seccion.elementos.map((elemento) => (
-                <li key={elemento.ruta}>
-                  <ElementoNavegacion
-                    as={NavLink}
-                    to={elemento.ruta}
-                    icono={elemento.icono}
-                    etiqueta={elemento.etiqueta}
-                    onClick={cerrarSuperpuesto}
-                  />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-        {consulta && resultados.length === 0 && (
-          <p className="app-lateral__vacio">Ningún módulo coincide con «{busqueda.trim()}».</p>
-        )}
-        <p className="ds-solo-lector" role="status">
-          {consulta ? `${resultados.length} ${resultados.length === 1 ? "módulo encontrado" : "módulos encontrados"}` : ""}
-        </p>
-      </nav>
+      <aside id="app-lateral" className="app-lateral" aria-label="Barra lateral">
+        <nav className="app-lateral__nav" aria-label="Módulos">
+          {!consulta && (
+            <ElementoNavegacion as={NavLink} to="/" end icono={House} etiqueta="Inicio" onClick={cerrarSuperpuesto} />
+          )}
+          {secciones.map((seccion) => (
+            <div key={seccion.titulo} className="app-lateral__seccion">
+              <p className="app-lateral__titulo" id={`nav-${seccion.titulo}`}>
+                {seccion.titulo}
+              </p>
+              <ul className="app-lateral__lista" aria-labelledby={`nav-${seccion.titulo}`}>
+                {seccion.modulos.map((modulo) => (
+                  <li key={modulo.ruta}>
+                    <ElementoNavegacion
+                      as={NavLink}
+                      to={modulo.ruta}
+                      icono={modulo.icono}
+                      etiqueta={modulo.etiqueta}
+                      onClick={cerrarSuperpuesto}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          {consulta && resultados.length === 0 && (
+            <p className="app-lateral__vacio">Ningún módulo coincide con «{busqueda.trim()}».</p>
+          )}
+          <p className="ds-solo-lector" role="status">
+            {consulta ? `${resultados.length} ${resultados.length === 1 ? "módulo encontrado" : "módulos encontrados"}` : ""}
+          </p>
+        </nav>
+
+        <div className="app-lateral__pie">
+          <Selector
+            etiqueta="Rol de prueba"
+            ayuda="Temporal hasta contar con inicio de sesión."
+            opciones={OPCIONES_ROL}
+            value={rol}
+            onChange={alCambiarRol}
+          />
+        </div>
+      </aside>
 
       {superpuesto && <div className="app-velo" aria-hidden="true" onClick={cerrarSuperpuesto} />}
 
