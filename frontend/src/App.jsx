@@ -1,14 +1,6 @@
-import { ApplicantRegistration } from './features/recruitment'
+import { RouterProvider } from "react-router/dom";
+import { router } from "./router";
 
-/**
- * App Root Component
- *
- * Currently renders the RF-09 ApplicantRegistration feature directly.
- * When the Sprint 1 merge integrates the router, this will be replaced
- * with <RouterProvider> or <BrowserRouter> wrapping all feature routes.
- */
-function App() {
-  return <ApplicantRegistration />
+export default function App() {
+  return <RouterProvider router={router} />;
 }
-
-export default App

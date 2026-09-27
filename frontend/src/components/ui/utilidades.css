@@ -1,0 +1,36 @@
+/* Utilidades compartidas por los componentes base. */
+
+/* Los componentes no dependen del reinicio global de cada rama. */
+:where([class^="ds-"], [class*=" ds-"]),
+:where([class^="ds-"], [class*=" ds-"])::before,
+:where([class^="ds-"], [class*=" ds-"])::after {
+  box-sizing: border-box;
+}
+
+.ds-icono {
+  flex: none;
+  width: var(--size-icon);
+  height: var(--size-icon);
+  stroke-width: var(--icon-stroke);
+}
+
+.ds-solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ds-truncar {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-foco:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-border-focus);
+  outline-offset: var(--focus-ring-offset);
+}

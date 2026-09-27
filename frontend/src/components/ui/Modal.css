@@ -1,0 +1,76 @@
+.ds-modal {
+  width: min(var(--size-modal-lg), calc(100vw - var(--space-8)));
+  max-height: calc(100dvh - var(--space-8) * 2);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-overlay);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.ds-modal[open] {
+  display: flex;
+  flex-direction: column;
+  animation: ds-modal-entrada var(--duration) var(--easing);
+}
+
+.ds-modal--sm {
+  width: min(var(--size-modal), calc(100vw - var(--space-8)));
+}
+
+.ds-modal::backdrop {
+  background: var(--color-bg-overlay);
+}
+
+.ds-modal__encabezado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-4) var(--space-2) var(--space-6);
+}
+
+.ds-modal__titulo {
+  margin: 0;
+  color: var(--color-text);
+  font-family: inherit;
+  letter-spacing: normal;
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ds-modal__cuerpo {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-6);
+  color: var(--color-text-secondary);
+}
+
+.ds-modal__cuerpo strong {
+  color: var(--color-text);
+}
+
+.ds-modal__pie {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-6) var(--space-6);
+}
+
+@keyframes ds-modal-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2));
+  }
+}
+
+@media (max-width: 640px) {
+  .ds-modal__pie > * {
+    flex: 1;
+  }
+}
