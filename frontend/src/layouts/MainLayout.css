@@ -69,13 +69,6 @@
   pointer-events: none;
 }
 
-.app-barra__acciones {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 /* Barra lateral */
 .app-lateral {
   position: fixed;

@@ -4,8 +4,6 @@ Toda la interfaz del proyecto (módulo de RR.HH. del ERP del supermercado) sigue
 
 Lenguaje visual inspirado en herramientas de productividad tipo Jira / Atlassian Design System: limpio, denso y profesional. **No** se usan logos ni nombres de Jira o Atlassian. Los textos de la interfaz van en español.
 
-Vista previa de todos los tokens y componentes: `/design-preview`.
-
 ---
 
 ## Colores
@@ -133,5 +131,5 @@ import { Clock } from "lucide-react";
 ### Reglas para código nuevo
 
 - Ningún color, fuente, espaciado ni radio escrito a mano: siempre tokens.
-- Si falta un componente, se crea en `frontend/src/components/ui/` siguiendo este documento, se exporta en `index.js` y se añade a `/design-preview`.
+- Si falta un componente, se crea en `frontend/src/components/ui/` siguiendo este documento y se exporta en `index.js`.
 - Las clases de los componentes base usan el prefijo `ds-` para no chocar con estilos de cada módulo.

@@ -2,7 +2,6 @@ import { createBrowserRouter, Navigate } from "react-router";
 import MainLayout from "../layouts/MainLayout";
 import MarcajePage from "../features/marcaje/MarcajePage";
 import TurnosPage from "../features/turnos/TurnosPage";
-import VistaDisenoPage from "../features/vista-diseno/VistaDisenoPage";
 
 export const router = createBrowserRouter([
   {
@@ -14,5 +13,4 @@ export const router = createBrowserRouter([
       { path: "asistencia/turnos", element: <TurnosPage /> },
     ],
   },
-  { path: "/design-preview", element: <VistaDisenoPage /> },
 ]);

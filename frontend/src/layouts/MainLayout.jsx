@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
-import { Menu, Palette, Search } from "lucide-react";
+import { Menu, Search } from "lucide-react";
 import { Boton, ElementoNavegacion } from "../components/ui";
 import { SECCIONES_NAVEGACION } from "./navegacion";
 import "./MainLayout.css";
@@ -133,16 +133,6 @@ export default function MainLayout() {
             value={busqueda}
             onChange={(evento) => setBusqueda(evento.target.value)}
             onKeyDown={alPresionarEnBusqueda}
-          />
-        </div>
-        <div className="app-barra__acciones">
-          <Boton
-            variante="sutil"
-            soloIcono
-            icono={Palette}
-            href="/design-preview"
-            aria-label="Sistema de diseño"
-            title="Sistema de diseño"
           />
         </div>
       </header>
