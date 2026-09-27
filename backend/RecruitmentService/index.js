@@ -1,21 +1,24 @@
 import express from "express";
-import cvTestRoutes from "./src/routes/cvTestRoutes.js";
-import { errorHandler } from "./src/middlewares/errorHandler.js";
 import cors from "cors";
-import { Pool } from "pg";
+import { pool } from "./src/config/dbConfig.js";
+import cvTestRoutes from "./src/routes/cvTestRoutes.js";
+import postulacionRoutes from "./src/routes/postulacionRoutes.js";
+import { errorHandler } from "./src/middlewares/errorHandler.js";
 
 const app = express();
 const PORT = process.env.PORT || 3003;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (req, res) => {
   res.json({ service: "RecruitmentService", status: "Online", port: PORT });
 });
 
+// endpoints funcionalidades
 app.use("/cv", cvTestRoutes);
+app.use("/postulaciones", postulacionRoutes);
 
 app.get("/health", async (req, res) => {
   try {
@@ -32,13 +35,6 @@ app.get("/health", async (req, res) => {
       error: error.message,
     });
   }
-});
-
-app.get("/vacancies", (req, res) => {
-  res.json([
-    { id: 101, title: "programador", status: "abierta", candidates: 5 },
-    { id: 102, title: "abogado", status: "evaluación", candidates: 3 },
-  ]);
 });
 
 app.use(errorHandler);
