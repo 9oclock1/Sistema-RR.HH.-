@@ -5,6 +5,12 @@ const { withTransaction } = require('../utils/transaction');
 
 const noEncontrado = () => new HttpError(404, 'El cargo solicitado no existe.');
 
+// Monto decimal a centavos sin pasar por float: '8000', '8000.0' y '8000.00' son el mismo salario.
+const aCentavos = (monto) => {
+  const [enteros, decimales = ''] = String(monto).split('.');
+  return BigInt(enteros) * 100n + BigInt(decimales.padEnd(2, '0'));
+};
+
 const validarReferencias = async (client, cargo, idCargoActual = null) => {
   const errores = [];
 
@@ -58,12 +64,17 @@ const crearCargo = (cargo) =>
   });
 
 // PUT: reemplaza todos los campos editables, incluida la lista completa de funciones.
+// RF-17.3: la fecha de modificación solo avanza si cambió el nivel salarial o el salario; el resto de cambios no la toca.
 const reemplazarCargo = (idCargo, cargo) =>
   withTransaction(async (client) => {
-    if (!(await cargosModel.bloquearPorId(client, idCargo))) throw noEncontrado();
+    const actual = await cargosModel.bloquearPorId(client, idCargo);
+    if (!actual) throw noEncontrado();
 
     await validarReferencias(client, cargo, idCargo);
-    await cargosModel.reemplazar(client, idCargo, cargo);
+    const cambioSalarial =
+      cargo.nivel_salarial !== actual.nivel_salarial ||
+      aCentavos(cargo.salario_base_referencial) !== aCentavos(actual.salario_base_referencial);
+    await cargosModel.reemplazar(client, idCargo, cargo, { cambioSalarial });
     return cargosModel.obtenerPorId(client, idCargo);
   });
 

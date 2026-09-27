@@ -1,4 +1,5 @@
 const { randomUUID } = require('node:crypto');
+const { NIVELES_SALARIALES } = require('../utils/nivelesSalariales');
 
 const SELECT_CARGO = `
   SELECT
@@ -9,11 +10,12 @@ const SELECT_CARGO = `
     d.nombre AS departamento,
     c.id_cargo_jefe_directo,
     j.nombre AS cargo_jefe_directo,
-    c.nivel_jerarquico,
+    c.nivel_salarial,
     c.salario_base_referencial,
     c.requisitos_minimos,
     c.funciones_clave,
-    c.esta_activo
+    c.esta_activo,
+    c.fecha_modificacion
   FROM cargos c
   JOIN departamentos d ON d.id_departamento = c.id_departamento
   LEFT JOIN cargos j   ON j.id_cargo = c.id_cargo_jefe_directo
@@ -35,7 +37,9 @@ const listar = async (db, { idDepartamento } = {}) => {
     query += ` AND c.id_departamento = $${valores.length}`;
   }
 
-  query += ' ORDER BY c.nivel_jerarquico ASC, c.nombre ASC';
+  // Del nivel salarial más alto al más bajo; un valor fuera del catálogo (cargado a mano en la BD) va al final.
+  valores.push(NIVELES_SALARIALES);
+  query += ` ORDER BY array_position($${valores.length}::text[], c.nivel_salarial::text) DESC NULLS LAST, c.nombre ASC`;
   const { rows } = await db.query(query, valores);
   return rows.map(aCargo);
 };
@@ -45,16 +49,20 @@ const obtenerPorId = async (db, idCargo) => {
   return rows[0] ? aCargo(rows[0]) : null;
 };
 
+// Bloquea el cargo y devuelve su nivel salarial y salario vigentes, para comparar con los nuevos sin carreras (RF-17.3).
 const bloquearPorId = async (db, idCargo) => {
-  const { rows } = await db.query('SELECT id_cargo FROM cargos WHERE id_cargo = $1 FOR UPDATE', [idCargo]);
-  return rows.length > 0;
+  const { rows } = await db.query(
+    'SELECT id_cargo, nivel_salarial, salario_base_referencial FROM cargos WHERE id_cargo = $1 FOR UPDATE',
+    [idCargo]
+  );
+  return rows[0] || null;
 };
 
 const insertar = async (db, cargo) => {
   const { rows } = await db.query(
     `INSERT INTO cargos (
        id_cargo, id_departamento, id_cargo_jefe_directo, codigo, nombre,
-       nivel_jerarquico, salario_base_referencial, funciones_clave, requisitos_minimos
+       nivel_salarial, salario_base_referencial, funciones_clave, requisitos_minimos
      )
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING id_cargo`,
@@ -64,7 +72,7 @@ const insertar = async (db, cargo) => {
       cargo.id_cargo_jefe_directo,
       cargo.codigo,
       cargo.nombre,
-      cargo.nivel_jerarquico,
+      cargo.nivel_salarial,
       cargo.salario_base_referencial,
       cargo.funciones.join(SEPARADOR_FUNCIONES),
       cargo.requisitos_minimos,
@@ -73,24 +81,27 @@ const insertar = async (db, cargo) => {
   return rows[0].id_cargo;
 };
 
-const reemplazar = async (db, idCargo, cargo) => {
+// fecha_modificacion solo se toca si el servicio detectó un cambio de nivel salarial o de salario
+// (sin triggers, por decisión del equipo).
+const reemplazar = async (db, idCargo, cargo, { cambioSalarial = false } = {}) => {
+  const fechaModificacion = cambioSalarial ? ', fecha_modificacion = CURRENT_TIMESTAMP' : '';
   await db.query(
     `UPDATE cargos
         SET id_departamento = $1,
             id_cargo_jefe_directo = $2,
             codigo = $3,
             nombre = $4,
-            nivel_jerarquico = $5,
+            nivel_salarial = $5,
             salario_base_referencial = $6,
             funciones_clave = $7,
-            requisitos_minimos = $8
+            requisitos_minimos = $8${fechaModificacion}
       WHERE id_cargo = $9`,
     [
       cargo.id_departamento,
       cargo.id_cargo_jefe_directo,
       cargo.codigo,
       cargo.nombre,
-      cargo.nivel_jerarquico,
+      cargo.nivel_salarial,
       cargo.salario_base_referencial,
       cargo.funciones.join(SEPARADOR_FUNCIONES),
       cargo.requisitos_minimos,

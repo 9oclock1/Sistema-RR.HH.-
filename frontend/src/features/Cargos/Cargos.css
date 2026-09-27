@@ -32,3 +32,17 @@
 .cargos-funciones .ui-btn--dashed {
   margin-top: 2px;
 }
+
+/* ---------- Tabla: requisitos mínimos ---------- */
+/* Dos líneas como máximo para no estirar la fila; el texto completo queda en el title. */
+.cargos-requisitos {
+  display: -webkit-box;
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}

@@ -8,7 +8,8 @@ import {
   formularioVacio,
   validarFormulario,
 } from '../utils/cargoFormulario';
-import { formatearMonto } from '../utils/formato';
+import { formatearFechaHora, formatearMonto } from '../utils/formato';
+import { NIVELES_SALARIALES } from '../utils/nivelesSalariales';
 import FuncionesInput from './FuncionesInput';
 
 export default function CargoForm({
@@ -76,6 +77,8 @@ export default function CargoForm({
   const departamentoFaltante =
     valores.id_departamento && !departamentos.some((d) => d.id_departamento === valores.id_departamento);
   const salarioValido = /^\d{1,10}(\.\d{1,2})?$/.test(valores.salario_base_referencial.trim());
+  // Un nivel fuera del catálogo (cargado a mano en la BD) se conserva como opción para no perderlo al editar.
+  const nivelFueraDeCatalogo = valores.nivel_salarial && !NIVELES_SALARIALES.includes(valores.nivel_salarial);
 
   const propsCampo = (campo) => ({
     id: idCampo(campo),
@@ -104,7 +107,7 @@ export default function CargoForm({
             {esEdicion ? 'Editar cargo' : 'Nuevo cargo'}
           </h3>
           <p className="ui-card__subtitle">
-            {esEdicion ? `Modificando «${cargo.nombre}»` : 'Define el puesto, su nivel, su salario y sus funciones.'}
+            {esEdicion ? `Modificando «${cargo.nombre}»` : 'Define el puesto, su nivel salarial, su salario y sus funciones.'}
           </p>
         </div>
         {esEdicion && (
@@ -187,47 +190,54 @@ export default function CargoForm({
           </div>
         </div>
 
-        <div className="ui-form__row">
-          <div className="ui-field">
-            <label htmlFor={idCampo('nivel_jerarquico')} className="ui-field__label">
-              Nivel jerárquico <span className="ui-field__required" aria-hidden="true">*</span>
-            </label>
-            <input
-              type="number"
-              className="ui-input"
-              value={valores.nivel_jerarquico}
-              min={1}
-              step={1}
-              placeholder="Ej. 3"
-              required
-              onChange={(e) => actualizarCampo('nivel_jerarquico', e.target.value)}
-              {...propsCampo('nivel_jerarquico')}
-            />
-            {errores.nivel_jerarquico ? mensajeError('nivel_jerarquico') : <p className="ui-field__hint">1 es el nivel más alto.</p>}
-          </div>
+        <div className="ui-field">
+          <label htmlFor={idCampo('nivel_salarial')} className="ui-field__label">
+            Nivel salarial <span className="ui-field__required" aria-hidden="true">*</span>
+          </label>
+          <select
+            className="ui-input ui-select"
+            value={valores.nivel_salarial}
+            required
+            onChange={(e) => actualizarCampo('nivel_salarial', e.target.value)}
+            {...propsCampo('nivel_salarial')}
+          >
+            <option value="">Selecciona un nivel</option>
+            {NIVELES_SALARIALES.map((nivel) => (
+              <option key={nivel} value={nivel}>
+                {nivel}
+              </option>
+            ))}
+            {nivelFueraDeCatalogo && <option value={valores.nivel_salarial}>{valores.nivel_salarial}</option>}
+          </select>
+          {mensajeError('nivel_salarial')}
+        </div>
 
-          <div className="ui-field">
-            <label htmlFor={idCampo('salario_base_referencial')} className="ui-field__label">
-              Salario base <span className="ui-field__required" aria-hidden="true">*</span>
-            </label>
-            <input
-              type="text"
-              inputMode="decimal"
-              className="ui-input"
-              value={valores.salario_base_referencial}
-              placeholder="Ej. 3500.00"
-              required
-              onChange={(e) => actualizarCampo('salario_base_referencial', e.target.value)}
-              {...propsCampo('salario_base_referencial')}
-            />
-            {errores.salario_base_referencial ? (
-              mensajeError('salario_base_referencial')
-            ) : (
-              <p className="ui-field__hint">
-                {salarioValido ? formatearMonto(valores.salario_base_referencial) : 'Referencial, en bolivianos.'}
-              </p>
-            )}
-          </div>
+        <div className="ui-field">
+          <label htmlFor={idCampo('salario_base_referencial')} className="ui-field__label">
+            Salario base <span className="ui-field__required" aria-hidden="true">*</span>
+          </label>
+          <input
+            type="text"
+            inputMode="decimal"
+            className="ui-input"
+            value={valores.salario_base_referencial}
+            placeholder="Ej. 3500.00"
+            required
+            onChange={(e) => actualizarCampo('salario_base_referencial', e.target.value)}
+            {...propsCampo('salario_base_referencial')}
+          />
+          {errores.salario_base_referencial ? (
+            mensajeError('salario_base_referencial')
+          ) : (
+            <p className="ui-field__hint">
+              {salarioValido ? formatearMonto(valores.salario_base_referencial) : 'Referencial, en bolivianos.'}
+            </p>
+          )}
+          {esEdicion && cargo.fecha_modificacion && (
+            <p className="ui-field__hint">
+              Última actualización de salario: {formatearFechaHora(cargo.fecha_modificacion)}
+            </p>
+          )}
         </div>
 
         <div className="ui-field">

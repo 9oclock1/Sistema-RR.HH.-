@@ -8,26 +8,28 @@ const {
   lanzarSiHayErrores,
   validarIdRuta,
 } = require('./comunes');
+const { NIVELES_SALARIALES } = require('../utils/nivelesSalariales');
 
 const MAX_CODIGO = 20;
 const MAX_NOMBRE = 100;
-const MAX_SMALLINT = 32767;
 const MONTO_REGEX = /^\d{1,10}(\.\d{1,2})?$/;
 
-const normalizarNivelJerarquico = (valor, errores) => {
-  const campo = 'nivel_jerarquico';
+// Obligatorio aunque la columna tenga DEFAULT (RF-17, criterio 3). Acepta cualquier combinación de
+// mayúsculas y devuelve la escritura oficial del catálogo, para que las comparaciones sean exactas.
+const normalizarNivelSalarial = (valor, errores) => {
+  const campo = 'nivel_salarial';
   if (esVacio(valor)) {
     errores.push(faltante(campo));
     return null;
   }
-  const texto = typeof valor === 'string' ? valor.trim() : valor;
-  const numero = typeof texto === 'string' && /^\d+$/.test(texto) ? Number(texto) : texto;
+  const texto = typeof valor === 'string' ? valor.trim().toLowerCase() : null;
+  const nivel = NIVELES_SALARIALES.find((n) => n.toLowerCase() === texto);
 
-  if (!Number.isInteger(numero) || numero < 1 || numero > MAX_SMALLINT) {
-    errores.push(invalido(campo, `El campo '${campo}' debe ser un entero entre 1 y ${MAX_SMALLINT}.`));
+  if (!nivel) {
+    errores.push(invalido(campo, `El campo '${campo}' debe ser uno de: ${NIVELES_SALARIALES.join(', ')}.`));
     return null;
   }
-  return numero;
+  return nivel;
 };
 
 const normalizarMonto = (valor, campo, errores) => {
@@ -80,7 +82,7 @@ const validarCargo = (body) => {
     nombre: normalizarTexto(datos.nombre, 'nombre', { requerido: true, maxLength: MAX_NOMBRE }, errores),
     id_departamento: normalizarUuid(datos.id_departamento, 'id_departamento', { requerido: true }, errores),
     id_cargo_jefe_directo: normalizarUuid(datos.id_cargo_jefe_directo, 'id_cargo_jefe_directo', {}, errores),
-    nivel_jerarquico: normalizarNivelJerarquico(datos.nivel_jerarquico, errores),
+    nivel_salarial: normalizarNivelSalarial(datos.nivel_salarial, errores),
     salario_base_referencial: normalizarMonto(datos.salario_base_referencial, 'salario_base_referencial', errores),
     requisitos_minimos: normalizarTexto(datos.requisitos_minimos, 'requisitos_minimos', { requerido: true }, errores),
     funciones: normalizarFunciones(datos.funciones, errores),
