@@ -1,0 +1,101 @@
+.ds-campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  font-family: var(--font-family);
+}
+
+.ds-campo__etiqueta {
+  display: flex;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ds-campo__requerido {
+  color: var(--color-danger-text);
+}
+
+.ds-campo__ayuda,
+.ds-campo__error {
+  margin: 0;
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.ds-campo__ayuda {
+  color: var(--color-text-subtle);
+}
+
+.ds-campo__error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  color: var(--color-danger-text);
+}
+
+.ds-campo__error .ds-icono {
+  width: var(--line-height-small);
+  height: var(--line-height-small);
+}
+
+/* Control de texto y de selección */
+.ds-control {
+  width: 100%;
+  height: var(--size-control);
+  padding: 0 var(--space-2);
+  border: var(--border-width) solid var(--color-border-input);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-surface);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  transition: border-color var(--transition), background-color var(--transition), box-shadow var(--transition);
+}
+
+.ds-control::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.ds-control:hover:not(:disabled):not(:focus) {
+  background: var(--color-bg-hover);
+}
+
+.ds-control:focus {
+  outline: none;
+}
+
+.ds-control:focus-visible,
+.ds-control:focus {
+  border-color: var(--color-border-focus);
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-border-focus);
+}
+
+.ds-control[aria-invalid="true"] {
+  border-color: var(--color-danger);
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-danger);
+}
+
+.ds-control:disabled {
+  border-color: transparent;
+  background: var(--color-bg-hover);
+  color: var(--color-text-subtle);
+  cursor: not-allowed;
+}
+
+.ds-control[readonly] {
+  background: var(--color-bg-page);
+  border-style: dashed;
+}
+
+@media (pointer: coarse) {
+  .ds-control {
+    min-height: var(--size-touch);
+    /* Evita el zoom automático de iOS al enfocar */
+    font-size: var(--font-size-input-touch);
+  }
+}

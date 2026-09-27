@@ -1,0 +1,22 @@
+.ds-selector {
+  position: relative;
+}
+
+.ds-selector__control {
+  appearance: none;
+  padding-right: calc(var(--space-2) * 2 + var(--size-icon));
+  cursor: pointer;
+}
+
+.ds-selector__flecha {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  color: var(--color-text-secondary);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.ds-selector__control:disabled + .ds-selector__flecha {
+  color: var(--color-text-subtle);
+}

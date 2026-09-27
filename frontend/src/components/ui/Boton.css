@@ -1,0 +1,129 @@
+.ds-boton {
+  display: inline-flex;
+  text-decoration: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  height: var(--size-control);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-control);
+  font-family: var(--font-family);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.ds-boton--sm {
+  height: var(--size-control-sm);
+  padding: 0 var(--space-2);
+}
+
+.ds-boton--solo-icono {
+  width: var(--size-control);
+  padding: 0;
+}
+
+.ds-boton--sm.ds-boton--solo-icono {
+  width: var(--size-control-sm);
+}
+
+/* Primario */
+.ds-boton--primario {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.ds-boton--primario:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.ds-boton--primario:active:not(:disabled) {
+  background: var(--color-primary-pressed);
+}
+
+/* Predeterminado */
+.ds-boton--predeterminado {
+  background: var(--color-bg-surface);
+  border-color: var(--color-border-input);
+  color: var(--color-text);
+}
+
+.ds-boton--predeterminado:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+
+.ds-boton--predeterminado:active:not(:disabled) {
+  background: var(--color-bg-pressed);
+}
+
+/* Sutil */
+.ds-boton--sutil {
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.ds-boton--sutil:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.ds-boton--sutil:active:not(:disabled) {
+  background: var(--color-bg-pressed);
+}
+
+/* Peligro */
+.ds-boton--peligro {
+  background: var(--color-danger);
+  color: var(--color-on-danger);
+}
+
+.ds-boton--peligro:hover:not(:disabled) {
+  background: var(--color-danger-hover);
+}
+
+.ds-boton--peligro:active:not(:disabled) {
+  background: var(--color-danger-pressed);
+}
+
+.ds-boton:disabled {
+  background: var(--color-bg-hover);
+  border-color: transparent;
+  color: var(--color-text-subtle);
+  cursor: not-allowed;
+}
+
+.ds-boton[aria-busy="true"] {
+  cursor: progress;
+}
+
+.ds-boton__giro {
+  animation: ds-boton-giro 800ms linear infinite;
+}
+
+@keyframes ds-boton-giro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-boton__giro {
+    animation-duration: 2400ms;
+  }
+}
+
+@media (pointer: coarse) {
+  .ds-boton,
+  .ds-boton--sm {
+    min-height: var(--size-touch);
+  }
+
+  .ds-boton--solo-icono {
+    min-width: var(--size-touch);
+  }
+}

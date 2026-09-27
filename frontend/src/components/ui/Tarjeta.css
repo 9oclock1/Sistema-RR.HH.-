@@ -1,0 +1,55 @@
+.ds-tarjeta {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-card);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  text-align: left;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+button.ds-tarjeta {
+  cursor: pointer;
+}
+
+.ds-tarjeta--interactiva:hover {
+  border-color: var(--color-border-hover);
+}
+
+.ds-tarjeta--seleccionada,
+.ds-tarjeta--seleccionada:hover {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-primary), var(--shadow-card);
+}
+
+.ds-tarjeta__encabezado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.ds-tarjeta__titulo {
+  margin: 0;
+  color: var(--color-text);
+  font-family: inherit;
+  letter-spacing: normal;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-regular);
+}
+
+.ds-tarjeta__acciones {
+  display: flex;
+  flex: none;
+  gap: var(--space-1);
+}

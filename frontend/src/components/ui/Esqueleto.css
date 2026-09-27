@@ -1,0 +1,44 @@
+.ds-esqueleto {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-control);
+  background: linear-gradient(
+    90deg,
+    var(--color-skeleton) 0%,
+    var(--color-skeleton-shine) 50%,
+    var(--color-skeleton) 100%
+  );
+  background-size: 200% 100%;
+  animation: ds-esqueleto-brillo 1400ms ease-in-out infinite;
+}
+
+.ds-esqueleto--texto {
+  height: var(--space-3);
+}
+
+.ds-esqueleto--circulo {
+  width: var(--size-avatar);
+  height: var(--size-avatar);
+  border-radius: var(--radius-round);
+}
+
+.ds-esqueleto--bloque {
+  height: var(--size-row);
+  border-radius: var(--radius-card);
+}
+
+@keyframes ds-esqueleto-brillo {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-esqueleto {
+    animation: none;
+    background: var(--color-skeleton);
+  }
+}
