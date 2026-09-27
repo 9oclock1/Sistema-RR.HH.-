@@ -10,4 +10,9 @@ const obtenerFicha = async (req, res) => {
   res.status(200).json(await empleadosService.obtenerFicha(idEmpleado));
 };
 
-module.exports = { listarEmpleados, obtenerFicha };
+const obtenerResumen = async (req, res) => {
+  const idEmpleado = validarIdRuta(req.params.id, 'id');
+  res.status(200).json(await empleadosService.obtenerResumen(idEmpleado));
+};
+
+module.exports = { listarEmpleados, obtenerFicha, obtenerResumen };

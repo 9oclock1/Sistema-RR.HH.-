@@ -40,4 +40,10 @@ const listarEmpleados = () => empleadosModel.listar(pool);
 
 const obtenerFicha = (idEmpleado) => construirFicha(pool, idEmpleado);
 
-module.exports = { listarEmpleados, obtenerFicha, construirFicha, noEncontrado };
+const obtenerResumen = async (idEmpleado) => {
+  const resumen = await empleadosModel.obtenerResumen(pool, idEmpleado);
+  if (!resumen) throw noEncontrado();
+  return resumen;
+};
+
+module.exports = { listarEmpleados, obtenerFicha, obtenerResumen, construirFicha, noEncontrado };

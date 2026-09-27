@@ -66,6 +66,21 @@ const obtenerFicha = async (db, idEmpleado) => {
   return rows[0] || null;
 };
 
+// Datos mínimos para otros servicios (p. ej. AttendanceService al registrar marcajes).
+const obtenerResumen = async (db, idEmpleado) => {
+  const { rows } = await db.query(
+    `SELECT e.id_empleado,
+            e.nombres,
+            concat_ws(' ', e.primer_apellido, e.segundo_apellido) AS apellidos,
+            ee.permite_acceso AS activo
+       FROM empleados e
+       JOIN estados_empleado ee ON ee.id_estado_empleado = e.id_estado_empleado
+      WHERE e.id_empleado = $1`,
+    [idEmpleado]
+  );
+  return rows[0] || null;
+};
+
 const actualizarAsignacionActual = async (db, idEmpleado, { id_cargo, id_sucursal }) => {
   await db.query(
     `UPDATE empleados
@@ -77,4 +92,4 @@ const actualizarAsignacionActual = async (db, idEmpleado, { id_cargo, id_sucursa
   );
 };
 
-module.exports = { listar, bloquearPorId, obtenerFicha, actualizarAsignacionActual };
+module.exports = { listar, bloquearPorId, obtenerFicha, obtenerResumen, actualizarAsignacionActual };
