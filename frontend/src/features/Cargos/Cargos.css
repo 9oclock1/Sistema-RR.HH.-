@@ -1,48 +1,172 @@
-/* ---------- Lista dinámica de funciones ---------- */
-.cargos-funciones__list {
+.cargos {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-4);
+}
+
+.cargos .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+.cargos-filtro {
+  width: var(--size-sidebar);
+}
+
+/* ---------- Tabla ---------- */
+/* Columnas fijas (~860px) + al menos ~135px para cada columna flexible; por debajo, la tabla se desplaza. */
+.cargos-tabla .ds-tabla {
+  min-width: calc(var(--size-sidebar) * 4.7);
+}
+
+.cargos-tabla th:last-child {
+  width: calc(var(--size-control) + var(--space-2) * 2);
+}
+
+.cargos-nombre {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-block: var(--space-1);
+}
+
+.cargos-codigo {
+  color: var(--color-text-subtle);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.cargos-sin-dato {
+  color: var(--color-text-subtle);
+}
+
+.cargos-funciones-resumen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-1) 0;
+  list-style: none;
+}
+
+.cargos-funciones-resumen li {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Dos líneas como máximo para no estirar la fila; el texto completo queda en el title. */
+.cargos-requisitos {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.cargos-acciones {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---------- Formulario (dentro del modal) ---------- */
+.cargo-formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-1);
+}
+
+.cargo-formulario__campos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.cargo-formulario__ancho {
+  grid-column: 1 / -1;
+}
+
+.cargo-formulario__texto-largo {
+  height: auto;
+  min-height: calc(var(--size-control) * 2.5);
+  padding-block: var(--space-1);
+  resize: vertical;
+}
+
+/* ---------- Lista dinámica de funciones ---------- */
+.cargo-funciones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.cargo-funciones legend {
+  margin-bottom: var(--space-1);
+  padding: 0;
+}
+
+.cargo-funciones__lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.cargos-funciones__item {
+.cargo-funciones__item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
-.cargos-funciones__index {
-  flex-shrink: 0;
-  width: 18px;
-  color: var(--text-subtle);
-  font-size: 12px;
+.cargo-funciones__indice {
+  flex: none;
+  width: var(--space-4);
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
-.cargos-funciones__empty {
-  margin: 0;
-  color: var(--text-subtle);
-  font-size: 13px;
+.cargo-funciones__campo {
+  flex: 1;
 }
 
-.cargos-funciones .ui-btn--dashed {
-  margin-top: 2px;
+.cargo-funciones__vacio {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
 }
 
-/* ---------- Tabla: requisitos mínimos ---------- */
-/* Dos líneas como máximo para no estirar la fila; el texto completo queda en el title. */
-.cargos-requisitos {
-  display: -webkit-box;
-  max-width: 220px;
-  overflow: hidden;
-  color: var(--text-muted);
-  font-size: 13px;
-  overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+.cargo-funciones__agregar {
+  align-self: flex-start;
+}
+
+@media (pointer: coarse) {
+  .cargos-tabla th:last-child {
+    width: calc(var(--size-touch) + var(--space-2) * 2);
+  }
+}
+
+@media (max-width: 640px) {
+  .cargos-filtro {
+    width: auto;
+  }
+
+  .cargo-formulario__campos {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

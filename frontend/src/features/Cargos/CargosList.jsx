@@ -1,86 +1,105 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import { Link } from 'react-router';
+import { Plus } from 'lucide-react';
 import { createCargo, updateCargo } from '../../api/cargosApi';
+import { Alerta, Boton, Contador, EncabezadoPagina, Selector, Tarjeta, useAvisos } from '../../components/ui';
 import { useDepartamentosActivos } from '../../hooks/useDepartamentosActivos';
 import CargoForm from './components/CargoForm';
 import CargosTable from './components/CargosTable';
 import { useCargos } from './hooks/useCargos';
 import './Cargos.css';
 
-const DURACION_AVISO_MS = 4000;
-
 export default function CargosList() {
+  const avisar = useAvisos();
   const [areaFiltro, setAreaFiltro] = useState('');
   const { cargos, cargando, error, recargar } = useCargos(areaFiltro);
   const areas = useDepartamentosActivos();
-
-  const [cargoEnEdicion, setCargoEnEdicion] = useState(null);
-  const [formKey, setFormKey] = useState(0);
-  const [aviso, setAviso] = useState(null);
-  const formRef = useRef(null);
-
-  useEffect(() => {
-    if (!aviso) return undefined;
-    const timer = setTimeout(() => setAviso(null), DURACION_AVISO_MS);
-    return () => clearTimeout(timer);
-  }, [aviso]);
-
-  const abrirFormulario = (cargo) => {
-    setCargoEnEdicion(cargo);
-    setFormKey((k) => k + 1);
-  };
-
-  const iniciarEdicion = (cargo) => {
-    setAviso(null);
-    abrirFormulario(cargo);
-    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  };
+  
+  const [formulario, setFormulario] = useState(null);
 
   const guardar = async (payload) => {
-    const guardado = cargoEnEdicion
-      ? await updateCargo(cargoEnEdicion.id_cargo, payload)
-      : await createCargo(payload);
-
-    setAviso({ texto: `Cargo «${guardado.nombre}» ${cargoEnEdicion ? 'actualizado' : 'creado'}.` });
-    abrirFormulario(null);
+    const { cargo } = formulario;
+    const guardado = cargo ? await updateCargo(cargo.id_cargo, payload) : await createCargo(payload);
+    setFormulario(null);
     recargar();
+    avisar({ tono: 'exito', titulo: cargo ? 'Cargo actualizado' : 'Cargo creado', mensaje: guardado.nombre });
   };
 
+  const botonNuevo = (
+    <Boton variante="primario" icono={Plus} onClick={() => setFormulario({ cargo: null })}>
+      Nuevo cargo
+    </Boton>
+  );
+
+  const filtroArea = (
+    <Selector
+      className="cargos-filtro"
+      aria-label="Filtrar por área"
+      value={areaFiltro}
+      onChange={(e) => setAreaFiltro(e.target.value)}
+      disabled={Boolean(areas.error)}
+      title={areas.error ? 'No se pudieron cargar las áreas' : undefined}
+      textoVacio="Todas las áreas"
+      opciones={areas.departamentos.map((d) => ({ valor: d.id_departamento, etiqueta: d.nombre }))}
+    />
+  );
+
   return (
-    <section className="ui-section" aria-labelledby="cargos-titulo">
-      <header className="ui-section__header">
-        <p className="ui-eyebrow">Organización estructural</p>
-        <h2 id="cargos-titulo" className="ui-section__title">
-          Catálogo de cargos
-        </h2>
-      </header>
+    <section className="cargos" aria-labelledby="cargos-titulo">
+      <EncabezadoPagina
+        migas={[{ etiqueta: 'Inicio', href: '/' }, { etiqueta: 'Organización' }]}
+        enlace={Link}
+        titulo="Cargos"
+        idTitulo="cargos-titulo"
+        descripcion="Catálogo de cargos activos con su nivel salarial, funciones y perfil requerido."
+        acciones={!error && botonNuevo}
+      />
 
-      <div className="ui-split">
-        <div ref={formRef} className="ui-split__aside">
-          <CargoForm
-            key={formKey}
-            cargo={cargoEnEdicion}
-            departamentos={areas.departamentos}
-            errorDepartamentos={areas.error}
-            cargandoCatalogos={areas.cargando}
-            aviso={aviso?.texto}
-            onGuardar={guardar}
-            onCancelar={() => abrirFormulario(null)}
+      {error ? (
+        <Alerta
+          tono="peligro"
+          role="alert"
+          titulo="No se pudieron cargar los cargos"
+          acciones={
+            <Boton tamano="sm" onClick={recargar}>
+              Reintentar
+            </Boton>
+          }
+        >
+          {error.message}
+        </Alerta>
+      ) : (
+        <Tarjeta
+          className="cargos-tarjeta"
+          titulo={
+            <>
+              Cargos activos {!cargando && <Contador aria-label={`${cargos.length} cargos`}>{cargos.length}</Contador>}
+            </>
+          }
+          acciones={filtroArea}
+        >
+          <CargosTable
+            cargos={cargos}
+            cargando={cargando}
+            hayFiltro={Boolean(areaFiltro)}
+            accionVacia={botonNuevo}
+            onQuitarFiltro={() => setAreaFiltro('')}
+            onEditar={(cargo) => setFormulario({ cargo })}
           />
-        </div>
+        </Tarjeta>
+      )}
 
-        <CargosTable
-          cargos={cargos}
-          cargando={cargando}
-          error={error}
-          onReintentar={recargar}
-          areaId={areaFiltro}
-          onCambiarArea={setAreaFiltro}
+      {formulario && (
+        <CargoForm
+          key={formulario.cargo?.id_cargo ?? 'nuevo'}
+          cargo={formulario.cargo}
           departamentos={areas.departamentos}
           errorDepartamentos={areas.error}
-          idEnEdicion={cargoEnEdicion?.id_cargo}
-          onEditar={iniciarEdicion}
+          cargandoCatalogos={areas.cargando}
+          onGuardar={guardar}
+          onCancelar={() => setFormulario(null)}
         />
-      </div>
+      )}
     </section>
   );
 }

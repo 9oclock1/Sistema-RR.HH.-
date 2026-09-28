@@ -1,0 +1,196 @@
+/* Tokens del sistema de diseño. Ver DESIGN.md. Ningún componente usa valores fijos fuera de este archivo. */
+
+:root {
+  /* Color: acción principal */
+  --color-primary: #1868db;
+  --color-primary-hover: #1558bc;
+  --color-primary-pressed: #144794;
+  --color-on-primary: #ffffff;
+  --color-link: var(--color-primary);
+
+  /* Color: texto */
+  --color-text: #292a2e;
+  --color-text-secondary: #505258;
+  --color-text-subtle: #6b6e76;
+  --color-text-inverse: #ffffff;
+
+  /* Color: fondos */
+  --color-bg-surface: #ffffff;
+  --color-bg-page: #f8f8f8;
+  --color-bg-hover: #f0f1f2;
+  --color-bg-pressed: #dddee1;
+  --color-bg-neutral: #e9eaec;
+  --color-bg-selected: #e9f2fe;
+  --color-text-selected: #1868db;
+  --color-bg-overlay: rgba(5, 12, 31, 0.46);
+
+  /* Color: bordes */
+  --color-border: #dddee1;
+  --color-border-hover: #b7b9be;
+  --color-border-input: #b7b9be;
+  --color-border-focus: var(--color-primary);
+
+  /* Color: estados. La variante -text es la que se usa para texto sobre fondo claro. */
+  --color-success: #22a06b;
+  --color-success-text: #216e4e;
+  --color-warning: #e2b203;
+  --color-warning-text: #7f5f01;
+  --color-danger: #c9372c;
+  --color-danger-hover: #ae2e24;
+  --color-danger-pressed: #872821;
+  --color-danger-text: #ae2e24;
+  --color-on-danger: #ffffff;
+  --color-info: #1868db;
+  --color-info-text: #0055cc;
+  --color-purple: #8270db;
+  --color-purple-text: #5e4db2;
+
+  /* Color: fondos suaves de estado (alertas en línea) */
+  --color-info-bg: #e9f2fe;
+  --color-success-bg: #dcfff1;
+  --color-warning-bg: #fff7d6;
+  --color-danger-bg: #ffeceb;
+
+  /* Color: avatares (iniciales en blanco) */
+  --color-avatar-1: #1868db;
+  --color-avatar-2: #6e5dc6;
+  --color-avatar-3: #216e4e;
+  --color-avatar-4: #a54800;
+  --color-avatar-5: #206a83;
+  --color-avatar-6: #ae2e24;
+  --color-on-avatar: #ffffff;
+
+  /* Color: carga */
+  --color-skeleton: #f0f1f2;
+  --color-skeleton-shine: #e4e5e8;
+
+  /* Tipografía */
+  --font-family: "Inter", system-ui, sans-serif;
+  --font-family-mono: ui-monospace, Consolas, monospace;
+  --font-size-body: 14px;
+  --line-height-body: 20px;
+  --font-size-small: 12px;
+  --line-height-small: 16px;
+  --font-size-title: 24px;
+  --line-height-title: 28px;
+  --font-size-section: 16px;
+  --font-size-input-touch: 16px;
+  --line-height-section: 20px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  /* Espaciado (grilla de 8px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-content: var(--space-6);
+
+  /* Radios */
+  --radius-control: 4px;
+  --radius-nav: 6px;
+  --radius-card: 8px;
+  --radius-round: 999px;
+
+  /* Tamaños */
+  --size-control: 32px;
+  --size-control-sm: 24px;
+  --size-touch: 44px;
+  --size-row: 40px;
+  --size-nav-item: 32px;
+  --size-icon: 16px;
+  --size-avatar: 24px;
+  --size-avatar-lg: 32px;
+  --size-topbar: 48px;
+  --size-sidebar: 240px;
+  --size-search-max: 600px;
+  --size-modal: 400px;
+  --size-modal-lg: 600px;
+  --size-toast: 360px;
+  --border-width: 1px;
+  --border-width-strong: 2px;
+  --icon-stroke: 1.75;
+
+  /* Sombras */
+  --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.08);
+  --shadow-overlay: 0 8px 12px rgba(30, 31, 33, 0.15), 0 0 1px rgba(30, 31, 33, 0.31);
+
+  /* Foco */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* Movimiento */
+  --duration: 150ms;
+  --easing: ease;
+  --transition: var(--duration) var(--easing);
+
+  /* Capas */
+  --z-sticky: 10;
+  --z-sidebar: 20;
+  --z-modal: 100;
+  --z-toast: 200;
+
+  /* Puntos de quiebre (referencia; en media queries se escriben literal) */
+  --breakpoint-sidebar: 1024px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-primary: #669df1;
+    --color-primary-hover: #8fb8f6;
+    --color-primary-pressed: #adcbfb;
+    --color-on-primary: #1f1f21;
+
+    --color-text: #cecfd2;
+    --color-text-secondary: #a9abaf;
+    --color-text-subtle: #96999e;
+    --color-text-inverse: #1f1f21;
+
+    --color-bg-surface: #1f1f21;
+    --color-bg-page: #18191a;
+    --color-bg-hover: #2b2c2f;
+    --color-bg-pressed: #3d3f43;
+    --color-bg-neutral: #303134;
+    --color-bg-selected: #1c2b42;
+    --color-text-selected: #669df1;
+    --color-bg-overlay: rgba(16, 18, 20, 0.6);
+
+    --color-border: #3d3f43;
+    --color-border-hover: #63666b;
+    --color-border-input: #7e8188;
+
+    --color-success: #2abb7f;
+    --color-success-text: #7ee2b8;
+    --color-warning: #cf9f02;
+    --color-warning-text: #f5cd47;
+    --color-danger: #f87168;
+    --color-danger-hover: #fd9891;
+    --color-danger-pressed: #ffd5d2;
+    --color-danger-text: #fd9891;
+    --color-on-danger: #1f1f21;
+    --color-info: #669df1;
+    --color-info-text: #8fb8f6;
+    --color-purple: #9f8fef;
+    --color-purple-text: #b8acf6;
+
+    --color-info-bg: #1c2b42;
+    --color-success-bg: #1c3329;
+    --color-warning-bg: #332e1b;
+    --color-danger-bg: #42221f;
+
+    --color-skeleton: #2b2c2f;
+    --color-skeleton-shine: #36373a;
+
+    --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.4);
+    --shadow-overlay: 0 8px 12px rgba(0, 0, 0, 0.36), 0 0 1px rgba(188, 214, 240, 0.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration: 0.01ms;
+  }
+}

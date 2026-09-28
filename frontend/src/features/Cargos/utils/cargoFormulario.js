@@ -39,13 +39,13 @@ export const validarFormulario = (valores) => {
   const errores = {};
   if (!valores.nombre.trim()) errores.nombre = 'El nombre del cargo es obligatorio.';
   if (!valores.codigo.trim()) errores.codigo = 'El código es obligatorio.';
-  if (!valores.id_departamento) errores.id_departamento = 'Selecciona un área.';
-  if (!valores.nivel_salarial) errores.nivel_salarial = 'Selecciona el nivel salarial.';
-  if (!valores.salario_base_referencial.trim()) errores.salario_base_referencial = 'Indica el salario.';
+  if (!valores.id_departamento) errores.id_departamento = 'Seleccione un área.';
+  if (!valores.nivel_salarial) errores.nivel_salarial = 'Seleccione el nivel salarial.';
+  if (!valores.salario_base_referencial.trim()) errores.salario_base_referencial = 'Indique el salario.';
   else if (!MONTO_REGEX.test(valores.salario_base_referencial.trim()))
     errores.salario_base_referencial = 'Monto positivo, hasta 2 decimales.';
   if (!valores.requisitos_minimos.trim()) errores.requisitos_minimos = 'Los requisitos mínimos son obligatorios.';
-  if (!valores.funciones.some((f) => f.texto.trim())) errores.funciones = 'Agrega al menos una función clave.';
+  if (!valores.funciones.some((f) => f.texto.trim())) errores.funciones = 'Agregue al menos una función clave.';
   return errores;
 };
 

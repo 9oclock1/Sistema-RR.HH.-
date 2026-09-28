@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { IconoCerrar, IconoMas } from '../../../components/Iconos';
+import { CircleAlert, Plus, X } from 'lucide-react';
+import { Boton, CampoTexto } from '../../../components/ui';
 import { nuevaFuncion } from '../utils/cargoFormulario';
 
-export default function FuncionesInput({ funciones, onChange, error, errorId }) {
+export default function FuncionesInput({ id, className = '', funciones, onChange, error }) {
   const [enfocarId, setEnfocarId] = useState(null);
+  const idError = `${id}-error`;
 
   const agregar = () => {
     const funcion = nuevaFuncion();
@@ -11,9 +13,9 @@ export default function FuncionesInput({ funciones, onChange, error, errorId }) 
     setEnfocarId(funcion.id);
   };
 
-  const actualizar = (id, texto) => onChange(funciones.map((f) => (f.id === id ? { ...f, texto } : f)));
+  const actualizar = (idFuncion, texto) => onChange(funciones.map((f) => (f.id === idFuncion ? { ...f, texto } : f)));
 
-  const quitar = (id) => onChange(funciones.filter((f) => f.id !== id));
+  const quitar = (idFuncion) => onChange(funciones.filter((f) => f.id !== idFuncion));
 
   const manejarTecla = (evento, indice) => {
     if (evento.key !== 'Enter') return;
@@ -22,23 +24,25 @@ export default function FuncionesInput({ funciones, onChange, error, errorId }) 
   };
 
   return (
-    <fieldset className="ui-field cargos-funciones" aria-describedby={error ? errorId : undefined}>
-      <legend className="ui-field__label">
-        Funciones clave <span className="ui-field__required" aria-hidden="true">*</span>
+    <fieldset id={id} className={`cargo-funciones ${className}`} aria-describedby={error ? idError : undefined}>
+      <legend className="ds-campo__etiqueta">
+        Funciones clave
+        <span className="ds-campo__requerido" aria-hidden="true">
+          *
+        </span>
       </legend>
 
       {funciones.length === 0 ? (
-        <p className="cargos-funciones__empty">Aún no agregaste funciones.</p>
+        <p className="cargo-funciones__vacio">Aún no agregó funciones.</p>
       ) : (
-        <ol className="cargos-funciones__list">
+        <ol className="cargo-funciones__lista">
           {funciones.map((funcion, indice) => (
-            <li key={funcion.id} className="cargos-funciones__item">
-              <span className="cargos-funciones__index" aria-hidden="true">
+            <li key={funcion.id} className="cargo-funciones__item">
+              <span className="cargo-funciones__indice" aria-hidden="true">
                 {indice + 1}
               </span>
-              <input
-                type="text"
-                className="ui-input"
+              <CampoTexto
+                className="cargo-funciones__campo"
                 value={funcion.texto}
                 placeholder="Ej. Atender la caja registradora"
                 aria-label={`Función ${indice + 1}`}
@@ -47,26 +51,26 @@ export default function FuncionesInput({ funciones, onChange, error, errorId }) 
                 onChange={(e) => actualizar(funcion.id, e.target.value)}
                 onKeyDown={(e) => manejarTecla(e, indice)}
               />
-              <button
-                type="button"
-                className="ui-icon-btn"
+              <Boton
+                variante="sutil"
+                soloIcono
+                icono={X}
                 aria-label={`Quitar función ${indice + 1}`}
                 title="Quitar"
                 onClick={() => quitar(funcion.id)}
-              >
-                <IconoCerrar size={14} />
-              </button>
+              />
             </li>
           ))}
         </ol>
       )}
 
-      <button type="button" className="ui-btn ui-btn--dashed" onClick={agregar}>
-        <IconoMas size={14} /> Agregar función
-      </button>
+      <Boton variante="sutil" icono={Plus} className="cargo-funciones__agregar" onClick={agregar}>
+        Agregar función
+      </Boton>
 
       {error && (
-        <p id={errorId} className="ui-field__error">
+        <p id={idError} className="ds-campo__error">
+          <CircleAlert className="ds-icono" aria-hidden="true" />
           {error}
         </p>
       )}

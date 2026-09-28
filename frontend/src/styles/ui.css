@@ -1,4 +1,44 @@
-/* Componentes base compartidos por todos los módulos. Los colores salen de los tokens de index.css. */
+.ui-section {
+  --bg: #0e0e10;
+  --surface: #17171a;
+  --surface-2: #1e1e22;
+  --surface-hover: #242429;
+  --border: #2a2a30;
+  --border-strong: #3a3a42;
+  --text: #ededf0;
+  --text-muted: #8d8d97;
+  --text-subtle: #5e5e67;
+  --accent: #f1e08a;
+  --accent-soft: rgba(241, 224, 138, 0.12);
+  --accent-ring: rgba(241, 224, 138, 0.35);
+  --primary: #f5f5f7;
+  --primary-hover: #ffffff;
+  --primary-text: #0e0e10;
+  --danger: #f28b82;
+  --danger-soft: rgba(242, 139, 130, 0.1);
+  --danger-ring: rgba(242, 139, 130, 0.35);
+  --success: #86d49a;
+  --success-soft: rgba(134, 212, 154, 0.1);
+  --tone-1: #f1e08a;
+  --tone-2: #86d49a;
+  --tone-3: #8ab8f5;
+  --tone-4: #b89af5;
+  --skeleton: #232328;
+  --skeleton-shine: #2d2d33;
+
+  --radius-lg: 20px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --radius-pill: 999px;
+
+  --font-sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, Consolas, monospace;
+
+  color-scheme: dark;
+  font: 14px/1.45 var(--font-sans);
+  color: var(--text);
+  background: var(--bg);
+}
 
 /* ---------- Sección de un módulo ---------- */
 .ui-section {

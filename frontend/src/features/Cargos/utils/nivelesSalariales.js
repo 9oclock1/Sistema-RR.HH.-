@@ -6,11 +6,10 @@ export const NIVELES_SALARIALES = [
   'Gerencia Administrativa',
 ];
 
-
-export const CLASE_BADGE_NIVEL = {
-  'Operativo Base': '',
-  'Operativo Especializado': 'ui-badge--tone-2',
-  'Supervisión de Área': 'ui-badge--tone-1',
-  'Gerencia de Sucursal': 'ui-badge--tone-3',
-  'Gerencia Administrativa': 'ui-badge--tone-4',
+export const TONO_NIVEL = {
+  'Operativo Base': 'neutral',
+  'Operativo Especializado': 'info',
+  'Supervisión de Área': 'exito',
+  'Gerencia de Sucursal': 'morado',
+  'Gerencia Administrativa': 'aviso',
 };
