@@ -1,72 +1,69 @@
 import { useId } from 'react';
-import { IconoAlerta } from '../../../components/Iconos';
+import { History, UserSearch } from 'lucide-react';
+import { Alerta, Avatar, Boton, Esqueleto, EstadoVacio, Etiqueta, Tabla, Tarjeta, TextoTruncado } from '../../../components/ui';
 import { formatearFecha } from '../../Vacantes/utils/formato';
-
-const iniciales = (ficha) => `${ficha.nombres[0] ?? ''}${ficha.primer_apellido[0] ?? ''}`.toUpperCase();
 
 const documento = (ficha) =>
   ficha.complemento_documento ? `${ficha.numero_documento}-${ficha.complemento_documento}` : ficha.numero_documento;
+
+const SIN_DATO = <span className="asig-sin-dato">—</span>;
 
 function Dato({ etiqueta, children }) {
   return (
     <div className="asig-dato">
       <dt>{etiqueta}</dt>
-      <dd>{children || <span className="ui-muted">—</span>}</dd>
+      <dd>{children || SIN_DATO}</dd>
     </div>
   );
 }
 
-function Esqueleto() {
+function Mosaico({ etiqueta, valor, children }) {
   return (
-    <div className="asig-esqueleto" aria-hidden="true">
-      <span className="ui-skeleton" />
-      <div className="asig-tiles">
+    <div className="asig-mosaico">
+      <span className="asig-mosaico__etiqueta">{etiqueta}</span>
+      <TextoTruncado className="asig-mosaico__valor">{valor || SIN_DATO}</TextoTruncado>
+      {children}
+    </div>
+  );
+}
+
+function Cargando() {
+  return (
+    <div className="asig-cargando" aria-hidden="true">
+      <div className="asig-identidad">
+        <Esqueleto forma="circulo" ancho="var(--size-avatar-lg)" alto="var(--size-avatar-lg)" />
+        <Esqueleto ancho="40%" />
+      </div>
+      <div className="asig-mosaicos">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="asig-tile">
-            <span className="ui-skeleton" />
-          </div>
+          <Esqueleto key={i} forma="bloque" alto="calc(var(--size-row) * 2)" />
         ))}
       </div>
-      <span className="ui-skeleton" />
+      <Esqueleto />
     </div>
   );
 }
 
-function Historial({ historial }) {
-  if (historial.length === 0) {
-    return <p className="asig-vacio">Aún no hay asignaciones registradas en el historial.</p>;
-  }
-
-  return (
-    <div className="ui-table__scroll">
-      <table className="ui-table asig-historial">
-        <thead>
-          <tr>
-            <th scope="col">Cargo</th>
-            <th scope="col">Sucursal</th>
-            <th scope="col">Desde</th>
-            <th scope="col">Hasta</th>
-          </tr>
-        </thead>
-        <tbody>
-          {historial.map((a) => (
-            <tr key={a.id_asignacion}>
-              <td>
-                <div className="ui-table__name">{a.cargo}</div>
-                <div className="ui-table__sub">{a.area}</div>
-              </td>
-              <td>{a.sucursal}</td>
-              <td className="ui-table__num">{formatearFecha(a.fecha_inicio)}</td>
-              <td className="ui-table__num">
-                {a.es_vigente ? <span className="ui-badge ui-badge--tone-2">Vigente</span> : formatearFecha(a.fecha_fin)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+const COLUMNAS_HISTORIAL = [
+  {
+    clave: 'cargo',
+    titulo: 'Cargo',
+    celda: (a) => (
+      <div className="asig-celda">
+        <TextoTruncado>{a.cargo}</TextoTruncado>
+        <TextoTruncado className="asig-celda__sub">{a.area}</TextoTruncado>
+      </div>
+    ),
+  },
+  { clave: 'sucursal', titulo: 'Sucursal' },
+  { clave: 'fecha_inicio', titulo: 'Desde', ancho: '25%', celda: (a) => formatearFecha(a.fecha_inicio) },
+  {
+    clave: 'fecha_fin',
+    titulo: 'Hasta',
+    ancho: '25%',
+    celda: (a) => (a.es_vigente ? <Etiqueta tono="exito">Vigente</Etiqueta> : formatearFecha(a.fecha_fin)),
+  },
+];
 
 export default function FichaEmpleado({ ficha, cargando, error, onReintentar, selector }) {
   const uid = useId();
@@ -74,61 +71,64 @@ export default function FichaEmpleado({ ficha, cargando, error, onReintentar, se
 
   let contenido;
   if (cargando) {
-    contenido = <Esqueleto />;
+    contenido = <Cargando />;
   } else if (error) {
     contenido = (
-      <div className="ui-alert ui-alert--error" role="alert">
-        <IconoAlerta />
-        <span>{error.message}</span>
-        <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm" onClick={onReintentar}>
-          Reintentar
-        </button>
-      </div>
+      <Alerta
+        tono="peligro"
+        role="alert"
+        titulo="No se pudo cargar la ficha"
+        acciones={
+          <Boton tamano="sm" onClick={onReintentar}>
+            Reintentar
+          </Boton>
+        }
+      >
+        {error.message}
+      </Alerta>
     );
   } else if (!ficha) {
-    contenido = <p className="asig-vacio">Selecciona un empleado para ver su ficha.</p>;
+    contenido = (
+      <EstadoVacio
+        icono={UserSearch}
+        titulo="Ningún empleado seleccionado"
+        mensaje="Elige un empleado para ver su cargo, área y sucursal vigentes."
+      />
+    );
   } else {
     contenido = (
       <>
         <div className="asig-identidad">
-          <span className="asig-avatar" aria-hidden="true">
-            {iniciales(ficha)}
-          </span>
+          <Avatar nombre={ficha.nombre_completo} tamano="lg" decorativo />
           <div className="asig-identidad__texto">
-            <p className="asig-identidad__nombre">{ficha.nombre_completo}</p>
-            <p className="ui-card__subtitle">
-              CI <span className="ui-code">{documento(ficha)}</span>
+            <TextoTruncado as="p" className="asig-identidad__nombre">
+              {ficha.nombre_completo}
+            </TextoTruncado>
+            <p className="asig-nota">
+              CI <span className="asig-codigo">{documento(ficha)}</span>
             </p>
           </div>
-          <span className={`ui-badge ${ficha.estado.codigo === 'ACTIVO' ? 'ui-badge--tone-2' : 'asig-badge--inactivo'}`}>
-            {ficha.estado.nombre}
-          </span>
+          <Etiqueta tono={ficha.estado.codigo === 'ACTIVO' ? 'exito' : 'neutral'}>{ficha.estado.nombre}</Etiqueta>
         </div>
 
         <section className="asig-bloque" aria-labelledby={`${uid}-vigente`}>
           <h4 id={`${uid}-vigente`} className="asig-bloque__titulo">
             Asignación vigente
-            {actual.vigente_desde && <span className="asig-bloque__nota">desde {formatearFecha(actual.vigente_desde)}</span>}
+            {actual.vigente_desde && <span className="asig-nota">desde {formatearFecha(actual.vigente_desde)}</span>}
           </h4>
-          <div className="asig-tiles">
-            <div className="asig-tile">
-              <span className="asig-tile__label">Cargo</span>
-              <span className="asig-tile__valor">{actual.cargo.nombre}</span>
-              {actual.cargo.esta_activo ? (
-                <span className="ui-code">{actual.cargo.codigo}</span>
-              ) : (
-                <span className="asig-tile__alerta">Cargo dado de baja</span>
-              )}
-            </div>
-            <div className="asig-tile">
-              <span className="asig-tile__label">Área</span>
-              <span className="asig-tile__valor">{actual.area.nombre}</span>
-            </div>
-            <div className="asig-tile">
-              <span className="asig-tile__label">Sucursal</span>
-              <span className="asig-tile__valor">{actual.sucursal.nombre}</span>
-              <span className="asig-tile__nota">{actual.sucursal.ciudad}</span>
-            </div>
+          <div className="asig-mosaicos">
+            <Mosaico etiqueta="Cargo" valor={actual.cargo.nombre}>
+              {actual.cargo.nombre &&
+                (actual.cargo.esta_activo ? (
+                  <span className="asig-codigo">{actual.cargo.codigo}</span>
+                ) : (
+                  <Etiqueta tono="peligro">Cargo dado de baja</Etiqueta>
+                ))}
+            </Mosaico>
+            <Mosaico etiqueta="Área" valor={actual.area.nombre} />
+            <Mosaico etiqueta="Sucursal" valor={actual.sucursal.nombre}>
+              {actual.sucursal.ciudad && <span className="asig-nota">{actual.sucursal.ciudad}</span>}
+            </Mosaico>
           </div>
         </section>
 
@@ -146,28 +146,26 @@ export default function FichaEmpleado({ ficha, cargando, error, onReintentar, se
           </dl>
         </section>
 
-        <section className="asig-bloque asig-bloque--ultimo" aria-labelledby={`${uid}-historial`}>
+        <section className="asig-bloque" aria-labelledby={`${uid}-historial`}>
           <h4 id={`${uid}-historial`} className="asig-bloque__titulo">
             Historial de asignaciones
           </h4>
-          <Historial historial={ficha.historial} />
+          <Tabla
+            className="asig-historial"
+            descripcion={`Historial de asignaciones de ${ficha.nombre_completo}`}
+            columnas={COLUMNAS_HISTORIAL}
+            filas={ficha.historial}
+            claveFila="id_asignacion"
+            vacio={<EstadoVacio icono={History} titulo="Sin historial" mensaje="Aún no hay asignaciones registradas." />}
+          />
         </section>
       </>
     );
   }
 
   return (
-    <section className="ui-card ui-table-card asig-ficha" aria-labelledby={`${uid}-titulo`} aria-busy={cargando}>
-      <header className="ui-card__header">
-        <div>
-          <h3 id={`${uid}-titulo`} className="ui-card__title">
-            Ficha del empleado
-          </h3>
-          <p className="ui-card__subtitle">Cargo, área y sucursal vigentes.</p>
-        </div>
-        {selector}
-      </header>
-      {contenido}
-    </section>
+    <Tarjeta titulo="Ficha del empleado" acciones={selector} className="asig-tarjeta" aria-busy={cargando}>
+      <div className="asig-ficha">{contenido}</div>
+    </Tarjeta>
   );
 }
