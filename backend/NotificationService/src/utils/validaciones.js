@@ -28,8 +28,17 @@ function validarCamposObligatorios(asunto, contenido) {
   return { asunto: asuntoLimpio, contenido: contenidoLimpio };
 }
 
+function validarUuid(valor, nombreCampo = "id") {
+  if (!valor || typeof valor !== "string" || !UUID_RE.test(valor.trim())) {
+    throw new ErrorApp(400, `El identificador «${nombreCampo}» debe ser un UUID válido.`);
+  }
+  return valor.trim().toLowerCase();
+}
+
 module.exports = {
   UUID_RE,
   esUuidValido,
+  validarUuid,
   validarCamposObligatorios,
 };
+

@@ -21,6 +21,10 @@ module.exports = (err, req, res, next) => {
     return res.status(422).json({ error: "Uno de los identificadores relacionados no existe en la base de datos." });
   }
 
+  if (err.code === "22P02") {
+    return res.status(400).json({ error: "Sintaxis de identificador UUID inválida." });
+  }
+
   console.error("Error no controlado en NotificationService:", err);
   res.status(500).json({ error: "Error interno en el servicio de notificaciones y comunicaciones." });
 };

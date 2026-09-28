@@ -60,5 +60,7 @@ export const consultarEnviados = (idRemitente, rol) =>
   });
 
 // RF-67 AC 2 & 3: Auditoría de comunicado
-export const consultarAuditoria = (idComunicacion) =>
-  solicitar(`${RUTA}/${idComunicacion}/auditoria`);
+export const consultarAuditoria = (idComunicacion, idRemitente, rol) =>
+  solicitar(`${RUTA}/${idComunicacion}/auditoria`, {
+    cabeceras: cabecerasUsuario(idRemitente, rol),
+  });

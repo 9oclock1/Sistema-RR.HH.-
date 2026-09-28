@@ -31,6 +31,7 @@ CREATE TABLE comunicaciones (
     id_tipo smallint NOT NULL,
     id_alcance smallint NOT NULL,
     id_usuario_remitente uuid NOT NULL,
+    remitente_nombre varchar(150) NULL,
     asunto varchar(150) NOT NULL,
     contenido text NOT NULL,
     requiere_confirmacion boolean NOT NULL DEFAULT false,

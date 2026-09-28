@@ -23,10 +23,9 @@ app.get("/health", async (req, res) => {
       timestamp: result.rows[0].db_time,
     });
   } catch (error) {
-    res.json({
+    res.status(503).json({
       service: "NotificationService",
       db_connected: false,
-      aviso: "Operando con almacén de contingencia en memoria",
       error: error.message,
     });
   }
@@ -44,6 +43,14 @@ app.post("/send", (req, res) => {
 
 // Rutas de microservicio de notificaciones y mensajería
 app.use(comunicacionesRoutes);
+
+// Manejador para rutas no encontradas en formato JSON (evita HTML 404 por defecto)
+app.use((req, res) => {
+  res.status(404).json({
+    exito: false,
+    error: `Ruta no encontrada: ${req.method} ${req.originalUrl}`,
+  });
+});
 
 // Manejador centralizado de errores
 app.use(manejadorErrores);

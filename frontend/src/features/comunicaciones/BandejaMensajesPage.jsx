@@ -170,7 +170,7 @@ export default function BandejaMensajesPage() {
   const opcionesEmpleados = useMemo(() => {
     const opciones = listaEmpleados.map((emp) => ({
       valor: emp.id_empleado,
-      etiqueta: `${emp.nombres} ${emp.apellidos} (${emp.cargo || "Empleado"})${emp.activo ? "" : " - Inactivo"}`,
+      etiqueta: `${emp.nombre_completo || `${emp.nombres || ""} ${emp.apellidos || ""}`.trim() || "Empleado"} (${emp.cargo || "Funcionario"})${emp.activo ? "" : " - Inactivo"}`,
     }));
 
     // Opción para probar usuario nuevo sin mensajes (RF-66 AC 4)
@@ -199,8 +199,8 @@ export default function BandejaMensajesPage() {
 
   const empleadoActual = listaEmpleados.find((e) => e.id_empleado === idEmpleado);
   const nombreEmpleado = empleadoActual
-    ? `${empleadoActual.nombres} ${empleadoActual.apellidos}`
-    : "Empleado Activo";
+    ? (empleadoActual.nombre_completo || `${empleadoActual.nombres || ""} ${empleadoActual.apellidos || ""}`.trim() || "Empleado Activo")
+    : (idEmpleado === "00000000-0000-0000-0000-000000000099" ? "Empleado Nuevo (Sin mensajes)" : "Empleado Activo");
 
   return (
     <section className="comunicaciones" aria-labelledby="bandeja-titulo">

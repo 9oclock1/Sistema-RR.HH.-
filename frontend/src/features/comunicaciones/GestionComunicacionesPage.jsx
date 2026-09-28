@@ -37,14 +37,21 @@ import {
   useAvisos,
 } from "../../components/ui";
 import { useRol } from "../../context/sesion";
+import { puedeAcceder } from "../../utils/permisos";
 import { formatearFecha, formatearFechaLarga } from "./formatoFecha";
 import "./comunicaciones.css";
 
 export default function GestionComunicacionesPage() {
   const avisar = useAvisos();
   const rol = useRol();
+  const esAdminOGerente = puedeAcceder(rol, ["admin", "gerente"]);
 
-  const [pestanaActiva, setPestanaActiva] = useState("institucional");
+  const [pestanaSeleccionada, setPestanaSeleccionada] = useState(
+    () => (puedeAcceder(rol, ["admin", "gerente"]) ? "institucional" : "directo")
+  );
+
+  const pestanaActiva =
+    !esAdminOGerente && pestanaSeleccionada === "institucional" ? "directo" : pestanaSeleccionada;
 
   // Destinatarios y catálogos disponibles desde el backend
   const [destinatariosData, setDestinatariosData] = useState({
@@ -52,6 +59,28 @@ export default function GestionComunicacionesPage() {
     departamentos: [],
     sucursales: [],
   });
+
+  // Identidad activa del remitente
+  const idRemitenteSugerido = useMemo(() => {
+    if (rol === "supervisor") {
+      const sup = destinatariosData.empleados.find(
+        (e) => (e.cargo && e.cargo.toLowerCase().includes("supervisor")) || e.id_empleado === "cb7995a6-4b23-4738-ab8b-37d0b203d73b"
+      );
+      if (sup) return sup.id_empleado;
+      return "cb7995a6-4b23-4738-ab8b-37d0b203d73b"; // Luis Rojas Vargas
+    }
+    const adminEmp = destinatariosData.empleados.find(
+      (e) => e.id_empleado === "4192f252-acf0-4522-a109-e051cad9a50b"
+    );
+    if (adminEmp) return adminEmp.id_empleado;
+    return localStorage.getItem("rrhh.idEmpleado") || "4192f252-acf0-4522-a109-e051cad9a50b";
+  }, [rol, destinatariosData.empleados]);
+
+  const [idRemitente, setIdRemitente] = useState(
+    () => localStorage.getItem("rrhh.idRemitente") || localStorage.getItem("rrhh.idEmpleado") || ""
+  );
+
+  const idRemitenteEfectivo = idRemitente || idRemitenteSugerido;
 
   // Lista de enviados
   const [enviados, setEnviados] = useState([]);
@@ -111,7 +140,7 @@ export default function GestionComunicacionesPage() {
     if (pestanaActiva !== "enviados") return;
     let cancelado = false;
 
-    consultarEnviados(null, rol)
+    consultarEnviados(idRemitenteEfectivo, rol)
       .then((datos) => {
         if (cancelado) return;
         setEnviados(datos || []);
@@ -128,12 +157,12 @@ export default function GestionComunicacionesPage() {
     return () => {
       cancelado = true;
     };
-  }, [pestanaActiva, rol]);
+  }, [pestanaActiva, idRemitenteEfectivo, rol]);
 
   const recargarEnviados = useCallback(() => {
     setCargandoEnviados(true);
     setErrorEnviados(null);
-    consultarEnviados(null, rol)
+    consultarEnviados(idRemitenteEfectivo, rol)
       .then((datos) => {
         setEnviados(datos || []);
       })
@@ -141,7 +170,7 @@ export default function GestionComunicacionesPage() {
         setErrorEnviados(err.message || "Error al cargar la lista de enviados.");
       })
       .finally(() => setCargandoEnviados(false));
-  }, [rol]);
+  }, [idRemitenteEfectivo, rol]);
 
   // Cálculo de estimación de destinatarios activos para el alcance institucional
   const estimacionDestinatarios = useMemo(() => {
@@ -198,7 +227,7 @@ export default function GestionComunicacionesPage() {
     setEnviandoInst(true);
     try {
       // RF-65 AC 1 & 2: Emisión y entrega
-      const res = await emitirComunicadoInstitucional(formInst, null, rol);
+      const res = await emitirComunicadoInstitucional(formInst, idRemitenteEfectivo, rol);
       avisar({
         tono: "exito",
         titulo: "Comunicado emitido",
@@ -218,7 +247,7 @@ export default function GestionComunicacionesPage() {
 
       // Cambiar a la pestaña de enviados para ver el resultado
       setCargandoEnviados(true);
-      setPestanaActiva("enviados");
+      setPestanaSeleccionada("enviados");
     } catch (err) {
       // RF-65 AC 3: Si el grupo no tiene activos, el backend informa y no registra el intento
       setAlertaInst({
@@ -256,7 +285,7 @@ export default function GestionComunicacionesPage() {
     setEnviandoDir(true);
     try {
       // RF-64 AC 1: Almacena y entrega en bandeja
-      const res = await enviarComunicacionDirecta(formDir, null, rol);
+      const res = await enviarComunicacionDirecta(formDir, idRemitenteEfectivo, rol);
       avisar({
         tono: "exito",
         titulo: "Mensaje directo enviado",
@@ -272,7 +301,7 @@ export default function GestionComunicacionesPage() {
       });
 
       setCargandoEnviados(true);
-      setPestanaActiva("enviados");
+      setPestanaSeleccionada("enviados");
     } catch (err) {
       // RF-64 AC 4: Si no es activo, el sistema rechaza y da el motivo
       setAlertaDir({
@@ -295,7 +324,7 @@ export default function GestionComunicacionesPage() {
     setAuditoriaSeleccionada(null);
 
     try {
-      const auditoria = await consultarAuditoria(comunicacion.id_comunicacion);
+      const auditoria = await consultarAuditoria(comunicacion.id_comunicacion, idRemitenteEfectivo, rol);
       setAuditoriaSeleccionada(auditoria);
     } catch (err) {
       avisar({ tono: "peligro", titulo: "Error al cargar auditoría", mensaje: err.message });
@@ -329,8 +358,17 @@ export default function GestionComunicacionesPage() {
 
   const opcionesEmpleados = destinatariosData.empleados.map((emp) => ({
     valor: emp.id_empleado,
-    etiqueta: `${emp.nombres} ${emp.apellidos} — ${emp.cargo || "Empleado"}${emp.activo ? "" : " [INACTIVO]"}`,
+    etiqueta: `${emp.nombre_completo || `${emp.nombres || ""} ${emp.apellidos || ""}`.trim() || "Empleado"} — ${emp.cargo || "Funcionario"}${emp.activo ? "" : " [INACTIVO]"}`,
   }));
+
+  const opcionesRemitente = useMemo(() => {
+    return destinatariosData.empleados
+      .filter((e) => e.activo)
+      .map((emp) => ({
+        valor: emp.id_empleado,
+        etiqueta: `${emp.nombre_completo || `${emp.nombres || ""} ${emp.apellidos || ""}`.trim()} — ${emp.cargo || "Funcionario"}`,
+      }));
+  }, [destinatariosData.empleados]);
 
   // Columnas para la tabla de enviados (RF-64 AC 3, RF-65 AC 2)
   const columnasEnviados = [
@@ -416,24 +454,30 @@ export default function GestionComunicacionesPage() {
     },
   ];
 
-  const pestanas = [
-    {
-      id: "institucional",
-      etiqueta: "Emitir comunicado",
-      icono: Megaphone,
-    },
-    {
-      id: "directo",
-      etiqueta: "Mensaje directo",
-      icono: Send,
-    },
-    {
-      id: "enviados",
-      etiqueta: "Enviados y auditoría",
-      icono: FileText,
-      contador: enviados.length > 0 ? enviados.length : undefined,
-    },
-  ];
+  const pestanas = useMemo(() => {
+    const lista = [];
+    if (esAdminOGerente) {
+      lista.push({
+        id: "institucional",
+        etiqueta: "Emitir comunicado",
+        icono: Megaphone,
+      });
+    }
+    lista.push(
+      {
+        id: "directo",
+        etiqueta: "Mensaje directo",
+        icono: Send,
+      },
+      {
+        id: "enviados",
+        etiqueta: "Enviados y auditoría",
+        icono: FileText,
+        contador: enviados.length > 0 ? enviados.length : undefined,
+      }
+    );
+    return lista;
+  }, [esAdminOGerente, enviados.length]);
 
   return (
     <section className="comunicaciones" aria-labelledby="gestion-titulo">
@@ -443,8 +487,28 @@ export default function GestionComunicacionesPage() {
         titulo="Gestión de comunicaciones"
         idTitulo="gestion-titulo"
         descripcion="Emisión de comunicados institucionales, mensajes directos a empleados y auditoría de lecturas."
+        acciones={
+          opcionesRemitente.length > 0 && (
+            <div style={{ minWidth: 260 }}>
+              <Selector
+                etiqueta="Remitente (Identidad activa)"
+                ayuda={`Rol actual: ${rol}`}
+                value={idRemitenteEfectivo}
+                onChange={(e) => {
+                  setIdRemitente(e.target.value);
+                  try {
+                    localStorage.setItem("rrhh.idRemitente", e.target.value);
+                  } catch {
+                    /* sin almacenamiento */
+                  }
+                }}
+                opciones={opcionesRemitente}
+              />
+            </div>
+          )
+        }
       >
-        <Pestanas pestanas={pestanas} activa={pestanaActiva} onCambiar={setPestanaActiva} />
+        <Pestanas pestanas={pestanas} activa={pestanaActiva} onCambiar={setPestanaSeleccionada} />
       </EncabezadoPagina>
 
       {/* ==================================================== */}
@@ -694,8 +758,8 @@ export default function GestionComunicacionesPage() {
                 titulo="Sin comunicaciones enviadas"
                 mensaje="Aún no ha emitido comunicados ni mensajes directos."
                 accion={
-                  <Boton tamano="sm" onClick={() => setPestanaActiva("institucional")}>
-                    Emitir primer comunicado
+                  <Boton tamano="sm" onClick={() => setPestanaSeleccionada(esAdminOGerente ? "institucional" : "directo")}>
+                    {esAdminOGerente ? "Emitir comunicado" : "Enviar mensaje directo"}
                   </Boton>
                 }
               />
