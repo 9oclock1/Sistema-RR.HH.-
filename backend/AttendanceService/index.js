@@ -1,10 +1,12 @@
 const express = require("express");
 const cors = require("cors");
-const { Pool } = require("pg");
+const pool = require("./src/config/db");
+const turnosRoutes = require("./src/routes/turnos.routes");
+const marcajesRoutes = require("./src/routes/marcajes.routes");
+const manejadorErrores = require("./src/middlewares/manejadorErrores");
 
 const app = express();
 const PORT = process.env.PORT || 3004;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(cors());
 app.use(express.json());
@@ -32,14 +34,9 @@ app.get("/health", async (req, res) => {
   }
 });
 
-app.post("/check-in", (req, res) => {
-  const { employeeId } = req.body;
-  res.json({
-    message: "Registro de entrada exitoso",
-    employeeId: employeeId || 1,
-    time: new Date(),
-  });
-});
+app.use(turnosRoutes);
+app.use(marcajesRoutes);
+app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`AttendanceService corriendo en http://0.0.0.0:${PORT}`);

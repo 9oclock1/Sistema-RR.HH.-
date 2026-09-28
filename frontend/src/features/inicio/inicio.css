@@ -1,0 +1,86 @@
+.inicio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.inicio .ds-encabezado {
+  margin-bottom: 0;
+}
+
+.inicio-seccion__encabezado {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.inicio-seccion__titulo {
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* El margen negativo alinea el ícono con el título de la sección; el fondo del hover sobresale. */
+.inicio-modulos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--size-sidebar)), 1fr));
+  gap: var(--space-2);
+  margin: 0 calc(var(--space-3) * -1);
+  padding: 0;
+  list-style: none;
+}
+
+/* Acceso sutil: sin borde, fondo gris al pasar el cursor (como los botones sutiles). */
+.inicio-modulo {
+  display: flex;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: background-color var(--transition);
+}
+
+.inicio-modulo:hover {
+  background: var(--color-bg-hover);
+}
+
+.inicio-modulo:active {
+  background: var(--color-bg-pressed);
+}
+
+.inicio-modulo__icono {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-avatar-lg);
+  height: var(--size-avatar-lg);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-selected);
+  color: var(--color-text-selected);
+}
+
+.inicio-modulo__texto {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* La primera línea del nombre queda centrada con el ícono. */
+.inicio-modulo__nombre {
+  min-width: 0;
+  padding-block: calc((var(--size-avatar-lg) - var(--line-height-body)) / 2);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.inicio-modulo__descripcion {
+  color: var(--color-text-secondary);
+}

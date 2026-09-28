@@ -1,0 +1,68 @@
+.ds-etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  height: var(--size-control-sm);
+  padding: 0 var(--space-2);
+  border: var(--border-width) solid var(--tono-borde);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-surface);
+  color: var(--tono-texto);
+  font-family: var(--font-family);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  font-weight: var(--font-weight-medium);
+  vertical-align: middle;
+}
+
+.ds-etiqueta .ds-icono {
+  width: var(--line-height-small);
+  height: var(--line-height-small);
+}
+
+.ds-etiqueta--neutral {
+  --tono-borde: var(--color-border-input);
+  --tono-texto: var(--color-text-secondary);
+}
+
+.ds-etiqueta--exito {
+  --tono-borde: var(--color-success);
+  --tono-texto: var(--color-success-text);
+}
+
+.ds-etiqueta--aviso {
+  --tono-borde: var(--color-warning);
+  --tono-texto: var(--color-warning-text);
+}
+
+.ds-etiqueta--peligro {
+  --tono-borde: var(--color-danger);
+  --tono-texto: var(--color-danger-text);
+}
+
+.ds-etiqueta--info {
+  --tono-borde: var(--color-info);
+  --tono-texto: var(--color-info-text);
+}
+
+.ds-etiqueta--morado {
+  --tono-borde: var(--color-purple);
+  --tono-texto: var(--color-purple-text);
+}
+
+.ds-contador {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--size-avatar);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-round);
+  background: var(--color-bg-neutral);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+}

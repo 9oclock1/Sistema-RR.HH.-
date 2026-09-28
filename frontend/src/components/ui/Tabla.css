@@ -1,0 +1,53 @@
+/* La tabla se desplaza dentro de su contenedor; la página nunca. */
+.ds-tabla-contenedor {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.ds-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.ds-tabla th,
+.ds-tabla td {
+  height: var(--size-row);
+  padding: 0 var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.ds-tabla td {
+  overflow: hidden;
+}
+
+.ds-tabla td > .ds-truncar {
+  display: block;
+}
+
+.ds-tabla th {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.ds-tabla tbody tr {
+  transition: background-color var(--transition);
+}
+
+.ds-tabla tbody tr:hover {
+  background: var(--color-bg-hover);
+}
+
+.ds-tabla .ds-tabla__fin {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
