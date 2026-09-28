@@ -8,22 +8,64 @@ export class ErrorApi extends Error {
   }
 }
 
-export async function solicitar(ruta, { metodo = "GET", cuerpo, cabeceras } = {}) {
+export async function solicitar(
+  ruta,
+  { metodo = "GET", cuerpo, cabeceras, respuestaBinaria = false } = {},
+) {
   let respuesta;
+  const esFormData =
+    typeof FormData !== "undefined" && cuerpo instanceof FormData;
+
+  // Si es FormData, dejamos que el navegador defina Content-Type con el boundary
+  const headers = {
+    ...(!esFormData && cuerpo && { "Content-Type": "application/json" }),
+    ...cabeceras,
+  };
+
+  const body = esFormData
+    ? cuerpo
+    : cuerpo
+      ? JSON.stringify(cuerpo)
+      : undefined;
+
   try {
     respuesta = await fetch(`${BASE_URL}${ruta}`, {
       method: metodo,
-      headers: { ...(cuerpo && { "Content-Type": "application/json" }), ...cabeceras },
-      body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+      headers,
+      body,
     });
   } catch {
     throw new ErrorApi(0, "No se pudo conectar con el servidor");
   }
 
   if (respuesta.status === 204) return null;
+
+  if (respuestaBinaria) {
+    if (!respuesta.ok) {
+      throw new ErrorApi(respuesta.status, "Error al descargar el archivo");
+    }
+    return await respuesta.blob();
+  }
+
   const datos = await respuesta.json().catch(() => null);
   if (!respuesta.ok) {
-    throw new ErrorApi(respuesta.status, datos?.error ?? "Error inesperado del servidor", datos?.detalles);
+    throw new ErrorApi(
+      respuesta.status,
+      datos?.message || datos?.error || "Error inesperado del servidor",
+      datos?.detalles,
+    );
   }
   return datos;
 }
+
+export const cliente = {
+  get: (ruta, opciones) => solicitar(ruta, { ...opciones, metodo: "GET" }),
+  post: (ruta, cuerpo, opciones) =>
+    solicitar(ruta, { ...opciones, metodo: "POST", cuerpo }),
+  put: (ruta, cuerpo, opciones) =>
+    solicitar(ruta, { ...opciones, metodo: "PUT", cuerpo }),
+  delete: (ruta, opciones) =>
+    solicitar(ruta, { ...opciones, metodo: "DELETE" }),
+};
+
+export default cliente;
