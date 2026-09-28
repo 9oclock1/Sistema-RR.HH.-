@@ -1,6 +1,8 @@
-import { CalendarClock, Fingerprint } from "lucide-react";
+import { CalendarClock, Fingerprint, Mail, Megaphone } from "lucide-react";
 import MarcajePage from "../features/marcaje/MarcajePage";
 import TurnosPage from "../features/turnos/TurnosPage";
+import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
+import GestionComunicacionesPage from "../features/comunicaciones/GestionComunicacionesPage";
 import { puedeAcceder } from "../utils/permisos";
 
 // Módulos del sistema: alimentan el inicio, la barra lateral y las rutas.
@@ -26,6 +28,27 @@ export const SECCIONES = [
         icono: CalendarClock,
         roles: ["admin"],
         pagina: TurnosPage,
+      },
+    ],
+  },
+  {
+    titulo: "Comunicaciones",
+    modulos: [
+      {
+        ruta: "/comunicaciones/bandeja",
+        etiqueta: "Bandeja de mensajes",
+        descripcion: "Mensajes, notificaciones y comunicados corporativos.",
+        icono: Mail,
+        roles: ["empleado"],
+        pagina: BandejaMensajesPage,
+      },
+      {
+        ruta: "/comunicaciones/gestion",
+        etiqueta: "Gestión de comunicados",
+        descripcion: "Emisión de comunicados, mensajes directos y auditoría de lecturas.",
+        icono: Megaphone,
+        roles: ["supervisor"],
+        pagina: GestionComunicacionesPage,
       },
     ],
   },
