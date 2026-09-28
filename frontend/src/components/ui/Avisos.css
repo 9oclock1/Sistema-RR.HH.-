@@ -1,0 +1,99 @@
+.ds-avisos {
+  position: fixed;
+  bottom: var(--space-6);
+  left: var(--space-6);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(var(--size-toast), calc(100vw - var(--space-6) * 2));
+  pointer-events: none;
+}
+
+.ds-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-overlay);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  pointer-events: auto;
+  animation: ds-aviso-entrada var(--duration) var(--easing);
+}
+
+.ds-aviso__icono {
+  margin-top: calc((var(--line-height-body) - var(--size-icon)) / 2);
+}
+
+.ds-aviso--exito .ds-aviso__icono { color: var(--color-success); }
+.ds-aviso--aviso .ds-aviso__icono { color: var(--color-warning); }
+.ds-aviso--peligro .ds-aviso__icono { color: var(--color-danger); }
+.ds-aviso--info .ds-aviso__icono { color: var(--color-info); }
+
+.ds-aviso__texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.ds-aviso__titulo,
+.ds-aviso__mensaje {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ds-aviso__titulo {
+  font-weight: var(--font-weight-semibold);
+}
+
+.ds-aviso__mensaje {
+  color: var(--color-text-secondary);
+}
+
+.ds-aviso__cerrar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-control-sm);
+  height: var(--size-control-sm);
+  margin: calc(var(--space-1) * -1) calc(var(--space-2) * -1) 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--transition);
+}
+
+.ds-aviso__cerrar:hover {
+  background: var(--color-bg-hover);
+}
+
+@keyframes ds-aviso-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2));
+  }
+}
+
+@media (max-width: 640px) {
+  .ds-avisos {
+    bottom: var(--space-4);
+    left: var(--space-4);
+    width: calc(100vw - var(--space-4) * 2);
+  }
+}
+
+@media (pointer: coarse) {
+  .ds-aviso__cerrar {
+    width: var(--size-touch);
+    height: var(--size-touch);
+    margin: calc(var(--space-3) * -1) calc(var(--space-3) * -1) calc(var(--space-3) * -1) 0;
+  }
+}

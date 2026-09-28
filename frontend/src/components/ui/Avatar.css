@@ -1,0 +1,28 @@
+.ds-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-avatar);
+  height: var(--size-avatar);
+  border-radius: var(--radius-round);
+  color: var(--color-on-avatar);
+  font-family: var(--font-family);
+  font-size: var(--font-size-small);
+  line-height: 1;
+  font-weight: var(--font-weight-semibold);
+  user-select: none;
+}
+
+.ds-avatar--lg {
+  width: var(--size-avatar-lg);
+  height: var(--size-avatar-lg);
+  font-size: var(--font-size-body);
+}
+
+.ds-avatar--color-1 { background: var(--color-avatar-1); }
+.ds-avatar--color-2 { background: var(--color-avatar-2); }
+.ds-avatar--color-3 { background: var(--color-avatar-3); }
+.ds-avatar--color-4 { background: var(--color-avatar-4); }
+.ds-avatar--color-5 { background: var(--color-avatar-5); }
+.ds-avatar--color-6 { background: var(--color-avatar-6); }

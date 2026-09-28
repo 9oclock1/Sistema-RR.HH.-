@@ -1,16 +1,6 @@
-import CargosList from './features/Cargos/CargosList';
-import OrganizacionView from './features/organizacion/OrganizacionView';
-import VacantesView from './features/Vacantes/VacantesView';
-import './App.css';
+import { RouterProvider } from "react-router/dom";
+import { router } from "./router";
 
-function App() {
-  return (
-    <main className="app">
-      <OrganizacionView />
-      <CargosList />
-      <VacantesView />
-    </main>
-  );
+export default function App() {
+  return <RouterProvider router={router} />;
 }
-
-export default App;
