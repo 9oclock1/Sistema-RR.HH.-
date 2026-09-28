@@ -14,7 +14,7 @@ app.use(express.urlencoded({ extended: true }));
 // Rutas para las funcionalidades
 app.use("/convocatorias", convocatoriaRoutes);
 app.use("/postulaciones", postulacionRoutes);
-app.use("/cv", cvTestRoutes);
+//app.use("/cv", cvTestRoutes);
 
 app.use(errorHandler);
 

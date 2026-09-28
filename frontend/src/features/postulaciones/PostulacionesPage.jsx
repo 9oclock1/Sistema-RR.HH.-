@@ -1,11 +1,17 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router";
-import { FileCheck, FileWarning, Download, ExternalLink, RefreshCw } from "lucide-react";
+import { FileCheck, FileWarning, Download, RefreshCw, Users } from "lucide-react";
 import { EncabezadoPagina, Tarjeta, Selector, Boton, Alerta, Etiqueta, useAvisos } from "../../components/ui";
 import { postulacionApi } from "../../api/postulacion";
 import CvUploadForm from "./components/CvUploadForm";
 import CvViewer from "./components/CvViewer";
 import "./PostulacionesPage.css";
+
+const tieneCvValido = (postulante) => {
+  if (!postulante || !postulante.cv_archivo_url) return false;
+  const url = postulante.cv_archivo_url.trim().toLowerCase();
+  return url !== "" && url !== "pending";
+};
 
 export default function PostulacionesPage() {
   const avisar = useAvisos();
@@ -18,26 +24,32 @@ export default function PostulacionesPage() {
 
   // carga de todas las convocatorias
   useEffect(() => {
+    let montado = true;
     async function cargarConvocatorias() {
       try {
         const lista = await postulacionApi.obtenerConvocatorias();
+        if (!montado) return;
         setConvocatorias(lista);
         if (lista.length > 0) {
           setConvocatoriaId(lista[0].id_convocatoria);
         }
       } catch (err) {
-        setErrorCarga("No se pudieron cargar las convocatorias disponibles.");
+        if (montado) setErrorCarga("No se pudieron cargar las convocatorias disponibles.");
+        console.error(err);
       }
     }
     cargarConvocatorias();
+    return () => {
+      montado = false;
+    };
   }, []);
 
   // carga de todos los postulantes de la convocatoria seleccionada
-  const cargarPostulantes = useCallback(async () => {
-    if (!convocatoriaId) return;
+  const refrescarPostulantes = useCallback(async (idConvocatoria) => {
+    if (!idConvocatoria) return;
     setCargando(true);
     try {
-      const lista = await postulacionApi.obtenerPostulantesPorConvocatoria(convocatoriaId);
+      const lista = await postulacionApi.obtenerPostulantesPorConvocatoria(idConvocatoria);
       setPostulantes(lista);
       if (lista.length > 0) {
         setPostulanteId((actual) =>
@@ -47,21 +59,23 @@ export default function PostulacionesPage() {
         setPostulanteId("");
       }
     } catch (err) {
-      setErrorCarga("Error al consultar postulantes de la vacante.");
+      setErrorCarga("Error al consultar los postulantes de la vacante.");
+      console.error(err);
     } finally {
       setCargando(false);
     }
-  }, [convocatoriaId]);
+  }, []);
 
   useEffect(() => {
-    cargarPostulantes();
-  }, [cargarPostulantes]);
+    if (convocatoriaId) {
+      refrescarPostulantes(convocatoriaId);
+    }
+  }, [convocatoriaId, refrescarPostulantes]);
 
   const convocatoriaActual = convocatorias.find((c) => c.id_convocatoria === convocatoriaId);
   const postulanteActual = postulantes.find((p) => p.id_postulante === postulanteId);
-  const tieneCvCargado = Boolean(postulanteActual?.cv_archivo_url);
+  const tieneCv = tieneCvValido(postulanteActual);
   const esPdf = postulanteActual?.cv_formato_mimetype?.includes("pdf");
-  
 
   const opcionesConvocatoria = convocatorias.map((c) => ({
     valor: c.id_convocatoria,
@@ -70,7 +84,7 @@ export default function PostulacionesPage() {
 
   const opcionesPostulante = postulantes.map((p) => ({
     valor: p.id_postulante,
-    etiqueta: `${p.apellidos}, ${p.nombres} ${p.cv_archivo_url ? "(CV Adjuntado)" : "(Pendiente de CV)"}`,  
+    etiqueta: `${p.apellidos}, ${p.nombres} ${tieneCvValido(p) ? "(CV Adjuntado)" : "(Pendiente de CV)"}`,
   }));
 
   return (
@@ -85,7 +99,10 @@ export default function PostulacionesPage() {
             variante="sutil"
             icono={RefreshCw}
             cargando={cargando}
-            onClick={cargarPostulantes}
+            onClick={() => {
+              refrescarPostulantes(convocatoriaId);
+              avisar({ tono: "info", titulo: "Datos actualizados" });
+            }}
           >
             Actualizar datos
           </Boton>
@@ -98,7 +115,6 @@ export default function PostulacionesPage() {
         </Alerta>
       )}
 
-      {/* Selectores de contexto */}
       <div className="postulaciones-page__filtros">
         <Selector
           etiqueta="Convocatoria / Vacante"
@@ -112,12 +128,11 @@ export default function PostulacionesPage() {
           value={postulanteId}
           onChange={(e) => setPostulanteId(e.target.value)}
           disabled={postulantes.length === 0}
-          textoVacio={postulantes.length === 0 ? "Sin candidatos registrados" : undefined}
+          textoVacio={postulantes.length === 0 ? "No hay candidatos inscritos a esta vacante" : undefined}
         />
       </div>
 
       <div className="postulaciones-page__contenido">
-        {/* Panel lateral: Resumen del postulante */}
         <div className="postulaciones-page__lateral">
           <Tarjeta titulo="Detalles del Candidato" nivelTitulo={3}>
             {postulanteActual ? (
@@ -132,25 +147,34 @@ export default function PostulacionesPage() {
                   <span><strong>Correo:</strong> {postulanteActual.correo_electronico}</span>
                   <span><strong>Teléfono:</strong> {postulanteActual.telefono_contacto}</span>
                   <div style={{ marginTop: "var(--space-2)" }}>
-                    <Etiqueta tono={tieneCvCargado ? "exito" : "aviso"}>
-                      {tieneCvCargado ? "Documento recibido" : "Pendiente de CV"}
+                    <Etiqueta tono={tieneCv ? "exito" : "aviso"}>
+                      {tieneCv ? "Documento recibido" : "Pendiente de CV"}
                     </Etiqueta>
                   </div>
                 </div>
               </div>
             ) : (
               <p style={{ color: "var(--color-text-subtle)", fontSize: "var(--font-size-small)" }}>
-                Seleccione un postulante para ver los detalles.
+                Seleccione un candidato para examinar su estado.
               </p>
             )}
           </Tarjeta>
         </div>
 
-        {/* Panel principal dinámico */}
         <div className="postulaciones-page__panel-accion">
-          {postulanteActual && (
+          {postulantes.length === 0 ? (
+            <Tarjeta titulo="Sin postulaciones" nivelTitulo={3}>
+              <div className="cv-visualizador-caja__docx-info">
+                <Users className="ds-icono" style={{ width: 36, height: 36, color: "var(--color-text-subtle)" }} />
+                <p><strong>Aún no hay candidatos postulados a esta convocatoria.</strong></p>
+                <p style={{ color: "var(--color-text-secondary)", fontSize: "var(--font-size-small)" }}>
+                  Los registros aparecerán aquí una vez que los postulantes sean inscritos en la vacante.
+                </p>
+              </div>
+            </Tarjeta>
+          ) : postulanteActual && (
             <>
-              {tieneCvCargado ? (
+              {tieneCv ? (
                 <Tarjeta titulo="Currículum Vitae Vinculado" nivelTitulo={3}>
                   <div className="cv-visualizador-caja">
                     <div className="cv-visualizador-caja__cabecera">
@@ -202,7 +226,7 @@ export default function PostulacionesPage() {
                     idPostulacion={postulanteActual.id_postulacion}
                     tituloConvocatoria={convocatoriaActual?.titulo_puesto}
                     alCompletar={() => {
-                      cargarPostulantes();
+                      refrescarPostulantes(convocatoriaId);
                     }}
                   />
                 </Tarjeta>

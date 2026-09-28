@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useCvUpload } from "../../../hooks/useCvUpload";
 import FileInput from "../../../components/common/FileInput";
 import { Boton, Alerta, useAvisos } from "../../../components/ui";
@@ -11,6 +12,7 @@ export default function CvUploadForm({
   alCompletar,
 }) {
   const avisar = useAvisos();
+  const [subiendo, setSubiendo] = useState(false);
 
   const manejarExito = (resultado) => {
     avisar({
@@ -25,7 +27,6 @@ export default function CvUploadForm({
     archivo,
     errorValidacion,
     errorEnvio,
-    enviando,
     formatosPermitidos,
     seleccionarArchivo,
     removerArchivo,
@@ -34,12 +35,23 @@ export default function CvUploadForm({
 
   const alEnviar = async (e) => {
     e.preventDefault();
-    if (!archivo) return;
+    if (!archivo || subiendo || !idPostulacion) return;
+
+    setSubiendo(true);
+    setErrorEnvio(null);
+
     try {
       const resultado = await postulacionApi.adjuntarCvAPostulacion(idPostulacion, archivo);
-      manejarExito(resultado);
+      avisar({
+        tono: "exito",
+        titulo: "CV adjuntado con éxito",
+        mensaje: "El documento se vinculó correctamente a la postulación del candidato.",
+      });
+      if (alCompletar) alCompletar(resultado);
     } catch (err) {
-      setErrorEnvio(err.message || "Error al subir el CV.");
+      setErrorEnvio(err.message || "Error al subir el currículum.");
+    } finally {
+      setSubiendo(false);
     }
   };
 
@@ -53,7 +65,7 @@ export default function CvUploadForm({
       {errorEnvio && (
         <Alerta
           tono="peligro"
-          titulo="No se pudo registrar la postulación"
+          titulo="No se pudo registrar el CV"
           role="alert"
           onCerrar={() => setErrorEnvio(null)}
         >
@@ -67,7 +79,7 @@ export default function CvUploadForm({
         aceptar={formatosPermitidos}
         archivo={archivo}
         error={errorValidacion}
-        deshabilitado={enviando}
+        deshabilitado={subiendo}
         requerido
         onSeleccionar={seleccionarArchivo}
         onRemover={removerArchivo}
@@ -78,10 +90,10 @@ export default function CvUploadForm({
           type="submit"
           variante="primario"
           icono={Send}
-          cargando={enviando}
-          disabled={!archivo || Boolean(errorValidacion) || enviando}
+          cargando={subiendo}
+          disabled={!archivo || Boolean(errorValidacion) || subiendo || !idPostulacion}
         >
-          Confirmar postulación
+          {subiendo ? "Subiendo archivo..." : "Confirmar postulación"}
         </Boton>
       </div>
     </form>
