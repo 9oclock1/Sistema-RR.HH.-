@@ -12,7 +12,6 @@ function construirArbol(filas) {
       codigo: f.codigo,
       cargo: f.cargo,
       departamento: f.departamento,
-      nivel_jerarquico: f.nivel_jerarquico,
       empleados: f.empleados,
       hijos: [],
     });

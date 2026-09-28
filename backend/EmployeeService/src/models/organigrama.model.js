@@ -8,7 +8,6 @@ async function obtenerCargosConOcupantes() {
        c.id_cargo,
        c.codigo,
        c.nombre AS cargo,
-       c.nivel_jerarquico,
        c.id_cargo_jefe_directo AS id_cargo_superior,
        d.nombre AS departamento,
        COALESCE(
@@ -27,7 +26,7 @@ async function obtenerCargosConOcupantes() {
      LEFT JOIN sucursales s ON s.id_sucursal = e.id_sucursal_actual
      WHERE c.esta_activo = TRUE
      GROUP BY c.id_cargo, d.id_departamento
-     ORDER BY c.nivel_jerarquico, c.nombre;`
+     ORDER BY c.nombre;`
   );
   return rows;
 }
