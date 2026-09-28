@@ -1,6 +1,7 @@
-import { CalendarClock, Fingerprint } from "lucide-react";
+import { CalendarClock, Fingerprint, FileUser } from "lucide-react";
 import MarcajePage from "../features/marcaje/MarcajePage";
 import TurnosPage from "../features/turnos/TurnosPage";
+import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import { puedeAcceder } from "../utils/permisos";
 
 // Módulos del sistema: alimentan el inicio, la barra lateral y las rutas.
@@ -22,10 +23,25 @@ export const SECCIONES = [
       {
         ruta: "/asistencia/turnos",
         etiqueta: "Turnos",
-        descripcion: "Horarios de trabajo, refrigerios y márgenes de tolerancia.",
+        descripcion:
+          "Horarios de trabajo, refrigerios y márgenes de tolerancia.",
         icono: CalendarClock,
         roles: ["admin"],
         pagina: TurnosPage,
+      },
+    ],
+  },
+  {
+    titulo: "Reclutamiento",
+    modulos: [
+      {
+        ruta: "/reclutamiento/postulaciones",
+        etiqueta: "Postulaciones",
+        descripcion:
+          "Recepción de hojas de vida, validación de formatos y registro de postulantes.",
+        icono: FileUser,
+        roles: ["reclutador"], // El rol "reclutador" o "admin" podrá verlo automáticamente
+        pagina: PostulacionesPage,
       },
     ],
   },
@@ -34,5 +50,7 @@ export const SECCIONES = [
 export const seccionesPara = (rol) =>
   SECCIONES.map((seccion) => ({
     ...seccion,
-    modulos: seccion.modulos.filter((modulo) => puedeAcceder(rol, modulo.roles)),
+    modulos: seccion.modulos.filter((modulo) =>
+      puedeAcceder(rol, modulo.roles),
+    ),
   })).filter((seccion) => seccion.modulos.length > 0);
