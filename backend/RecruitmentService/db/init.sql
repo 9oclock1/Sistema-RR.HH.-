@@ -58,7 +58,7 @@ CREATE TABLE POSTULACIONES (
     id_postulante UUID NOT NULL,
     id_etapa SMALLINT NOT NULL,
     cv_archivo_url varchar(255) NOT NULL,
-    cv_formato_mimetype varchar(50) NOT NULL,
+    cv_formato_mimetype varchar(100) NOT NULL,
     datos_extraidos_cv JSONB NULL,
     porcentaje_afinidad numeric(5, 2) NULL,
     posicion_ranking int NULL,
