@@ -45,6 +45,12 @@
   --color-purple: #8270db;
   --color-purple-text: #5e4db2;
 
+  /* Color: fondos suaves de estado (alertas en línea) */
+  --color-info-bg: #e9f2fe;
+  --color-success-bg: #dcfff1;
+  --color-warning-bg: #fff7d6;
+  --color-danger-bg: #ffeceb;
+
   /* Color: avatares (iniciales en blanco) */
   --color-avatar-1: #1868db;
   --color-avatar-2: #6e5dc6;
@@ -169,6 +175,11 @@
     --color-info-text: #8fb8f6;
     --color-purple: #9f8fef;
     --color-purple-text: #b8acf6;
+
+    --color-info-bg: #1c2b42;
+    --color-success-bg: #1c3329;
+    --color-warning-bg: #332e1b;
+    --color-danger-bg: #42221f;
 
     --color-skeleton: #2b2c2f;
     --color-skeleton-shine: #36373a;
