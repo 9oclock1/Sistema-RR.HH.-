@@ -267,3 +267,17 @@ ALTER TABLE ASIGNACIONES_EMPLEADO
 ADD CONSTRAINT ASIGNACIONES_EMPLEADO_CARGOS FOREIGN KEY (id_cargo) REFERENCES CARGOS (id_cargo) NOT DEFERRABLE INITIALLY IMMEDIATE;
 ALTER TABLE ASIGNACIONES_EMPLEADO
 ADD CONSTRAINT ASIGNACIONES_EMPLEADO_SUCURSALES FOREIGN KEY (id_sucursal) REFERENCES SUCURSALES (id_sucursal) NOT DEFERRABLE INITIALLY IMMEDIATE;
+
+-- RF-18 (criterio 4): historial de cambios del superior (jefe directo) de un cargo.
+-- Agregar al final de backend/EmployeeService/db/init.sql.
+-- Es idempotente: también se puede correr a mano sin borrar el volumen (ver instrucciones aparte).
+CREATE TABLE IF NOT EXISTS HISTORIAL_JERARQUIA_CARGO (
+    id_historial UUID NOT NULL,
+    id_cargo UUID NOT NULL REFERENCES CARGOS (id_cargo),
+    id_cargo_jefe_anterior UUID NULL REFERENCES CARGOS (id_cargo),
+    id_cargo_jefe_nuevo UUID NULL REFERENCES CARGOS (id_cargo),
+    cambiado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT HISTORIAL_JERARQUIA_CARGO_pk PRIMARY KEY (id_historial)
+);
+CREATE INDEX IF NOT EXISTS ix_historial_jerarquia_cargo
+    ON HISTORIAL_JERARQUIA_CARGO (id_cargo, cambiado_en DESC);
