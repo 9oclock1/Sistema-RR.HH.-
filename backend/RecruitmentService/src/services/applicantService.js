@@ -49,14 +49,23 @@ async function registerApplicant(data) {
   }
 
   // Evaluate the lock:
-  // If acepta_postulaciones was computed in SQL, use it; fallback to JS evaluation
+  // If acepta_postulaciones was computed in SQL, use it; fallback to JS evaluation in America/La_Paz
+  const fechaLimite = convocatoria.fecha_limite_postulacion
+    ? (convocatoria.fecha_limite_postulacion instanceof Date
+        ? convocatoria.fecha_limite_postulacion.toISOString().split("T")[0]
+        : String(convocatoria.fecha_limite_postulacion).split("T")[0])
+    : null;
+  const hoyLaPaz = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/La_Paz",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
   const isAccepting =
     convocatoria.acepta_postulaciones !== undefined
       ? Boolean(convocatoria.acepta_postulaciones)
-      : convocatoria.esta_activa === true &&
-        (!convocatoria.fecha_limite_postulacion ||
-          new Date(convocatoria.fecha_limite_postulacion) >=
-            new Date(new Date().setHours(0, 0, 0, 0)));
+      : Boolean(convocatoria.esta_activa) && (!fechaLimite || fechaLimite >= hoyLaPaz);
 
   if (!isAccepting) {
     return {
@@ -74,37 +83,71 @@ async function registerApplicant(data) {
     };
   }
 
-  // 2. Check if applicant already exists by document number
-  let applicant = await applicantModel.findByDocumentNumber(numero_documento);
+  // 2. Concurrency-safe transaction
+  //    Guarantees atomicity and prevents duplicate applicants under concurrent requests.
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
 
-  if (applicant) {
-    // 3. Duplicate detection: same document → same convocatoria
-    const existingApplication =
-      await applicationModel.findByConvocatoriaAndPostulante(
-        id_convocatoria,
-        applicant.id_postulante
-      );
+    // Concurrency protection: serialize operations on the same document number
+    // using PostgreSQL transaction-level advisory lock.
+    // This prevents race conditions where 20 requests with the same document number
+    // arrive simultaneously and create 20 duplicate applicants in POSTULANTES.
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1));", [
+      "postulante_doc_" + String(numero_documento).trim(),
+    ]);
 
-    if (existingApplication) {
-      return {
-        success: false,
-        statusCode: 409,
-        message: `El postulante con documento "${numero_documento}" ya se encuentra registrado en esta convocatoria.`,
-        error: `El postulante con documento "${numero_documento}" ya se encuentra registrado en esta convocatoria.`,
-        data: {
-          id_postulante: applicant.id_postulante,
-          numero_documento: applicant.numero_documento,
-          nombres: applicant.nombres,
-          apellidos: applicant.apellidos,
-          fecha_postulacion: existingApplication.fecha_postulacion,
-        },
-      };
-    }
+    // Check if applicant already exists by document number INSIDE transaction
+    let applicant = await applicantModel.findByDocumentNumber(numero_documento, client);
 
-    // 4. Check if the updated email belongs to another applicant
-    if (correo_electronico) {
-      const existingByEmail = await applicantModel.findByEmail(correo_electronico);
-      if (existingByEmail && existingByEmail.id_postulante !== applicant.id_postulante) {
+    if (applicant) {
+      // 3. Duplicate detection: same document → same convocatoria
+      const existingApplication =
+        await applicationModel.findByConvocatoriaAndPostulante(
+          id_convocatoria,
+          applicant.id_postulante,
+          client
+        );
+
+      if (existingApplication) {
+        await client.query("ROLLBACK");
+        return {
+          success: false,
+          statusCode: 409,
+          message: `El postulante con documento "${numero_documento}" ya se encuentra registrado en esta convocatoria.`,
+          error: `El postulante con documento "${numero_documento}" ya se encuentra registrado en esta convocatoria.`,
+          data: {
+            id_postulante: applicant.id_postulante,
+            numero_documento: applicant.numero_documento,
+            nombres: applicant.nombres,
+            apellidos: applicant.apellidos,
+            fecha_postulacion: existingApplication.fecha_postulacion,
+          },
+        };
+      }
+
+      // Check if provided email belongs to ANOTHER applicant with a different document number
+      if (correo_electronico) {
+        const existingByEmail = await applicantModel.findByEmail(correo_electronico, client);
+        if (existingByEmail && existingByEmail.id_postulante !== applicant.id_postulante) {
+          await client.query("ROLLBACK");
+          return {
+            success: false,
+            statusCode: 409,
+            message: `El correo electrónico "${correo_electronico}" ya se encuentra registrado con otro número de documento.`,
+            error: `El correo electrónico "${correo_electronico}" ya se encuentra registrado con otro número de documento.`,
+          };
+        }
+      }
+
+      // IMPORTANT: Do NOT overwrite existing applicant's profile (names, phone, etc.).
+      // Re-applying to another opening reuses the existing canonical applicant record
+      // without mutating POSTULANTES, preventing data corruption of historical applications.
+    } else {
+      // Check email uniqueness before creating new applicant
+      const existingByEmail = await applicantModel.findByEmail(correo_electronico, client);
+      if (existingByEmail) {
+        await client.query("ROLLBACK");
         return {
           success: false,
           statusCode: 409,
@@ -112,42 +155,7 @@ async function registerApplicant(data) {
           error: `El correo electrónico "${correo_electronico}" ya se encuentra registrado con otro número de documento.`,
         };
       }
-    }
-  } else {
-    // 5. Check email uniqueness before creating
-    const existingByEmail = await applicantModel.findByEmail(correo_electronico);
-    if (existingByEmail) {
-      return {
-        success: false,
-        statusCode: 409,
-        message: `El correo electrónico "${correo_electronico}" ya se encuentra registrado con otro número de documento.`,
-        error: `El correo electrónico "${correo_electronico}" ya se encuentra registrado con otro número de documento.`,
-      };
-    }
-  }
 
-  // 6. Execute database writes in a transaction
-  //    Guarantees atomicity: if creating the application fails, the applicant insert/update is rolled back
-  //    so no orphan rows are left in POSTULANTES.
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-
-    if (applicant) {
-      // Update profile preserving saved details if new fields are empty
-      applicant = await applicantModel.updateApplicant(
-        applicant.id_postulante,
-        {
-          nombres,
-          apellidos,
-          correo_electronico,
-          telefono_contacto,
-          direccion_residencia,
-          ciudad,
-        },
-        client
-      );
-    } else {
       // Create new applicant
       applicant = await applicantModel.createApplicant(
         {
@@ -163,7 +171,7 @@ async function registerApplicant(data) {
       );
     }
 
-    // 7. Create the application (association between applicant ↔ convocatoria)
+    // 4. Create the application (association between applicant ↔ convocatoria)
     //    Default stage id_etapa = 1 (first stage in the workflow)
     //    cv_archivo_url defaults to "pending" until document upload module is integrated
     const application = await applicationModel.createApplication(
@@ -224,6 +232,7 @@ async function getApplicantsByJobOpening(id_convocatoria) {
       success: false,
       statusCode: 404,
       message: "La convocatoria especificada no existe.",
+      error: "La convocatoria especificada no existe.",
     };
   }
 

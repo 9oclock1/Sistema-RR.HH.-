@@ -10,7 +10,8 @@ const RUTA_BASE = "/recr/applicants";
 function adaptarError(error) {
   if (error instanceof ErrorApi) {
     error.status = error.estado;
-    error.errors = Array.isArray(error.detalles) ? error.detalles : [];
+    error.detalles = Array.isArray(error.detalles) ? error.detalles : [];
+    error.errors = error.detalles;
   }
   return error;
 }

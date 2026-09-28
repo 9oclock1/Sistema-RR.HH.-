@@ -129,10 +129,10 @@ export function useApplicantForm() {
     if (!Array.isArray(backendErrors)) return;
     const errors = {};
     for (const err of backendErrors) {
-      // Only keep the FIRST error per field (backend sends at most one,
-      // but guard against future changes)
-      if (!errors[err.field]) {
-        errors[err.field] = err.message;
+      const field = err.field || err.campo;
+      const message = err.message || err.mensaje;
+      if (field && message && !errors[field]) {
+        errors[field] = message;
       }
     }
     setFieldErrors(errors);

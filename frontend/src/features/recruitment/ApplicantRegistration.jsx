@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router";
-import { Briefcase, Calendar, Plus, RefreshCw, UserPlus, Users, X } from "lucide-react";
+import { Briefcase, Calendar, Plus, RefreshCw, Users, X } from "lucide-react";
 import {
   fetchActiveJobOpenings,
   registerApplicant,
@@ -21,6 +21,20 @@ import {
 import ApplicantForm from "./ApplicantForm";
 import ApplicantList from "./ApplicantList";
 import "./ApplicantRegistration.css";
+
+function formatearFechaLimite(fecha) {
+  if (!fecha) return "Abierta";
+  try {
+    const partes = String(fecha).split("T")[0].split("-");
+    if (partes.length === 3) {
+      const [year, month, day] = partes.map(Number);
+      return new Intl.DateTimeFormat("es-BO").format(new Date(year, month - 1, day));
+    }
+    return new Intl.DateTimeFormat("es-BO").format(new Date(fecha));
+  } catch {
+    return String(fecha);
+  }
+}
 
 /**
  * RF-09: Pantalla de Registro de Postulantes
@@ -48,6 +62,13 @@ export default function ApplicantRegistration() {
   // Estado: envío y notificaciones en página
   const [submitting, setSubmitting] = useState(false);
   const [alerta, setAlerta] = useState(null);
+  const alertaRef = useRef(null);
+
+  useEffect(() => {
+    if (alerta && alertaRef.current) {
+      alertaRef.current.focus();
+    }
+  }, [alerta]);
 
   // Estado: alternar visualización del formulario
   const [showForm, setShowForm] = useState(false);
@@ -166,8 +187,8 @@ export default function ApplicantRegistration() {
           titulo: "Postulación duplicada",
           mensaje: err.message,
         });
-      } else if (estado === 400 && (err.errors?.length > 0 || err.detalles?.length > 0)) {
-        const errores = err.errors || err.detalles;
+      } else if (estado === 400 && (err.detalles?.length > 0 || err.errors?.length > 0)) {
+        const errores = err.detalles?.length > 0 ? err.detalles : err.errors;
         setBackendErrors(errores);
         setAlerta({
           tono: "peligro",
@@ -219,6 +240,8 @@ export default function ApplicantRegistration() {
           tono={alerta.tono}
           titulo={alerta.titulo}
           role={alerta.tono === "peligro" ? "alert" : undefined}
+          tabIndex={-1}
+          ref={alertaRef}
           onCerrar={() => setAlerta(null)}
         >
           {alerta.mensaje}
@@ -261,16 +284,6 @@ export default function ApplicantRegistration() {
               ayuda={jobOpenings.length === 0 ? "No hay convocatorias activas disponibles actualmente." : undefined}
             />
           )}
-
-          {selectedOpening && !showForm && (
-            <Boton
-              variante="primario"
-              icono={UserPlus}
-              onClick={handleToggleForm}
-            >
-              Registrar postulante
-            </Boton>
-          )}
         </div>
 
         {/* Resumen de la convocatoria seleccionada */}
@@ -294,9 +307,7 @@ export default function ApplicantRegistration() {
               <span className="postulantes-metrica__etiqueta">Fecha límite</span>
               <span className="postulantes-metrica__valor">
                 <Calendar className="ds-icono" aria-hidden="true" />
-                {selectedOpening.fecha_limite_postulacion
-                  ? new Date(selectedOpening.fecha_limite_postulacion).toLocaleDateString("es-BO")
-                  : "Abierta"}
+                {formatearFechaLimite(selectedOpening.fecha_limite_postulacion)}
               </span>
             </div>
             <div className="postulantes-metrica">

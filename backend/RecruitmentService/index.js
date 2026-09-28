@@ -62,6 +62,16 @@ async function initDbSeed() {
   }
 }
 
+// ── 404 Handler for Unknown Routes ──
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    statusCode: 404,
+    error: "Ruta no encontrada.",
+    message: "Ruta no encontrada.",
+  });
+});
+
 // ── Centralized Error Handling Middleware ──
 app.use(manejadorErrores);
 

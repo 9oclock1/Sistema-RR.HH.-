@@ -31,18 +31,19 @@ const COLUMNAS = [
   {
     clave: "indice",
     titulo: "#",
-    ancho: "48px",
+    ancho: "44px",
     celda: (fila, index) => <span className="ds-tabla__indice">{index + 1}</span>,
   },
   {
     clave: "numero_documento",
     titulo: "Documento",
-    ancho: "130px",
+    ancho: "110px",
     celda: (fila) => <code className="postulante-documento">{fila.numero_documento}</code>,
   },
   {
     clave: "nombre_completo",
     titulo: "Postulante",
+    ancho: "180px",
     celda: (fila) => {
       const nombreCompleto = `${fila.nombres ?? ""} ${fila.apellidos ?? ""}`.trim();
       return (
@@ -56,24 +57,25 @@ const COLUMNAS = [
   {
     clave: "correo_electronico",
     titulo: "Correo electrónico",
+    ancho: "190px",
     celda: (fila) => <TextoTruncado>{fila.correo_electronico}</TextoTruncado>,
   },
   {
     clave: "telefono_contacto",
     titulo: "Teléfono",
-    ancho: "130px",
+    ancho: "110px",
     celda: (fila) => fila.telefono_contacto || "—",
   },
   {
     clave: "ciudad",
     titulo: "Ciudad",
-    ancho: "110px",
+    ancho: "90px",
     celda: (fila) => fila.ciudad || "—",
   },
   {
     clave: "nombre_etapa",
     titulo: "Etapa",
-    ancho: "140px",
+    ancho: "120px",
     celda: (fila) => {
       const etapa = fila.nombre_etapa || fila.etapa || "Postulado";
       return <Etiqueta tono={mapearTonoEtapa(etapa)}>{etapa}</Etiqueta>;
@@ -82,7 +84,7 @@ const COLUMNAS = [
   {
     clave: "fecha_postulacion",
     titulo: "Fecha postulación",
-    ancho: "160px",
+    ancho: "140px",
     celda: (fila) => (
       <span className="postulante-fecha">
         {formatearFechaPostulacion(fila.fecha_postulacion)}

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { UserPlus } from "lucide-react";
 import { Alerta, Boton, CampoTexto } from "../../components/ui";
 
@@ -16,11 +17,23 @@ export default function ApplicantForm({
   submitting = false,
 }) {
   const totalErrores = Object.keys(fieldErrors).length;
+  const errorSummaryRef = useRef(null);
+
+  useEffect(() => {
+    if (totalErrores > 0 && errorSummaryRef.current) {
+      errorSummaryRef.current.focus();
+    }
+  }, [totalErrores]);
 
   return (
     <form className="postulante-formulario" onSubmit={onSubmit} noValidate>
       {totalErrores > 0 && (
-        <Alerta tono="peligro" role="alert">
+        <Alerta
+          tono="peligro"
+          role="alert"
+          tabIndex={-1}
+          ref={errorSummaryRef}
+        >
           El formulario contiene {totalErrores} campo(s) con error. Por favor revise los campos marcados.
         </Alerta>
       )}

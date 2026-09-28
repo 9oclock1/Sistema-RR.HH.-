@@ -38,6 +38,8 @@ const TEST_DOCUMENTS = [
   "76543210",
   "77112233",
   "88223344",
+  "33445566",
+  "22334455",
   "123",
 ];
 
@@ -149,7 +151,9 @@ async function ensureTestSeedData() {
       '${OPENING_EXPIRED}', '00000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001',
       'CONV-TEST-004', 'Convocatoria Vencida', 'Puesto con fecha límite expirada',
       1, 1.0, 'Licenciatura', ARRAY['QA', 'Testing'],
-      CURRENT_DATE - INTERVAL '30 days', CURRENT_DATE - INTERVAL '1 day', TRUE
+      (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date - INTERVAL '30 days',
+      (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date - INTERVAL '2 days',
+      TRUE
     )
     ON CONFLICT (id_convocatoria) DO UPDATE SET
       esta_activa = EXCLUDED.esta_activa,
@@ -919,6 +923,173 @@ async function runTestSuite() {
     "4.6 Querying with invalid UUID string returns HTTP 400 cleanly",
     pass4_6,
     res4_6
+  );
+
+  // --- REGRESSION & REVIEW CRITERIA TESTS ---
+  console.log("\n--- REGRESSION & REVIEW CRITERIA TESTS ---");
+
+  // Test 5.1: Concurrency - 20 simultaneous requests with SAME document number and DIFFERENT emails
+  const concurrentDoc = "33445566";
+  const concurrentPromises = [];
+  for (let i = 1; i <= 20; i++) {
+    concurrentPromises.push(
+      apiRequest("/applicants/register", {
+        method: "POST",
+        body: JSON.stringify({
+          id_convocatoria: OPENING_ACTIVE_1,
+          numero_documento: concurrentDoc,
+          nombres: `Postulante Concurrente ${i}`,
+          apellidos: `Apellido ${i}`,
+          correo_electronico: `concurrente_${i}@testempresa.com`,
+          telefono_contacto: `700000${i.toString().padStart(2, "0")}`,
+        }),
+      })
+    );
+  }
+
+  const concurrentResults = await Promise.all(concurrentPromises);
+  const status201Count = concurrentResults.filter((r) => r.status === 201).length;
+  const status409Count = concurrentResults.filter((r) => r.status === 409).length;
+
+  const dbApplicants = await pool.query(
+    `SELECT count(*) FROM POSTULANTES WHERE numero_documento = $1;`,
+    [concurrentDoc]
+  );
+  const dbApplications = await pool.query(
+    `SELECT count(*) FROM POSTULACIONES WHERE id_convocatoria = $1 AND id_postulante IN (
+       SELECT id_postulante FROM POSTULANTES WHERE numero_documento = $2
+     );`,
+    [OPENING_ACTIVE_1, concurrentDoc]
+  );
+
+  const pass5_1 =
+    status201Count === 1 &&
+    status409Count === 19 &&
+    parseInt(dbApplicants.rows[0].count, 10) === 1 &&
+    parseInt(dbApplications.rows[0].count, 10) === 1;
+
+  recordResult(
+    "Regression (Concurrency)",
+    "5.1 20 concurrent requests with same ID create exactly 1 applicant & 1 application (no duplicates)",
+    pass5_1,
+    { status201Count, status409Count, dbApplicants: dbApplicants.rows[0].count, dbApplications: dbApplications.rows[0].count }
+  );
+
+  // Test 5.2: Re-applying with same document number to another opening does NOT overwrite existing person
+  const originalPerson = {
+    id_convocatoria: OPENING_ACTIVE_1,
+    numero_documento: "22334455",
+    nombres: "Carlos Original",
+    apellidos: "Condori Original",
+    correo_electronico: "carlos.original@testempresa.com",
+    telefono_contacto: "71234567",
+  };
+  await apiRequest("/applicants/register", {
+    method: "POST",
+    body: JSON.stringify(originalPerson),
+  });
+
+  // Re-apply to second opening with different name/email under same document
+  const reApplyPerson = {
+    id_convocatoria: OPENING_ACTIVE_2,
+    numero_documento: "22334455",
+    nombres: "Carlos Modificado",
+    apellidos: "Condori Modificado",
+    correo_electronico: "carlos.nuevo@testempresa.com",
+    telefono_contacto: "79876543",
+  };
+  const res5_2 = await apiRequest("/applicants/register", {
+    method: "POST",
+    body: JSON.stringify(reApplyPerson),
+  });
+
+  const checkPersonDb = await pool.query(
+    `SELECT nombres, apellidos, correo_electronico, telefono_contacto FROM POSTULANTES WHERE numero_documento = '22334455';`
+  );
+
+  const pass5_2 =
+    res5_2.status === 201 &&
+    checkPersonDb.rows[0]?.nombres === "Carlos Original" &&
+    checkPersonDb.rows[0]?.apellidos === "Condori Original" &&
+    checkPersonDb.rows[0]?.correo_electronico === "carlos.original@testempresa.com";
+
+  recordResult(
+    "Regression (Data Preservation)",
+    "5.2 Re-applying does NOT overwrite the existing person's canonical profile",
+    pass5_2,
+    checkPersonDb.rows[0]
+  );
+
+  // Test 5.3: Validly formatted phone number over 20 chars returns 400 Bad Request, not 500
+  const longPhoneApplicant = {
+    id_convocatoria: OPENING_ACTIVE_1,
+    numero_documento: "76543210",
+    nombres: "Pedro",
+    apellidos: "Gómez",
+    correo_electronico: "pedro.longphone@testempresa.com",
+    telefono_contacto: "+591 (2) 12345678-90123", // 24 chars, valid phone format but > 20 chars
+  };
+  const res5_3 = await apiRequest("/applicants/register", {
+    method: "POST",
+    body: JSON.stringify(longPhoneApplicant),
+  });
+
+  const pass5_3 =
+    res5_3.status === 400 &&
+    res5_3.body?.success === false &&
+    Array.isArray(res5_3.body?.detalles) &&
+    res5_3.body.detalles.some((d) => d.field === "telefono_contacto" || d.campo === "telefono_contacto");
+
+  recordResult(
+    "Regression (Phone Validation)",
+    "5.3 Phone number over 20 characters returns HTTP 400 with detalles (not 500)",
+    pass5_3,
+    res5_3
+  );
+
+  // Test 5.4: 400 response provides 'detalles' array for server-side field errors
+  const res5_4 = await apiRequest("/applicants/register", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  const pass5_4 =
+    res5_4.status === 400 &&
+    Array.isArray(res5_4.body?.detalles) &&
+    res5_4.body.detalles.length > 0;
+
+  recordResult(
+    "Regression (API Contract)",
+    "5.4 Server 400 response includes detalles array matching UI form expectation",
+    pass5_4,
+    { hasDetalles: Array.isArray(res5_4.body?.detalles), count: res5_4.body?.detalles?.length }
+  );
+
+  // Test 5.5: 404 for missing opening has 'error' field
+  const res5_5 = await apiRequest(`/applicants/by-opening/${NON_EXISTENT_UUID}`);
+  const pass5_5 =
+    res5_5.status === 404 &&
+    Boolean(res5_5.body?.error);
+
+  recordResult(
+    "Regression (API Contract)",
+    "5.5 404 response for missing opening includes error field",
+    pass5_5,
+    res5_5
+  );
+
+  // Test 5.6: Unknown routes return JSON 404 instead of Express HTML 404
+  const res5_6 = await apiRequest(`/route-that-does-not-exist-at-all`);
+  const pass5_6 =
+    res5_6.status === 404 &&
+    res5_6.body !== null &&
+    typeof res5_6.body === "object" &&
+    res5_6.body?.error === "Ruta no encontrada.";
+
+  recordResult(
+    "Regression (Route Handling)",
+    "5.6 Unknown routes return JSON 404 instead of Express default HTML",
+    pass5_6,
+    res5_6
   );
 
   // ============================================================================

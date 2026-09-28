@@ -162,6 +162,12 @@ function validateApplicantRegistration(req, res, next) {
         label: "Teléfono de contacto",
         message: "El teléfono de contacto es obligatorio.",
       });
+    } else if (val.length > 20) {
+      errors.push({
+        field: "telefono_contacto",
+        label: "Teléfono de contacto",
+        message: "El teléfono de contacto no debe exceder 20 caracteres.",
+      });
     } else {
       // Strip common formatting (spaces, dashes, plus, parens)
       const digits = val.replace(/[\s\-+()]/g, "");
@@ -218,6 +224,12 @@ function validateApplicantRegistration(req, res, next) {
       message: errorMsg,
       error: errorMsg,
       errors,
+      detalles: errors.map((e) => ({
+        campo: e.field,
+        mensaje: e.message,
+        field: e.field,
+        message: e.message,
+      })),
       errores: errors.map((e) => ({ campo: e.field, mensaje: e.message })),
       campos_faltantes: errors.map((e) => e.field),
     });

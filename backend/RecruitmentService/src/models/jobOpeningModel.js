@@ -25,7 +25,7 @@ async function findAllActive(dbClient = pool) {
       esta_activa
     FROM CONVOCATORIAS
     WHERE esta_activa = TRUE
-      AND (fecha_limite_postulacion IS NULL OR fecha_limite_postulacion >= CURRENT_DATE)
+      AND (fecha_limite_postulacion IS NULL OR fecha_limite_postulacion >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date)
     ORDER BY fecha_publicacion DESC;
   `;
   const result = await dbClient.query(query);
@@ -44,7 +44,7 @@ async function findById(id_convocatoria, dbClient = pool) {
     SELECT 
       *,
       (CASE 
-        WHEN esta_activa = TRUE AND (fecha_limite_postulacion IS NULL OR fecha_limite_postulacion >= CURRENT_DATE) THEN TRUE 
+        WHEN esta_activa = TRUE AND (fecha_limite_postulacion IS NULL OR fecha_limite_postulacion >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date) THEN TRUE 
         ELSE FALSE 
       END) AS acepta_postulaciones
     FROM CONVOCATORIAS 

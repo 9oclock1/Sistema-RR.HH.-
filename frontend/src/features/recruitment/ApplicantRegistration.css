@@ -126,6 +126,15 @@
   white-space: nowrap;
 }
 
+/* Prevenir colapso de columnas bajo 1024px con table-layout: fixed */
+.postulantes-tabla {
+  width: 100%;
+}
+
+.postulantes-tabla .ds-tabla {
+  min-width: 900px;
+}
+
 /* Responsividad */
 @media (max-width: 640px) {
   .postulantes-selector-fila {
