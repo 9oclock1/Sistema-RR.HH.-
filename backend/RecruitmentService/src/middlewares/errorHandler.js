@@ -25,9 +25,12 @@ export const errorHandler = (err, req, res, next) => {
     });
   }
 
-  return res.status(500).json({
+  const statusCode = err.statusCode || err.status || 500;
+  return res.status(statusCode).json({
     success: false,
-    error: "INTERNAL_SERVER_ERROR",
+    error:
+      err.code ||
+      (statusCode === 500 ? "INTERNAL_SERVER_ERROR" : "ERROR_SOLICITUD"),
     message: err.message || "Error interno del servidor.",
   });
 };
