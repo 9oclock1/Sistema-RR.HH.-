@@ -3,6 +3,7 @@ import cors from "cors";
 import { pool } from "./src/config/dbConfig.js";
 import cvTestRoutes from "./src/routes/cvTestRoutes.js";
 import postulacionRoutes from "./src/routes/postulacionRoutes.js";
+import convocatoriaRoutes from "./src/routes/convocatoriaRoutes.js";
 import { errorHandler } from "./src/middlewares/errorHandler.js";
 
 const app = express();
@@ -18,6 +19,7 @@ app.get("/", (req, res) => {
 
 // endpoints funcionalidades
 app.use("/cv", cvTestRoutes);
+app.use("/convocatorias", convocatoriaRoutes);
 app.use("/postulaciones", postulacionRoutes);
 
 app.get("/health", async (req, res) => {
