@@ -31,7 +31,7 @@ export default function OrganigramaNodo({ nodo, nodoSeleccionado, onSeleccionar 
         {tieneHijos && (
           <button
             type="button"
-            className="organigrama__toggle"
+            className="ui-icon-btn organigrama__toggle"
             aria-label={expandido ? 'Contraer rama' : 'Expandir rama'}
             aria-expanded={expandido}
             onClick={(e) => {
@@ -44,7 +44,7 @@ export default function OrganigramaNodo({ nodo, nodoSeleccionado, onSeleccionar 
         )}
         <span className="organigrama__box-title">{nodo.cargo}</span>
         <span
-          className={`organigrama__box-holder${total === 0 ? ' organigrama__box-holder--vacant' : ''}`}
+          className={total === 0 ? 'ui-muted' : 'ui-table__sub'}
         >
           {ocupante}
         </span>
