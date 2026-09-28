@@ -8,4 +8,10 @@ router.post("/", cvUpload.single("cv"), PostulacionController.crear);
 
 router.get("/:idPostulacion/cv", PostulacionController.obtenerCv);
 
+router.patch(
+  "/:idPostulacion/cv",
+  cvUpload.single("cv"),
+  PostulacionController.adjuntarCv,
+);
+
 export default router;

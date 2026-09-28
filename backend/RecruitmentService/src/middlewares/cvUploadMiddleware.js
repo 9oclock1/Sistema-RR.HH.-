@@ -6,7 +6,6 @@ const MAX_SIZE_BYTES =
 const ALLOWED_MIME_TYPES = [
   "application/pdf", // pdf
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // docx
-  "application/msword", // doc
 ];
 
 const storage = multer.memoryStorage();

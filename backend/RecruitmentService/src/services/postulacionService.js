@@ -88,4 +88,46 @@ export const PostulacionService = {
       downloadFileName: nombreDescarga,
     };
   },
+
+  async vincularCvAPostulacion({ idPostulacion, file }) {
+    if (!idPostulacion) {
+      const error = new Error("El id_postulacion es obligatorio.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (!file) {
+      const error = new Error("Es obligatorio adjuntar el archivo de CV.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const postulacionExistente =
+      await PostulacionModel.obtenerPorId(idPostulacion);
+    if (!postulacionExistente) {
+      const error = new Error(
+        "No se encontró la postulación asociada para vincular el documento.",
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Guardar archivo físico o en S3
+    const fileExtension = file.originalname.split(".").pop();
+    const uniqueFileName = `${idPostulacion}-cv.${fileExtension}`;
+    const storageResult = await saveFile(file, uniqueFileName);
+
+    const postulacionActualizada = await PostulacionModel.adjuntarCv(
+      idPostulacion,
+      {
+        cvArchivoUrl: storageResult.url,
+        cvFormatoMimetype: file.mimetype,
+      },
+    );
+
+    return {
+      postulacion: postulacionActualizada,
+      archivo: storageResult,
+    };
+  },
 };

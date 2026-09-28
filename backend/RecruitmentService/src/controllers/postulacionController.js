@@ -49,4 +49,24 @@ export const PostulacionController = {
       next(error);
     }
   },
+
+  async adjuntarCv(req, res, next) {
+    try {
+      const { idPostulacion } = req.params;
+      const file = req.file;
+
+      const resultado = await PostulacionService.vincularCvAPostulacion({
+        idPostulacion,
+        file,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "CV adjuntado y vinculado exitosamente a la postulación.",
+        data: resultado,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 };

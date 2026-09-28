@@ -69,4 +69,23 @@ export const PostulacionModel = {
     const { rows } = await pool.query(query, [idPostulacion]);
     return rows[0] || null;
   },
+
+  // Actualizar el archivo CV de una postulación existente
+  async adjuntarCv(idPostulacion, { cvArchivoUrl, cvFormatoMimetype }) {
+    const query = `
+    UPDATE POSTULACIONES 
+    SET 
+      cv_archivo_url = $1,
+      cv_formato_mimetype = $2,
+      actualizado_en = CURRENT_TIMESTAMP
+    WHERE id_postulacion = $3
+    RETURNING *;
+  `;
+    const { rows } = await pool.query(query, [
+      cvArchivoUrl,
+      cvFormatoMimetype,
+      idPostulacion,
+    ]);
+    return rows[0] || null;
+  },
 };

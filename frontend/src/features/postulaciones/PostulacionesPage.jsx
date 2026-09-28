@@ -59,8 +59,9 @@ export default function PostulacionesPage() {
 
   const convocatoriaActual = convocatorias.find((c) => c.id_convocatoria === convocatoriaId);
   const postulanteActual = postulantes.find((p) => p.id_postulante === postulanteId);
-  const tieneCvCargado = Boolean(postulanteActual?.id_postulacion);
+  const tieneCvCargado = Boolean(postulanteActual?.cv_archivo_url);
   const esPdf = postulanteActual?.cv_formato_mimetype?.includes("pdf");
+  
 
   const opcionesConvocatoria = convocatorias.map((c) => ({
     valor: c.id_convocatoria,
@@ -69,7 +70,7 @@ export default function PostulacionesPage() {
 
   const opcionesPostulante = postulantes.map((p) => ({
     valor: p.id_postulante,
-    etiqueta: `${p.apellidos}, ${p.nombres} ${p.id_postulacion ? "(CV Adjuntado)" : "(Pendiente de CV)"}`,
+    etiqueta: `${p.apellidos}, ${p.nombres} ${p.cv_archivo_url ? "(CV Adjuntado)" : "(Pendiente de CV)"}`,  
   }));
 
   return (
@@ -198,16 +199,10 @@ export default function PostulacionesPage() {
               ) : (
                 <Tarjeta titulo="Carga de Hoja de Vida" nivelTitulo={3}>
                   <CvUploadForm
-                    idConvocatoria={convocatoriaId}
-                    idPostulante={postulanteId}
+                    idPostulacion={postulanteActual.id_postulacion}
                     tituloConvocatoria={convocatoriaActual?.titulo_puesto}
                     alCompletar={() => {
                       cargarPostulantes();
-                      avisar({
-                        tono: "exito",
-                        titulo: "CV Registrado",
-                        mensaje: "El documento se vinculó correctamente al candidato.",
-                      });
                     }}
                   />
                 </Tarjeta>

@@ -1,12 +1,12 @@
 import { useCvUpload } from "../../../hooks/useCvUpload";
 import FileInput from "../../../components/common/FileInput";
 import { Boton, Alerta, useAvisos } from "../../../components/ui";
+import { postulacionApi } from "../../../api/postulacion";
 import { Send } from "lucide-react";
 import "./CvUploadForm.css";
 
 export default function CvUploadForm({
-  idConvocatoria,
-  idPostulante,
+  idPostulacion,
   tituloConvocatoria = "Vacante seleccionada",
   alCompletar,
 }) {
@@ -15,12 +15,10 @@ export default function CvUploadForm({
   const manejarExito = (resultado) => {
     avisar({
       tono: "exito",
-      titulo: "Postulación completada",
-      mensaje: "Su currículum vitae ha sido adjuntado y registrado exitosamente.",
+      titulo: "CV adjuntado con éxito",
+      mensaje: "El documento se vinculó correctamente a la postulación del candidato.",
     });
-    if (alCompletar) {
-      alCompletar(resultado);
-    }
+    if (alCompletar) alCompletar(resultado);
   };
 
   const {
@@ -31,17 +29,18 @@ export default function CvUploadForm({
     formatosPermitidos,
     seleccionarArchivo,
     removerArchivo,
-    enviarPostulacion,
     setErrorEnvio,
-  } = useCvUpload({
-    idConvocatoria,
-    idPostulante,
-    onExito: manejarExito,
-  });
+  } = useCvUpload();
 
   const alEnviar = async (e) => {
     e.preventDefault();
-    await enviarPostulacion();
+    if (!archivo) return;
+    try {
+      const resultado = await postulacionApi.adjuntarCvAPostulacion(idPostulacion, archivo);
+      manejarExito(resultado);
+    } catch (err) {
+      setErrorEnvio(err.message || "Error al subir el CV.");
+    }
   };
 
   return (

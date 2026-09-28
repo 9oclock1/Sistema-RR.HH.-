@@ -6,6 +6,7 @@ import app from "../app.js";
 describe("RF-10: Carga digital y almacenamiento de CV", () => {
   const ID_CONVOCATORIA_TEST = "11111111-1111-7111-8111-111111111111";
   const ID_POSTULANTE_TEST = "33333333-3333-7333-8333-333333333333";
+  const ID_POSTULACION_SIN_CV = "02b1f667-82ac-86f1-c8e9-4aff2dcf170c";
 
   // formatos invalidos
   it("Debe rechazar archivos con formato no permitido (.txt)", async () => {
@@ -64,5 +65,19 @@ describe("RF-10: Carga digital y almacenamiento de CV", () => {
 
     assert.equal(res.status, 400);
     assert.match(res.body.message, /obligatorio adjuntar el archivo/);
+  });
+
+  // formatos invalidos, pero solo actualizamos el apartado de CV en postulaciones
+  it("Debe rechazar archivos con formato no permitido (.txt)", async () => {
+    const bufferTxt = Buffer.from("Texto plano");
+    const res = await request(app)
+      .patch(`/postulaciones/${ID_POSTULACION_SIN_CV}/cv`)
+      .attach("cv", bufferTxt, {
+        filename: "cv_invalido.txt",
+        contentType: "text/plain",
+      });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, "INVALID_FILE_TYPE");
   });
 });

@@ -66,6 +66,8 @@ export const cliente = {
     solicitar(ruta, { ...opciones, metodo: "PUT", cuerpo }),
   delete: (ruta, opciones) =>
     solicitar(ruta, { ...opciones, metodo: "DELETE" }),
+  patch: (ruta, cuerpo, opciones) =>
+    solicitar(ruta, { ...opciones, metodo: "PATCH", cuerpo }),
 };
 
 export default cliente;

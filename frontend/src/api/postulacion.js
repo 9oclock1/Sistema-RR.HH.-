@@ -63,4 +63,14 @@ export const postulacionApi = {
     link.remove();
     window.URL.revokeObjectURL(blobUrl);
   },
+
+  async adjuntarCvAPostulacion(idPostulacion, archivoCv) {
+    const formData = new FormData();
+    formData.append("cv", archivoCv);
+
+    return await cliente.patch(
+      `${BASE_RECRUITMENT}/postulaciones/${idPostulacion}/cv`,
+      formData,
+    );
+  },
 };
