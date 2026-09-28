@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { Briefcase, UserCheck } from "lucide-react";
+import { UserCheck, FileCheck } from "lucide-react";
 import { EncabezadoPagina, Tarjeta } from "../../components/ui";
 import CvUploadForm from "./components/CvUploadForm";
+import CvViewer from "./components/CvViewer";
 import "./PostulacionesPage.css";
 
-// Datos de prueba correspondientes al seed_test_data.sql
 const VACANTE_DEMO = {
   idConvocatoria: "11111111-1111-7111-8111-111111111111",
   titulo: "Desarrollador Full Stack Jr.",
@@ -20,7 +20,7 @@ const POSTULANTE_DEMO = {
 };
 
 export default function PostulacionesPage() {
-  const [postulacionExitosa, setPostulacionExitosa] = useState(null);
+  const [postulacionRegistrada, setPostulacionRegistrada] = useState(null);
 
   return (
     <div className="postulaciones-page">
@@ -32,30 +32,50 @@ export default function PostulacionesPage() {
       />
 
       <div className="postulaciones-page__contenido">
-        <Tarjeta titulo="Información de la Vacante" nivelTitulo={3}>
-          <div className="postulaciones-vacante-info">
-            <p className="postulaciones-vacante-info__titulo">{VACANTE_DEMO.titulo}</p>
-            <p className="postulaciones-vacante-info__desc">{VACANTE_DEMO.descripcion}</p>
-            <div className="postulaciones-vacante-info__meta">
-              <span><strong>Candidato simulado:</strong> {POSTULANTE_DEMO.nombre}</span>
-              <span><strong>Email:</strong> {POSTULANTE_DEMO.correo}</span>
+        <div className="postulaciones-page__lateral">
+          <Tarjeta titulo="Detalles de la Vacante" nivelTitulo={3}>
+            <div className="postulaciones-vacante-info">
+              <p className="postulaciones-vacante-info__titulo">{VACANTE_DEMO.titulo}</p>
+              <p className="postulaciones-vacante-info__desc">{VACANTE_DEMO.descripcion}</p>
+              <div className="postulaciones-vacante-info__meta">
+                <span><strong>Postulante actual:</strong> {POSTULANTE_DEMO.nombre}</span>
+                <span><strong>Correo:</strong> {POSTULANTE_DEMO.correo}</span>
+              </div>
             </div>
-          </div>
-        </Tarjeta>
+          </Tarjeta>
 
-        <Tarjeta titulo="Formulario de Postulación Digital" nivelTitulo={3}>
+          {postulacionRegistrada && (
+            <Tarjeta titulo="Acciones de Reclutador" nivelTitulo={3} className="tarjeta-acciones-cv">
+              <div className="postulaciones-acciones-reclutador">
+                <div className="postulaciones-acciones-reclutador__info">
+                  <FileCheck className="ds-icono" aria-hidden="true" />
+                  <span>Documento vinculado disponible</span>
+                </div>
+                <CvViewer
+                  idPostulacion={postulacionRegistrada.id_postulacion}
+                  nombreCandidato={POSTULANTE_DEMO.nombre}
+                  mimetype={postulacionRegistrada.cv_formato_mimetype}
+                />
+              </div>
+            </Tarjeta>
+          )}
+        </div>
+
+        <Tarjeta titulo="Carga de Currículum Vitae" nivelTitulo={3}>
           <CvUploadForm
             idConvocatoria={VACANTE_DEMO.idConvocatoria}
             idPostulante={POSTULANTE_DEMO.idPostulante}
             tituloConvocatoria={VACANTE_DEMO.titulo}
-            alCompletar={(resultado) => setPostulacionExitosa(resultado)}
+            alCompletar={(resultado) => {
+              setPostulacionRegistrada(resultado.data?.postulacion);
+            }}
           />
 
-          {postulacionExitosa && (
+          {postulacionRegistrada && (
             <div className="postulaciones-resultado-exito">
               <UserCheck className="ds-icono" aria-hidden="true" />
               <span>
-                Postulación registrada con ID: <code>{postulacionExitosa.data?.postulacion?.id_postulacion}</code>
+                Postulación confirmada con éxito. ID: <code>{postulacionRegistrada.id_postulacion}</code>
               </span>
             </div>
           )}

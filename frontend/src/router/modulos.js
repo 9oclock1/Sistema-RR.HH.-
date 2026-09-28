@@ -40,7 +40,7 @@ export const SECCIONES = [
         descripcion:
           "Recepción de hojas de vida, validación de formatos y registro de postulantes.",
         icono: FileUser,
-        roles: ["reclutador"], // El rol "reclutador" o "admin" podrá verlo automáticamente
+        roles: ["reclutador"],
         pagina: PostulacionesPage,
       },
     ],
