@@ -3,6 +3,18 @@ import cliente, { solicitar } from "./cliente";
 const BASE_RECRUITMENT = "/recr";
 
 export const postulacionApi = {
+  async obtenerConvocatorias() {
+    const res = await cliente.get(`${BASE_RECRUITMENT}/convocatorias`);
+    return res.data;
+  },
+
+  async obtenerPostulantesPorConvocatoria(idConvocatoria) {
+    const res = await cliente.get(
+      `${BASE_RECRUITMENT}/convocatorias/${idConvocatoria}/postulantes`,
+    );
+    return res.data;
+  },
+
   /**
    * Envía la postulación con el archivo CV adjunto (multipart/form-data)
    * @param {Object} params
