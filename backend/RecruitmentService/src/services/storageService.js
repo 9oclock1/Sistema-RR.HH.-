@@ -1,6 +1,10 @@
 import fs from "fs";
 import path from "path";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
 
 const storageDriver = process.env.STORAGE_DRIVER || "local";
 const uploadDir = path.resolve(
@@ -57,5 +61,36 @@ export const saveFile = async (file, customFileName) => {
     url: `/uploads/cvs/${fileName}`,
     path: filePath,
     mimetype: file.mimetype,
+  };
+};
+
+export const getFileDetails = async (fileUrl) => {
+  if (storageDriver === "s3") {
+    const bucket = process.env.OCI_S3_BUCKET_NAME;
+    const key = fileUrl.split(`${bucket}/`)[1];
+    const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+    const s3Item = await s3Client.send(command);
+
+    return {
+      type: "stream",
+      stream: s3Item.Body,
+      contentType: s3Item.ContentType,
+    };
+  }
+
+  const fileName = path.basename(fileUrl);
+  const localFilePath = path.join(uploadDir, fileName);
+
+  if (!fs.existsSync(localFilePath)) {
+    const error = new Error(
+      "El archivo físico del CV no fue encontrado en el servidor.",
+    );
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return {
+    type: "local",
+    filePath: localFilePath,
   };
 };

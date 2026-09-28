@@ -21,4 +21,32 @@ export const PostulacionController = {
       next(error);
     }
   },
+
+  async obtenerCv(req, res, next) {
+    try {
+      const { idPostulacion } = req.params;
+      const downloadMode = req.query.download === "true";
+
+      const { fileDetails, mimetype, downloadFileName } =
+        await PostulacionService.obtenerArchivoCv(idPostulacion);
+
+      // cabeceras HTTP
+      res.setHeader("Content-Type", mimetype);
+      const disposition = downloadMode ? "attachment" : "inline";
+      res.setHeader(
+        "Content-Disposition",
+        `${disposition}; filename="${downloadFileName}"`,
+      );
+
+      if (fileDetails.type === "local") {
+        return res.sendFile(fileDetails.filePath);
+      }
+
+      if (fileDetails.type === "stream") {
+        return fileDetails.stream.pipe(res);
+      }
+    } catch (error) {
+      next(error);
+    }
+  },
 };

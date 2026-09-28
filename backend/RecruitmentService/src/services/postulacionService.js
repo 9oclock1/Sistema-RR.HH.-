@@ -1,6 +1,6 @@
 import { v7 as uuidv7 } from "uuid";
 import { PostulacionModel } from "../models/postulacionModel.js";
-import { saveFile } from "./storageService.js";
+import { saveFile, getFileDetails } from "./storageService.js";
 
 export const PostulacionService = {
   async registrarPostulacionConCv({ idConvocatoria, idPostulante, file }) {
@@ -51,6 +51,41 @@ export const PostulacionService = {
     return {
       postulacion: nuevaPostulacion,
       archivo: storageResult,
+    };
+  },
+
+  async obtenerArchivoCv(idPostulacion) {
+    const postulacion = await PostulacionModel.obtenerPorId(idPostulacion);
+    if (!postulacion) {
+      const error = new Error("La postulación indicada no existe.");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (!postulacion.cv_archivo_url) {
+      const error = new Error(
+        "La postulación no cuenta con un documento de CV vinculado.",
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const fileDetails = await getFileDetails(postulacion.cv_archivo_url);
+
+    // extensión segun el mimetype
+    const extension = postulacion.cv_formato_mimetype.includes("pdf")
+      ? "pdf"
+      : "docx";
+    const nombreDescarga =
+      `CV_${postulacion.nombres}_${postulacion.apellidos}.${extension}`.replace(
+        /\s+/g,
+        "_",
+      );
+
+    return {
+      fileDetails,
+      mimetype: postulacion.cv_formato_mimetype,
+      downloadFileName: nombreDescarga,
     };
   },
 };

@@ -6,4 +6,6 @@ const router = Router();
 
 router.post("/", cvUpload.single("cv"), PostulacionController.crear);
 
+router.get("/:idPostulacion/cv", PostulacionController.obtenerCv);
+
 export default router;
