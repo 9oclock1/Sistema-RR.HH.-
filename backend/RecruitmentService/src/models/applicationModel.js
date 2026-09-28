@@ -18,13 +18,7 @@ const { v4: uuidv4 } = require("uuid");
  * @returns {Object} The created application row
  */
 async function createApplication(data, dbClient = pool) {
-  const {
-    id_convocatoria,
-    id_postulante,
-    id_etapa,
-    cv_archivo_url,
-    cv_formato_mimetype,
-  } = data;
+  const { id_convocatoria, id_postulante, id_etapa } = data;
 
   const id_postulacion = uuidv4();
 
@@ -33,21 +27,12 @@ async function createApplication(data, dbClient = pool) {
       id_postulacion,
       id_convocatoria,
       id_postulante,
-      id_etapa,
-      cv_archivo_url,
-      cv_formato_mimetype
-    ) VALUES ($1, $2, $3, $4, $5, $6)
+      id_etapa
+    ) VALUES ($1, $2, $3, $4)
     RETURNING *;
   `;
 
-  const values = [
-    id_postulacion,
-    id_convocatoria,
-    id_postulante,
-    id_etapa,
-    cv_archivo_url || "pending",
-    cv_formato_mimetype || "application/pdf",
-  ];
+  const values = [id_postulacion, id_convocatoria, id_postulante, id_etapa];
 
   const result = await dbClient.query(query, values);
   return result.rows[0];
@@ -64,7 +49,7 @@ async function createApplication(data, dbClient = pool) {
 async function findByConvocatoriaAndPostulante(
   id_convocatoria,
   id_postulante,
-  dbClient = pool
+  dbClient = pool,
 ) {
   const query = `
     SELECT p.*, pos.nombres, pos.apellidos, pos.numero_documento
