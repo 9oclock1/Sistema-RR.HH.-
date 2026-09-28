@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { IconoAlerta, IconoCheck, IconoCerrar } from '../../../components/Iconos';
+import { Alerta, Boton, Campo, CampoTexto, Modal, Selector } from '../../../components/ui';
 import { mapearErroresApi } from '../../../utils/erroresApi';
 import { useNivelesEducacion } from '../hooks/useNivelesEducacion';
 import { usePerfilCargo } from '../hooks/usePerfilCargo';
@@ -15,16 +15,17 @@ import {
   validarFormulario,
 } from '../utils/vacanteFormulario';
 import HabilidadesInput from './HabilidadesInput';
+import PerfilCargoPreview from './PerfilCargoPreview';
 
 // Valores de los campos del perfil en un formulario nuevo (experiencia arranca en '0').
 const PERFIL_VACIO = perfilAFormulario({});
-import PerfilCargoPreview from './PerfilCargoPreview';
+const PARA_PUBLICAR = 'Necesaria para publicar.';
 
-export default function VacanteForm({ convocatoria, cargos, errorCargos, cargandoCargos, aviso, onGuardar, onCancelar }) {
+export default function VacanteForm({ convocatoria, cargos, errorCargos, cargandoCargos, onGuardar, onCancelar }) {
   const esEdicion = Boolean(convocatoria);
   const uid = useId();
+  const idFormulario = `${uid}-formulario`;
   const idCampo = (campo) => `${uid}-${campo}`;
-  const idError = (campo) => `${uid}-${campo}-error`;
 
   const [valores, setValores] = useState(() =>
     convocatoria ? convocatoriaAFormulario(convocatoria) : formularioVacio()
@@ -122,96 +123,60 @@ export default function VacanteForm({ convocatoria, cargos, errorCargos, cargand
   const propsCampo = (campo) => ({
     id: idCampo(campo),
     ref: registrar(campo),
-    'aria-invalid': errores[campo] ? true : undefined,
-    'aria-describedby': errores[campo] ? idError(campo) : undefined,
+    error: errores[campo],
+    value: valores[campo],
+    onChange: (e) => actualizarCampo(campo, e.target.value),
   });
 
-  const mensajeError = (campo) =>
-    errores[campo] && (
-      <p id={idError(campo)} className="ui-field__error">
-        {errores[campo]}
-      </p>
-    );
-
-  const requerido = (
-    <span className="ui-field__required" aria-hidden="true">
-      *
-    </span>
-  );
-  const paraPublicar = <span className="ui-field__optional">· para publicar</span>;
-
   return (
-    <form
-      className={`ui-card ui-form${esEdicion ? ' is-editing' : ''}`}
-      onSubmit={manejarSubmit}
-      noValidate
-      aria-labelledby={idCampo('titulo')}
+    <Modal
+      abierto
+      titulo={esEdicion ? `Editar borrador ${convocatoria.codigo_convocatoria}` : 'Nueva vacante'}
+      onCerrar={onCancelar}
+      bloqueado={guardando}
+      pie={
+        <>
+          <Boton variante="sutil" onClick={onCancelar} disabled={guardando}>
+            Cancelar
+          </Boton>
+          <Boton variante="primario" type="submit" form={idFormulario} cargando={guardando}>
+            {guardando ? 'Guardando…' : esEdicion ? 'Guardar cambios' : 'Guardar borrador'}
+          </Boton>
+        </>
+      }
     >
-      <header className="ui-card__header">
-        <div>
-          <h3 id={idCampo('titulo')} className="ui-card__title">
-            {esEdicion ? 'Editar borrador' : 'Nueva vacante'}
-          </h3>
-          <p className="ui-card__subtitle">
-            {esEdicion
-              ? `${convocatoria.codigo_convocatoria} · ${convocatoria.titulo_puesto}`
-              : 'Elige un cargo para precargar su perfil y completa los requisitos.'}
-          </p>
-        </div>
-        {esEdicion && (
-          <button type="button" className="ui-icon-btn" onClick={onCancelar} aria-label="Cerrar borrador" title="Nueva vacante">
-            <IconoCerrar />
-          </button>
+      <form id={idFormulario} className="vacante-form" onSubmit={manejarSubmit} noValidate>
+        {!esEdicion && <p>Elige un cargo para precargar su perfil y completa los requisitos.</p>}
+
+        {errorGeneral && (
+          <Alerta tono="peligro" role="alert" titulo="No se pudo guardar el borrador">
+            {errorGeneral}
+          </Alerta>
         )}
-      </header>
+        {esEdicion && (
+          <Alerta tono={pendientes.length > 0 ? 'aviso' : 'exito'} role="status">
+            {pendientes.length > 0
+              ? `Para publicar falta: ${pendientes.map((c) => ETIQUETAS_CAMPO[c] ?? c).join(', ')}.`
+              : 'Listo para publicar.'}
+          </Alerta>
+        )}
 
-      {aviso && (
-        <div className="ui-alert ui-alert--success" role="status">
-          <IconoCheck /> <span>{aviso}</span>
-        </div>
-      )}
-      {errorGeneral && (
-        <div className="ui-alert ui-alert--error" role="alert">
-          <IconoAlerta /> <span>{errorGeneral}</span>
-        </div>
-      )}
-      {esEdicion && (
-        <div className={`vacantes-pendientes${pendientes.length === 0 ? ' is-listo' : ''}`} role="note">
-          {pendientes.length === 0 ? <IconoCheck size={14} /> : <IconoAlerta size={14} />}
-          <span>
-            {pendientes.length === 0
-              ? 'Listo para publicar.'
-              : `Para publicar falta: ${pendientes.map((c) => ETIQUETAS_CAMPO[c] ?? c).join(', ')}.`}
-          </span>
-        </div>
-      )}
-
-      <div className="ui-form__body">
-        <div className="ui-field">
-          <label htmlFor={idCampo('id_cargo_referencial')} className="ui-field__label">
-            Cargo {requerido}
-          </label>
-          <select
-            className="ui-input ui-select"
-            value={valores.id_cargo_referencial}
-            required
-            disabled={cargandoCargos}
-            onChange={(e) => seleccionarCargo(e.target.value)}
+        <div className="vacante-form__cargo">
+          <Selector
             {...propsCampo('id_cargo_referencial')}
+            onChange={(e) => seleccionarCargo(e.target.value)}
+            etiqueta="Cargo"
+            requerido
+            disabled={cargandoCargos}
+            textoVacio={cargandoCargos ? 'Cargando…' : 'Selecciona un cargo'}
+            opciones={cargos.map((c) => ({ valor: c.id_cargo, etiqueta: `${c.nombre} · ${c.departamento}` }))}
+            ayuda={errorCargos && !errores.id_cargo_referencial ? 'No se pudieron cargar los cargos.' : undefined}
+            data-autofocus
           >
-            <option value="">{cargandoCargos ? 'Cargando…' : 'Selecciona un cargo'}</option>
-            {cargos.map((c) => (
-              <option key={c.id_cargo} value={c.id_cargo}>
-                {c.nombre} · {c.departamento}
-              </option>
-            ))}
             {cargoFaltante && (
               <option value={valores.id_cargo_referencial}>{perfil.datos?.cargo.nombre ?? 'Cargo inactivo'}</option>
             )}
-          </select>
-          {errores.id_cargo_referencial
-            ? mensajeError('id_cargo_referencial')
-            : errorCargos && <p className="ui-field__hint is-warning">No se pudieron cargar los cargos.</p>}
+          </Selector>
           <PerfilCargoPreview
             cargando={perfil.cargando}
             datos={perfil.datos}
@@ -220,161 +185,88 @@ export default function VacanteForm({ convocatoria, cargos, errorCargos, cargand
           />
         </div>
 
-        <div className="ui-field">
-          <label htmlFor={idCampo('titulo_puesto')} className="ui-field__label">
-            Título del puesto {requerido}
-          </label>
-          <input
-            type="text"
-            className="ui-input"
-            value={valores.titulo_puesto}
-            maxLength={120}
-            placeholder="Se precarga con el nombre del cargo"
-            required
-            onChange={(e) => actualizarCampo('titulo_puesto', e.target.value)}
-            {...propsCampo('titulo_puesto')}
-          />
-          {mensajeError('titulo_puesto')}
-        </div>
+        <CampoTexto
+          {...propsCampo('titulo_puesto')}
+          etiqueta="Título del puesto"
+          requerido
+          maxLength={120}
+          placeholder="Se precarga con el nombre del cargo"
+        />
 
-        <div className="ui-field">
-          <label htmlFor={idCampo('descripcion_puesto')} className="ui-field__label">
-            Descripción {paraPublicar}
-          </label>
-          <textarea
-            className="ui-input ui-textarea"
-            rows={5}
-            value={valores.descripcion_puesto}
-            placeholder="Funciones y requisitos del puesto"
-            onChange={(e) => actualizarCampo('descripcion_puesto', e.target.value)}
-            {...propsCampo('descripcion_puesto')}
-          />
-          {mensajeError('descripcion_puesto')}
-        </div>
-
-        <div className="ui-form__row">
-          <div className="ui-field">
-            <label htmlFor={idCampo('nivel_educacion_min')} className="ui-field__label">
-              Formación mínima
-            </label>
-            <select
-              className="ui-input ui-select"
-              value={valores.nivel_educacion_min}
-              disabled={niveles.cargando}
-              onChange={(e) => actualizarCampo('nivel_educacion_min', e.target.value)}
-              {...propsCampo('nivel_educacion_min')}
-            >
-              <option value="">{niveles.cargando ? 'Cargando…' : 'Sin definir'}</option>
-              {niveles.niveles.map((n) => (
-                <option key={n.codigo} value={n.codigo}>
-                  {n.nombre}
-                </option>
-              ))}
-            </select>
-            {errores.nivel_educacion_min ? (
-              mensajeError('nivel_educacion_min')
-            ) : niveles.error ? (
-              <p className="ui-field__hint is-warning">No se pudieron cargar los niveles.</p>
-            ) : (
-              <p className="ui-field__hint">Necesaria para publicar.</p>
-            )}
-          </div>
-
-          <div className="ui-field">
-            <label htmlFor={idCampo('year_experiencia_min')} className="ui-field__label">
-              Experiencia {requerido}
-            </label>
-            <input
-              type="number"
-              className="ui-input"
-              value={valores.year_experiencia_min}
-              min={0}
-              max={999.9}
-              step={0.5}
-              required
-              onChange={(e) => actualizarCampo('year_experiencia_min', e.target.value)}
-              {...propsCampo('year_experiencia_min')}
+        <Campo id={idCampo('descripcion_puesto')} etiqueta="Descripción" ayuda={PARA_PUBLICAR} error={errores.descripcion_puesto}>
+          {(atributos) => (
+            <textarea
+              className="ds-control vacante-form__textarea"
+              rows={5}
+              ref={registrar('descripcion_puesto')}
+              value={valores.descripcion_puesto}
+              placeholder="Funciones y requisitos del puesto"
+              onChange={(e) => actualizarCampo('descripcion_puesto', e.target.value)}
+              {...atributos}
             />
-            {errores.year_experiencia_min ? mensajeError('year_experiencia_min') : <p className="ui-field__hint">Años mínimos.</p>}
-          </div>
-        </div>
+          )}
+        </Campo>
 
-        <div className="ui-form__row">
-          <div className="ui-field">
-            <label htmlFor={idCampo('cantidad_vacantes')} className="ui-field__label">
-              Vacantes {requerido}
-            </label>
-            <input
-              type="number"
-              className="ui-input"
-              value={valores.cantidad_vacantes}
-              min={1}
-              step={1}
-              required
-              onChange={(e) => actualizarCampo('cantidad_vacantes', e.target.value)}
-              {...propsCampo('cantidad_vacantes')}
-            />
-            {mensajeError('cantidad_vacantes')}
-          </div>
-
-          <div className="ui-field">
-            <label htmlFor={idCampo('fecha_limite_postulacion')} className="ui-field__label">
-              Fecha límite
-            </label>
-            <input
-              type="date"
-              className="ui-input"
-              value={valores.fecha_limite_postulacion}
-              min={hoyLocal()}
-              onChange={(e) => actualizarCampo('fecha_limite_postulacion', e.target.value)}
-              {...propsCampo('fecha_limite_postulacion')}
-            />
-            {errores.fecha_limite_postulacion ? (
-              mensajeError('fecha_limite_postulacion')
-            ) : (
-              <p className="ui-field__hint">Necesaria para publicar.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="ui-field">
-          <label htmlFor={idCampo('id_sucursal_destino')} className="ui-field__label">
-            Sucursal de destino {requerido}
-          </label>
-          {/* EmployeeService aún no expone el catálogo de sucursales: cuando exista, esto pasa a ser un <select>. */}
-          <input
-            type="text"
-            className="ui-input vacantes-uuid"
-            value={valores.id_sucursal_destino}
-            placeholder="ID de la sucursal (UUID)"
-            spellCheck={false}
-            autoComplete="off"
-            required
-            onChange={(e) => actualizarCampo('id_sucursal_destino', e.target.value)}
-            {...propsCampo('id_sucursal_destino')}
+        <div className="vacante-form__fila">
+          <Selector
+            {...propsCampo('nivel_educacion_min')}
+            etiqueta="Formación mínima"
+            disabled={niveles.cargando}
+            textoVacio={niveles.cargando ? 'Cargando…' : 'Sin definir'}
+            opciones={niveles.niveles.map((n) => ({ valor: n.codigo, etiqueta: n.nombre }))}
+            ayuda={niveles.error ? 'No se pudieron cargar los niveles.' : PARA_PUBLICAR}
           />
-          {mensajeError('id_sucursal_destino')}
+          <CampoTexto
+            {...propsCampo('year_experiencia_min')}
+            type="number"
+            inputMode="decimal"
+            etiqueta="Experiencia mínima"
+            requerido
+            min={0}
+            max={999.9}
+            step={0.5}
+            ayuda="En años, hasta un decimal."
+          />
         </div>
+
+        <div className="vacante-form__fila">
+          <CampoTexto
+            {...propsCampo('cantidad_vacantes')}
+            type="number"
+            inputMode="numeric"
+            etiqueta="Vacantes"
+            requerido
+            min={1}
+            step={1}
+          />
+          <CampoTexto
+            {...propsCampo('fecha_limite_postulacion')}
+            type="date"
+            etiqueta="Fecha límite"
+            min={hoyLocal()}
+            ayuda={PARA_PUBLICAR}
+          />
+        </div>
+
+        {/* EmployeeService aún no expone el catálogo de sucursales: cuando exista, esto pasa a ser un Selector. */}
+        <CampoTexto
+          {...propsCampo('id_sucursal_destino')}
+          className="vacante-form__uuid"
+          etiqueta="Sucursal de destino"
+          requerido
+          placeholder="ID de la sucursal (UUID)"
+          spellCheck={false}
+          autoComplete="off"
+        />
 
         <HabilidadesInput
+          id={idCampo('habilidades_clave_requeridas')}
           habilidades={valores.habilidades_clave_requeridas}
           onChange={(habilidades) => actualizarCampo('habilidades_clave_requeridas', habilidades)}
           error={errores.habilidades_clave_requeridas}
-          errorId={idError('habilidades_clave_requeridas')}
-          etiquetaExtra={paraPublicar}
+          ayuda={PARA_PUBLICAR}
         />
-      </div>
-
-      <footer className="ui-form__footer">
-        {esEdicion && (
-          <button type="button" className="ui-btn ui-btn--ghost" onClick={onCancelar} disabled={guardando}>
-            Cancelar
-          </button>
-        )}
-        <button type="submit" className="ui-btn ui-btn--primary" disabled={guardando}>
-          {guardando ? 'Guardando…' : esEdicion ? 'Guardar cambios' : 'Guardar borrador'}
-        </button>
-      </footer>
-    </form>
+      </form>
+    </Modal>
   );
 }

@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import { Link } from 'react-router';
+import { Plus } from 'lucide-react';
 import {
   cerrarConvocatoria,
   createConvocatoria,
   publicarConvocatoria,
   updateConvocatoria,
 } from '../../api/convocatoriasApi';
+import { Alerta, Boton, EncabezadoPagina, ModalConfirmacion, useAvisos } from '../../components/ui';
 import { useCargos } from '../Cargos/hooks/useCargos';
 import VacanteForm from './components/VacanteForm';
 import VacantesTable from './components/VacantesTable';
@@ -13,137 +16,156 @@ import { useNivelesEducacion } from './hooks/useNivelesEducacion';
 import { formatearFecha } from './utils/formato';
 import './Vacantes.css';
 
-const DURACION_AVISO_MS = 4000;
-
 export default function VacantesView() {
+  const avisar = useAvisos();
   const [estadoFiltro, setEstadoFiltro] = useState('');
   const { convocatorias, cargando, error, recargar } = useConvocatorias(estadoFiltro);
   const catalogoCargos = useCargos('');
   const { niveles } = useNivelesEducacion();
 
-  const [vacanteEnEdicion, setVacanteEnEdicion] = useState(null);
-  const [formKey, setFormKey] = useState(0);
-  const [aviso, setAviso] = useState(null);
-  const formRef = useRef(null);
+  // null: formulario cerrado. { convocatoria: null }: vacante nueva.
+  const [formulario, setFormulario] = useState(null);
 
-  const [idConfirmandoCierre, setIdConfirmandoCierre] = useState(null);
+  const [vacanteACerrar, setVacanteACerrar] = useState(null);
   const [idEnProceso, setIdEnProceso] = useState(null);
   const [alerta, setAlerta] = useState(null);
 
-  useEffect(() => {
-    if (!aviso) return undefined;
-    const timer = setTimeout(() => setAviso(null), DURACION_AVISO_MS);
-    return () => clearTimeout(timer);
-  }, [aviso]);
-
-  useEffect(() => {
-    if (alerta?.tipo !== 'success') return undefined;
-    const timer = setTimeout(() => setAlerta(null), DURACION_AVISO_MS);
-    return () => clearTimeout(timer);
-  }, [alerta]);
-
-  const abrirFormulario = (vacante) => {
-    setVacanteEnEdicion(vacante);
-    setFormKey((k) => k + 1);
+  const abrirFormulario = (convocatoria) => {
+    setAlerta(null);
+    setFormulario({ convocatoria });
   };
 
-  const iniciarEdicion = (vacante) => {
-    setAviso(null);
-    setIdConfirmandoCierre(null);
-    abrirFormulario(vacante);
-    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  };
-
-  // Tras guardar, el borrador queda abierto: lo habitual es completarlo en varias pasadas antes de publicarlo.
+  // Si falla, el error llega al formulario y este sigue abierto; si sale bien, se cierra y la tabla se recarga.
   const guardar = async (payload) => {
-    const guardada = vacanteEnEdicion
-      ? await updateConvocatoria(vacanteEnEdicion.id_convocatoria, payload)
+    const actual = formulario.convocatoria;
+    const guardada = actual
+      ? await updateConvocatoria(actual.id_convocatoria, payload)
       : await createConvocatoria(payload);
 
-    setAviso({ texto: `Borrador ${guardada.codigo_convocatoria} ${vacanteEnEdicion ? 'actualizado' : 'guardado'}.` });
-    abrirFormulario(guardada);
+    setFormulario(null);
     recargar();
+    avisar({
+      tono: 'exito',
+      titulo: actual ? 'Borrador actualizado' : 'Borrador guardado',
+      mensaje: `${guardada.codigo_convocatoria} · ${guardada.titulo_puesto}`,
+    });
   };
 
-  // Publicar y cerrar comparten el mismo manejo: una fila en proceso, alerta en la tabla y recarga siempre,
+  // Publicar y cerrar comparten el mismo manejo: una fila en proceso, alerta de error y recarga siempre,
   // porque un 409 significa que el estado cambió por otro lado.
-  const ejecutarAccion = async (vacante, accion, mensajeExito) => {
+  const ejecutarAccion = async (vacante, accion, { tituloError, exito }) => {
     setAlerta(null);
     setIdEnProceso(vacante.id_convocatoria);
     try {
       const actualizada = await accion(vacante.id_convocatoria);
-      setAlerta({ tipo: 'success', texto: mensajeExito(actualizada) });
-      if (vacanteEnEdicion?.id_convocatoria === vacante.id_convocatoria) abrirFormulario(null);
+      avisar({ tono: 'exito', ...exito(actualizada) });
     } catch (err) {
-      setAlerta({ tipo: 'error', texto: err.message });
+      setAlerta({ titulo: tituloError, texto: err.message });
     } finally {
       setIdEnProceso(null);
-      setIdConfirmandoCierre(null);
+      setVacanteACerrar(null);
       recargar();
     }
   };
 
   const publicar = (vacante) =>
-    ejecutarAccion(
-      vacante,
-      publicarConvocatoria,
-      (v) => `${v.codigo_convocatoria} publicada. Recibe postulaciones hasta el ${formatearFecha(v.fecha_limite_postulacion)}.`
-    );
+    ejecutarAccion(vacante, publicarConvocatoria, {
+      tituloError: `No se pudo publicar ${vacante.codigo_convocatoria}`,
+      exito: (v) => ({
+        titulo: `${v.codigo_convocatoria} publicada`,
+        mensaje: `Recibe postulaciones hasta el ${formatearFecha(v.fecha_limite_postulacion)}.`,
+      }),
+    });
 
   const pedirCierre = (vacante) => {
     setAlerta(null);
-    setIdConfirmandoCierre(vacante.id_convocatoria);
+    setVacanteACerrar(vacante);
   };
 
-  const confirmarCierre = (vacante) =>
-    ejecutarAccion(
-      vacante,
-      cerrarConvocatoria,
-      (v) => `${v.codigo_convocatoria} cerrada. Las postulaciones registradas se conservan.`
-    );
+  const confirmarCierre = () =>
+    ejecutarAccion(vacanteACerrar, cerrarConvocatoria, {
+      tituloError: `No se pudo cerrar ${vacanteACerrar.codigo_convocatoria}`,
+      exito: (v) => ({
+        titulo: `${v.codigo_convocatoria} cerrada`,
+        mensaje: 'Las postulaciones registradas se conservan.',
+      }),
+    });
+
+  const sinVacantes = !cargando && !error && !estadoFiltro && convocatorias.length === 0;
+  const botonNueva = (
+    <Boton variante="primario" icono={Plus} onClick={() => abrirFormulario(null)}>
+      Nueva vacante
+    </Boton>
+  );
 
   return (
-    <section className="ui-section vacantes" aria-labelledby="vacantes-titulo">
-      <header className="ui-section__header">
-        <p className="ui-eyebrow">Reclutamiento</p>
-        <h2 id="vacantes-titulo" className="ui-section__title">
-          Gestión de vacantes
-        </h2>
-      </header>
+    <section className="vacantes" aria-labelledby="vacantes-titulo">
+      <EncabezadoPagina
+        migas={[{ etiqueta: 'Inicio', href: '/' }, { etiqueta: 'Reclutamiento' }]}
+        enlace={Link}
+        titulo="Vacantes"
+        idTitulo="vacantes-titulo"
+        descripcion="Convocatorias con los requisitos del cargo. Un borrador se publica cuando tiene todos sus requisitos."
+        acciones={!sinVacantes && botonNueva}
+      />
 
-      <div className="ui-split">
-        <div ref={formRef} className="ui-split__aside">
-          <VacanteForm
-            key={formKey}
-            convocatoria={vacanteEnEdicion}
-            cargos={catalogoCargos.cargos}
-            errorCargos={catalogoCargos.error}
-            cargandoCargos={catalogoCargos.cargando}
-            aviso={aviso?.texto}
-            onGuardar={guardar}
-            onCancelar={() => abrirFormulario(null)}
-          />
-        </div>
+      {alerta && (
+        <Alerta tono="peligro" role="alert" titulo={alerta.titulo} onCerrar={() => setAlerta(null)}>
+          {alerta.texto}
+        </Alerta>
+      )}
 
+      {error && convocatorias.length === 0 ? (
+        <Alerta
+          tono="peligro"
+          role="alert"
+          titulo="No se pudieron cargar las vacantes"
+          acciones={
+            <Boton tamano="sm" cargando={cargando} onClick={recargar}>
+              Reintentar
+            </Boton>
+          }
+        >
+          {error.message}
+        </Alerta>
+      ) : (
         <VacantesTable
           vacantes={convocatorias}
           cargando={cargando}
-          error={error}
-          onReintentar={recargar}
           estado={estadoFiltro}
           onCambiarEstado={setEstadoFiltro}
           niveles={niveles}
-          alerta={alerta}
-          idEnEdicion={vacanteEnEdicion?.id_convocatoria}
-          idConfirmandoCierre={idConfirmandoCierre}
           idEnProceso={idEnProceso}
-          onEditar={iniciarEdicion}
+          accionVacia={botonNueva}
+          onEditar={abrirFormulario}
           onPublicar={publicar}
-          onPedirCierre={pedirCierre}
-          onCancelarCierre={() => setIdConfirmandoCierre(null)}
-          onConfirmarCierre={confirmarCierre}
+          onCerrar={pedirCierre}
         />
-      </div>
+      )}
+
+      {formulario && (
+        <VacanteForm
+          key={formulario.convocatoria?.id_convocatoria ?? 'nueva'}
+          convocatoria={formulario.convocatoria}
+          cargos={catalogoCargos.cargos}
+          errorCargos={catalogoCargos.error}
+          cargandoCargos={catalogoCargos.cargando}
+          onGuardar={guardar}
+          onCancelar={() => setFormulario(null)}
+        />
+      )}
+
+      <ModalConfirmacion
+        abierto={Boolean(vacanteACerrar)}
+        titulo="¿Cerrar la convocatoria?"
+        textoConfirmar="Cerrar convocatoria"
+        procesando={Boolean(vacanteACerrar) && idEnProceso === vacanteACerrar.id_convocatoria}
+        onConfirmar={confirmarCierre}
+        onCancelar={() => setVacanteACerrar(null)}
+      >
+        <strong>{vacanteACerrar?.titulo_puesto}</strong> ({vacanteACerrar?.codigo_convocatoria}) dejará de aceptar
+        postulaciones. Las postulaciones ya registradas se conservan.
+      </ModalConfirmacion>
     </section>
   );
 }

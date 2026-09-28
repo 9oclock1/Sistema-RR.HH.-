@@ -1,10 +1,14 @@
 import { useState } from 'react';
-import { IconoCerrar, IconoMas } from '../../../components/Iconos';
+import { CircleAlert, Plus, X } from 'lucide-react';
+import { Boton, CampoTexto } from '../../../components/ui';
 import { nuevaHabilidad } from '../utils/vacanteFormulario';
 
 // Mismo patrón que FuncionesInput de Cargos: una fila por habilidad, Enter en la última agrega otra.
-export default function HabilidadesInput({ habilidades, onChange, error, errorId, etiquetaExtra }) {
+export default function HabilidadesInput({ id, habilidades, onChange, error, ayuda }) {
   const [enfocarId, setEnfocarId] = useState(null);
+  const idError = `${id}-error`;
+  const idAyuda = `${id}-ayuda`;
+  const descritoPor = [error && idError, ayuda && idAyuda].filter(Boolean).join(' ') || undefined;
 
   const agregar = () => {
     const habilidad = nuevaHabilidad();
@@ -12,9 +16,9 @@ export default function HabilidadesInput({ habilidades, onChange, error, errorId
     setEnfocarId(habilidad.id);
   };
 
-  const actualizar = (id, texto) => onChange(habilidades.map((h) => (h.id === id ? { ...h, texto } : h)));
+  const actualizar = (idHabilidad, texto) => onChange(habilidades.map((h) => (h.id === idHabilidad ? { ...h, texto } : h)));
 
-  const quitar = (id) => onChange(habilidades.filter((h) => h.id !== id));
+  const quitar = (idHabilidad) => onChange(habilidades.filter((h) => h.id !== idHabilidad));
 
   const manejarTecla = (evento, indice) => {
     if (evento.key !== 'Enter') return;
@@ -23,23 +27,20 @@ export default function HabilidadesInput({ habilidades, onChange, error, errorId
   };
 
   return (
-    <fieldset className="ui-field vacantes-lista" aria-describedby={error ? errorId : undefined}>
-      <legend className="ui-field__label">
-        Habilidades clave {etiquetaExtra}
-      </legend>
+    <fieldset id={id} className="vacante-habilidades" aria-describedby={descritoPor}>
+      <legend className="vacante-habilidades__etiqueta">Habilidades clave</legend>
 
       {habilidades.length === 0 ? (
-        <p className="vacantes-lista__empty">Aún no agregaste habilidades.</p>
+        <p className="vacante-habilidades__vacio">Aún no agregaste habilidades.</p>
       ) : (
-        <ol className="vacantes-lista__list">
+        <ol className="vacante-habilidades__lista">
           {habilidades.map((habilidad, indice) => (
-            <li key={habilidad.id} className="vacantes-lista__item">
-              <span className="vacantes-lista__index" aria-hidden="true">
+            <li key={habilidad.id} className="vacante-habilidades__item">
+              <span className="vacante-habilidades__indice" aria-hidden="true">
                 {indice + 1}
               </span>
-              <input
-                type="text"
-                className="ui-input"
+              <CampoTexto
+                className="vacante-habilidades__campo"
                 value={habilidad.texto}
                 maxLength={100}
                 placeholder="Ej. Contabilidad NIIF"
@@ -49,27 +50,32 @@ export default function HabilidadesInput({ habilidades, onChange, error, errorId
                 onChange={(e) => actualizar(habilidad.id, e.target.value)}
                 onKeyDown={(e) => manejarTecla(e, indice)}
               />
-              <button
-                type="button"
-                className="ui-icon-btn"
+              <Boton
+                variante="sutil"
+                soloIcono
+                icono={X}
                 aria-label={`Quitar habilidad ${indice + 1}`}
                 title="Quitar"
                 onClick={() => quitar(habilidad.id)}
-              >
-                <IconoCerrar size={14} />
-              </button>
+              />
             </li>
           ))}
         </ol>
       )}
 
-      <button type="button" className="ui-btn ui-btn--dashed" onClick={agregar}>
-        <IconoMas size={14} /> Agregar habilidad
-      </button>
+      <Boton variante="sutil" tamano="sm" icono={Plus} className="vacante-habilidades__agregar" onClick={agregar}>
+        Agregar habilidad
+      </Boton>
 
       {error && (
-        <p id={errorId} className="ui-field__error">
+        <p id={idError} className="vacante-habilidades__error">
+          <CircleAlert className="ds-icono" aria-hidden="true" />
           {error}
+        </p>
+      )}
+      {ayuda && (
+        <p id={idAyuda} className="vacante-habilidades__ayuda">
+          {ayuda}
         </p>
       )}
     </fieldset>

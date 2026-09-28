@@ -1,144 +1,241 @@
-/* ---------- Lista dinámica de habilidades (mismo patrón que las funciones de Cargos) ---------- */
-.vacantes-lista__list {
+/* Estilos propios del módulo de vacantes. Solo tokens (ver DESIGN.md). */
+.vacantes {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  gap: var(--space-4);
 }
 
-.vacantes-lista__item {
+.vacantes .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+/* ---------- Listado ---------- */
+.vacantes-filtro {
+  width: calc(var(--size-sidebar) * 0.75);
+}
+
+.vacantes-tabla .ds-tabla {
+  /* Debajo de este ancho los porcentajes dejarían sin lugar a las acciones: la tabla se desplaza. */
+  min-width: calc(var(--size-sidebar) * 4);
+}
+
+/* Las celdas de dos líneas (dato + meta) necesitan aire arriba y abajo. */
+.vacantes-tabla .ds-tabla td {
+  padding-top: var(--space-1);
+  padding-bottom: var(--space-1);
+}
+
+/* Estado (2.ª columna): el «Falta: …» se corta con un margen para no quedar pegado a Requisitos. */
+.vacantes-tabla .ds-tabla :is(th, td):nth-child(2) {
+  padding-right: var(--space-6);
+}
+
+.vacantes-celda {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vacantes-celda > .ds-etiqueta {
+  align-self: flex-start;
+}
+
+.vacantes-meta {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.vacantes-meta--aviso {
+  color: var(--color-warning-text);
+}
+
+.vacantes-meta--exito {
+  color: var(--color-success-text);
+}
+
+.vacantes-codigo {
+  font-family: var(--font-family-mono);
+}
+
+.vacantes-fecha {
+  font-variant-numeric: tabular-nums;
+}
+
+.vacantes-acciones {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: var(--space-1);
 }
 
-.vacantes-lista__index {
-  flex-shrink: 0;
-  width: 18px;
-  color: var(--text-subtle);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
+/* ---------- Formulario (dentro del modal) ---------- */
+.vacante-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-1);
 }
 
-.vacantes-lista__empty {
-  margin: 0;
-  color: var(--text-subtle);
-  font-size: 13px;
+.vacante-form__cargo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
-.vacantes-lista .ui-btn--dashed {
-  margin-top: 2px;
+.vacante-form__fila {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.vacante-form__textarea.ds-control {
+  height: auto;
+  min-height: calc(var(--size-row) * 3);
+  padding: var(--space-1) var(--space-2);
+  resize: vertical;
+}
+
+.vacante-form__uuid .ds-control {
+  font-family: var(--font-family-mono);
 }
 
 /* ---------- Vista previa del perfil del cargo ---------- */
-.vacantes-perfil {
+.vacante-perfil {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 2px;
-  padding: 10px 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-page);
 }
 
-.vacantes-perfil__header {
+.vacante-perfil__encabezado {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
-.vacantes-perfil__titulo {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.vacante-perfil__titulo {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  font-weight: var(--font-weight-semibold);
 }
 
-.vacantes-perfil__meta {
-  color: var(--text-subtle);
-  font-size: 12px;
+.vacante-perfil__meta,
+.vacante-perfil__texto {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
 }
 
-.vacantes-perfil__texto {
+.vacante-perfil__meta {
+  color: var(--color-text-subtle);
+}
+
+.vacante-perfil__texto {
   display: -webkit-box;
   overflow: hidden;
-  color: var(--text-muted);
-  font-size: 12px;
+  color: var(--color-text-secondary);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
   line-clamp: 4;
 }
 
-.vacantes-perfil__skeleton-corto {
-  width: 45%;
-}
-
-.vacantes-perfil__error {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* ---------- Requisitos pendientes para publicar un borrador ---------- */
-.vacantes-pendientes {
+.vacante-perfil__error,
+.vacante-habilidades__error {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 16px;
-  padding: 10px 12px;
-  border: 1px solid var(--accent-ring);
-  border-radius: var(--radius-md);
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 12px;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
 }
 
-.vacantes-pendientes svg {
-  flex-shrink: 0;
-  margin-top: 1px;
+.vacante-perfil__error .ds-icono,
+.vacante-habilidades__error .ds-icono {
+  width: var(--line-height-small);
+  height: var(--line-height-small);
 }
 
-.vacantes-pendientes.is-listo {
-  border-color: var(--success-soft);
-  background: var(--success-soft);
-  color: var(--success);
+/* ---------- Lista dinámica de habilidades ---------- */
+.vacante-habilidades {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
-.vacantes-uuid {
-  font-family: var(--font-mono);
-  font-size: 12px;
+.vacante-habilidades__etiqueta {
+  margin-bottom: var(--space-1);
+  padding: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  font-weight: var(--font-weight-semibold);
 }
 
-/* ---------- Tabla de vacantes: estados ---------- */
-.vacantes-badge--cerrada {
-  color: var(--text-muted);
+.vacante-habilidades__lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.vacantes-falta {
-  max-width: 180px;
-  margin-top: 4px;
-  color: var(--accent);
-  font-size: 12px;
+.vacante-habilidades__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-.vacantes-listo {
-  color: var(--success);
+.vacante-habilidades__indice {
+  flex: none;
+  width: var(--space-4);
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
-.vacantes-requisitos {
-  margin-bottom: 6px;
-  color: var(--text);
-  font-size: 13px;
-  white-space: nowrap;
+.vacante-habilidades__campo {
+  flex: 1;
 }
 
-/* Publicar/Cerrar son botones con texto: la columna fija necesita más ancho que solo iconos. */
-.vacantes .ui-table__actions {
-  min-width: 132px;
+.vacante-habilidades__agregar {
+  align-self: flex-start;
+}
+
+.vacante-habilidades__vacio,
+.vacante-habilidades__ayuda {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+@media (pointer: coarse) {
+  /* Con controles táctiles de 44px, Editar + Publicar no caben en el 15% de la columna. */
+  .vacantes-tabla th:last-child {
+    width: calc(var(--size-touch) * 3 + var(--space-2) * 2) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .vacante-form__fila {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vacantes-filtro {
+    width: auto;
+  }
 }
