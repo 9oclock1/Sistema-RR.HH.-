@@ -1,5 +1,6 @@
 const pool = require('../../db/pool');
 const cargosModel = require('../models/cargosModel');
+const jerarquiaModel = require('../models/jerarquia.model');
 const HttpError = require('../utils/HttpError');
 const { withTransaction } = require('../utils/transaction');
 
@@ -54,6 +55,17 @@ const crearCargo = (cargo) =>
   withTransaction(async (client) => {
     await validarReferencias(client, cargo);
     const idCargo = await cargosModel.insertar(client, cargo);
+
+    // RF-18: si el cargo nace con un jefe directo asignado, también queda
+    // constancia en el historial de jerarquía (no solo los cambios por
+    // PUT /cargos/:id o por el endpoint de jerarquía).
+    if (cargo.id_cargo_jefe_directo) {
+      await jerarquiaModel.registrarHistorial(
+        { idCargo, anterior: null, nuevo: cargo.id_cargo_jefe_directo },
+        client
+      );
+    }
+
     return cargosModel.obtenerPorId(client, idCargo);
   });
 
@@ -62,8 +74,20 @@ const reemplazarCargo = (idCargo, cargo) =>
   withTransaction(async (client) => {
     if (!(await cargosModel.bloquearPorId(client, idCargo))) throw noEncontrado();
 
+    // RF-18: se guarda el jefe directo ANTES del UPDATE para poder comparar
+    // y dejar constancia del cambio en el historial de jerarquía, igual que
+    // hace el endpoint dedicado de jerarquía (PUT /jerarquia/cargos/:id/superior).
+    const cargoAntes = await cargosModel.obtenerPorId(client, idCargo);
+    const anterior = cargoAntes?.id_cargo_jefe_directo ?? null;
+    const nuevo = cargo.id_cargo_jefe_directo ?? null;
+
     await validarReferencias(client, cargo, idCargo);
     await cargosModel.reemplazar(client, idCargo, cargo);
+
+    if (anterior !== nuevo) {
+      await jerarquiaModel.registrarHistorial({ idCargo, anterior, nuevo }, client);
+    }
+
     return cargosModel.obtenerPorId(client, idCargo);
   });
 
