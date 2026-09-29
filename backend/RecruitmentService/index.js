@@ -1,10 +1,11 @@
 const express = require("express");
 const cors = require("cors");
-const { Pool } = require("pg");
+const pool = require("./db/pool");
+const convocatoriasRoutes = require("./src/routes/convocatorias");
+const errorHandler = require("./src/middlewares/errorHandler");
 
 const app = express();
 const PORT = process.env.PORT || 3003;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(cors());
 app.use(express.json());
@@ -31,13 +32,9 @@ app.get("/health", async (req, res) => {
       });
   }
 });
+app.use("/convocatorias", convocatoriasRoutes);
 
-app.get("/vacancies", (req, res) => {
-  res.json([
-    { id: 101, title: "programador", status: "abierta", candidates: 5 },
-    { id: 102, title: "abogado", status: "evaluación", candidates: 3 },
-  ]);
-});
+app.use(errorHandler);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RecruitmentService corriendo en http://0.0.0.0:${PORT}`);

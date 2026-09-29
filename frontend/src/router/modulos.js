@@ -1,8 +1,9 @@
-import { Briefcase, Building2, CalendarClock, Fingerprint } from "lucide-react";
-import MarcajePage from "../features/marcaje/MarcajePage";
-import TurnosPage from "../features/turnos/TurnosPage";
-import OrganizacionView from "../features/organizacion/OrganizacionView";
+import { Briefcase, Building2, CalendarClock, Fingerprint, Megaphone } from "lucide-react";
 import CargosList from "../features/Cargos/CargosList";
+import MarcajePage from "../features/marcaje/MarcajePage";
+import OrganizacionView from "../features/organizacion/OrganizacionView";
+import TurnosPage from "../features/turnos/TurnosPage";
+import VacantesView from "../features/Vacantes/VacantesView";
 import { puedeAcceder } from "../utils/permisos";
 
 // Módulos del sistema: alimentan el inicio, la barra lateral y las rutas.
@@ -15,8 +16,8 @@ export const SECCIONES = [
     modulos: [
       {
         ruta: "/organizacion/areas",
-        etiqueta: "Áreas y departamentos",
-        descripcion: "Estructura organizacional de áreas y departamentos.",
+        etiqueta: "Áreas",
+        descripcion: "Departamentos y áreas de la empresa.",
         icono: Building2,
         roles: ["admin"],
         pagina: OrganizacionView,
@@ -24,10 +25,23 @@ export const SECCIONES = [
       {
         ruta: "/organizacion/cargos",
         etiqueta: "Cargos",
-        descripcion: "Catálogo de cargos y su perfil requerido.",
+        descripcion: "Puestos de trabajo, funciones y perfil requerido.",
         icono: Briefcase,
         roles: ["admin"],
         pagina: CargosList,
+      },
+    ],
+  },
+  {
+    titulo: "Reclutamiento",
+    modulos: [
+      {
+        ruta: "/reclutamiento/vacantes",
+        etiqueta: "Vacantes",
+        descripcion: "Convocatorias: creación, publicación y cierre.",
+        icono: Megaphone,
+        roles: ["admin", "reclutador"],
+        pagina: VacantesView,
       },
     ],
   },
