@@ -1,6 +1,7 @@
 import { v7 as uuidv7 } from "uuid";
 import { PostulacionModel } from "../models/postulacionModel.js";
 import { saveFile, getFileDetails } from "./storageService.js";
+import { CvProcessingService } from "./cvProcessingService.js";
 
 export const PostulacionService = {
   async registrarPostulacionConCv({ idConvocatoria, idPostulante, file }) {
@@ -47,6 +48,16 @@ export const PostulacionService = {
       cvArchivoUrl: storageResult.url,
       cvFormatoMimetype: file.mimetype,
     });
+
+    const datosExtraidos =
+      await CvProcessingService.procesarDocumentoPostulacion({
+        idPostulacion,
+        fileBuffer: file.buffer,
+        mimetype: file.mimetype,
+        fileName: file.originalname,
+      });
+
+    nuevaPostulacion.datos_extraidos_cv = datosExtraidos;
 
     return {
       postulacion: nuevaPostulacion,
@@ -124,6 +135,16 @@ export const PostulacionService = {
         cvFormatoMimetype: file.mimetype,
       },
     );
+
+    const datosExtraidos =
+      await CvProcessingService.procesarDocumentoPostulacion({
+        idPostulacion,
+        fileBuffer: file.buffer,
+        mimetype: file.mimetype,
+        fileName: file.originalname,
+      });
+
+    postulacionActualizada.datos_extraidos_cv = datosExtraidos;
 
     return {
       postulacion: postulacionActualizada,
