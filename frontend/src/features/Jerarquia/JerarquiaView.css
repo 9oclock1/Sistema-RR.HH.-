@@ -1,0 +1,116 @@
+/* ---------- Cadena de mando ----------
+   La tarjeta, el filtro, los campos y la tabla vienen de ui.css.
+   Aquí solo va la ficha del cargo (identidad + bloques), igual que en
+   la ficha de Asignaciones. */
+
+/* Combo de cargo en el header de la tarjeta: mismo ancho fijo que usa
+   Asignaciones para su selector de empleado. */
+.jer-ficha .ui-card__header .ui-filter .ui-select {
+  max-width: 260px;
+}
+
+.jer-vacio {
+  padding: 32px 0 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.jer-identidad {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.jer-avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--accent-ring);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.jer-identidad__texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.jer-identidad__nombre {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jer-bloque {
+  padding-top: 18px;
+}
+
+.jer-bloque__titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jer-bloque__form {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.jer-bloque__form .ui-field {
+  flex: 1;
+  min-width: 0;
+  max-width: 360px;
+}
+
+.jer-subordinados {
+  max-width: none;
+}
+
+/* El historial cierra la tarjeta: su tabla va a ras de los bordes, como en Asignaciones. */
+.jer-bloque--ultimo .ui-table__scroll {
+  margin-top: 4px;
+}
+
+.jer-historial {
+  min-width: 480px;
+}
+
+@media (max-width: 560px) {
+  .jer-bloque__form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .jer-bloque__form .ui-field {
+    max-width: none;
+  }
+
+  .jer-ficha .ui-card__header .ui-filter .ui-select {
+    max-width: none;
+  }
+
+  /* A 375px, este min-width era justamente lo que hacía scrollear la
+     página entera hacia los costados (497px de ancho): la tabla ya tiene
+     su propio scroll horizontal (.ui-table__scroll), así que acá no hace
+     falta forzarle un ancho mínimo. */
+  .jer-historial {
+    min-width: 0;
+  }
+}

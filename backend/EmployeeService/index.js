@@ -6,6 +6,8 @@ const cargosRoutes = require("./src/routes/cargos");
 const sucursalesRoutes = require("./src/routes/sucursales");
 const empleadosRoutes = require("./src/routes/empleados");
 const asignacionesRoutes = require("./src/routes/asignaciones");
+const organigramaRoutes = require("./src/routes/organigrama.routes"); // RF-20
+const jerarquiaRoutes = require("./src/routes/jerarquia.routes"); // RF-18
 const errorHandler = require("./src/middlewares/errorHandler");
 
 const app = express();
@@ -40,6 +42,14 @@ app.use("/cargos", cargosRoutes);
 app.use("/sucursales", sucursalesRoutes);
 app.use("/empleados", empleadosRoutes);
 app.use("/asignaciones", asignacionesRoutes);
+app.use("/organigrama", organigramaRoutes); // RF-20
+app.use("/jerarquia", jerarquiaRoutes); // RF-18
+
+// Cualquier ruta que no matcheó nada de arriba: 404 en JSON, no el HTML
+// por defecto de Express.
+app.use((req, res) => {
+  res.status(404).json({ error: `Ruta no encontrada: ${req.method} ${req.originalUrl}` });
+});
 
 app.use(errorHandler);
 

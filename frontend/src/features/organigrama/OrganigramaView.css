@@ -1,0 +1,192 @@
+/* ---------- Organigrama ----------
+   La tarjeta, el split y los botones vienen de ui.css. Aquí solo va lo que
+   ui.css no tiene: el árbol con conectores y la ficha de detalle del nodo. */
+
+/* A 1280px el árbol quedaba aplastado en una columna angosta y la ficha de
+   detalle se llevaba casi todo el ancho: se fuerza el reparto de columnas
+   acá en vez de depender del valor por defecto de .ui-split. */
+.organigrama__split {
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .organigrama__split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.organigrama__tree-card {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.organigrama__tree {
+  padding-top: 4px;
+}
+
+/* ---------- Árbol con líneas conectoras ---------- */
+.organigrama__root,
+.organigrama__children {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.organigrama__root {
+  width: max-content;
+  min-width: 100%;
+}
+
+.organigrama__children {
+  position: relative;
+  padding-top: 20px;
+}
+
+.organigrama__children::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 20px;
+  border-left: 2px solid var(--border);
+}
+
+.organigrama__node {
+  position: relative;
+  padding: 20px 8px 0;
+  text-align: center;
+  list-style: none;
+}
+
+.organigrama__root > .organigrama__node {
+  padding-top: 0;
+}
+
+.organigrama__children > .organigrama__node::before,
+.organigrama__children > .organigrama__node::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 20px;
+  border-top: 2px solid var(--border);
+}
+
+.organigrama__children > .organigrama__node::after {
+  right: auto;
+  left: 50%;
+  border-left: 2px solid var(--border);
+}
+
+.organigrama__children > .organigrama__node:only-child::before,
+.organigrama__children > .organigrama__node:only-child::after {
+  display: none;
+}
+
+.organigrama__children > .organigrama__node:first-child::before,
+.organigrama__children > .organigrama__node:last-child::after {
+  border: 0 none;
+}
+
+.organigrama__children > .organigrama__node:last-child::before {
+  border-right: 2px solid var(--border);
+  border-radius: 0 6px 0 0;
+}
+
+.organigrama__children > .organigrama__node:first-child::after {
+  border-radius: 6px 0 0 0;
+}
+
+/* ---------- Caja de cada cargo ---------- */
+.organigrama__node-inner {
+  position: relative;
+  display: inline-block;
+}
+
+.organigrama__box {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 148px;
+  max-width: 200px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.organigrama__box:hover {
+  border-color: var(--border-strong);
+}
+
+.organigrama__box:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.organigrama__box--selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.organigrama__box-title {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.organigrama__toggle {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  width: 22px;
+  height: 22px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* ---------- Ficha de detalle (aside) ---------- */
+.organigrama__detail-identidad {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.organigrama__detail-avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--accent-ring);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.organigrama__detail-bloque {
+  padding-top: 18px;
+}
+
+.organigrama__detail-titulo {
+  margin: 0 0 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.organigrama__detail-empleados {
+  max-width: none;
+}

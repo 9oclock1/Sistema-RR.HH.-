@@ -1,10 +1,12 @@
-import { Briefcase, Building2, CalendarClock, FileUser, Fingerprint, Mail, Megaphone, Send, UserCheck, UserPlus } from "lucide-react";
+import { Briefcase, Building2, CalendarClock, FileUser, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
 import CargosList from "../features/Cargos/CargosList";
 import GestionComunicacionesPage from "../features/comunicaciones/GestionComunicacionesPage";
+import JerarquiaView from "../features/Jerarquia/JerarquiaView";
 import MarcajePage from "../features/marcaje/MarcajePage";
+import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import TurnosPage from "../features/turnos/TurnosPage";
@@ -34,6 +36,22 @@ export const SECCIONES = [
         icono: Briefcase,
         roles: ["admin"],
         pagina: CargosList,
+      },
+      {
+        ruta: "/organizacion/jerarquia",
+        etiqueta: "Cadena de mando",
+        descripcion: "Superior directo de cada cargo y su historial de cambios.",
+        icono: ListTree,
+        roles: ["admin"],
+        pagina: JerarquiaView,
+      },
+      {
+        ruta: "/organizacion/organigrama",
+        etiqueta: "Organigrama",
+        descripcion: "Estructura de cargos con sus ocupantes, exportable.",
+        icono: Network,
+        roles: ["supervisor"],
+        pagina: OrganigramaView,
       },
       {
         ruta: "/organizacion/asignaciones",
