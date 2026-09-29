@@ -1,9 +1,10 @@
-import { Briefcase, Building2, CalendarClock, Fingerprint, Megaphone, UserCheck, UserPlus } from "lucide-react";
+import { Briefcase, Building2, CalendarClock, FileUser, Fingerprint, Megaphone, UserCheck, UserPlus } from "lucide-react";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import CargosList from "../features/Cargos/CargosList";
 import MarcajePage from "../features/marcaje/MarcajePage";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
+import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import TurnosPage from "../features/turnos/TurnosPage";
 import VacantesView from "../features/Vacantes/VacantesView";
 import { puedeAcceder } from "../utils/permisos";
@@ -60,6 +61,14 @@ export const SECCIONES = [
         icono: UserPlus,
         roles: ["reclutador"],
         pagina: ApplicantRegistration,
+      },
+      {
+        ruta: "/reclutamiento/postulaciones",
+        etiqueta: "Postulaciones",
+        descripcion: "Recepción de hojas de vida, validación de formatos y registro de postulantes.",
+        icono: FileUser,
+        roles: ["reclutador"],
+        pagina: PostulacionesPage,
       },
     ],
   },

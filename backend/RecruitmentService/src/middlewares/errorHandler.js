@@ -1,3 +1,4 @@
+const multer = require('multer');
 const HttpError = require('../utils/HttpError');
 const { ErrorApp } = require('../utils/errores');
 
@@ -17,6 +18,23 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
+  // Errores de la carga de CV (RF-10): { success, error: código, message }.
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      const maxMb = process.env.MAX_FILE_SIZE_MB || 5;
+      return res.status(400).json({
+        success: false,
+        error: 'LIMIT_FILE_SIZE',
+        message: `El archivo supera el tamaño máximo permitido de ${maxMb}MB.`,
+      });
+    }
+    return res.status(400).json({ success: false, error: err.code, message: err.message });
+  }
+
+  if (err.code === 'INVALID_FILE_TYPE') {
+    return res.status(400).json({ success: false, error: 'INVALID_FILE_TYPE', message: err.message });
+  }
+
   if (err.type === 'entity.parse.failed') {
     return res.status(400).json({ error: 'El cuerpo de la petición no es un JSON válido.' });
   }
@@ -33,6 +51,12 @@ const errorHandler = (err, req, res, next) => {
     const [, campo, valor] = /Key \((\w+)\)=\(([^)]*)\)/.exec(err.detail || '') || [];
     const mensaje = campo ? `No existe un registro con ${campo} = ${valor}.` : 'Referencia a un registro inexistente.';
     return res.status(400).json({ error: mensaje, campos_faltantes: [], errores: campo ? [{ campo, mensaje }] : [] });
+  }
+
+  // Errores con statusCode de la carga de CV (400, 404, 409).
+  const statusCode = err.statusCode || err.status;
+  if (statusCode && statusCode < 500) {
+    return res.status(statusCode).json({ success: false, error: 'ERROR_SOLICITUD', message: err.message });
   }
 
   console.error(err);

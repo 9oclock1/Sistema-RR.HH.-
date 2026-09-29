@@ -1,0 +1,32 @@
+.cv-upload-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cv-upload-form__cabecera {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cv-upload-form__titulo {
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.cv-upload-form__subtitulo {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  color: var(--color-text-subtle);
+  margin: 0;
+}
+
+.cv-upload-form__acciones {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-2);
+}
