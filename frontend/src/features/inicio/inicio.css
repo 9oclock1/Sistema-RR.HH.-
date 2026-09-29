@@ -21,34 +21,20 @@
   font-weight: var(--font-weight-semibold);
 }
 
-/* El margen negativo alinea el ícono con el título de la sección; el fondo del hover sobresale. */
 .inicio-modulos {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--size-sidebar)), 1fr));
   gap: var(--space-2);
-  margin: 0 calc(var(--space-3) * -1);
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* Acceso sutil: sin borde, fondo gris al pasar el cursor (como los botones sutiles). */
-.inicio-modulo {
+/* Tarjeta enlace: borde, sombra y hover vienen de .ds-tarjeta; aquí solo la distribución interna. */
+.inicio-modulos .inicio-modulo {
   display: flex;
   gap: var(--space-3);
   height: 100%;
-  padding: var(--space-3);
-  border-radius: var(--radius-card);
-  color: var(--color-text);
-  text-decoration: none;
-  transition: background-color var(--transition);
-}
-
-.inicio-modulo:hover {
-  background: var(--color-bg-hover);
-}
-
-.inicio-modulo:active {
-  background: var(--color-bg-pressed);
 }
 
 .inicio-modulo__icono {
