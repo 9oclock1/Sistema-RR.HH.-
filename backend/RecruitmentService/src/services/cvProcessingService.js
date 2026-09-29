@@ -1,6 +1,29 @@
+import { fromBuffer } from "pdf2pic";
 import { TextExtractionService } from "./textExtractionService.js";
 import { CvParserService } from "./cvParserService.js";
 import { PostulacionModel } from "../models/postulacionModel.js";
+
+const convertirPdfPaginaABase64 = async (fileBuffer) => {
+  try {
+    const options = {
+      density: 150,
+      saveFilename: "cv_page",
+      savePath: "/tmp",
+      format: "png",
+      width: 1200,
+      height: 1600,
+    };
+    const convert = fromBuffer(fileBuffer, options);
+    const pageToConvert = 1;
+    const result = await convert(pageToConvert, { responseType: "base64" });
+    return result?.base64 || null;
+  } catch (err) {
+    console.warn(
+      `[CvProcessingService] No se pudo renderizar PDF a imagen: ${err.message}`,
+    );
+    return null;
+  }
+};
 
 export const CvProcessingService = {
   /**
@@ -26,28 +49,32 @@ export const CvProcessingService = {
           fileName,
         });
 
-      if (!isTextSufficient) {
-        console.warn(
-          `[CvProcessingService] Contenido de texto insuficiente para postulación: ${idPostulacion}`,
-        );
-        const payloadFallido = {
-          estadoExtraccion: "FALLIDA",
-          educacion: [],
-          aniosExperienciaEstimados: 0,
-          destrezasTecnicas: [],
-          esVerificado: false,
-          modificadoPor: null,
-          fechaVerificacion: null,
-          errorDetalle: "DOCUMENT_NOT_PARSEABLE_OR_EMPTY",
-        };
-        await PostulacionModel.guardarDatosExtraidosCv(
-          idPostulacion,
-          payloadFallido,
-        );
-        return payloadFallido;
-      }
+      let datosParseados;
 
-      const datosParseados = await CvParserService.parseCv({ rawText });
+      if (isTextSufficient) {
+        datosParseados = await CvParserService.parseCv({ rawText });
+      } else {
+        console.info(
+          `[CvProcessingService] Texto plano insuficiente (< 100 caracteres). Intentando análisis por visión ${idPostulacion}`,
+        );
+
+        const isPdf =
+          mimetype?.includes("pdf") || fileName?.toLowerCase().endsWith(".pdf");
+        let base64Image = null;
+
+        if (isPdf) {
+          base64Image = await convertirPdfPaginaABase64(fileBuffer);
+        }
+
+        if (base64Image) {
+          datosParseados = await CvParserService.parseCv({
+            rawText: "",
+            imagesBase64: [base64Image],
+          });
+        } else {
+          throw new Error("DOCUMENT_NOT_PARSEABLE_OR_EMPTY");
+        }
+      }
 
       await PostulacionModel.guardarDatosExtraidosCv(
         idPostulacion,
