@@ -1,3 +1,9 @@
+.organizacion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 .organizacion .ui-table__actions {
   min-width: 96px;
 }

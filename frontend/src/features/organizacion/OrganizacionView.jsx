@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import departamentosApi from '../../api/departamentosApi';
+import { EncabezadoPagina } from '../../components/ui';
 import { useDepartamentosActivos } from '../../hooks/useDepartamentosActivos';
 import DepartamentoForm from './components/DepartamentoForm';
 import DepartamentosTable from './components/DepartamentosTable';
@@ -71,15 +73,16 @@ export default function OrganizacionView() {
   };
 
   return (
-    <section className="ui-section organizacion" aria-labelledby="organizacion-titulo">
-      <header className="ui-section__header">
-        <p className="ui-eyebrow">Organización estructural</p>
-        <h2 id="organizacion-titulo" className="ui-section__title">
-          Áreas y departamentos
-        </h2>
-      </header>
+    <section className="organizacion" aria-labelledby="organizacion-titulo">
+      <EncabezadoPagina
+        migas={[{ etiqueta: 'Inicio', href: '/' }, { etiqueta: 'Organización' }]}
+        enlace={Link}
+        titulo="Áreas"
+        idTitulo="organizacion-titulo"
+        descripcion="Departamentos y áreas de la empresa."
+      />
 
-      <div className="ui-split">
+      <div className="ui-section ui-split">
         <div ref={formRef} className="ui-split__aside">
           <DepartamentoForm
             key={formKey}
