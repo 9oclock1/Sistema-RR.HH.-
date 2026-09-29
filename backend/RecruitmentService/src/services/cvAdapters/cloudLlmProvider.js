@@ -1,19 +1,32 @@
 const SYSTEM_PROMPT = `
-Eres un asistente experto en Recursos Humanos. Analiza el siguiente Currículum Vitae y extrae los datos en formato JSON estrictamente válido, sin texto adicional, sin backticks y sin markdown.
+    Eres un asistente experto en Recursos Humanos y Reclutamiento. Analiza el siguiente Currículum Vitae y extrae los datos requeridos estrictamente en formato JSON válido, sin backticks ni explicaciones.
 
-Esquema JSON obligatorio:
-{
-  "educacion": [
+    Esquema JSON obligatorio:
     {
-      "institucion": "Nombre de la entidad o universidad",
-      "titulo": "Grado o carrera",
-      "anioFin": 2024
+      "destrezasTecnicas": ["Tecnología 1", "Competencia 2"],
+      "educacion": [
+        {
+          "institucion": "Universidad o Institución",
+          "titulo": "Grado académico o carrera",
+          "anioFin": 2016
+        }
+      ],
+      "experienciaLaboral": [
+        {
+          "puesto": "Cargo desempeñado",
+          "empresa": "Nombre de la empresa",
+          "anioInicio": 2010,
+          "anioFin": 2024,
+          "esActual": false
+        }
+      ]
     }
-  ],
-  "aniosExperienciaEstimados": 3.0,
-  "destrezasTecnicas": ["Tecnología 1", "Tecnología 2"]
-}
-`;
+
+    Reglas:
+    - "experienciaLaboral": Extrae todos los puestos de trabajo con su año de inicio y fin como números enteros. Si el empleo es actual o dice "presente", marca "esActual": true y "anioFin": null.
+    - "educacion": Extrae todos los grados académicos completos o en curso.
+    - "destrezasTecnicas": Lista de habilidades, herramientas y competencias técnicas detectadas.
+    `;
 
 // Google
 const callGoogle = async (rawText, model, apiKey) => {
@@ -64,7 +77,7 @@ const callOpenAI = async (rawText, model, apiKey) => {
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: `Documento CV:\n"""\n${rawText}\n"""` },
       ],
-      temperature: 0.1,
+      temperature: 0.0,
     }),
   });
 
@@ -99,7 +112,7 @@ const callAnthropic = async (rawText, model, apiKey) => {
           content: `Documento CV:\n"""\n${rawText}\n"""\n\nResponde ÚNICAMENTE con el objeto JSON solicitado:`,
         },
       ],
-      temperature: 0.1,
+      temperature: 0.0,
     }),
   });
 

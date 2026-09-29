@@ -1,18 +1,26 @@
 import { z } from "zod";
 
+const AnioFlexible = z
+  .union([z.number().int(), z.string(), z.null(), z.undefined()])
+  .transform((val) => {
+    if (val === null || val === undefined || val === "") return null;
+    const num = Number(val);
+    return isNaN(num) ? null : num;
+  });
+
 // Esquema ítem educativo
 export const EducacionItemSchema = z.object({
   institucion: z.string().min(1, "La institución es requerida"),
   titulo: z.string().min(1, "El título o grado es requerido"),
-  anioFin: z.union([z.number().int(), z.string()]).optional().nullable(),
+  anioFin: AnioFlexible.optional(),
 });
 
-// Esquema ítem de experiencia laboral
+// Esquema ítem experiencia laboral
 export const ExperienciaLaboralItemSchema = z.object({
-  empresa: z.string().default("No especificada"),
   puesto: z.string().min(1, "El puesto o cargo es requerido"),
-  anioInicio: z.union([z.number().int(), z.string()]).optional().nullable(),
-  anioFin: z.union([z.number().int(), z.string()]).optional().nullable(),
+  empresa: z.string().optional().nullable().default("No especificada"),
+  anioInicio: AnioFlexible.optional(),
+  anioFin: AnioFlexible.optional(),
   esActual: z.boolean().default(false),
 });
 
@@ -24,12 +32,12 @@ export const DatosExtraidosCvSchema = z.object({
   aniosExperienciaEstimados: z.number().min(0).default(0),
   destrezasTecnicas: z.array(z.string().min(1)).default([]),
   esVerificado: z.boolean().default(false),
-  modificadoPor: z.string().uuid().optional().nullable(),
-  fechaVerificacion: z.string().datetime().optional().nullable(),
+  modificadoPor: z.string().optional().nullable(),
+  fechaVerificacion: z.string().optional().nullable(),
   errorDetalle: z.string().optional().nullable(),
 });
 
-// Esquema para el payload de corrección manual desde el frontend
+// Esquema para el payload de corrección manual
 export const ActualizarDatosCvManualSchema = z.object({
   educacion: z.array(EducacionItemSchema).default([]),
   experienciaLaboral: z.array(ExperienciaLaboralItemSchema).default([]),
@@ -37,5 +45,5 @@ export const ActualizarDatosCvManualSchema = z.object({
     .number()
     .min(0, "Los años de experiencia deben ser >= 0"),
   destrezasTecnicas: z.array(z.string()).default([]),
-  modificadoPor: z.string().uuid("ID de usuario inválido"),
+  modificadoPor: z.string().optional().nullable(),
 });

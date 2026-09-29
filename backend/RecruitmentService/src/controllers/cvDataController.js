@@ -97,6 +97,10 @@ export const CvDataController = {
 
       const validacion = ActualizarDatosCvManualSchema.safeParse(req.body);
       if (!validacion.success) {
+        console.error(
+          "[CvDataController.actualizarDatosCv] Error de validación Zod:",
+          JSON.stringify(validacion.error.format(), null, 2),
+        );
         return res.status(400).json({
           success: false,
           message: "Los datos enviados no cumplen con el formato requerido.",

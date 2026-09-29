@@ -135,15 +135,15 @@ export default function CvDatosExtraidos({ idPostulacion, tieneCv, alActualizar 
       const payload = {
         aniosExperienciaEstimados: Number(aniosExperiencia) || 0,
         educacion: educacion.map((ed) => ({
-          institucion: ed.institucion,
-          titulo: ed.titulo,
-          anioFin: ed.anioFin ? Number(ed.anioFin) : null,
+          institucion: ed.institucion.trim(),
+          titulo: ed.titulo.trim(),
+          anioFin: ed.anioFin && String(ed.anioFin).trim() !== "" ? Number(ed.anioFin) : null,
         })),
         experienciaLaboral: experienciaLaboral.map((exp) => ({
-          puesto: exp.puesto,
-          empresa: exp.empresa || "No especificada",
-          anioInicio: exp.anioInicio ? Number(exp.anioInicio) : null,
-          anioFin: exp.esActual ? null : exp.anioFin ? Number(exp.anioFin) : null,
+          puesto: exp.puesto.trim(),
+          empresa: exp.empresa ? exp.empresa.trim() : "No especificada",
+          anioInicio: exp.anioInicio && String(exp.anioInicio).trim() !== "" ? Number(exp.anioInicio) : null,
+          anioFin: exp.esActual ? null : (exp.anioFin && String(exp.anioFin).trim() !== "" ? Number(exp.anioFin) : null),
           esActual: Boolean(exp.esActual),
         })),
         destrezasTecnicas: destrezas,

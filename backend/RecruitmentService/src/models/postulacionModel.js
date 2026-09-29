@@ -109,9 +109,10 @@ export const PostulacionModel = {
   // datos corregidos manualmente
   async actualizarDatosCvManual(idPostulacion, payloadManual) {
     const datosActualizados = {
-      educacion: payloadManual.educacion,
-      aniosExperienciaEstimados: payloadManual.aniosExperienciaEstimados,
-      destrezasTecnicas: payloadManual.destrezasTecnicas,
+      educacion: payloadManual.educacion || [],
+      experienciaLaboral: payloadManual.experienciaLaboral || [],
+      aniosExperienciaEstimados: payloadManual.aniosExperienciaEstimados || 0,
+      destrezasTecnicas: payloadManual.destrezasTecnicas || [],
       esVerificado: true,
       modificadoPor: payloadManual.modificadoPor,
       fechaVerificacion: new Date().toISOString(),

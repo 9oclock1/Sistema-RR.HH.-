@@ -27,52 +27,62 @@ const DICCIONARIO_DESTREZAS = [
   "AWS",
   "Azure",
   "GCP",
+  "Liderazgo",
+  "Comunicación asertiva",
+  "Gestión de activos",
+  "Resolución de problemas",
+  "Elaboración de reportes",
+  "Trabajo en equipo",
 ];
 
 export const RegexFallbackProvider = {
   async extract(rawText) {
-    // busqueda de destrezas tecnicas concordancia lexica
+    // Destrezas
     const destrezasDetectadas = DICCIONARIO_DESTREZAS.filter((tech) => {
       const regex = new RegExp(`\\b${tech.replace(".", "\\.")}\\b`, "i");
       return regex.test(rawText);
     });
 
-    // estimación de años a partir de la busqueda de rangos numéricos
+    // Experiencias basadas en rangos de fechas
     const aniosMatches = [
       ...rawText.matchAll(
         /\b(19\d\d|20\d\d)\s*(?:-|a|al|hasta)\s*(19\d\d|20\d\d|presente|actualidad)\b/gi,
       ),
     ];
-    let totalAnios = 0;
-    const anioActual = new Date().getFullYear();
 
-    aniosMatches.forEach((m) => {
+    const experienciaLaboral = [];
+    aniosMatches.forEach((m, idx) => {
       const inicio = parseInt(m[1], 10);
-      const fin = /presente|actualidad/i.test(m[2])
-        ? anioActual
-        : parseInt(m[2], 10);
-      const diff = fin - inicio;
-      if (diff > 0 && diff <= 40) {
-        totalAnios += diff;
-      }
+      const esActual = /presente|actualidad/i.test(m[2]);
+      const fin = esActual ? null : parseInt(m[2], 10);
+
+      experienciaLaboral.push({
+        puesto: `Experiencia detectada #${idx + 1}`,
+        empresa: "No especificada",
+        anioInicio: inicio,
+        anioFin: fin,
+        esActual,
+      });
     });
 
-    // extraccion de formacion educacional buscando instituciones
+    // Educación
     const educacion = [];
     const eduMatch = rawText.match(
-      /(?:Universidad|Instituto|Colegio|Licenciatura|Ingenier[ií]a)[^\n.]+/i,
+      /(?:Universidad|Instituto|Colegio|Licenciatura|Ingenier[ií]a|Maestr[ií]a)[^\n.]+/gi,
     );
     if (eduMatch) {
-      educacion.push({
-        institucion: eduMatch[0].trim(),
-        titulo: "Grado académico detectado",
-        anioFin: null,
+      eduMatch.slice(0, 3).forEach((item) => {
+        educacion.push({
+          institucion: item.trim(),
+          titulo: "Grado académico detectado",
+          anioFin: null,
+        });
       });
     }
 
     return {
       educacion,
-      aniosExperienciaEstimados: Math.min(totalAnios, 35),
+      experienciaLaboral,
       destrezasTecnicas: destrezasDetectadas,
     };
   },
