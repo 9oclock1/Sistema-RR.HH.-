@@ -1,7 +1,9 @@
-import { Briefcase, Building2, CalendarClock, FileUser, Fingerprint, Megaphone, UserCheck, UserPlus } from "lucide-react";
+import { Briefcase, Building2, CalendarClock, FileUser, Fingerprint, Mail, Megaphone, Send, UserCheck, UserPlus } from "lucide-react";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
+import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
 import CargosList from "../features/Cargos/CargosList";
+import GestionComunicacionesPage from "../features/comunicaciones/GestionComunicacionesPage";
 import MarcajePage from "../features/marcaje/MarcajePage";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
@@ -90,6 +92,27 @@ export const SECCIONES = [
         icono: CalendarClock,
         roles: ["admin"],
         pagina: TurnosPage,
+      },
+    ],
+  },
+  {
+    titulo: "Comunicaciones",
+    modulos: [
+      {
+        ruta: "/comunicaciones/bandeja",
+        etiqueta: "Bandeja de mensajes",
+        descripcion: "Mensajes, notificaciones y comunicados corporativos.",
+        icono: Mail,
+        roles: ["empleado"],
+        pagina: BandejaMensajesPage,
+      },
+      {
+        ruta: "/comunicaciones/gestion",
+        etiqueta: "Gestión de comunicados",
+        descripcion: "Emisión de comunicados, mensajes directos y auditoría de lecturas.",
+        icono: Send,
+        roles: ["supervisor"],
+        pagina: GestionComunicacionesPage,
       },
     ],
   },
