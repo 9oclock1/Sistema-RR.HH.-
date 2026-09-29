@@ -1,4 +1,5 @@
-import { Briefcase, Building2, CalendarClock, Fingerprint, Megaphone } from "lucide-react";
+import { Briefcase, Building2, CalendarClock, Fingerprint, Megaphone, UserCheck } from "lucide-react";
+import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import CargosList from "../features/Cargos/CargosList";
 import MarcajePage from "../features/marcaje/MarcajePage";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
@@ -29,6 +30,14 @@ export const SECCIONES = [
         icono: Briefcase,
         roles: ["admin"],
         pagina: CargosList,
+      },
+      {
+        ruta: "/organizacion/asignaciones",
+        etiqueta: "Asignaciones",
+        descripcion: "Cargo, área y sucursal vigentes de cada empleado, con su historial.",
+        icono: UserCheck,
+        roles: ["admin"],
+        pagina: AsignacionesView,
       },
     ],
   },
