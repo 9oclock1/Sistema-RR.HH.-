@@ -6,6 +6,7 @@ import { postulacionApi } from "../../api/postulacion";
 import CvUploadForm from "./components/CvUploadForm";
 import CvViewer from "./components/CvViewer";
 import "./PostulacionesPage.css";
+import CvDatosExtraidos from "./components/CvDatosExtraidos";
 
 const tieneCvValido = (postulante) => {
   if (!postulante || !postulante.cv_archivo_url) return false;
@@ -159,6 +160,17 @@ export default function PostulacionesPage() {
               </p>
             )}
           </Tarjeta>
+
+          {/* Renderizado de los datos extraídos del CV si ya cuenta con documento */}
+          {postulanteActual && tieneCv && (
+            <div style={{ marginTop: "var(--space-4)" }}>
+              <CvDatosExtraidos
+                idPostulacion={postulanteActual.id_postulacion}
+                tieneCv={tieneCv}
+                alActualizar={() => refrescarPostulantes(convocatoriaId)}
+              />
+            </div>
+          )}
         </div>
 
         <div className="postulaciones-page__panel-accion">

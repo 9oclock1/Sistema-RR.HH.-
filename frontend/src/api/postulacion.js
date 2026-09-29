@@ -73,4 +73,26 @@ export const postulacionApi = {
       formData,
     );
   },
+
+  async obtenerDatosCv(idPostulacion) {
+    const res = await cliente.get(
+      `${BASE_RECRUITMENT}/postulaciones/${idPostulacion}/datos-cv`,
+    );
+    return res.data?.data || res.data;
+  },
+
+  async actualizarDatosCvManual(idPostulacion, payload) {
+    const res = await cliente.put(
+      `${BASE_RECRUITMENT}/postulaciones/${idPostulacion}/datos-cv`,
+      payload,
+    );
+    return res.data?.data || res.data;
+  },
+
+  async analizarCv(idPostulacion) {
+    const res = await cliente.post(
+      `${BASE_RECRUITMENT}/postulaciones/${idPostulacion}/analizar-cv`,
+    );
+    return res.data?.data || res.data;
+  },
 };

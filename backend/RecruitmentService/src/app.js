@@ -4,6 +4,7 @@ import convocatoriaRoutes from "./routes/convocatoriaRoutes.js";
 import postulacionRoutes from "./routes/postulacionRoutes.js";
 import cvTestRoutes from "./routes/cvTestRoutes.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
+import cvDataRoutes from "./routes/cvDataRoutes.js";
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/convocatorias", convocatoriaRoutes);
 app.use("/postulaciones", postulacionRoutes);
 //app.use("/cv", cvTestRoutes);
+app.use("/", cvDataRoutes);
 
 app.use(errorHandler);
 

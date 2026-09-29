@@ -1,8 +1,11 @@
-import pdfParse from "pdf-parse";
 import fs from "fs/promises";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 /**
- * extrae texto plano de un documento PDF a partir de un Buffer o una ruta del sistema de archivos
+ * Extrae texto plano de un documento PDF a partir de un Buffer o una ruta del sistema de archivos
  * @param {Buffer|string} input - Buffer del archivo o ruta del PDF.
  * @returns {Promise<string>} Texto plano contenido en el PDF.
  */

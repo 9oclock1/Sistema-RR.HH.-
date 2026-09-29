@@ -2,14 +2,9 @@ import { LocalLlmProvider } from "./cvAdapters/localLlmProvider.js";
 import { CloudLlmProvider } from "./cvAdapters/cloudLlmProvider.js";
 import { RegexFallbackProvider } from "./cvAdapters/regexFallbackProvider.js";
 import { DatosExtraidosCvSchema } from "../utils/cvDataSchema.js";
+import { calcularAniosExperiencia } from "../utils/experienceCalculator.js";
 
 export const CvParserService = {
-  /**
-   * Orquesta la extracción de datos según el proveedor configurado.
-   * @param {Object} params
-   * @param {string} params.rawText - Texto plano extraído del documento
-   * @param {string[]} [params.imagesBase64] - imágenes en base64 si no hubo texto suficiente
-   */
   async parseCv({ rawText = "", imagesBase64 = [] }) {
     const provider = process.env.CV_PARSER_PROVIDER || "local";
     let extractedPayload;
@@ -32,11 +27,18 @@ export const CvParserService = {
       extractedPayload = await RegexFallbackProvider.extract(rawText);
     }
 
+    const experiencias = extractedPayload.experienciaLaboral || [];
+
+    const aniosCalculados =
+      experiencias.length > 0
+        ? calcularAniosExperiencia(experiencias)
+        : Number(extractedPayload.aniosExperienciaEstimados) || 0;
+
     const resultadoConsolidado = {
       estadoExtraccion: "EXITOSA",
       educacion: extractedPayload.educacion || [],
-      aniosExperienciaEstimados:
-        Number(extractedPayload.aniosExperienciaEstimados) || 0,
+      experienciaLaboral: experiencias,
+      aniosExperienciaEstimados: aniosCalculados,
       destrezasTecnicas: extractedPayload.destrezasTecnicas || [],
       esVerificado: false,
       modificadoPor: null,

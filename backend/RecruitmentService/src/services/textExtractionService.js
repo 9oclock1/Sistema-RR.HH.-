@@ -1,58 +1,52 @@
-import path from "path";
-import { extractTextFromPdf } from "../utils/pdfExtractor.js";
-import { extractTextFromDocx } from "../utils/docxExtractor.js";
-
-const normalizeText = (text) => {
-  if (!text) return "";
-  return text
-    .replace(/\r\n/g, "\n")
-    .replace(/\t/g, " ")
-    .replace(/[ ]{2,}/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-};
+import { extractText as extractPdfText } from "unpdf";
+import mammoth from "mammoth";
 
 export const TextExtractionService = {
-  /**
-   * Extrae y normaliza el texto de un documento PDF o DOCX.
-   * Acepta un Buffer directo o una ruta en disco.
-   * @param {Object} params
-   * @param {Buffer|string} params.fileInput - Buffer en memoria o ruta física del archivo.
-   * @param {string} [params.mimetype] - Mimetype
-   * @param {string} [params.fileName] - Nombre del archivo original
-   * @returns {Promise<{ rawText: string, charCount: number, isTextSufficient: boolean }>}
-   */
   async extractText({ fileInput, mimetype = "", fileName = "" }) {
-    const effectiveMime = mimetype.toLowerCase();
-    const effectiveExt = (fileName ? path.extname(fileName) : "").toLowerCase();
-
-    let extractedText = "";
-
-    const isPdf = effectiveMime.includes("pdf") || effectiveExt === ".pdf";
-
-    const isDocx =
-      effectiveMime.includes("wordprocessingml") ||
-      effectiveMime.includes("officedocument") ||
-      effectiveExt === ".docx";
-
-    if (isPdf) {
-      extractedText = await extractTextFromPdf(fileInput);
-    } else if (isDocx) {
-      extractedText = await extractTextFromDocx(fileInput);
-    } else {
+    if (!Buffer.isBuffer(fileInput)) {
       throw new Error(
-        `Tipo de archivo no soportado para extracción: ${mimetype || effectiveExt}`,
+        "Formato de entrada no soportado para extracción (se requiere Buffer).",
       );
     }
 
-    const cleanText = normalizeText(extractedText);
-    const charCount = cleanText.length;
-    const isTextSufficient = charCount >= 100;
+    const lowerName = fileName.toLowerCase();
+    const isDocx =
+      mimetype.includes("wordprocessingml") ||
+      mimetype.includes("msword") ||
+      mimetype.includes("officedocument") ||
+      lowerName.endsWith(".docx");
 
-    return {
-      rawText: cleanText,
-      charCount,
-      isTextSufficient,
-    };
+    const isPdf = mimetype.includes("pdf") || lowerName.endsWith(".pdf");
+
+    let rawText = "";
+
+    try {
+      if (isDocx) {
+        const result = await mammoth.extractRawText({ buffer: fileInput });
+        rawText = result.value || "";
+      } else if (isPdf) {
+        const { text } = await extractPdfText(new Uint8Array(fileInput));
+        rawText = Array.isArray(text) ? text.join("\n") : text || "";
+      } else {
+        throw new Error(
+          `Tipo de archivo no soportado: ${mimetype || fileName}`,
+        );
+      }
+
+      const cleanText = rawText
+        .replace(/\r\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+      const isTextSufficient = cleanText.length >= 200;
+
+      return {
+        rawText: cleanText,
+        isTextSufficient,
+        charCount: cleanText.length,
+      };
+    } catch (err) {
+      throw new Error(`Fallo en lectura de documento: ${err.message}`);
+    }
   },
 };
