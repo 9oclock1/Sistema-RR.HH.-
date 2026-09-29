@@ -1,5 +1,6 @@
 /* La tabla se desplaza dentro de su contenedor; la página nunca. */
 .ds-tabla-contenedor {
+  position: relative;
   width: 100%;
   overflow-x: auto;
 }
