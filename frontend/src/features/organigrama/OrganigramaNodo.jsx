@@ -12,7 +12,6 @@ export default function OrganigramaNodo({ nodo, nodoSeleccionado, onSeleccionar 
     total === 0 ? 'Vacante' : total === 1 ? empleados[0].nombre : `${total} empleados`;
 
   function alTeclear(e) {
-    if (e.target !== e.currentTarget) return; // ignora teclas que vienen del botón +/−
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onSeleccionar(nodo);
@@ -21,33 +20,32 @@ export default function OrganigramaNodo({ nodo, nodoSeleccionado, onSeleccionar 
 
   return (
     <li className="organigrama__node">
-      <div
-        className={`organigrama__box${seleccionado ? ' organigrama__box--selected' : ''}`}
-        role="button"
-        tabIndex={0}
-        onClick={() => onSeleccionar(nodo)} // Criterio 2
-        onKeyDown={alTeclear}
-      >
+      {/* El botón +/− va como hermano del nodo seleccionable, nunca adentro:
+          un <button> dentro de un role="button" es un elemento interactivo
+          anidado y axe lo marca como error de accesibilidad. */}
+      <div className="organigrama__node-inner">
+        <div
+          className={`organigrama__box${seleccionado ? ' organigrama__box--selected' : ''}`}
+          role="button"
+          tabIndex={0}
+          onClick={() => onSeleccionar(nodo)} // Criterio 2
+          onKeyDown={alTeclear}
+        >
+          <span className="organigrama__box-title">{nodo.cargo}</span>
+          <span className={total === 0 ? 'ui-muted' : 'ui-table__sub'}>{ocupante}</span>
+        </div>
+
         {tieneHijos && (
           <button
             type="button"
             className="ui-icon-btn organigrama__toggle"
             aria-label={expandido ? 'Contraer rama' : 'Expandir rama'}
             aria-expanded={expandido}
-            onClick={(e) => {
-              e.stopPropagation(); // no dispara la selección del nodo
-              setExpandido((prev) => !prev);
-            }}
+            onClick={() => setExpandido((prev) => !prev)}
           >
             {expandido ? '−' : '+'}
           </button>
         )}
-        <span className="organigrama__box-title">{nodo.cargo}</span>
-        <span
-          className={total === 0 ? 'ui-muted' : 'ui-table__sub'}
-        >
-          {ocupante}
-        </span>
       </div>
 
       {tieneHijos && expandido && (

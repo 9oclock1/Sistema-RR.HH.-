@@ -1,5 +1,5 @@
 // src/features/organigrama/OrganigramaView.jsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import organigramaApi from '../../api/organigramaApi';
 import OrganigramaNodo from './OrganigramaNodo';
 import './OrganigramaView.css';
@@ -9,15 +9,21 @@ export default function OrganigramaView() {
   const [nodoSeleccionado, setNodoSeleccionado] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const abortRef = useRef(null);
 
   const cargarOrganigrama = useCallback(async () => {
+    abortRef.current?.abort();
+    const controlador = new AbortController();
+    abortRef.current = controlador;
+
     setCargando(true);
     setError('');
     try {
-      const { data } = await organigramaApi.obtenerArbol();
+      const data = await organigramaApi.obtenerArbol({ signal: controlador.signal });
       setArbol(Array.isArray(data) ? data : []); // criterios 1 y 4: siempre el estado vigente
     } catch (err) {
-      setError('No se pudo cargar el organigrama.');
+      if (err.name === 'AbortError') return;
+      setError(err.message || 'No se pudo cargar el organigrama.');
     } finally {
       setCargando(false);
     }
@@ -25,6 +31,7 @@ export default function OrganigramaView() {
 
   useEffect(() => {
     cargarOrganigrama();
+    return () => abortRef.current?.abort();
   }, [cargarOrganigrama]);
 
   const empleados = nodoSeleccionado?.empleados ?? [];
@@ -32,11 +39,11 @@ export default function OrganigramaView() {
   return (
     <section className="ui-section">
       <header className="ui-section__header">
-        <p className="ui-eyebrow">Organización estructural</p>
+        <p className="ui-eyebrow">Organización</p>
         <h1 className="ui-section__title">Organigrama</h1>
       </header>
 
-      <div className="ui-split">
+      <div className="ui-split organigrama__split">
         <div className="ui-card organigrama__tree-card">
           <div className="ui-card__header">
             <div>

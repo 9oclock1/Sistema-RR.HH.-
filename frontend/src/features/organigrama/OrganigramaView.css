@@ -2,7 +2,22 @@
    La tarjeta, el split y los botones vienen de ui.css. Aquí solo va lo que
    ui.css no tiene: el árbol con conectores y la ficha de detalle del nodo. */
 
+/* A 1280px el árbol quedaba aplastado en una columna angosta y la ficha de
+   detalle se llevaba casi todo el ancho: se fuerza el reparto de columnas
+   acá en vez de depender del valor por defecto de .ui-split. */
+.organigrama__split {
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .organigrama__split {
+    grid-template-columns: 1fr;
+  }
+}
+
 .organigrama__tree-card {
+  min-width: 0;
   overflow-x: auto;
 }
 
@@ -87,8 +102,12 @@
 }
 
 /* ---------- Caja de cada cargo ---------- */
-.organigrama__box {
+.organigrama__node-inner {
   position: relative;
+  display: inline-block;
+}
+
+.organigrama__box {
   display: inline-flex;
   flex-direction: column;
   gap: 2px;

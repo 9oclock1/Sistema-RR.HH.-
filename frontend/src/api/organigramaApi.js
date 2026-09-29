@@ -1,14 +1,16 @@
-// src/api/organigramaApi.js
-import axios from 'axios';
+import { request } from './httpClient';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost/api/empl';
+const BASE = '/empl/organigrama';
 
-export default {
-  obtenerArbol() {
-    return axios.get(`${API_URL}/organigrama`);
-  },
-  urlExportar() {
-    // Se usa directo como href de descarga, no como llamada axios
-    return `${API_URL}/organigrama/exportar`;
-  },
+// El API_URL se calcula igual que en httpClient.js: no se puede importar de
+// ahí (es privado del módulo), así que se replica la misma regla acá nomás
+// para armar el link de descarga.
+const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '');
+
+const organigramaApi = {
+  obtenerArbol: ({ signal } = {}) => request(BASE, { signal }),
+
+  urlExportar: () => `${API_URL}${BASE}/exportar`,
 };
+
+export default organigramaApi;

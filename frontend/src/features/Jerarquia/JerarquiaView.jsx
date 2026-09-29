@@ -1,7 +1,12 @@
 // src/features/jerarquia/JerarquiaView.jsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import jerarquiaApi from '../../api/jerarquiaApi';
 import './JerarquiaView.css';
+
+const FORMATO_FECHA = new Intl.DateTimeFormat('es-BO', {
+  dateStyle: 'short',
+  timeStyle: 'medium',
+});
 
 export default function JerarquiaView() {
   const [cargos, setCargos] = useState([]);
@@ -13,16 +18,17 @@ export default function JerarquiaView() {
   const [historial, setHistorial] = useState([]);
   const [mensaje, setMensaje] = useState(null); // { tipo: 'ok' | 'error', texto }
   const [guardando, setGuardando] = useState(false);
+  const superiorSelectRef = useRef(null);
 
   const cargarCargos = useCallback(async () => {
     setCargandoCargos(true);
     setErrorCargos(false);
     try {
-      const { data } = await jerarquiaApi.listarCargos();
+      const data = await jerarquiaApi.listarCargos();
       setCargos(Array.isArray(data) ? data : []);
     } catch (err) {
       setErrorCargos(true);
-      setMensaje({ tipo: 'error', texto: 'No se pudieron cargar los cargos.' });
+      setMensaje({ tipo: 'error', texto: err.message || 'No se pudieron cargar los cargos.' });
     } finally {
       setCargandoCargos(false);
     }
@@ -45,10 +51,10 @@ export default function JerarquiaView() {
         jerarquiaApi.listarSubordinados(id), // criterio 3
         jerarquiaApi.listarHistorial(id), // criterio 4
       ]);
-      setSubordinados(Array.isArray(subs.data) ? subs.data : []);
-      setHistorial(Array.isArray(hist.data) ? hist.data : []);
+      setSubordinados(Array.isArray(subs) ? subs : []);
+      setHistorial(Array.isArray(hist) ? hist : []);
     } catch (err) {
-      setMensaje({ tipo: 'error', texto: 'No se pudo cargar el detalle del cargo.' });
+      setMensaje({ tipo: 'error', texto: err.message || 'No se pudo cargar el detalle del cargo.' });
     }
   }, []);
 
@@ -72,11 +78,16 @@ export default function JerarquiaView() {
       await cargarCargos();
       await cargarDetalle(idSeleccionado);
     } catch (err) {
-      // Criterio 2: mensaje de rechazo cuando la relación genera un ciclo
+      // Criterio 2: mensaje de rechazo cuando la relación genera un ciclo.
+      // El combo vuelve al superior real (no se queda con el valor rechazado)
+      // y el foco va al select para que se note el motivo del error.
+      const cargoActual = cargos.find((c) => c.id_cargo === idSeleccionado);
+      setIdSuperiorForm(cargoActual?.id_cargo_superior || '');
       setMensaje({
         tipo: 'error',
-        texto: err.response?.data?.error || 'No se pudo guardar la relación jerárquica.',
+        texto: err.message || 'No se pudo guardar la relación jerárquica.',
       });
+      superiorSelectRef.current?.focus();
     } finally {
       setGuardando(false);
     }
@@ -148,7 +159,8 @@ export default function JerarquiaView() {
                   </label>
                   <select
                     id="jer-superior-select"
-                    className="ui-select"
+                    ref={superiorSelectRef}
+                    className="ui-input ui-select"
                     value={idSuperiorForm}
                     onChange={(e) => setIdSuperiorForm(e.target.value)}
                   >
@@ -204,7 +216,7 @@ export default function JerarquiaView() {
                         <tr key={h.id_historial}>
                           <td>{h.superior_anterior || <span className="ui-muted">Sin superior</span>}</td>
                           <td>{h.superior_nuevo || <span className="ui-muted">Sin superior</span>}</td>
-                          <td className="ui-table__num">{new Date(h.cambiado_en).toLocaleString()}</td>
+                          <td className="ui-table__num">{FORMATO_FECHA.format(new Date(h.cambiado_en))}</td>
                         </tr>
                       ))}
                     </tbody>

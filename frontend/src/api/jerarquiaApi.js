@@ -1,22 +1,22 @@
-// src/api/jerarquiaApi.js
-import axios from 'axios';
+import { request } from './httpClient';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost/api/empl';
+const BASE = '/empl/jerarquia';
 
-export default {
-  listarCargos() {
-    return axios.get(`${API_URL}/jerarquia/cargos`);
-  },
-  listarSubordinados(idCargo) {
-    return axios.get(`${API_URL}/jerarquia/cargos/${idCargo}/subordinados`);
-  },
-  listarHistorial(idCargo) {
-    return axios.get(`${API_URL}/jerarquia/cargos/${idCargo}/historial`);
-  },
+const jerarquiaApi = {
+  listarCargos: ({ signal } = {}) => request(`${BASE}/cargos`, { signal }),
+
+  listarSubordinados: (idCargo, { signal } = {}) =>
+    request(`${BASE}/cargos/${idCargo}/subordinados`, { signal }),
+
+  listarHistorial: (idCargo, { signal } = {}) =>
+    request(`${BASE}/cargos/${idCargo}/historial`, { signal }),
+
   // idSuperior null quita el superior actual
-  asignarSuperior(idCargo, idSuperior) {
-    return axios.put(`${API_URL}/jerarquia/cargos/${idCargo}/superior`, {
-      id_cargo_superior: idSuperior,
-    });
-  },
+  asignarSuperior: (idCargo, idSuperior) =>
+    request(`${BASE}/cargos/${idCargo}/superior`, {
+      method: 'PUT',
+      body: { id_cargo_superior: idSuperior },
+    }),
 };
+
+export default jerarquiaApi;

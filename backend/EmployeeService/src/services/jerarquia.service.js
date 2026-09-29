@@ -11,7 +11,12 @@ class JerarquiaError extends Error {
 }
 
 async function cargoOFallar(id, db, opciones) {
-  if (typeof id !== 'string' || !UUID_RE.test(id)) throw new JerarquiaError('El cargo no existe.', 404);
+  // Un id con formato inválido (no-UUID, un número, etc.) es un error del
+  // cliente (400), distinto de "el cargo no existe" (404), que solo aplica
+  // cuando el id SÍ tiene forma de UUID pero no hay ningún cargo con ese id.
+  if (typeof id !== 'string' || !UUID_RE.test(id)) {
+    throw new JerarquiaError('El id del cargo no tiene un formato válido (debe ser un UUID).', 400);
+  }
   const cargo = await model.obtenerCargo(id.toLowerCase(), db, opciones);
   if (!cargo) throw new JerarquiaError('El cargo no existe.', 404);
   return cargo;
@@ -35,7 +40,7 @@ async function listarHistorial(idCargo) {
 // Criterios 1, 2 y 4. idSuperior = null quita el superior.
 async function asignarSuperior(idCargo, idSuperior) {
   if (idSuperior !== null && (typeof idSuperior !== 'string' || !UUID_RE.test(idSuperior))) {
-    throw new JerarquiaError('El cargo superior no existe.', 404);
+    throw new JerarquiaError('El id del cargo superior no tiene un formato válido (debe ser un UUID).', 400);
   }
 
   return model.enTransaccion(async (db) => {

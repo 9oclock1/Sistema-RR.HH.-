@@ -35,7 +35,7 @@ async function asignarSuperior(req, res) {
   try {
     const { id_cargo_superior } = req.body ?? {};
     if (id_cargo_superior === undefined) {
-      return res.status(422).json({ error: 'Debes indicar id_cargo_superior (o null para quitarlo).' });
+      return res.status(400).json({ error: 'Debes indicar id_cargo_superior (o null para quitarlo).' });
     }
     const superior = id_cargo_superior === '' ? null : id_cargo_superior;
     return res.status(200).json(await service.asignarSuperior(req.params.id, superior));

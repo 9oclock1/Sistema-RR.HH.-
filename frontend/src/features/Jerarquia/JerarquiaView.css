@@ -105,4 +105,12 @@
   .jer-ficha .ui-card__header .ui-filter .ui-select {
     max-width: none;
   }
+
+  /* A 375px, este min-width era justamente lo que hacía scrollear la
+     página entera hacia los costados (497px de ancho): la tabla ya tiene
+     su propio scroll horizontal (.ui-table__scroll), así que acá no hace
+     falta forzarle un ancho mínimo. */
+  .jer-historial {
+    min-width: 0;
+  }
 }

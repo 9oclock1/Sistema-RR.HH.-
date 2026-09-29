@@ -6,6 +6,7 @@ async function obtenerArbol(req, res) {
     const arbol = await service.obtenerArbolOrganigrama();
     return res.status(200).json(arbol); // Criterio 1
   } catch (err) {
+    console.error('Error al construir el organigrama:', err);
     return res.status(500).json({ error: 'Error al construir el organigrama.' });
   }
 }
@@ -22,6 +23,7 @@ async function exportar(req, res) {
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).send(JSON.stringify(datos, null, 2));
   } catch (err) {
+    console.error('Error al exportar el organigrama:', err);
     return res.status(500).json({ error: 'Error al exportar el organigrama.' });
   }
 }
