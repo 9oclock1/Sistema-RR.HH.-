@@ -1,0 +1,151 @@
+/* Estilos para el módulo de Reclutamiento / Registro de Postulantes
+   Construido estrictamente con los tokens del sistema de diseño (DESIGN.md). */
+
+.postulantes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.postulantes .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+/* Tarjeta del selector de convocatoria */
+.postulantes-selector-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.postulantes-selector-fila {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: flex-end;
+}
+
+/* Detalle resumen de la convocatoria seleccionada */
+.postulantes-convocatoria-resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  background-color: var(--color-bg-page);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.postulantes-metrica {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.postulantes-metrica__etiqueta {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  color: var(--color-text-subtle);
+  margin: 0;
+}
+
+.postulantes-metrica__valor {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Formulario de postulante */
+.postulante-formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.postulante-formulario__seccion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.postulante-formulario__subtitulo {
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+  padding-bottom: var(--space-1);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.postulante-formulario__cuadricula {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.postulante-formulario__ancho {
+  grid-column: 1 / -1;
+}
+
+.postulante-formulario__acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+/* Elementos de la tabla */
+.postulante-fila-nombre {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.postulante-documento {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  background-color: var(--color-bg-page);
+  padding: 2px 6px;
+  border-radius: var(--radius-control);
+  border: var(--border-width) solid var(--color-border);
+  color: var(--color-text);
+}
+
+.postulante-fecha {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* Prevenir colapso de columnas bajo 1024px con table-layout: fixed */
+.postulantes-tabla {
+  width: 100%;
+}
+
+.postulantes-tabla .ds-tabla {
+  min-width: 900px;
+}
+
+/* Responsividad */
+@media (max-width: 640px) {
+  .postulantes-selector-fila {
+    grid-template-columns: 1fr;
+  }
+
+  .postulante-formulario__cuadricula {
+    grid-template-columns: 1fr;
+  }
+
+  .postulantes-convocatoria-resumen {
+    grid-template-columns: 1fr 1fr;
+  }
+}

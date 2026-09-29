@@ -1,5 +1,6 @@
-import { Briefcase, Building2, CalendarClock, Fingerprint, Megaphone, UserCheck } from "lucide-react";
+import { Briefcase, Building2, CalendarClock, Fingerprint, Megaphone, UserCheck, UserPlus } from "lucide-react";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
+import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import CargosList from "../features/Cargos/CargosList";
 import MarcajePage from "../features/marcaje/MarcajePage";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
@@ -51,6 +52,14 @@ export const SECCIONES = [
         icono: Megaphone,
         roles: ["admin", "reclutador"],
         pagina: VacantesView,
+      },
+      {
+        ruta: "/reclutamiento/postulantes",
+        etiqueta: "Postulantes",
+        descripcion: "Registro de candidatos y postulaciones por convocatoria.",
+        icono: UserPlus,
+        roles: ["reclutador"],
+        pagina: ApplicantRegistration,
       },
     ],
   },

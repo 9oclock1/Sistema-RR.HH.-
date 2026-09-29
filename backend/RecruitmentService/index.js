@@ -2,13 +2,14 @@ const express = require("express");
 const cors = require("cors");
 const pool = require("./db/pool");
 const convocatoriasRoutes = require("./src/routes/convocatorias");
+const applicantRoutes = require("./src/routes/applicantRoutes");
 const errorHandler = require("./src/middlewares/errorHandler");
 
 const app = express();
 const PORT = process.env.PORT || 3003;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 
 app.get("/", (req, res) => {
   res.json({ service: "RecruitmentService", status: "Online", port: PORT });
@@ -32,10 +33,46 @@ app.get("/health", async (req, res) => {
       });
   }
 });
+
 app.use("/convocatorias", convocatoriasRoutes);
 
+// === RF-09: Applicant Registration Routes ===
+app.use("/applicants", applicantRoutes);
+app.use("/postulantes", applicantRoutes);
+
+// ── Stage Catalog Auto-Seed Self-Healing ──
+async function initDbSeed() {
+  try {
+    await pool.query(`
+      INSERT INTO CATALOGOS_ETAPA_POSTULACION (id_etapa, codigo, nombre, orden_flujo) VALUES
+      (1, 'POSTULADO', 'Postulación Recibida', 1),
+      (2, 'REVISION_CV', 'Revisión Curricular', 2),
+      (3, 'ENTREVISTA', 'Entrevista', 3),
+      (4, 'EVALUACION', 'Evaluación Técnica', 4),
+      (5, 'FINALISTA', 'Finalista / Oferta', 5),
+      (6, 'CONTRATADO', 'Contratado', 6),
+      (7, 'RECHAZADO', 'No Seleccionado', 7)
+      ON CONFLICT (id_etapa) DO NOTHING;
+    `);
+    console.log("[DB] Catálogo de etapas inicializado/verificado correctamente.");
+  } catch (err) {
+    console.warn("[DB] Advertencia al verificar catálogo de etapas:", err.message);
+  }
+}
+
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    statusCode: 404,
+    error: "Ruta no encontrada.",
+    message: "Ruta no encontrada.",
+  });
+});
+
+// Debe ir después de todas las rutas.
 app.use(errorHandler);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RecruitmentService corriendo en http://0.0.0.0:${PORT}`);
+  initDbSeed();
 });

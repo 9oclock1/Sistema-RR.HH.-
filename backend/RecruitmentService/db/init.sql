@@ -57,8 +57,8 @@ CREATE TABLE POSTULACIONES (
     id_convocatoria UUID NOT NULL,
     id_postulante UUID NOT NULL,
     id_etapa SMALLINT NOT NULL,
-    cv_archivo_url varchar(255) NOT NULL,
-    cv_formato_mimetype varchar(50) NOT NULL,
+    cv_archivo_url varchar(255) NULL,
+    cv_formato_mimetype varchar(50) NULL,
     datos_extraidos_cv JSONB NULL,
     porcentaje_afinidad numeric(5, 2) NULL,
     posicion_ranking int NULL,
@@ -101,4 +101,13 @@ ADD CONSTRAINT POSTULACIONES_CONVOCATORIAS FOREIGN KEY (id_convocatoria) REFEREN
 -- Reference: POSTULACIONES_POSTULANTES (table: POSTULACIONES)
 ALTER TABLE POSTULACIONES
 ADD CONSTRAINT POSTULACIONES_POSTULANTES FOREIGN KEY (id_postulante) REFERENCES POSTULANTES (id_postulante) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Seed initial recruitment stages catalog (CATALOGOS_ETAPA_POSTULACION)
+INSERT INTO CATALOGOS_ETAPA_POSTULACION (id_etapa, codigo, nombre, orden_flujo)
+VALUES (1, 'POSTULADO', 'Postulación Recibida', 1),
+    (2, 'REVISION_CV', 'Revisión Curricular', 2),
+    (3, 'ENTREVISTA', 'Entrevista', 3),
+    (4, 'EVALUACION', 'Evaluación Técnica', 4),
+    (5, 'FINALISTA', 'Finalista / Oferta', 5),
+    (6, 'CONTRATADO', 'Contratado', 6),
+    (7, 'RECHAZADO', 'No Seleccionado', 7) ON CONFLICT (id_etapa) DO NOTHING;
 -- End of file.
