@@ -2,7 +2,7 @@ import AsignacionesView from './features/Asignaciones/AsignacionesView';
 import CargosList from './features/Cargos/CargosList';
 import OrganizacionView from './features/organizacion/OrganizacionView';
 import OrganigramaView from './features/organigrama/OrganigramaView';
-import JerarquiaView from './features/Jerarquia/Jerarquiaview'; // RF-18
+import JerarquiaView from './features/Jerarquia/JerarquiaView'; // RF-18
 import VacantesView from './features/Vacantes/VacantesView';
 import './App.css';
 

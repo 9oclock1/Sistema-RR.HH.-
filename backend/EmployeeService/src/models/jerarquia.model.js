@@ -62,6 +62,10 @@ async function actualizarSuperior(idCargo, idSuperior, db = pool) {
   await db.query(`UPDATE cargos SET id_cargo_jefe_directo = $2 WHERE id_cargo = $1;`, [idCargo, idSuperior]);
 }
 
+// Ian puede importar esta misma función desde su modelo/controlador de
+// cargos y llamarla después de cualquier UPDATE/INSERT que toque
+// id_cargo_jefe_directo (PUT /cargos/:id, POST /cargos), para que ese
+// cambio también quede en el historial.
 async function registrarHistorial({ idCargo, anterior, nuevo }, db = pool) {
   await db.query(
     `INSERT INTO historial_jerarquia_cargo
