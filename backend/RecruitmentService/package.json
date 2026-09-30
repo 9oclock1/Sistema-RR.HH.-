@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "test": "node --test src/tests/cvUploadTest.js && node test/acceptance_criteria.test.js"
+    "test": "node --test src/tests/cvUploadTest.js src/tests/cvExtractionTest.js && node test/acceptance_criteria.test.js"
   },
   "keywords": [],
   "author": "",
@@ -16,9 +16,14 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "mammoth": "^1.13.0",
     "multer": "^2.4.0",
+    "pdf-parse": "^2.4.5",
+    "pdf2pic": "^3.2.0",
     "pg": "^8.23.0",
-    "uuid": "^14.0.2"
+    "unpdf": "^1.7.0",
+    "uuid": "^14.0.2",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "supertest": "^7.3.0"

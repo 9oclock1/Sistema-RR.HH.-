@@ -19,3 +19,28 @@ Dentro de la base de datos se encuentras las siguientes observaciones que deben 
 ## Entrevistas
 
 - El campo id_entrevistador_empleado debería hacer referencia a un campo similar a id_empleado proporcionado por EmployeeDB.
+
+# Aclaración ténica y Spike
+
+## Evaluación de librerías de Parsing (.pdf y .docx)
+
+- PDF: pdf-parse
+  ventajas:
+  - librería ligera
+  - No tiene dependencias del sistema operativo
+  - ejecución en buffers de memoria
+    desventajas:
+  - extrae texto digital/vectorial embebido (si el cv es una imagen escaneada o fue exportado como raster plano no extrae nada de informacion).
+- DOCX: mammoth
+  ventajas:
+  - diseñada exclusivamente para word
+  - retiene casi al 100% la información del documento
+
+## Estrategia de extracción
+
+- Paso 1: Se procesa el archivo mediante alguna de las librerías mencionadas anteriormente y se extrae el pipeline de texto plano.
+- Paso 2: Evaluación de un threshold de carácteres:
+  - Si el texto extraído supera los 200 carácteres, se envía el texto plano al LLM.
+  - Si el texto plano es menor a 200 carácteres se procede a:
+    - Se delega el análisis al canal de visión del modelo (como imagen a un LLM multimodal).
+    - Se trata de extraer la información como una excepción controlada por ejemplo "estado_extraccion = fallida" y se habilita la carga manual desde el frontend.

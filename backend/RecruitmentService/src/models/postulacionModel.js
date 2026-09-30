@@ -88,6 +88,67 @@ const PostulacionModel = {
     ]);
     return rows[0] || null;
   },
+
+  // pipeline de extraccion
+  async guardarDatosExtraidosCv(idPostulacion, datosJson) {
+    const query = `
+      UPDATE POSTULACIONES
+      SET 
+        datos_extraidos_cv = $2,
+        actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_postulacion = $1
+      RETURNING id_postulacion, datos_extraidos_cv;
+    `;
+    const { rows } = await pool.query(query, [
+      idPostulacion,
+      JSON.stringify(datosJson),
+    ]);
+    return rows[0] || null;
+  },
+
+  // datos corregidos manualmente
+  async actualizarDatosCvManual(idPostulacion, payloadManual) {
+    const datosActualizados = {
+      educacion: payloadManual.educacion || [],
+      experienciaLaboral: payloadManual.experienciaLaboral || [],
+      aniosExperienciaEstimados: payloadManual.aniosExperienciaEstimados || 0,
+      destrezasTecnicas: payloadManual.destrezasTecnicas || [],
+      esVerificado: true,
+      modificadoPor: payloadManual.modificadoPor,
+      fechaVerificacion: new Date().toISOString(),
+      estadoExtraccion: "EXITOSA",
+    };
+
+    const query = `
+      UPDATE POSTULACIONES
+      SET 
+        datos_extraidos_cv = $2,
+        actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_postulacion = $1
+      RETURNING id_postulacion, datos_extraidos_cv;
+    `;
+    const { rows } = await pool.query(query, [
+      idPostulacion,
+      JSON.stringify(datosActualizados),
+    ]);
+    return rows[0] || null;
+  },
+
+  async obtenerDatosCvPorPostulacionId(idPostulacion) {
+    const query = `
+    SELECT 
+      id_postulacion AS "idPostulacion",
+      id_convocatoria AS "idConvocatoria",
+      id_postulante AS "idPostulante",
+      cv_archivo_url AS "cvArchivoUrl",
+      cv_formato_mimetype AS "cvFormatoMimetype",
+      datos_extraidos_cv AS "datosExtraidosCv"
+    FROM POSTULACIONES
+    WHERE id_postulacion = $1;
+  `;
+    const { rows } = await pool.query(query, [idPostulacion]);
+    return rows[0] || null;
+  },
 };
 
 module.exports = { PostulacionModel };

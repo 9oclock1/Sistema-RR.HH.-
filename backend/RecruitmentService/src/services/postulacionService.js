@@ -1,6 +1,7 @@
 const { v7: uuidv7 } = require("uuid");
 const { PostulacionModel } = require("../models/postulacionModel");
 const { saveFile, getFileDetails } = require("./storageService");
+const { CvProcessingService } = require("./cvProcessingService");
 
 const PostulacionService = {
   async registrarPostulacionConCv({ idConvocatoria, idPostulante, file }) {
@@ -47,6 +48,16 @@ const PostulacionService = {
       cvArchivoUrl: storageResult.url,
       cvFormatoMimetype: file.mimetype,
     });
+
+    const datosExtraidos =
+      await CvProcessingService.procesarDocumentoPostulacion({
+        idPostulacion,
+        fileBuffer: file.buffer,
+        mimetype: file.mimetype,
+        fileName: file.originalname,
+      });
+
+    nuevaPostulacion.datos_extraidos_cv = datosExtraidos;
 
     return {
       postulacion: nuevaPostulacion,
@@ -124,6 +135,16 @@ const PostulacionService = {
         cvFormatoMimetype: file.mimetype,
       },
     );
+
+    const datosExtraidos =
+      await CvProcessingService.procesarDocumentoPostulacion({
+        idPostulacion,
+        fileBuffer: file.buffer,
+        mimetype: file.mimetype,
+        fileName: file.originalname,
+      });
+
+    postulacionActualizada.datos_extraidos_cv = datosExtraidos;
 
     return {
       postulacion: postulacionActualizada,

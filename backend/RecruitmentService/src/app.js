@@ -5,6 +5,7 @@ const convocatoriasRoutes = require("./routes/convocatorias");
 const convocatoriaRoutes = require("./routes/convocatoriaRoutes");
 const applicantRoutes = require("./routes/applicantRoutes");
 const postulacionRoutes = require("./routes/postulacionRoutes");
+const cvDataRoutes = require("./routes/cvDataRoutes");
 const errorHandler = require("./middlewares/errorHandler");
 
 const app = express();
@@ -45,6 +46,9 @@ app.use("/postulantes", applicantRoutes);
 
 // RF-10: carga y consulta de CV.
 app.use("/postulaciones", postulacionRoutes);
+
+// RF-11: datos extraídos del CV.
+app.use(cvDataRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
