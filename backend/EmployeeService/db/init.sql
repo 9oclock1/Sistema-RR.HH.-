@@ -280,3 +280,44 @@ CREATE TABLE IF NOT EXISTS HISTORIAL_JERARQUIA_CARGO (
 );
 CREATE INDEX IF NOT EXISTS ix_historial_jerarquia_cargo
     ON HISTORIAL_JERARQUIA_CARGO (id_cargo, cambiado_en DESC);
+
+-- KAN-268 (RF-37): memorándums de llamada de atención.
+ALTER TABLE MEMORANDUMS
+    ADD COLUMN gestion SMALLINT NULL,
+    ADD COLUMN numero_correlativo INT NULL,
+    ADD COLUMN naturaleza_falta varchar(10) NULL,
+    ADD COLUMN gravedad_falta varchar(10) NULL,
+    ADD COLUMN estado_sancion varchar(10) NOT NULL DEFAULT 'BORRADOR',
+    ADD COLUMN evidencia_adjunto_url varchar(255) NULL,
+    ADD COLUMN documento_pdf_url varchar(255) NULL,
+    ADD COLUMN motivo_anulacion text NULL,
+    ADD COLUMN fecha_hora_anulacion TIMESTAMPTZ NULL;
+
+-- El CITE se asigna recién al confirmar la emisión; un borrador aún no lo tiene.
+ALTER TABLE MEMORANDUMS
+    ALTER COLUMN codigo_cite DROP NOT NULL;
+
+ALTER TABLE MEMORANDUMS
+    ADD CONSTRAINT uq_memorandum_codigo_cite UNIQUE (codigo_cite),
+    ADD CONSTRAINT uq_memorandum_correlativo UNIQUE (gestion, numero_correlativo),
+    ADD CONSTRAINT ck_memorandum_naturaleza_falta CHECK (naturaleza_falta IN ('OPERATIVA', 'CONDUCTA')),
+    ADD CONSTRAINT ck_memorandum_gravedad_falta CHECK (gravedad_falta IN ('LEVE', 'MODERADA', 'GRAVE')),
+    ADD CONSTRAINT ck_memorandum_falta_completa CHECK ((naturaleza_falta IS NULL) = (gravedad_falta IS NULL)),
+    ADD CONSTRAINT ck_memorandum_estado_sancion CHECK (estado_sancion IN ('BORRADOR', 'EMITIDO', 'ANULADO')),
+    ADD CONSTRAINT ck_memorandum_correlativo_positivo CHECK (numero_correlativo > 0),
+    ADD CONSTRAINT ck_memorandum_emitido_con_correlativo CHECK (
+        estado_sancion = 'BORRADOR'
+        OR (gestion IS NOT NULL AND numero_correlativo IS NOT NULL AND codigo_cite IS NOT NULL)
+    ),
+    ADD CONSTRAINT ck_memorandum_anulacion CHECK (
+        (estado_sancion = 'ANULADO') = (motivo_anulacion IS NOT NULL AND fecha_hora_anulacion IS NOT NULL)
+    );
+CREATE INDEX ix_memorandum_receptor_estado_fecha
+    ON MEMORANDUMS (id_empleado_receptor, estado_sancion, fecha_emision DESC);
+
+CREATE TABLE CORRELATIVOS_MEMORANDUM (
+    gestion SMALLINT NOT NULL,
+    ultimo_numero INT NOT NULL DEFAULT 0,
+    CONSTRAINT CORRELATIVOS_MEMORANDUM_pk PRIMARY KEY (gestion),
+    CONSTRAINT ck_correlativo_memorandum_no_negativo CHECK (ultimo_numero >= 0)
+);
