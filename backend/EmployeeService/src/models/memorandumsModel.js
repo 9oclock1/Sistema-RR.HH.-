@@ -1,5 +1,10 @@
 const { randomUUID } = require('node:crypto');
 
+const COLUMNAS = `id_memorandum, id_empleado_receptor, id_tipo_memo, id_empleado_emisor,
+               codigo_cite, asunto, contenido_descripcion, fecha_emision,
+               gestion, numero_correlativo, naturaleza_falta, gravedad_falta,
+               estado_sancion, evidencia_adjunto_url, documento_pdf_url`;
+
 // Amonestaciones del empleado en los últimos `meses`; las anuladas no cuentan.
 const contarRecientes = async (db, idEmpleadoReceptor, meses) => {
   const { rows } = await db.query(
@@ -34,10 +39,7 @@ const insertarBorrador = async (db, memorandum) => {
         estado_sancion, evidencia_adjunto_url
      )
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'BORRADOR', $13)
-     RETURNING id_memorandum, id_empleado_receptor, id_tipo_memo, id_empleado_emisor,
-               codigo_cite, asunto, contenido_descripcion, fecha_emision,
-               gestion, numero_correlativo, naturaleza_falta, gravedad_falta,
-               estado_sancion, evidencia_adjunto_url, documento_pdf_url`,
+     RETURNING ${COLUMNAS}`,
     [
       randomUUID(),
       memorandum.id_empleado_receptor,
@@ -57,4 +59,43 @@ const insertarBorrador = async (db, memorandum) => {
   return rows[0];
 };
 
-module.exports = { contarRecientes, siguienteCorrelativo, insertarBorrador };
+// Datos del memorándum, del amonestado y del emisor que van impresos en el PDF oficial.
+const obtenerParaDocumento = async (db, idMemorandum) => {
+  const { rows } = await db.query(
+    `SELECT m.codigo_cite,
+            m.asunto,
+            m.contenido_descripcion,
+            m.fecha_emision,
+            m.naturaleza_falta,
+            m.gravedad_falta,
+            m.evidencia_adjunto_url,
+            t.nombre AS tipo_nombre,
+            concat_ws(' ', r.nombres, r.primer_apellido, r.segundo_apellido) AS receptor_nombre,
+            concat_ws('-', r.numero_documento, r.complemento_documento) AS receptor_documento,
+            cr.nombre AS receptor_cargo,
+            sr.nombre AS receptor_sucursal,
+            sr.ciudad AS receptor_ciudad,
+            concat_ws(' ', e.nombres, e.primer_apellido, e.segundo_apellido) AS emisor_nombre,
+            ce.nombre AS emisor_cargo
+       FROM memorandums m
+       JOIN tipos_memorandum t ON t.id_tipo_memo = m.id_tipo_memo
+       JOIN empleados r        ON r.id_empleado = m.id_empleado_receptor
+       JOIN cargos cr          ON cr.id_cargo = r.id_cargo_actual
+       JOIN sucursales sr      ON sr.id_sucursal = r.id_sucursal_actual
+       JOIN empleados e        ON e.id_empleado = m.id_empleado_emisor
+       JOIN cargos ce          ON ce.id_cargo = e.id_cargo_actual
+      WHERE m.id_memorandum = $1`,
+    [idMemorandum]
+  );
+  return rows[0] || null;
+};
+
+const guardarRutaPdf = async (db, idMemorandum, rutaPdf) => {
+  const { rows } = await db.query(
+    `UPDATE memorandums SET documento_pdf_url = $1 WHERE id_memorandum = $2 RETURNING ${COLUMNAS}`,
+    [rutaPdf, idMemorandum]
+  );
+  return rows[0];
+};
+
+module.exports = { contarRecientes, siguienteCorrelativo, insertarBorrador, obtenerParaDocumento, guardarRutaPdf };
