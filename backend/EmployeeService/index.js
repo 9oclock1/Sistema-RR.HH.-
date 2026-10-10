@@ -8,6 +8,7 @@ const empleadosRoutes = require("./src/routes/empleados");
 const asignacionesRoutes = require("./src/routes/asignaciones");
 const organigramaRoutes = require("./src/routes/organigrama.routes"); // RF-20
 const jerarquiaRoutes = require("./src/routes/jerarquia.routes"); // RF-18
+const memorandumsRoutes = require("./src/routes/memorandums"); // RF-37
 const errorHandler = require("./src/middlewares/errorHandler");
 
 const app = express();
@@ -44,6 +45,7 @@ app.use("/empleados", empleadosRoutes);
 app.use("/asignaciones", asignacionesRoutes);
 app.use("/organigrama", organigramaRoutes); // RF-20
 app.use("/jerarquia", jerarquiaRoutes); // RF-18
+app.use("/memorandums", memorandumsRoutes); // RF-37
 
 // Cualquier ruta que no matcheó nada de arriba: 404 en JSON, no el HTML
 // por defecto de Express.

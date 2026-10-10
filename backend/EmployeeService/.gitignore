@@ -10,3 +10,6 @@ npm-debug.log*
 .env
 .env.local
 .env.*.local
+
+# adjuntos subidos (evidencia de memorándums)
+uploads/

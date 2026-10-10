@@ -1,8 +1,21 @@
+const multer = require('multer');
 const HttpError = require('../utils/HttpError');
+const { MAX_MB } = require('./evidenciaUpload');
+
+const MENSAJES_MULTER = {
+  LIMIT_FILE_SIZE: `El archivo supera el tamaño máximo permitido de ${MAX_MB} MB.`,
+  LIMIT_FILE_COUNT: 'Solo se admite un archivo adjunto.',
+  LIMIT_UNEXPECTED_FILE: 'Campo de archivo no esperado.',
+};
 
 const errorHandler = (err, req, res, next) => {
   if (err instanceof HttpError) {
     return res.status(err.status).json({ error: err.message, ...err.detalles });
+  }
+
+  if (err instanceof multer.MulterError) {
+    const mensaje = MENSAJES_MULTER[err.code] || 'No se pudo procesar el archivo adjunto.';
+    return res.status(400).json({ error: mensaje, campos_faltantes: [], errores: [{ campo: err.field || 'evidencia', mensaje }] });
   }
 
   if (err.type === 'entity.parse.failed') {
