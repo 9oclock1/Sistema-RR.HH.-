@@ -6,12 +6,14 @@ const COLUMNAS = `id_memorandum, id_empleado_receptor, id_tipo_memo, id_empleado
                estado_sancion, evidencia_adjunto_url, documento_pdf_url`;
 
 // Amonestaciones del empleado en los últimos `meses`; las anuladas no cuentan.
+// Los reconocimientos (RF-38) viven en la misma tabla sin datos de falta y tampoco cuentan.
 const contarRecientes = async (db, idEmpleadoReceptor, meses) => {
   const { rows } = await db.query(
     `SELECT COUNT(*)::int AS total
        FROM memorandums
       WHERE id_empleado_receptor = $1
         AND estado_sancion <> 'ANULADO'
+        AND naturaleza_falta IS NOT NULL
         AND fecha_emision >= CURRENT_DATE - make_interval(months => $2::int)`,
     [idEmpleadoReceptor, meses]
   );
@@ -59,6 +61,41 @@ const insertarBorrador = async (db, memorandum) => {
   return rows[0];
 };
 
+const obtenerTipo = async (db, idTipoMemo) => {
+  const { rows } = await db.query(
+    'SELECT id_tipo_memo, clasificacion, nombre FROM tipos_memorandum WHERE id_tipo_memo = $1',
+    [idTipoMemo]
+  );
+  return rows[0] || null;
+};
+
+// RF-38: un reconocimiento no lleva datos de falta ni evidencia y queda emitido al registrarse.
+const insertarReconocimiento = async (db, reconocimiento) => {
+  const { rows } = await db.query(
+    `INSERT INTO memorandums (
+        id_memorandum, id_empleado_receptor, id_tipo_memo, id_empleado_emisor,
+        codigo_cite, asunto, contenido_descripcion, fecha_emision,
+        gestion, numero_correlativo, naturaleza_falta, gravedad_falta,
+        estado_sancion
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NULL, NULL, 'EMITIDO')
+     RETURNING ${COLUMNAS}`,
+    [
+      randomUUID(),
+      reconocimiento.id_empleado_receptor,
+      reconocimiento.id_tipo_memo,
+      reconocimiento.id_empleado_emisor,
+      reconocimiento.codigo_cite,
+      reconocimiento.asunto,
+      reconocimiento.contenido_descripcion,
+      reconocimiento.fecha_emision,
+      reconocimiento.gestion,
+      reconocimiento.numero_correlativo,
+    ]
+  );
+  return rows[0];
+};
+
 // Datos del memorándum, del amonestado y del emisor que van impresos en el PDF oficial.
 const obtenerParaDocumento = async (db, idMemorandum) => {
   const { rows } = await db.query(
@@ -98,4 +135,12 @@ const guardarRutaPdf = async (db, idMemorandum, rutaPdf) => {
   return rows[0];
 };
 
-module.exports = { contarRecientes, siguienteCorrelativo, insertarBorrador, obtenerParaDocumento, guardarRutaPdf };
+module.exports = {
+  contarRecientes,
+  siguienteCorrelativo,
+  insertarBorrador,
+  obtenerTipo,
+  insertarReconocimiento,
+  obtenerParaDocumento,
+  guardarRutaPdf,
+};

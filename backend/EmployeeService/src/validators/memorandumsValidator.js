@@ -53,4 +53,4 @@ const validarMemorandum = (body) => {
   return memorandum;
 };
 
-module.exports = { validarMemorandum };
+module.exports = { validarMemorandum, normalizarIdTipoMemo };
