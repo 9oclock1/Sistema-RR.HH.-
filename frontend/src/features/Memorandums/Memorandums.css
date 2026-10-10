@@ -1,0 +1,96 @@
+/* Valores solo desde styles/tokens.css (ver DESIGN.md). */
+
+.memo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.memo .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+.memo-contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: calc(var(--size-sidebar) * 3);
+}
+
+/* ---------- Resultado de la emisión ---------- */
+.memo-resultado {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-radius: var(--radius-card);
+}
+
+.memo-resultado:focus {
+  outline: none;
+}
+
+.memo-resultado:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-border-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.memo-documento {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.memo-documento__etiqueta {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  font-weight: var(--font-weight-semibold);
+}
+
+.memo-documento__ruta {
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Formulario ---------- */
+.memo-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.memo-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.memo-fila {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.memo-form__pie {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .memo-fila {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -1,4 +1,4 @@
-import { Briefcase, Building2, CalendarClock, FileUser, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
+import { Briefcase, Building2, CalendarClock, FileUser, FileWarning, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
@@ -6,6 +6,7 @@ import CargosList from "../features/Cargos/CargosList";
 import GestionComunicacionesPage from "../features/comunicaciones/GestionComunicacionesPage";
 import JerarquiaView from "../features/Jerarquia/JerarquiaView";
 import MarcajePage from "../features/marcaje/MarcajePage";
+import MemorandumsView from "../features/Memorandums/MemorandumsView";
 import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
@@ -110,6 +111,19 @@ export const SECCIONES = [
         icono: CalendarClock,
         roles: ["admin"],
         pagina: TurnosPage,
+      },
+    ],
+  },
+  {
+    titulo: "Disciplina",
+    modulos: [
+      {
+        ruta: "/disciplina/memorandums",
+        etiqueta: "Llamadas de atención",
+        descripcion: "Emisión de memorándums de llamada de atención con evidencia y documento oficial.",
+        icono: FileWarning,
+        roles: ["supervisor"],
+        pagina: MemorandumsView,
       },
     ],
   },

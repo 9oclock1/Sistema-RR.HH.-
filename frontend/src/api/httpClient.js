@@ -12,13 +12,17 @@ export class ApiError extends Error {
 }
 
 export async function request(path, { method = 'GET', body, signal } = {}) {
+  // Con FormData (archivos adjuntos) el navegador define el Content-Type con su boundary.
+  const esFormData = body instanceof FormData;
+  const enviaJson = body !== undefined && !esFormData;
+
   let response;
   try {
     response = await fetch(`${API_URL}${path}`, {
       method,
       signal,
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      headers: enviaJson ? { 'Content-Type': 'application/json' } : undefined,
+      body: enviaJson ? JSON.stringify(body) : body,
     });
   } catch (error) {
     if (error.name === 'AbortError') throw error;
