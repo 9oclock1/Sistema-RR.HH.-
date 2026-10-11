@@ -167,6 +167,26 @@ const crearPoolFalso = () => {
     return { ...fila };
   };
 
+  const obtenerResumen = ([idEmpleado]) => {
+    const empleado = estado.empleados[idEmpleado];
+    return empleado ? { id_empleado: idEmpleado, nombres: empleado.nombre, apellidos: '', activo: true } : null;
+  };
+
+  const listarPorEmpleado = ([idEmpleado]) =>
+    estado.memorandums
+      .filter((fila) => fila.id_empleado_receptor === idEmpleado && fila.estado_sancion !== 'ANULADO')
+      .sort((a, b) => b.fecha_emision.localeCompare(a.fecha_emision) || b.numero_correlativo - a.numero_correlativo)
+      .map((fila) => ({
+        id_memorandum: fila.id_memorandum,
+        codigo_cite: fila.codigo_cite,
+        asunto: fila.asunto,
+        fecha_emision: fila.fecha_emision,
+        gravedad_falta: fila.gravedad_falta,
+        documento_pdf_url: fila.documento_pdf_url,
+        tipo_nombre: estado.tipos[fila.id_tipo_memo].nombre,
+        es_reconocimiento: fila.naturaleza_falta == null,
+      }));
+
   const filas = (fila) => ({ rows: fila ? [fila] : [] });
 
   const query = async (sql, params = []) => {
@@ -188,6 +208,8 @@ const crearPoolFalso = () => {
     if (/INSERT INTO correlativos_memorandum/i.test(texto)) return filas({ ultimo_numero: siguienteCorrelativo(params) });
     if (/FROM tipos_memorandum WHERE id_tipo_memo/i.test(texto)) return filas(estado.tipos[params[0]]);
     if (/INSERT INTO memorandums/i.test(texto)) return filas(insertarMemorandum(params, texto));
+    if (/permite_acceso AS activo FROM empleados e/i.test(texto)) return filas(obtenerResumen(params));
+    if (/WHERE m\.id_empleado_receptor = \$1/i.test(texto)) return { rows: listarPorEmpleado(params) };
     if (/FROM memorandums m JOIN tipos_memorandum/i.test(texto)) return filas(obtenerParaDocumento(params));
     if (/UPDATE memorandums SET documento_pdf_url/i.test(texto)) return filas(guardarRutaPdf(params));
 
