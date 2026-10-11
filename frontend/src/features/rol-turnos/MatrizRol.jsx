@@ -8,6 +8,7 @@ import { abreviar, esFinDeSemana, formatearDiaCorto, formatearDiaLargo, franjaDe
 const DESCANSO = "descanso";
 const VACIAR = "vaciar";
 const TIPO_ARRASTRE = "text/plain";
+const MAXIMO_ATAJOS = 9;
 
 const valorDePincel = (clave) => {
   if (clave === VACIAR) return null;
@@ -115,7 +116,7 @@ export default function MatrizRol({ rol, paleta, valorDe, cambiar }) {
       return;
     }
     const numero = Number(evento.key);
-    if (Number.isInteger(numero) && numero >= 1 && numero <= opciones.length) {
+    if (Number.isInteger(numero) && numero >= 1 && numero <= Math.min(opciones.length, MAXIMO_ATAJOS)) {
       evento.preventDefault();
       setPincel(opciones[numero - 1].clave);
     }
@@ -190,9 +191,11 @@ export default function MatrizRol({ rol, paleta, valorDe, cambiar }) {
                   <span className="rt-pincel__nombre">{opcion.etiqueta}</span>
                   {opcion.detalle && <span className="rt-pincel__detalle">{opcion.detalle}</span>}
                 </span>
-                <kbd className="rt-pincel__atajo" aria-hidden="true">
-                  {indice + 1}
-                </kbd>
+                {indice < MAXIMO_ATAJOS && (
+                  <kbd className="rt-pincel__atajo" aria-hidden="true">
+                    {indice + 1}
+                  </kbd>
+                )}
               </button>
             );
           })}
@@ -209,7 +212,7 @@ export default function MatrizRol({ rol, paleta, valorDe, cambiar }) {
       <p id="rt-ayuda-matriz" className="rt-ayuda">
         Elija un turno y haga clic en las celdas (o arrastre el puntero sobre varias). También puede arrastrar un turno
         hasta una celda, el nombre de un colaborador (toda su fila) o un día (todo el personal). Con el teclado: flechas
-        para moverse, Enter para asignar, Supr para vaciar y 1–{opciones.length} para elegir el turno.
+        para moverse, Enter para asignar, Supr para vaciar y 1–{Math.min(opciones.length, MAXIMO_ATAJOS)} para elegir el turno.
       </p>
 
       <div className="rt-matriz" role="region" aria-label="Matriz de turnos" tabIndex={-1}>

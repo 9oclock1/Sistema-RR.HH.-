@@ -6,7 +6,8 @@ const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 const aFecha = (texto) => new Date(`${texto}T00:00:00Z`);
 const aTexto = (fecha) => fecha.toISOString().slice(0, 10);
 
-const esFechaValida = (texto) => typeof texto === "string" && FECHA_RE.test(texto) && aTexto(aFecha(texto)) === texto;
+const esFechaValida = (texto) =>
+  typeof texto === "string" && FECHA_RE.test(texto) && !isNaN(aFecha(texto)) && aTexto(aFecha(texto)) === texto;
 
 function sumarDias(texto, dias) {
   const fecha = aFecha(texto);
