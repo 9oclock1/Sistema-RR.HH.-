@@ -127,6 +127,26 @@ const obtenerParaDocumento = async (db, idMemorandum) => {
   return rows[0] || null;
 };
 
+const listarPorEmpleado = async (db, idEmpleado) => {
+  const { rows } = await db.query(
+    `SELECT m.id_memorandum,
+            m.codigo_cite,
+            m.asunto,
+            m.fecha_emision,
+            m.gravedad_falta,
+            m.documento_pdf_url,
+            t.nombre AS tipo_nombre,
+            (m.naturaleza_falta IS NULL) AS es_reconocimiento
+       FROM memorandums m
+       JOIN tipos_memorandum t ON t.id_tipo_memo = m.id_tipo_memo
+      WHERE m.id_empleado_receptor = $1
+        AND m.estado_sancion <> 'ANULADO'
+      ORDER BY m.fecha_emision DESC, m.numero_correlativo DESC`,
+    [idEmpleado]
+  );
+  return rows;
+};
+
 const guardarRutaPdf = async (db, idMemorandum, rutaPdf) => {
   const { rows } = await db.query(
     `UPDATE memorandums SET documento_pdf_url = $1 WHERE id_memorandum = $2 RETURNING ${COLUMNAS}`,
@@ -142,5 +162,6 @@ module.exports = {
   obtenerTipo,
   insertarReconocimiento,
   obtenerParaDocumento,
+  listarPorEmpleado,
   guardarRutaPdf,
 };

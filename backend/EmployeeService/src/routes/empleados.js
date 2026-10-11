@@ -6,5 +6,6 @@ const router = express.Router();
 router.get('/', empleadosController.listarEmpleados);
 router.get('/:id', empleadosController.obtenerResumen);
 router.get('/:id/ficha', empleadosController.obtenerFicha);
+router.get('/:id/memorandums', empleadosController.listarMemorandums);
 
 module.exports = router;
