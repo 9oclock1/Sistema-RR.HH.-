@@ -180,3 +180,54 @@
     width: 100%;
   }
 }
+
+/* Mis turnos */
+.mis-turnos {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mis-turnos__dia {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  justify-content: space-between;
+  align-items: center;
+  min-height: var(--size-row);
+  padding: var(--space-2) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.mis-turnos__dia:last-child {
+  border-bottom: 0;
+}
+
+.mis-turnos__dia--hoy {
+  font-weight: var(--font-weight-semibold);
+}
+
+.mis-turnos__fecha {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mis-turnos__fecha time::first-letter {
+  text-transform: uppercase;
+}
+
+.mis-turnos__fecha time {
+  display: inline-block;
+}
+
+.mis-turnos__horario {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mis-turnos__sin {
+  color: var(--color-text-subtle);
+}

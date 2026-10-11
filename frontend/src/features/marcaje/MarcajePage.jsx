@@ -12,6 +12,7 @@ import {
   Tarjeta,
 } from "../../components/ui";
 import IdentificacionEmpleado from "./IdentificacionEmpleado";
+import MisTurnos from "./MisTurnos";
 import Reloj from "./Reloj";
 import ResumenJornada from "./ResumenJornada";
 import { describirOrigen, formatearFechaJornada, formatearHora } from "./formato";
@@ -261,6 +262,8 @@ export default function MarcajePage() {
             )}
           </Tarjeta>
         )}
+
+        {jornada && <MisTurnos key={idEmpleado} idEmpleado={idEmpleado} />}
       </div>
 
       <ModalConfirmacion
