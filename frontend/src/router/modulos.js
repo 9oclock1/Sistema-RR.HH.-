@@ -1,4 +1,4 @@
-import { Briefcase, Building2, CalendarClock, FileUser, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
+import { Briefcase, Building2, CalendarClock, CalendarRange, FileUser, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
@@ -9,6 +9,7 @@ import MarcajePage from "../features/marcaje/MarcajePage";
 import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
+import RolTurnosPage from "../features/rol-turnos/RolTurnosPage";
 import TurnosPage from "../features/turnos/TurnosPage";
 import VacantesView from "../features/Vacantes/VacantesView";
 import { puedeAcceder } from "../utils/permisos";
@@ -110,6 +111,14 @@ export const SECCIONES = [
         icono: CalendarClock,
         roles: ["admin"],
         pagina: TurnosPage,
+      },
+      {
+        ruta: "/asistencia/rol-turnos",
+        etiqueta: "Rol de turnos",
+        descripcion: "Turnos rotativos semanales o mensuales por sucursal y área.",
+        icono: CalendarRange,
+        roles: ["supervisor"],
+        pagina: RolTurnosPage,
       },
     ],
   },
