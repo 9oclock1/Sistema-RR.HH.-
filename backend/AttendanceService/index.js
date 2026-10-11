@@ -3,13 +3,15 @@ const cors = require("cors");
 const pool = require("./src/config/db");
 const turnosRoutes = require("./src/routes/turnos.routes");
 const marcajesRoutes = require("./src/routes/marcajes.routes");
+const rolesTurnoRoutes = require("./src/routes/rolesTurno.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 
 const app = express();
 const PORT = process.env.PORT || 3004;
 
 app.use(cors());
-app.use(express.json());
+// Un rol mensual puede guardar miles de celdas de una vez.
+app.use(express.json({ limit: "1mb" }));
 
 app.get("/", (req, res) => {
   res.json({ service: "AttendanceService", status: "Online", port: PORT });
@@ -36,6 +38,7 @@ app.get("/health", async (req, res) => {
 
 app.use(turnosRoutes);
 app.use(marcajesRoutes);
+app.use(rolesTurnoRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {

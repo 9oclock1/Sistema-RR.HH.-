@@ -1,16 +1,27 @@
 const NOMBRE_COMPLETO = `concat_ws(' ', e.nombres, e.primer_apellido, e.segundo_apellido)`;
 
-const listar = async (db) => {
+// Filtros opcionales: sucursal actual y área del cargo actual.
+const listar = async (db, { idSucursal = null, idDepartamento = null } = {}) => {
   const { rows } = await db.query(
     `SELECT e.id_empleado,
             ${NOMBRE_COMPLETO} AS nombre_completo,
             e.numero_documento,
             c.nombre AS cargo,
-            s.nombre AS sucursal
+            s.nombre AS sucursal,
+            c.id_cargo,
+            e.id_sucursal_actual AS id_sucursal,
+            c.id_departamento,
+            d.nombre AS area,
+            ee.permite_acceso AS activo
        FROM empleados e
-       JOIN cargos c     ON c.id_cargo = e.id_cargo_actual
-       JOIN sucursales s ON s.id_sucursal = e.id_sucursal_actual
-      ORDER BY e.primer_apellido ASC, e.segundo_apellido ASC NULLS FIRST, e.nombres ASC`
+       JOIN cargos c            ON c.id_cargo = e.id_cargo_actual
+       JOIN sucursales s        ON s.id_sucursal = e.id_sucursal_actual
+       JOIN departamentos d     ON d.id_departamento = c.id_departamento
+       JOIN estados_empleado ee ON ee.id_estado_empleado = e.id_estado_empleado
+      WHERE ($1::uuid IS NULL OR e.id_sucursal_actual = $1)
+        AND ($2::uuid IS NULL OR c.id_departamento = $2)
+      ORDER BY e.primer_apellido ASC, e.segundo_apellido ASC NULLS FIRST, e.nombres ASC`,
+    [idSucursal, idDepartamento]
   );
   return rows;
 };

@@ -36,7 +36,7 @@ const construirFicha = async (db, idEmpleado) => {
   return aFicha(fila, await asignacionesModel.listarPorEmpleado(db, idEmpleado));
 };
 
-const listarEmpleados = () => empleadosModel.listar(pool);
+const listarEmpleados = (filtros) => empleadosModel.listar(pool, filtros);
 
 const obtenerFicha = (idEmpleado) => construirFicha(pool, idEmpleado);
 
