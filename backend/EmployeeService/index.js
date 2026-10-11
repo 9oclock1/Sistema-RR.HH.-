@@ -49,14 +49,16 @@ app.use("/jerarquia", jerarquiaRoutes); // RF-18
 app.use("/memorandums", memorandumsRoutes); // RF-37
 app.use("/reconocimientos", reconocimientosRoutes); // RF-38
 
-// Cualquier ruta que no matcheó nada de arriba: 404 en JSON, no el HTML
-// por defecto de Express.
 app.use((req, res) => {
   res.status(404).json({ error: `Ruta no encontrada: ${req.method} ${req.originalUrl}` });
 });
 
 app.use(errorHandler);
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`EmployeeService corriendo en http://0.0.0.0:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`EmployeeService corriendo en http://0.0.0.0:${PORT}`);
+  });
+}
+
+module.exports = app;
