@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { History, UserSearch } from 'lucide-react';
 import { Alerta, Avatar, Boton, Esqueleto, EstadoVacio, Etiqueta, Tabla, Tarjeta, TextoTruncado } from '../../../components/ui';
 import { formatearFecha } from '../../Vacantes/utils/formato';
+import HistorialMemorandums from './HistorialMemorandums';
 
 const documento = (ficha) =>
   ficha.complemento_documento ? `${ficha.numero_documento}-${ficha.complemento_documento}` : ficha.numero_documento;
@@ -158,6 +159,13 @@ export default function FichaEmpleado({ ficha, cargando, error, onReintentar, se
             claveFila="id_asignacion"
             vacio={<EstadoVacio icono={History} titulo="Sin historial" mensaje="Aún no hay asignaciones registradas." />}
           />
+        </section>
+
+        <section className="asig-bloque" aria-labelledby={`${uid}-memorandums`}>
+          <h4 id={`${uid}-memorandums`} className="asig-bloque__titulo">
+            Memorándums
+          </h4>
+          <HistorialMemorandums key={ficha.id_empleado} idEmpleado={ficha.id_empleado} nombre={ficha.nombre_completo} />
         </section>
       </>
     );
