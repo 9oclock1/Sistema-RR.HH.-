@@ -42,3 +42,9 @@
 
 - `EVENTOS_SALIENTES` guarda, en la misma transacción que la publicación, los avisos para otros módulos (patrón outbox). Un proceso los envía después y reintenta si fallan.
 - `topico` indica el destino; `carga` es el cuerpo JSON que se envía. Estados: `PENDIENTE`, `ENTREGADO`, `FALLIDO` (agotó los reintentos).
+- Al publicar un rol de un área de producción o de reparto se registra un evento `ROL_TURNOS_PUBLICADO` por tópico. El área se reconoce por su código en EmployeeDB:
+  - `AREAS_PRODUCCION` (panadería, fraccionamiento…) → tópico `produccion-logistica` (Producción y Logística).
+  - `AREAS_REPARTO` (choferes de reparto) → tópico `entregas-despachos` (Gestión de Entregas y Despachos).
+- La carga trae el periodo, la sucursal, el área, la disponibilidad por día (cuántos en mañana, tarde, noche y descanso) y el turno de cada colaborador. Cada nueva publicación del rol genera eventos nuevos con la versión.
+- Si el tópico tiene URL (`URL_PRODUCCION_LOGISTICA`, `URL_ENTREGAS_DESPACHOS`), el despachador hace `POST` con la carga y las cabeceras `X-Evento-Id` y `X-Topico`; una respuesta 2xx lo marca como entregado. Reintenta con espera creciente (30 s, 1 min, 2 min… hasta 1 h) y tras 8 intentos queda fallido.
+- Sin URL, el módulo puede leer los eventos con `GET /eventos?topico=&estado=PENDIENTE` y confirmarlos con `POST /eventos/:id/confirmar`. Los consumidores deben ignorar un `X-Evento-Id` ya procesado (un evento puede llegar más de una vez).

@@ -4,7 +4,9 @@ const pool = require("./src/config/db");
 const turnosRoutes = require("./src/routes/turnos.routes");
 const marcajesRoutes = require("./src/routes/marcajes.routes");
 const rolesTurnoRoutes = require("./src/routes/rolesTurno.routes");
+const eventosRoutes = require("./src/routes/eventos.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
+const { iniciarDespachador } = require("./src/services/eventos.service");
 
 const app = express();
 const PORT = process.env.PORT || 3004;
@@ -39,8 +41,10 @@ app.get("/health", async (req, res) => {
 app.use(turnosRoutes);
 app.use(marcajesRoutes);
 app.use(rolesTurnoRoutes);
+app.use(eventosRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`AttendanceService corriendo en http://0.0.0.0:${PORT}`);
+  iniciarDespachador();
 });

@@ -1,5 +1,6 @@
 const modelo = require("../models/rolesTurno.model");
 const empleados = require("./empleados.service");
+const eventos = require("./eventos.service");
 const { enTransaccion } = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
@@ -80,10 +81,11 @@ async function calcularAlertas(rol, asignaciones, personal) {
 
 async function armarDetalle(rol) {
   const asignaciones = await modelo.listarAsignaciones(rol.id_rol);
-  const [sucursal, area, personal] = await Promise.all([
+  const [sucursal, area, personal, eventosDelRol] = await Promise.all([
     empleados.obtenerSucursal(rol.id_sucursal),
     empleados.obtenerArea(rol.id_departamento),
     armarPersonal(rol, asignaciones),
+    eventos.listarDeRol(rol.id_rol),
   ]);
   const { turnos, alertas } = await calcularAlertas(rol, asignaciones, personal);
   const dias = diasDelPeriodo(rol.fecha_inicio, rol.fecha_fin);
@@ -109,6 +111,7 @@ async function armarDetalle(rol) {
     }),
     alertas,
     celdas_vacias: celdasVacias,
+    eventos: eventosDelRol,
   };
 }
 
@@ -236,7 +239,8 @@ async function publicar(id) {
       if (actual.actualizado_en.getTime() !== rol.actualizado_en.getTime()) {
         throw new ErrorApp(409, "El rol cambió mientras se publicaba. Revise los cambios y vuelva a publicar.");
       }
-      await modelo.publicar(cliente, rol.id_rol, ids);
+      const publicado = await modelo.publicar(cliente, rol.id_rol, ids);
+      await eventos.registrarPublicacion(cliente, { ...detalle, ...resumirRol(publicado) });
     });
   } catch (error) {
     if (error.code !== "23505" || error.constraint !== "uq_turno_publicado_empleado_fecha") throw error;
