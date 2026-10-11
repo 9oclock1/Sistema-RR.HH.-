@@ -96,7 +96,7 @@ const insertarReconocimiento = async (db, reconocimiento) => {
   return rows[0];
 };
 
-// Datos del memorándum, del amonestado y del emisor que van impresos en el PDF oficial.
+// Datos del memorándum, del receptor y del emisor que van impresos en el PDF oficial.
 const obtenerParaDocumento = async (db, idMemorandum) => {
   const { rows } = await db.query(
     `SELECT m.codigo_cite,

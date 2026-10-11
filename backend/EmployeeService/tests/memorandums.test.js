@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const CARPETA_TEMPORAL = 'tests/.tmp';
+const CARPETA_TEMPORAL = 'tests/.tmp/memorandums';
 const CARPETA_PDF = `${CARPETA_TEMPORAL}/memorandums_pdf`;
 const CARPETA_EVIDENCIA = `${CARPETA_TEMPORAL}/evidencia`;
 

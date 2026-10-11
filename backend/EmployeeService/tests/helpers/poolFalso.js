@@ -1,5 +1,6 @@
 const TIPOS_MEMORANDUM = {
   1: { id_tipo_memo: 1, clasificacion: 'DISCIPLINARIO', nombre: 'Llamada de atención' },
+  2: { id_tipo_memo: 2, clasificacion: 'RECONOCIMIENTO', nombre: 'Felicitación por puntualidad' },
 };
 
 const EMPLEADOS = {
@@ -72,6 +73,7 @@ const crearPoolFalso = () => {
       (fila) =>
         fila.id_empleado_receptor === idReceptor &&
         fila.estado_sancion !== 'ANULADO' &&
+        fila.naturaleza_falta != null &&
         fila.fecha_emision >= desde
     ).length;
   };
@@ -81,7 +83,8 @@ const crearPoolFalso = () => {
     return estado.contadores[gestion];
   };
 
-  const insertarMemorandum = (params) => {
+  // Sirve para la amonestación (13 parámetros, BORRADOR) y para el reconocimiento (10 parámetros, EMITIDO).
+  const insertarMemorandum = (params, texto) => {
     const [
       id_memorandum,
       id_empleado_receptor,
@@ -93,9 +96,9 @@ const crearPoolFalso = () => {
       fecha_emision,
       gestion,
       numero_correlativo,
-      naturaleza_falta,
-      gravedad_falta,
-      evidencia_adjunto_url,
+      naturaleza_falta = null,
+      gravedad_falta = null,
+      evidencia_adjunto_url = null,
     ] = params;
 
     if (!estado.empleados[id_empleado_receptor]) throw llaveForanea('id_empleado_receptor', id_empleado_receptor, 'empleados');
@@ -122,7 +125,7 @@ const crearPoolFalso = () => {
       numero_correlativo,
       naturaleza_falta,
       gravedad_falta,
-      estado_sancion: 'BORRADOR',
+      estado_sancion: /'EMITIDO'/.test(texto) ? 'EMITIDO' : 'BORRADOR',
       evidencia_adjunto_url,
       documento_pdf_url: null,
     };
@@ -183,7 +186,8 @@ const crearPoolFalso = () => {
     if (/SELECT CURRENT_DATE/i.test(texto)) return filas({ hoy: estado.hoy });
     if (/SELECT COUNT\(\*\)::int AS total FROM memorandums/i.test(texto)) return filas({ total: contarRecientes(params) });
     if (/INSERT INTO correlativos_memorandum/i.test(texto)) return filas({ ultimo_numero: siguienteCorrelativo(params) });
-    if (/INSERT INTO memorandums/i.test(texto)) return filas(insertarMemorandum(params));
+    if (/FROM tipos_memorandum WHERE id_tipo_memo/i.test(texto)) return filas(estado.tipos[params[0]]);
+    if (/INSERT INTO memorandums/i.test(texto)) return filas(insertarMemorandum(params, texto));
     if (/FROM memorandums m JOIN tipos_memorandum/i.test(texto)) return filas(obtenerParaDocumento(params));
     if (/UPDATE memorandums SET documento_pdf_url/i.test(texto)) return filas(guardarRutaPdf(params));
 
