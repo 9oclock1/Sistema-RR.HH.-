@@ -1,3 +1,6 @@
+-- extensiones
+-- btree_gist: permite combinar UUID y rangos de fechas en una restricción EXCLUDE.
+CREATE EXTENSION IF NOT EXISTS btree_gist;
 -- tablas
 -- Tabla: CATALOGOS_TIPO_JORNADA
 CREATE TABLE CATALOGOS_TIPO_JORNADA (
@@ -75,6 +78,113 @@ CREATE TABLE MARCAJES (
     CONSTRAINT MARCAJES_pk PRIMARY KEY (id_marcaje),
     CONSTRAINT uq_marcaje_empleado_tipo_jornada UNIQUE (id_empleado, id_tipo_marcaje, fecha_jornada)
 );
+-- Tabla: CATALOGOS_PERIODO_ROL
+CREATE TABLE CATALOGOS_PERIODO_ROL (
+    id_periodo_rol SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_PERIODO_ROL_pk PRIMARY KEY (id_periodo_rol),
+    CONSTRAINT uq_periodo_rol_codigo UNIQUE (codigo)
+);
+-- Tabla: CATALOGOS_ESTADO_ROL
+CREATE TABLE CATALOGOS_ESTADO_ROL (
+    id_estado_rol SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_ESTADO_ROL_pk PRIMARY KEY (id_estado_rol),
+    CONSTRAINT uq_estado_rol_codigo UNIQUE (codigo)
+);
+-- Tabla: ROLES_TURNO
+-- Rol de turnos rotativos de un área en una sucursal para una semana o un mes.
+CREATE TABLE ROLES_TURNO (
+    id_rol UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_sucursal UUID NOT NULL,
+    id_departamento UUID NOT NULL,
+    id_periodo_rol SMALLINT NOT NULL,
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    id_estado_rol SMALLINT NOT NULL DEFAULT 1,
+    version_publicada int NOT NULL DEFAULT 0,
+    tiene_cambios_sin_publicar boolean NOT NULL DEFAULT FALSE,
+    publicado_en TIMESTAMPTZ NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ROLES_TURNO_pk PRIMARY KEY (id_rol),
+    CONSTRAINT chk_rol_fechas CHECK (fecha_fin >= fecha_inicio),
+    CONSTRAINT chk_rol_version CHECK (version_publicada >= 0),
+    -- Un área de una sucursal no puede tener dos roles con días en común.
+    CONSTRAINT ex_rol_sin_solapamiento EXCLUDE USING gist (
+        id_sucursal WITH =,
+        id_departamento WITH =,
+        daterange(fecha_inicio, fecha_fin, '[]') WITH &&
+    )
+);
+-- Tabla: ASIGNACIONES_ROL_TURNO
+-- Borrador del rol: un turno o un descanso por empleado y día.
+CREATE TABLE ASIGNACIONES_ROL_TURNO (
+    id_asignacion_rol UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_rol UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    fecha date NOT NULL,
+    id_turno UUID NULL,
+    es_descanso boolean NOT NULL DEFAULT FALSE,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ASIGNACIONES_ROL_TURNO_pk PRIMARY KEY (id_asignacion_rol),
+    CONSTRAINT uq_asignacion_rol_empleado_fecha UNIQUE (id_rol, id_empleado, fecha),
+    CONSTRAINT chk_asignacion_rol_turno_o_descanso CHECK (es_descanso = (id_turno IS NULL))
+);
+CREATE INDEX idx_asignaciones_rol_turno_empleado_fecha ON ASIGNACIONES_ROL_TURNO (id_empleado, fecha);
+CREATE INDEX idx_asignaciones_rol_turno_id_turno ON ASIGNACIONES_ROL_TURNO (id_turno);
+-- Tabla: TURNOS_PUBLICADOS
+-- Copia del rol al publicarse: es lo que ve el colaborador en su portal.
+CREATE TABLE TURNOS_PUBLICADOS (
+    id_turno_publicado UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_rol UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    fecha date NOT NULL,
+    id_turno UUID NULL,
+    es_descanso boolean NOT NULL DEFAULT FALSE,
+    nombre_turno varchar(60) NULL,
+    hora_inicio TIME NULL,
+    hora_fin TIME NULL,
+    publicado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT TURNOS_PUBLICADOS_pk PRIMARY KEY (id_turno_publicado),
+    -- Un empleado tiene un solo turno publicado por día, aunque cambie de área.
+    CONSTRAINT uq_turno_publicado_empleado_fecha UNIQUE (id_empleado, fecha),
+    CONSTRAINT chk_turno_publicado_turno_o_descanso CHECK (
+        es_descanso = (id_turno IS NULL)
+        AND (es_descanso OR (nombre_turno IS NOT NULL AND hora_inicio IS NOT NULL AND hora_fin IS NOT NULL))
+    )
+);
+CREATE INDEX idx_turnos_publicados_id_rol ON TURNOS_PUBLICADOS (id_rol);
+CREATE INDEX idx_turnos_publicados_id_turno ON TURNOS_PUBLICADOS (id_turno);
+-- Tabla: CATALOGOS_ESTADO_EVENTO
+CREATE TABLE CATALOGOS_ESTADO_EVENTO (
+    id_estado_evento SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_ESTADO_EVENTO_pk PRIMARY KEY (id_estado_evento),
+    CONSTRAINT uq_estado_evento_codigo UNIQUE (codigo)
+);
+-- Tabla: EVENTOS_SALIENTES
+-- Eventos para otros módulos; se guardan junto con el cambio y se envían después.
+CREATE TABLE EVENTOS_SALIENTES (
+    id_evento UUID NOT NULL DEFAULT gen_random_uuid(),
+    topico varchar(60) NOT NULL,
+    tipo_evento varchar(60) NOT NULL,
+    id_rol UUID NULL,
+    carga JSONB NOT NULL,
+    id_estado_evento SMALLINT NOT NULL DEFAULT 1,
+    intentos SMALLINT NOT NULL DEFAULT 0,
+    ultimo_error varchar(255) NULL,
+    proximo_intento_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    entregado_en TIMESTAMPTZ NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT EVENTOS_SALIENTES_pk PRIMARY KEY (id_evento),
+    CONSTRAINT chk_evento_intentos CHECK (intentos >= 0)
+);
+CREATE INDEX idx_eventos_salientes_pendientes ON EVENTOS_SALIENTES (id_estado_evento, proximo_intento_en);
+CREATE INDEX idx_eventos_salientes_id_rol ON EVENTOS_SALIENTES (id_rol);
 -- llaves foráneas
 -- Referencia: TURNOS_CATALOGOS_TIPO_JORNADA (tabla: TURNOS)
 ALTER TABLE TURNOS
@@ -91,6 +201,27 @@ ADD CONSTRAINT MARCAJES_CATALOGOS_ORIGEN_MARCAJE FOREIGN KEY (id_origen_marcaje)
 -- Referencia: MARCAJES_CATALOGOS_ESTADO_MARCAJE (tabla: MARCAJES)
 ALTER TABLE MARCAJES
 ADD CONSTRAINT MARCAJES_CATALOGOS_ESTADO_MARCAJE FOREIGN KEY (id_estado_marcaje) REFERENCES CATALOGOS_ESTADO_MARCAJE (id_estado_marcaje) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: ROLES_TURNO_CATALOGOS_PERIODO_ROL (tabla: ROLES_TURNO)
+ALTER TABLE ROLES_TURNO
+ADD CONSTRAINT ROLES_TURNO_CATALOGOS_PERIODO_ROL FOREIGN KEY (id_periodo_rol) REFERENCES CATALOGOS_PERIODO_ROL (id_periodo_rol) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: ROLES_TURNO_CATALOGOS_ESTADO_ROL (tabla: ROLES_TURNO)
+ALTER TABLE ROLES_TURNO
+ADD CONSTRAINT ROLES_TURNO_CATALOGOS_ESTADO_ROL FOREIGN KEY (id_estado_rol) REFERENCES CATALOGOS_ESTADO_ROL (id_estado_rol) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: ASIGNACIONES_ROL_TURNO_ROLES_TURNO (tabla: ASIGNACIONES_ROL_TURNO)
+ALTER TABLE ASIGNACIONES_ROL_TURNO
+ADD CONSTRAINT ASIGNACIONES_ROL_TURNO_ROLES_TURNO FOREIGN KEY (id_rol) REFERENCES ROLES_TURNO (id_rol) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: ASIGNACIONES_ROL_TURNO_TURNOS (tabla: ASIGNACIONES_ROL_TURNO)
+ALTER TABLE ASIGNACIONES_ROL_TURNO
+ADD CONSTRAINT ASIGNACIONES_ROL_TURNO_TURNOS FOREIGN KEY (id_turno) REFERENCES TURNOS (id_turno) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: TURNOS_PUBLICADOS_ROLES_TURNO (tabla: TURNOS_PUBLICADOS)
+ALTER TABLE TURNOS_PUBLICADOS
+ADD CONSTRAINT TURNOS_PUBLICADOS_ROLES_TURNO FOREIGN KEY (id_rol) REFERENCES ROLES_TURNO (id_rol) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: TURNOS_PUBLICADOS_TURNOS (tabla: TURNOS_PUBLICADOS)
+ALTER TABLE TURNOS_PUBLICADOS
+ADD CONSTRAINT TURNOS_PUBLICADOS_TURNOS FOREIGN KEY (id_turno) REFERENCES TURNOS (id_turno) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: EVENTOS_SALIENTES_CATALOGOS_ESTADO_EVENTO (tabla: EVENTOS_SALIENTES)
+ALTER TABLE EVENTOS_SALIENTES
+ADD CONSTRAINT EVENTOS_SALIENTES_CATALOGOS_ESTADO_EVENTO FOREIGN KEY (id_estado_evento) REFERENCES CATALOGOS_ESTADO_EVENTO (id_estado_evento) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- datos iniciales
 INSERT INTO CATALOGOS_TIPO_JORNADA (id_tipo_jornada, codigo, nombre) VALUES
     (1, 'DIURNO', 'Diurno'),
@@ -105,4 +236,14 @@ INSERT INTO CATALOGOS_ORIGEN_MARCAJE (id_origen_marcaje, codigo, nombre) VALUES
 INSERT INTO CATALOGOS_ESTADO_MARCAJE (id_estado_marcaje, codigo, nombre) VALUES
     (1, 'REGISTRADO', 'Registrado'),
     (2, 'PENDIENTE_JUSTIFICACION', 'Pendiente de justificación');
+INSERT INTO CATALOGOS_PERIODO_ROL (id_periodo_rol, codigo, nombre) VALUES
+    (1, 'SEMANAL', 'Semanal'),
+    (2, 'MENSUAL', 'Mensual');
+INSERT INTO CATALOGOS_ESTADO_ROL (id_estado_rol, codigo, nombre) VALUES
+    (1, 'BORRADOR', 'Borrador'),
+    (2, 'PUBLICADO', 'Publicado');
+INSERT INTO CATALOGOS_ESTADO_EVENTO (id_estado_evento, codigo, nombre) VALUES
+    (1, 'PENDIENTE', 'Pendiente'),
+    (2, 'ENTREGADO', 'Entregado'),
+    (3, 'FALLIDO', 'Fallido');
 -- Fin del archivo.

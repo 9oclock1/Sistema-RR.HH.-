@@ -29,3 +29,16 @@
 - Antes de marcar se consulta `GET /empleados/:id` en EmployeeService (`EMPLOYEE_SERVICE_URL`). Se espera `{ id_empleado, nombres, apellidos, activo }` y 404 si el empleado no existe.
 - Solo se permite marcar si `activo` es `true`. Si EmployeeService no responde, el marcaje se rechaza (503) y no se guarda nada.
 - EmployeeService ya expone ese endpoint (KAN-39), así que el valor por defecto es `EMPLEADOS_SIMULADOS=false`. Con `true` se usa la lista fija de `src/config/empleadosSimulados.js` (solo para pruebas sin EmployeeService).
+
+## Roles de turnos rotativos
+
+- `ROLES_TURNO.id_sucursal` e `id_departamento` deberían hacer referencia a `SUCURSALES` y `DEPARTAMENTOS` de EmployeeDB (el área operativa).
+- Un rol es semanal (lunes a domingo) o mensual (del 1 al último día del mes). Un área de una sucursal no puede tener dos roles con días en común (`ex_rol_sin_solapamiento`, requiere la extensión `btree_gist`).
+- `ASIGNACIONES_ROL_TURNO` es el borrador que edita el supervisor: por empleado y día, un turno o un descanso (`id_turno` NULL y `es_descanso` TRUE). Una celda sin fila está vacía.
+- Al publicar, el borrador se copia a `TURNOS_PUBLICADOS` con el nombre y el horario del turno de ese momento. Es lo que ve el colaborador; los cambios posteriores al borrador no se ven hasta publicar de nuevo (`tiene_cambios_sin_publicar`, `version_publicada`).
+- Un empleado tiene un solo turno publicado por día (`uq_turno_publicado_empleado_fecha`), aunque figure en roles de dos áreas.
+
+## Eventos salientes
+
+- `EVENTOS_SALIENTES` guarda, en la misma transacción que la publicación, los avisos para otros módulos (patrón outbox). Un proceso los envía después y reintenta si fallan.
+- `topico` indica el destino; `carga` es el cuerpo JSON que se envía. Estados: `PENDIENTE`, `ENTREGADO`, `FALLIDO` (agotó los reintentos).
