@@ -13,7 +13,7 @@ const TIPOS = {
   3: { id_tipo_licencia: 3, nombre: "Duelo", es_con_goce_haberes: true, dias_maximos_continuos: 3, requiere_adjunto: true },
   5: { id_tipo_licencia: 5, nombre: "Personal", es_con_goce_haberes: false, dias_maximos_continuos: 2, requiere_adjunto: false },
 };
-const PDF = { originalname: "certificado.pdf", mimetype: "application/pdf", size: 1200, buffer: Buffer.from("x") };
+const PDF = { originalname: "certificado.pdf", mimetype: "application/pdf", size: 1200, buffer: Buffer.from("%PDF-1.4 contenido") };
 const datos = (extra = {}) => ({ id_tipo_licencia: "3", fecha_inicio: "2026-11-02", fecha_fin: "2026-11-04", ...extra });
 
 let crear;
@@ -62,6 +62,25 @@ test("criterio 3: detiene el envío si falta el respaldo obligatorio", async () 
   });
   assert.equal(crear.mock.callCount(), 0);
   assert.equal(almacenamiento.guardar.mock.callCount(), 0);
+});
+
+test("rechaza un archivo vacío sin guardar nada", async () => {
+  await assert.rejects(servicio.radicar(ANA, datos(), [{ ...PDF, size: 0, buffer: Buffer.alloc(0) }]), (error) => {
+    assert.equal(error.estado, 400);
+    assert.match(error.detalles[0].mensaje, /vacío/);
+    return true;
+  });
+  assert.equal(almacenamiento.guardar.mock.callCount(), 0);
+});
+
+test("rechaza un ejecutable que se hace pasar por PDF", async () => {
+  const falso = { ...PDF, buffer: Buffer.from("MZ ejecutable") };
+  await assert.rejects(servicio.radicar(ANA, datos(), [falso]), (error) => {
+    assert.equal(error.estado, 400);
+    assert.match(error.detalles[0].mensaje, /no corresponde/);
+    return true;
+  });
+  assert.equal(crear.mock.callCount(), 0);
 });
 
 test("criterio 3: no exige adjunto a los tipos que no lo requieren", async () => {

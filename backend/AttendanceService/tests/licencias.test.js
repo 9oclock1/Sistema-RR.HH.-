@@ -61,6 +61,23 @@ test("rechaza tipos que no son enteros positivos", () => {
   }
 });
 
+test("rechaza un mes inexistente sin lanzar excepción", () => {
+  assert.deepEqual(camposInvalidos({ ...valida, fecha_inicio: "2035-13-01", fecha_fin: "2035-13-01" }), ["fecha_inicio", "fecha_fin"]);
+});
+
+test("rechaza tipos con notación hexadecimal, científica o fuera del rango SMALLINT", () => {
+  for (const id_tipo_licencia of ["0x5", "1e0", "99999999999", "32768", "3abc"]) {
+    assert.deepEqual(camposInvalidos({ ...valida, id_tipo_licencia }), ["id_tipo_licencia"]);
+  }
+  assert.doesNotThrow(() => validarSolicitudLicencia({ ...valida, id_tipo_licencia: 32767 }));
+});
+
+test("limita el rango a 365 días", () => {
+  assert.doesNotThrow(() => validarSolicitudLicencia({ ...valida, fecha_inicio: "2030-01-01", fecha_fin: "2030-12-31" }));
+  assert.deepEqual(camposInvalidos({ ...valida, fecha_inicio: "2030-01-01", fecha_fin: "2031-01-01" }), ["fecha_fin"]);
+  assert.deepEqual(camposInvalidos({ ...valida, fecha_inicio: "0001-01-01", fecha_fin: "9999-12-31" }), ["fecha_fin"]);
+});
+
 test("rechaza fechas con formato o calendario inválido", () => {
   assert.deepEqual(camposInvalidos({ ...valida, fecha_inicio: "02/11/2026" }), ["fecha_inicio"]);
   assert.deepEqual(camposInvalidos({ ...valida, fecha_fin: "2026-02-30" }), ["fecha_fin"]);

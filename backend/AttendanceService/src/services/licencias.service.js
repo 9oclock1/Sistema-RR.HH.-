@@ -4,6 +4,7 @@ const almacenamiento = require("../utils/almacenamiento");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const { validarSolicitudLicencia } = require("../utils/validarSolicitudLicencia");
+const { coincideFirma } = require("../utils/firmaArchivo");
 const { ESTADO_SOLICITUD, diasSolicitados, evaluarLimite } = require("../utils/licencias");
 
 const EXCLUSION_VIOLADA = "23P01";
@@ -29,6 +30,15 @@ async function listarMisSolicitudes(idEmpleado) {
   return (await modelo.listarPorEmpleado(idEmpleado)).map(conClasificacion);
 }
 
+function archivoNoValido(archivo) {
+  const nombre = Buffer.from(archivo.originalname, "latin1").toString("utf8");
+  if (archivo.size === 0) return `«${nombre}» está vacío.`;
+  if (!coincideFirma(archivo.buffer, archivo.mimetype)) {
+    return `El contenido de «${nombre}» no corresponde a un archivo PDF, JPG o PNG válido.`;
+  }
+  return null;
+}
+
 async function radicar(idEmpleado, datos, archivos = []) {
   await verificarEmpleado(idEmpleado);
   const solicitud = validarSolicitudLicencia(datos);
@@ -44,6 +54,11 @@ async function radicar(idEmpleado, datos, archivos = []) {
     throw new ErrorApp(400, "Datos de solicitud inválidos", [
       { campo: "archivos", mensaje: `La licencia «${tipo.nombre}» exige adjuntar el respaldo digital.` },
     ]);
+  }
+
+  const archivoInvalido = archivos.map((a) => archivoNoValido(a)).find(Boolean);
+  if (archivoInvalido) {
+    throw new ErrorApp(400, "Datos de solicitud inválidos", [{ campo: "archivos", mensaje: archivoInvalido }]);
   }
 
   const dias = diasSolicitados(solicitud.fecha_inicio, solicitud.fecha_fin);
