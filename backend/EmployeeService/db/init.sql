@@ -321,3 +321,107 @@ CREATE TABLE CORRELATIVOS_MEMORANDUM (
     CONSTRAINT CORRELATIVOS_MEMORANDUM_pk PRIMARY KEY (gestion),
     CONSTRAINT ck_correlativo_memorandum_no_negativo CHECK (ultimo_numero >= 0)
 );
+
+-- KAN-263 (RF-36): Kardex laboral consolidado. Una fila por empleado con sus datos y totales.
+CREATE INDEX IF NOT EXISTS ix_contrato_empleado ON CONTRATOS (id_empleado);
+CREATE INDEX IF NOT EXISTS ix_capacitacion_empleado_fecha
+    ON CAPACITACIONES_CERTIFICACION (id_empleado, fecha_emision DESC);
+
+CREATE OR REPLACE VIEW vw_kardex_resumen AS
+SELECT e.id_empleado,
+       e.numero_documento,
+       e.complemento_documento,
+       e.nombres,
+       e.primer_apellido,
+       e.segundo_apellido,
+       concat_ws(' ', e.nombres, e.primer_apellido, e.segundo_apellido) AS nombre_completo,
+       e.fecha_nacimiento,
+       e.genero,
+       e.telefono_celular,
+       e.correo_personal,
+       e.direccion_domicilio,
+       e.fecha_ingreso,
+       extract(year FROM age(CURRENT_DATE, e.fecha_ingreso))::int AS antiguedad_anios,
+       extract(month FROM age(CURRENT_DATE, e.fecha_ingreso))::int AS antiguedad_meses,
+       ee.codigo AS estado_codigo,
+       ee.nombre AS estado_nombre,
+       c.id_cargo,
+       c.codigo AS cargo_codigo,
+       c.nombre AS cargo_nombre,
+       c.nivel_salarial AS cargo_nivel_salarial,
+       d.id_departamento,
+       d.nombre AS area_nombre,
+       s.id_sucursal,
+       s.nombre AS sucursal_nombre,
+       s.ciudad AS sucursal_ciudad,
+       asg.vigente_desde,
+       asg.total_asignaciones,
+       cv.id_contrato AS contrato_vigente_id,
+       cv.numero_contrato AS contrato_vigente_numero,
+       cv.tipo_contrato AS contrato_vigente_tipo,
+       cv.tipo_jornada AS contrato_vigente_jornada,
+       cv.fecha_inicio AS contrato_vigente_desde,
+       cv.fecha_fin AS contrato_vigente_hasta,
+       cv.haber_mensual_pactado AS contrato_vigente_haber,
+       ct.total_contratos,
+       ct.total_adendas,
+       mm.total_sanciones,
+       mm.sanciones_leves,
+       mm.sanciones_moderadas,
+       mm.sanciones_graves,
+       mm.total_reconocimientos,
+       mm.memorandums_sin_acuse,
+       mm.fecha_ultima_sancion,
+       cap.total_capacitaciones,
+       cap.capacitaciones_vencidas
+  FROM EMPLEADOS e
+  JOIN ESTADOS_EMPLEADO ee ON ee.id_estado_empleado = e.id_estado_empleado
+  JOIN CARGOS c            ON c.id_cargo = e.id_cargo_actual
+  JOIN DEPARTAMENTOS d     ON d.id_departamento = c.id_departamento
+  JOIN SUCURSALES s        ON s.id_sucursal = e.id_sucursal_actual
+  LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS total_asignaciones,
+              MAX(a.fecha_inicio) FILTER (WHERE a.es_vigente) AS vigente_desde
+         FROM ASIGNACIONES_EMPLEADO a
+        WHERE a.id_empleado = e.id_empleado
+  ) asg ON TRUE
+  LEFT JOIN LATERAL (
+       SELECT k.id_contrato,
+              k.numero_contrato,
+              tc.nombre AS tipo_contrato,
+              tj.nombre AS tipo_jornada,
+              lower(k.periodo_vigencia) AS fecha_inicio,
+              upper(k.periodo_vigencia) - 1 AS fecha_fin,
+              k.haber_mensual_pactado
+         FROM CONTRATOS k
+         JOIN TIPOS_CONTRATO tc ON tc.id_tipo_contrato = k.id_tipo_contrato
+         JOIN TIPOS_JORNADA tj  ON tj.id_tipo_jornada = k.id_tipo_jornada
+        WHERE k.id_empleado = e.id_empleado
+          AND k.periodo_vigencia @> CURRENT_DATE
+        ORDER BY lower(k.periodo_vigencia) DESC NULLS LAST, k.registrado_en DESC
+        LIMIT 1
+  ) cv ON TRUE
+  LEFT JOIN LATERAL (
+       SELECT COUNT(*) FILTER (WHERE NOT k.es_adenda)::int AS total_contratos,
+              COUNT(*) FILTER (WHERE k.es_adenda)::int AS total_adendas
+         FROM CONTRATOS k
+        WHERE k.id_empleado = e.id_empleado
+  ) ct ON TRUE
+  LEFT JOIN LATERAL (
+       SELECT COUNT(*) FILTER (WHERE m.naturaleza_falta IS NOT NULL)::int AS total_sanciones,
+              COUNT(*) FILTER (WHERE m.gravedad_falta = 'LEVE')::int AS sanciones_leves,
+              COUNT(*) FILTER (WHERE m.gravedad_falta = 'MODERADA')::int AS sanciones_moderadas,
+              COUNT(*) FILTER (WHERE m.gravedad_falta = 'GRAVE')::int AS sanciones_graves,
+              COUNT(*) FILTER (WHERE m.naturaleza_falta IS NULL)::int AS total_reconocimientos,
+              COUNT(*) FILTER (WHERE NOT m.acuse_recibo_firmado)::int AS memorandums_sin_acuse,
+              MAX(m.fecha_emision) FILTER (WHERE m.naturaleza_falta IS NOT NULL) AS fecha_ultima_sancion
+         FROM MEMORANDUMS m
+        WHERE m.id_empleado_receptor = e.id_empleado
+          AND m.estado_sancion <> 'ANULADO'
+  ) mm ON TRUE
+  LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS total_capacitaciones,
+              COUNT(*) FILTER (WHERE cc.fecha_vencimiento < CURRENT_DATE)::int AS capacitaciones_vencidas
+         FROM CAPACITACIONES_CERTIFICACION cc
+        WHERE cc.id_empleado = e.id_empleado
+  ) cap ON TRUE;
