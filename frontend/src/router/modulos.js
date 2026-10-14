@@ -1,4 +1,5 @@
-import { Briefcase, Building2, CalendarClock, CalendarRange, FileUser, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Briefcase, Building2, CalendarClock, CalendarRange, FileUser, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
+import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
@@ -119,6 +120,14 @@ export const SECCIONES = [
         icono: CalendarRange,
         roles: ["supervisor"],
         pagina: RolTurnosPage,
+      },
+      {
+        ruta: "/asistencia/alertas",
+        etiqueta: "Alertas de asistencia",
+        descripcion: "Atrasos, faltas y salidas anticipadas del día por sucursal.",
+        icono: AlarmClock,
+        roles: ["supervisor"],
+        pagina: AlertasAsistenciaPage,
       },
     ],
   },

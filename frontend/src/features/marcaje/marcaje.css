@@ -148,6 +148,16 @@
   line-height: var(--line-height-small);
 }
 
+.resumen-nota {
+  color: var(--color-warning-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.resumen-observaciones {
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
 .resumen-dato dd {
   margin: 0;
 }
