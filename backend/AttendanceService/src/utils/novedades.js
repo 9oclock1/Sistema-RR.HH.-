@@ -1,4 +1,5 @@
 const { minutosDuracion, minutosEfectivos, inicioProgramadoMs } = require("./jornada");
+const { TIPO_EVENTO } = require("./eventos");
 
 const TIPO_NOVEDAD = { ATRASO: 1, INASISTENCIA: 2, SALIDA_ANTICIPADA: 3, OMISION_SALIDA: 4 };
 const ESTADO_NOVEDAD = { REGISTRADA: 1, JUSTIFICADA: 2 };
@@ -93,6 +94,59 @@ function estadoJornada(turno, resultado, ahoraMs) {
   return { codigo, nombre: ESTADO_JORNADA[codigo] };
 }
 
+// Filas de NOVEDADES_ASISTENCIA con la copia del turno programado.
+const filasNovedades = (turno, resultado) =>
+  resultado.novedades.map((n) => ({
+    id_empleado: turno.id_empleado,
+    fecha_jornada: turno.fecha,
+    id_tipo_novedad: TIPO_NOVEDAD[n.tipo],
+    id_turno: turno.id_turno,
+    id_rol: turno.id_rol ?? null,
+    nombre_turno: turno.nombre_turno,
+    inicio_programado: new Date(resultado.horario.inicioMs),
+    fin_programado: new Date(resultado.horario.finMs),
+    minutos_tolerancia: turno.minutos_tolerancia,
+    id_marcaje: n.id_marcaje,
+    minutos: n.minutos,
+    minutos_penalizacion: n.minutos_penalizacion,
+  }));
+
+// Agrupa novedades (ordenadas por empleado y jornada) en una lista por jornada.
+function agruparPorJornada(novedades) {
+  const grupos = new Map();
+  for (const n of novedades) {
+    const clave = `${n.id_empleado}|${n.fecha_jornada}`;
+    if (!grupos.has(clave)) grupos.set(clave, []);
+    grupos.get(clave).push(n);
+  }
+  return [...grupos.values()];
+}
+
+// Cuerpo del evento para compensaciones: las novedades de una jornada y la penalización que suman.
+function armarCargaConsolidacion(novedades) {
+  const [primera] = novedades;
+  return {
+    evento: TIPO_EVENTO.JORNADA_CONSOLIDADA,
+    id_empleado: primera.id_empleado,
+    fecha_jornada: primera.fecha_jornada,
+    turno: {
+      nombre: primera.nombre_turno,
+      inicio_programado: new Date(primera.inicio_programado).toISOString(),
+      fin_programado: new Date(primera.fin_programado).toISOString(),
+    },
+    minutos_penalizacion: novedades
+      .filter((n) => n.estado_codigo === "REGISTRADA")
+      .reduce((total, n) => total + n.minutos_penalizacion, 0),
+    novedades: novedades.map((n) => ({
+      id_novedad: n.id_novedad,
+      tipo: n.tipo_codigo,
+      estado: n.estado_codigo,
+      minutos: n.minutos,
+      minutos_penalizacion: n.minutos_penalizacion,
+    })),
+  };
+}
+
 module.exports = {
   TIPO_NOVEDAD,
   ESTADO_NOVEDAD,
@@ -100,4 +154,7 @@ module.exports = {
   horarioProgramado,
   contrastarJornada,
   estadoJornada,
+  filasNovedades,
+  agruparPorJornada,
+  armarCargaConsolidacion,
 };

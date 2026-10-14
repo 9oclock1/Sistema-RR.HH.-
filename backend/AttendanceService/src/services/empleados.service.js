@@ -33,25 +33,36 @@ async function obtener(idEmpleado) {
 
 const nombreSimulado = ({ nombres, apellidos }) => `${nombres} ${apellidos}`;
 
-// Personal actual de un área en una sucursal: [{ id_empleado, nombre_completo, cargo, activo }].
-async function listarPorArea(idSucursal, idDepartamento) {
+// Personal actual de una sucursal (y de un área, si se indica): [{ id_empleado, nombre_completo, cargo, activo }].
+async function listarPorArea(idSucursal, idDepartamento = null) {
   if (usarSimulados()) {
     return simulados.map((empleado) => ({
       id_empleado: empleado.id_empleado,
       nombre_completo: nombreSimulado(empleado),
       cargo: "Personal simulado",
+      area: "Área simulada",
       activo: empleado.activo,
     }));
   }
-  const parametros = new URLSearchParams({ id_sucursal: idSucursal, id_departamento: idDepartamento });
+  const parametros = new URLSearchParams({ id_sucursal: idSucursal });
+  if (idDepartamento) parametros.set("id_departamento", idDepartamento);
   const lista = await consultar(`/empleados?${parametros}`, sinDatosDePersonal);
   if (!Array.isArray(lista)) throw sinDatosDePersonal();
-  return lista.map(({ id_empleado, nombre_completo, cargo, activo }) => ({
+  return lista.map(({ id_empleado, nombre_completo, cargo, area, activo }) => ({
     id_empleado,
     nombre_completo,
     cargo,
+    area,
     activo: activo === true,
   }));
+}
+
+// Empleados que pueden trabajar (con acceso habilitado), de todas las sucursales.
+async function listarIdsActivos() {
+  if (usarSimulados()) return new Set(simulados.filter((e) => e.activo).map((e) => e.id_empleado));
+  const lista = await consultar("/empleados", sinDatosDePersonal);
+  if (!Array.isArray(lista)) throw sinDatosDePersonal();
+  return new Set(lista.filter((e) => e.activo === true).map((e) => e.id_empleado));
 }
 
 // Nombre de un empleado que ya no está en el área (para mostrar sus celdas).
@@ -75,4 +86,4 @@ async function obtenerArea(idDepartamento) {
   return area ? { id_departamento: area.id_departamento, codigo: area.codigo, nombre: area.nombre } : null;
 }
 
-module.exports = { obtener, listarPorArea, obtenerNombre, obtenerSucursal, obtenerArea };
+module.exports = { obtener, listarPorArea, listarIdsActivos, obtenerNombre, obtenerSucursal, obtenerArea };

@@ -49,6 +49,24 @@
 - `consolidada_en` se llena cuando la jornada se cierra y se avisa a compensaciones.
 - `id_empleado` debería hacer referencia a `id_empleado` de EmployeeDB.
 
+### Contraste de turnos y marcajes
+
+- El turno de un día es el del rol publicado (`TURNOS_PUBLICADOS`); si no hay, la asignación fija vigente (`ASIGNACIONES_TURNO`) con un turno activo. Un descanso o un día sin turno no genera novedades.
+- La entrada del turno es la primera marcada desde 4 horas antes del inicio y antes del fin; la salida es la de la misma jornada de marcaje. Así una entrada pasada la medianoche cuenta para el turno nocturno de la víspera.
+- **Atraso:** entrada después de `hora_inicio` + tolerancia. Los minutos se cuentan desde `hora_inicio` (minuto iniciado = minuto completo) y son la penalización.
+- **Salida anticipada:** salida antes del fin del turno. Los minutos que faltaban son tiempo no laborado y son la penalización.
+- **Inasistencia:** sin entrada al terminar el turno. La penalización son las horas efectivas del turno (duración - refrigerio). Solo se registra a empleados activos en EmployeeService; si no responde, espera al siguiente contraste.
+- **Omisión de salida:** entrada sin salida al cerrar la jornada. Es una alerta, sin penalización.
+- La jornada se cierra `MINUTOS_CIERRE_JORNADA` minutos después del fin del turno (por defecto 120).
+- El atraso y la salida anticipada se registran al marcar; la respuesta del marcaje los incluye. Además, un proceso del servicio contrasta cada `INTERVALO_CONTRASTE_MS` (por defecto 5 minutos) los últimos 7 días, así que lo que no se registró al marcar (o mientras el servicio estuvo detenido) se recupera. Repetir el contraste no duplica novedades.
+- `GET /panel-asistencia?id_sucursal=&id_departamento=&fecha=` contrasta el día y devuelve el estado de cada colaborador activo: por llegar, sin marcar (pasó la tolerancia), puntual, atraso, falta injustificada, descanso o sin turno.
+
+### Aviso a compensaciones
+
+- Al cerrar la jornada, sus novedades se consolidan y se registra un evento `JORNADA_CONSOLIDADA` con tópico `compensaciones` en `EVENTOS_SALIENTES`: empleado, fecha, turno, minutos de penalización (de las novedades registradas, no justificadas) y el detalle de cada novedad.
+- Se envía igual que los demás eventos: con `URL_COMPENSACIONES` el despachador hace `POST`; sin URL, CompensationService lo lee con `GET /eventos?topico=compensaciones`.
+- Cada novedad se consolida una sola vez. Si una novedad aparece después del cierre, llega en otro evento de la misma jornada: el consumidor debe sumar por `id_novedad`.
+
 ## Eventos salientes
 
 - `EVENTOS_SALIENTES` guarda, en la misma transacción que la publicación, los avisos para otros módulos (patrón outbox). Un proceso los envía después y reintenta si fallan.

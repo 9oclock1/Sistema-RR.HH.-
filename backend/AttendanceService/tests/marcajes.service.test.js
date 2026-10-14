@@ -2,6 +2,7 @@ const { test, beforeEach, mock } = require("node:test");
 const assert = require("node:assert/strict");
 const modelo = require("../src/models/marcajes.model");
 const empleados = require("../src/services/empleados.service");
+const novedades = require("../src/services/novedades.service");
 const servicio = require("../src/services/marcajes.service");
 const { ORIGEN_MARCAJE, TIPO_MARCAJE, ESTADO_MARCAJE } = require("../src/utils/marcajes");
 
@@ -19,6 +20,7 @@ beforeEach(() => {
   mock.restoreAll();
   mock.method(empleados, "obtener", async (id) => (id === ANA ? { nombres: "Ana", apellidos: "Quispe", activo: true } : null));
   mock.method(modelo, "listarRecientes", async () => []);
+  mock.method(novedades, "alMarcar", async () => []);
   mock.method(modelo, "momentoActual", async () => ({ ahora: new Date("2026-09-24T21:10:00Z"), hoy: "2026-09-24" }));
   registrar = mock.method(modelo, "registrar", async (datos) => ({ ...entradaDeAna, ...datos }));
 });

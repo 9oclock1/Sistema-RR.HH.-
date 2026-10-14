@@ -19,6 +19,7 @@ const LIMITE_CONSULTA = 100;
 const destinos = () => ({
   [TOPICO.PRODUCCION_LOGISTICA]: process.env.URL_PRODUCCION_LOGISTICA || null,
   [TOPICO.ENTREGAS_DESPACHOS]: process.env.URL_ENTREGAS_DESPACHOS || null,
+  [TOPICO.COMPENSACIONES]: process.env.URL_COMPENSACIONES || null,
 });
 
 const topicosDe = (codigoArea) =>
@@ -40,6 +41,16 @@ async function registrarPublicacion(cliente, detalle) {
       carga: { ...carga, topico },
     });
   }
+}
+
+// Se llama dentro de la transacción que marca la jornada como consolidada.
+async function registrarConsolidacion(cliente, carga) {
+  await modelo.registrar(cliente, {
+    topico: TOPICO.COMPENSACIONES,
+    tipoEvento: TIPO_EVENTO.JORNADA_CONSOLIDADA,
+    idRol: null,
+    carga: { ...carga, topico: TOPICO.COMPENSACIONES },
+  });
 }
 
 async function enviar(evento, url) {
@@ -134,4 +145,12 @@ async function confirmar(id) {
   return resumir(await modelo.obtener(evento.id_evento));
 }
 
-module.exports = { registrarPublicacion, despachar, iniciarDespachador, listarDeRol, listar, confirmar };
+module.exports = {
+  registrarPublicacion,
+  registrarConsolidacion,
+  despachar,
+  iniciarDespachador,
+  listarDeRol,
+  listar,
+  confirmar,
+};
