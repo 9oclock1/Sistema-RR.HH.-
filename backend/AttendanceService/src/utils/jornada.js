@@ -12,9 +12,14 @@ const minutosDuracion = ({ hora_inicio, hora_fin }) =>
 
 const minutosEfectivos = (turno) => minutosDuracion(turno) - turno.minutos_refrigerio;
 
-function evaluarPuntualidad(turno, fechaJornada, marcaje) {
+// Instante en que empieza el turno en la jornada indicada (hora de Bolivia).
+function inicioProgramadoMs(turno, fechaJornada) {
   const [anio, mes, dia] = fechaJornada.split("-").map(Number);
-  const inicioMs = Date.UTC(anio, mes - 1, dia) + aSegundos(turno.hora_inicio) * 1000 + DESFASE_UTC_MS;
+  return Date.UTC(anio, mes - 1, dia) + aSegundos(turno.hora_inicio) * 1000 + DESFASE_UTC_MS;
+}
+
+function evaluarPuntualidad(turno, fechaJornada, marcaje) {
+  const inicioMs = inicioProgramadoMs(turno, fechaJornada);
   const limiteMs = inicioMs + turno.minutos_tolerancia * 60 * 1000;
   const marcajeMs = marcaje.getTime();
   const puntual = marcajeMs <= limiteMs;
@@ -35,4 +40,11 @@ const aMinutos = (fecha) => Math.floor(new Date(fecha).getTime() / 60000);
 const minutosTrabajados = (entrada, salida) =>
   entrada && salida ? aMinutos(salida.fecha_hora_marcaje) - aMinutos(entrada.fecha_hora_marcaje) : null;
 
-module.exports = { minutosDuracion, minutosEfectivos, evaluarPuntualidad, horaBolivia, minutosTrabajados };
+module.exports = {
+  minutosDuracion,
+  minutosEfectivos,
+  inicioProgramadoMs,
+  evaluarPuntualidad,
+  horaBolivia,
+  minutosTrabajados,
+};
