@@ -35,8 +35,19 @@
 - `ROLES_TURNO.id_sucursal` e `id_departamento` deberían hacer referencia a `SUCURSALES` y `DEPARTAMENTOS` de EmployeeDB (el área operativa).
 - Un rol es semanal (lunes a domingo) o mensual (del 1 al último día del mes). Un área de una sucursal no puede tener dos roles con días en común (`ex_rol_sin_solapamiento`, requiere la extensión `btree_gist`).
 - `ASIGNACIONES_ROL_TURNO` es el borrador que edita el supervisor: por empleado y día, un turno o un descanso (`id_turno` NULL y `es_descanso` TRUE). Una celda sin fila está vacía.
-- Al publicar, el borrador se copia a `TURNOS_PUBLICADOS` con el nombre y el horario del turno de ese momento. Es lo que ve el colaborador; los cambios posteriores al borrador no se ven hasta publicar de nuevo (`tiene_cambios_sin_publicar`, `version_publicada`).
+- Al publicar, el borrador se copia a `TURNOS_PUBLICADOS` con el nombre, el horario, el refrigerio y la tolerancia del turno de ese momento. Es lo que ve el colaborador; los cambios posteriores al borrador no se ven hasta publicar de nuevo (`tiene_cambios_sin_publicar`, `version_publicada`).
 - Un empleado tiene un solo turno publicado por día (`uq_turno_publicado_empleado_fecha`), aunque figure en roles de dos áreas.
+
+## Novedades de asistencia
+
+- `NOVEDADES_ASISTENCIA` guarda lo que se detecta al contrastar el turno programado con los marcajes. Tipos (`CATALOGOS_TIPO_NOVEDAD`): `ATRASO`, `INASISTENCIA` (falta injustificada), `SALIDA_ANTICIPADA` y `OMISION_SALIDA`.
+- `fecha_jornada` es el día en que empieza el turno. Cada tipo se registra una sola vez por empleado y jornada (`uq_novedad_empleado_jornada_tipo`).
+- La novedad copia el turno de ese día (`nombre_turno`, `inicio_programado`, `fin_programado`, `minutos_tolerancia`) para que no cambie si después se edita el turno o el rol; si el turno se elimina, `id_turno` queda en NULL y la copia se conserva. `id_rol` se llena si el turno vino de un rol publicado.
+- `id_marcaje` apunta a la entrada del atraso o a la salida anticipada; la omisión apunta a la entrada que quedó sin salida y la inasistencia no tiene marcaje.
+- `minutos` son los minutos de atraso, los que faltaron por la salida anticipada o los de la jornada no trabajada. `minutos_penalizacion` es el tiempo que se descuenta en compensaciones.
+- Estado (`CATALOGOS_ESTADO_NOVEDAD`): `REGISTRADA` o `JUSTIFICADA`. Una novedad justificada no suma penalización.
+- `consolidada_en` se llena cuando la jornada se cierra y se avisa a compensaciones.
+- `id_empleado` debería hacer referencia a `id_empleado` de EmployeeDB.
 
 ## Eventos salientes
 

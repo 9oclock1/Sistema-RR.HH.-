@@ -126,8 +126,10 @@ async function aplicarCambios(cliente, idRol, cambios) {
 async function publicar(cliente, idRol, idsEmpleados) {
   await cliente.query("DELETE FROM turnos_publicados WHERE id_rol = $1", [idRol]);
   await cliente.query(
-    `INSERT INTO turnos_publicados (id_rol, id_empleado, fecha, id_turno, es_descanso, nombre_turno, hora_inicio, hora_fin)
-     SELECT a.id_rol, a.id_empleado, a.fecha, a.id_turno, a.es_descanso, t.nombre, t.hora_inicio, t.hora_fin
+    `INSERT INTO turnos_publicados (id_rol, id_empleado, fecha, id_turno, es_descanso, nombre_turno, hora_inicio, hora_fin,
+                                    minutos_refrigerio, minutos_tolerancia)
+     SELECT a.id_rol, a.id_empleado, a.fecha, a.id_turno, a.es_descanso, t.nombre, t.hora_inicio, t.hora_fin,
+            t.minutos_refrigerio, t.minutos_tolerancia
      FROM asignaciones_rol_turno a LEFT JOIN turnos t USING (id_turno)
      WHERE a.id_rol = $1 AND a.id_empleado = ANY($2::uuid[])`,
     [idRol, idsEmpleados]

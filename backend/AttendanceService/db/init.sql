@@ -147,6 +147,8 @@ CREATE TABLE TURNOS_PUBLICADOS (
     nombre_turno varchar(60) NULL,
     hora_inicio TIME NULL,
     hora_fin TIME NULL,
+    minutos_refrigerio SMALLINT NULL,
+    minutos_tolerancia SMALLINT NULL,
     publicado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT TURNOS_PUBLICADOS_pk PRIMARY KEY (id_turno_publicado),
     -- Un empleado tiene un solo turno publicado por día, aunque cambie de área.
@@ -185,6 +187,50 @@ CREATE TABLE EVENTOS_SALIENTES (
 );
 CREATE INDEX idx_eventos_salientes_pendientes ON EVENTOS_SALIENTES (id_estado_evento, proximo_intento_en);
 CREATE INDEX idx_eventos_salientes_id_rol ON EVENTOS_SALIENTES (id_rol);
+-- Tabla: CATALOGOS_TIPO_NOVEDAD
+CREATE TABLE CATALOGOS_TIPO_NOVEDAD (
+    id_tipo_novedad SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_TIPO_NOVEDAD_pk PRIMARY KEY (id_tipo_novedad),
+    CONSTRAINT uq_tipo_novedad_codigo UNIQUE (codigo)
+);
+-- Tabla: CATALOGOS_ESTADO_NOVEDAD
+CREATE TABLE CATALOGOS_ESTADO_NOVEDAD (
+    id_estado_novedad SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_ESTADO_NOVEDAD_pk PRIMARY KEY (id_estado_novedad),
+    CONSTRAINT uq_estado_novedad_codigo UNIQUE (codigo)
+);
+-- Tabla: NOVEDADES_ASISTENCIA
+-- Atrasos, inasistencias, salidas anticipadas y omisiones halladas al contrastar turnos y marcajes.
+CREATE TABLE NOVEDADES_ASISTENCIA (
+    id_novedad UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    fecha_jornada date NOT NULL,
+    id_tipo_novedad SMALLINT NOT NULL,
+    id_estado_novedad SMALLINT NOT NULL DEFAULT 1,
+    id_turno UUID NULL,
+    id_rol UUID NULL,
+    nombre_turno varchar(60) NOT NULL,
+    inicio_programado TIMESTAMPTZ NOT NULL,
+    fin_programado TIMESTAMPTZ NOT NULL,
+    minutos_tolerancia SMALLINT NOT NULL DEFAULT 0,
+    id_marcaje UUID NULL,
+    minutos int NOT NULL DEFAULT 0,
+    minutos_penalizacion int NOT NULL DEFAULT 0,
+    detectada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    consolidada_en TIMESTAMPTZ NULL,
+    CONSTRAINT NOVEDADES_ASISTENCIA_pk PRIMARY KEY (id_novedad),
+    -- Cada tipo de novedad se registra una sola vez por jornada.
+    CONSTRAINT uq_novedad_empleado_jornada_tipo UNIQUE (id_empleado, fecha_jornada, id_tipo_novedad),
+    CONSTRAINT chk_novedad_minutos CHECK (minutos >= 0 AND minutos_penalizacion >= 0),
+    CONSTRAINT chk_novedad_horario CHECK (fin_programado > inicio_programado)
+);
+CREATE INDEX idx_novedades_asistencia_fecha ON NOVEDADES_ASISTENCIA (fecha_jornada);
+CREATE INDEX idx_novedades_asistencia_id_marcaje ON NOVEDADES_ASISTENCIA (id_marcaje);
+CREATE INDEX idx_novedades_asistencia_sin_consolidar ON NOVEDADES_ASISTENCIA (fin_programado) WHERE consolidada_en IS NULL;
 -- llaves foráneas
 -- Referencia: TURNOS_CATALOGOS_TIPO_JORNADA (tabla: TURNOS)
 ALTER TABLE TURNOS
@@ -222,6 +268,21 @@ ADD CONSTRAINT TURNOS_PUBLICADOS_TURNOS FOREIGN KEY (id_turno) REFERENCES TURNOS
 -- Referencia: EVENTOS_SALIENTES_CATALOGOS_ESTADO_EVENTO (tabla: EVENTOS_SALIENTES)
 ALTER TABLE EVENTOS_SALIENTES
 ADD CONSTRAINT EVENTOS_SALIENTES_CATALOGOS_ESTADO_EVENTO FOREIGN KEY (id_estado_evento) REFERENCES CATALOGOS_ESTADO_EVENTO (id_estado_evento) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: NOVEDADES_ASISTENCIA_CATALOGOS_TIPO_NOVEDAD (tabla: NOVEDADES_ASISTENCIA)
+ALTER TABLE NOVEDADES_ASISTENCIA
+ADD CONSTRAINT NOVEDADES_ASISTENCIA_CATALOGOS_TIPO_NOVEDAD FOREIGN KEY (id_tipo_novedad) REFERENCES CATALOGOS_TIPO_NOVEDAD (id_tipo_novedad) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: NOVEDADES_ASISTENCIA_CATALOGOS_ESTADO_NOVEDAD (tabla: NOVEDADES_ASISTENCIA)
+ALTER TABLE NOVEDADES_ASISTENCIA
+ADD CONSTRAINT NOVEDADES_ASISTENCIA_CATALOGOS_ESTADO_NOVEDAD FOREIGN KEY (id_estado_novedad) REFERENCES CATALOGOS_ESTADO_NOVEDAD (id_estado_novedad) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: NOVEDADES_ASISTENCIA_TURNOS (tabla: NOVEDADES_ASISTENCIA)
+ALTER TABLE NOVEDADES_ASISTENCIA
+ADD CONSTRAINT NOVEDADES_ASISTENCIA_TURNOS FOREIGN KEY (id_turno) REFERENCES TURNOS (id_turno) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: NOVEDADES_ASISTENCIA_ROLES_TURNO (tabla: NOVEDADES_ASISTENCIA)
+ALTER TABLE NOVEDADES_ASISTENCIA
+ADD CONSTRAINT NOVEDADES_ASISTENCIA_ROLES_TURNO FOREIGN KEY (id_rol) REFERENCES ROLES_TURNO (id_rol) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: NOVEDADES_ASISTENCIA_MARCAJES (tabla: NOVEDADES_ASISTENCIA)
+ALTER TABLE NOVEDADES_ASISTENCIA
+ADD CONSTRAINT NOVEDADES_ASISTENCIA_MARCAJES FOREIGN KEY (id_marcaje) REFERENCES MARCAJES (id_marcaje) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- datos iniciales
 INSERT INTO CATALOGOS_TIPO_JORNADA (id_tipo_jornada, codigo, nombre) VALUES
     (1, 'DIURNO', 'Diurno'),
@@ -246,4 +307,12 @@ INSERT INTO CATALOGOS_ESTADO_EVENTO (id_estado_evento, codigo, nombre) VALUES
     (1, 'PENDIENTE', 'Pendiente'),
     (2, 'ENTREGADO', 'Entregado'),
     (3, 'FALLIDO', 'Fallido');
+INSERT INTO CATALOGOS_TIPO_NOVEDAD (id_tipo_novedad, codigo, nombre) VALUES
+    (1, 'ATRASO', 'Atraso'),
+    (2, 'INASISTENCIA', 'Falta injustificada'),
+    (3, 'SALIDA_ANTICIPADA', 'Salida anticipada'),
+    (4, 'OMISION_SALIDA', 'Omisión de marcaje de salida');
+INSERT INTO CATALOGOS_ESTADO_NOVEDAD (id_estado_novedad, codigo, nombre) VALUES
+    (1, 'REGISTRADA', 'Registrada'),
+    (2, 'JUSTIFICADA', 'Justificada');
 -- Fin del archivo.
