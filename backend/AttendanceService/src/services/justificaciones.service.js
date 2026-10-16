@@ -1,6 +1,6 @@
 const pool = require("../config/db");
 const modelo = require("../models/justificaciones.model");
-const { momentoActual } = require("../models/novedades.model");
+const novedadesModelo = require("../models/novedades.model");
 const empleados = require("./empleados.service");
 const eventos = require("./eventos.service");
 const almacen = require("../utils/adjuntosJustificacion");
@@ -112,7 +112,7 @@ function leerRango({ desde, hasta } = {}, hoy) {
 // Panel del colaborador: sus atrasos, faltas y salidas anticipadas, con el plazo y la última solicitud de cada una.
 async function misNovedades(idEmpleado, filtros) {
   verificarIdentidad(idEmpleado);
-  const { ahora, hoy } = await momentoActual();
+  const { ahora, hoy } = await novedadesModelo.momentoActual();
   const { desde, hasta } = leerRango(filtros, hoy);
   const horas = horasPlazo();
 
@@ -144,7 +144,7 @@ async function misNovedades(idEmpleado, filtros) {
 async function registrar(idEmpleado, cuerpo, archivos = []) {
   verificarIdentidad(idEmpleado);
   const datos = validarSolicitud(cuerpo, archivos, await modelo.listarMotivos());
-  const { ahora } = await momentoActual();
+  const { ahora } = await novedadesModelo.momentoActual();
   const claves = [];
   try {
     const idSolicitud = await enTransaccion(async (cliente) => {
