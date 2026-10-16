@@ -44,7 +44,7 @@
 - `fecha_jornada` es el día en que empieza el turno. Cada tipo se registra una sola vez por empleado y jornada (`uq_novedad_empleado_jornada_tipo`).
 - La novedad copia el turno de ese día (`nombre_turno`, `inicio_programado`, `fin_programado`, `minutos_tolerancia`) para que no cambie si después se edita el turno o el rol; si el turno se elimina, `id_turno` queda en NULL y la copia se conserva. `id_rol` se llena si el turno vino de un rol publicado.
 - `id_marcaje` apunta a la entrada del atraso o a la salida anticipada; la omisión apunta a la entrada que quedó sin salida y la inasistencia no tiene marcaje.
-- `minutos` son los minutos de atraso, los que faltaron por la salida anticipada o los de la jornada no trabajada. `minutos_penalizacion` es el tiempo que se descuenta en compensaciones.
+- `minutos` son los minutos de atraso, los que faltaron por la salida anticipada o los de la jornada no trabajada. `minutos_penalizacion` es el tiempo que se descuenta en compensaciones. `minutos_programados` son las horas efectivas del turno (duración - refrigerio).
 - Estado (`CATALOGOS_ESTADO_NOVEDAD`): `REGISTRADA` o `JUSTIFICADA`. Una novedad justificada no suma penalización.
 - `consolidada_en` se llena cuando la jornada se cierra y se avisa a compensaciones.
 - `id_empleado` debería hacer referencia a `id_empleado` de EmployeeDB.
@@ -66,6 +66,15 @@
 - Al cerrar la jornada, sus novedades se consolidan y se registra un evento `JORNADA_CONSOLIDADA` con tópico `compensaciones` en `EVENTOS_SALIENTES`: empleado, fecha, turno, minutos de penalización (de las novedades registradas, no justificadas) y el detalle de cada novedad.
 - Se envía igual que los demás eventos: con `URL_COMPENSACIONES` el despachador hace `POST`; sin URL, CompensationService lo lee con `GET /eventos?topico=compensaciones`.
 - Cada novedad se consolida una sola vez. Si una novedad aparece después del cierre, llega en otro evento de la misma jornada: el consumidor debe sumar por `id_novedad`.
+
+## Justificaciones
+
+- `SOLICITUDES_JUSTIFICACION` guarda el justificativo que el colaborador presenta para una novedad: motivo (`CATALOGOS_MOTIVO_JUSTIFICACION`), descripción opcional y estado (`CATALOGOS_ESTADO_JUSTIFICACION`): `PENDIENTE`, `APROBADA` o `RECHAZADA`.
+- Solo se justifican los tipos con `es_justificable` en `CATALOGOS_TIPO_NOVEDAD`: atraso, inasistencia y salida anticipada. La omisión de salida no descuenta tiempo.
+- Una novedad tiene a lo sumo una solicitud pendiente o aprobada (`uq_justificacion_novedad_vigente`). Las rechazadas quedan como historial y se puede presentar otra dentro del plazo.
+- La revisión guarda `id_revisor` (y su nombre en ese momento), `revisada_en` y `comentario_revision` (obligatorio al rechazar).
+- `ADJUNTOS_JUSTIFICACION` registra cada comprobante (PDF, JPG o PNG). El archivo se guarda en disco (`uploads/justificaciones`) con `clave_almacenamiento`; el nombre original solo se muestra.
+- `id_empleado` e `id_revisor` deberían hacer referencia a `id_empleado` de EmployeeDB.
 
 ## Eventos salientes
 
