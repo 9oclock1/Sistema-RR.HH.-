@@ -11,6 +11,7 @@ import {
   ModalConfirmacion,
   Tarjeta,
 } from "../../components/ui";
+import MisNovedades from "../justificaciones/MisNovedades";
 import IdentificacionEmpleado from "./IdentificacionEmpleado";
 import MisTurnos from "./MisTurnos";
 import Reloj from "./Reloj";
@@ -271,6 +272,7 @@ export default function MarcajePage() {
         )}
 
         {jornada && <MisTurnos key={idEmpleado} idEmpleado={idEmpleado} />}
+        {jornada && <MisNovedades key={`novedades-${idEmpleado}`} idEmpleado={idEmpleado} />}
       </div>
 
       <ModalConfirmacion
