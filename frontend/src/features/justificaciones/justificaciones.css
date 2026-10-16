@@ -236,3 +236,144 @@
   font-size: var(--font-size-small);
   font-variant-numeric: tabular-nums;
 }
+
+/* Bandeja de revisión */
+.jf-bandeja {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.jf-bandeja .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+.jf-bandeja__superior {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--size-modal) * 0.9)), 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.jf-filtros__campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--size-sidebar) * 0.75), 1fr));
+  gap: var(--space-3) var(--space-4);
+  align-items: end;
+  margin-top: var(--space-2);
+}
+
+.jf-revisor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-secondary);
+}
+
+.jf-revisor strong {
+  color: var(--color-text);
+}
+
+.jf-celda {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-1) 0;
+}
+
+.jf-celda__principal {
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.jf-icono-sutil {
+  margin-right: var(--space-1);
+  vertical-align: text-bottom;
+}
+
+/* Detalle */
+.jf-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-2);
+}
+
+.jf-detalle__seccion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.jf-detalle__titulo {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.jf-detalle__texto {
+  margin: 0;
+  color: var(--color-text);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.jf-selector-adjuntos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.jf-selector-adjuntos .ds-boton {
+  max-width: 100%;
+}
+
+.jf-vista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  overflow: hidden;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-page);
+}
+
+.jf-vista__marco {
+  width: 100%;
+  height: min(60dvh, calc(var(--size-modal) * 1.1));
+  border: 0;
+  background: var(--color-bg-surface);
+}
+
+.jf-vista__imagen {
+  display: block;
+  max-width: 100%;
+  max-height: min(60dvh, calc(var(--size-modal) * 1.1));
+  margin: 0 auto;
+  object-fit: contain;
+}
+
+.jf-vista__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-top: var(--border-width) solid var(--color-border);
+  background: var(--color-bg-surface);
+}
+
+.jf-anteriores {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

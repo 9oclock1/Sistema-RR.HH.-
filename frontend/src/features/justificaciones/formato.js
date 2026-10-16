@@ -39,7 +39,7 @@ export function describirNovedad({ tipo, minutos }) {
 }
 
 export const ESTADOS_SOLICITUD = {
-  PENDIENTE: { tono: "info", icono: Hourglass, texto: "Pendiente de revisión" },
+  PENDIENTE: { tono: "info", icono: Hourglass, texto: "Pendiente" },
   APROBADA: { tono: "exito", icono: CircleCheck, texto: "Aprobada" },
   RECHAZADA: { tono: "peligro", icono: CircleX, texto: "Rechazada" },
 };
