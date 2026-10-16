@@ -109,6 +109,7 @@ const filasNovedades = (turno, resultado) =>
     id_marcaje: n.id_marcaje,
     minutos: n.minutos,
     minutos_penalizacion: n.minutos_penalizacion,
+    minutos_programados: minutosEfectivos(turno),
   }));
 
 // Agrupa novedades (ordenadas por empleado y jornada) en una lista por jornada.
@@ -122,11 +123,25 @@ function agruparPorJornada(novedades) {
   return [...grupos.values()];
 }
 
-// Cuerpo del evento para compensaciones: las novedades de una jornada y la penalización que suman.
-function armarCargaConsolidacion(novedades) {
+// Horas efectivas de la jornada: las del turno menos la penalización de las novedades no justificadas.
+function totalesJornada(novedades) {
+  const suma = (estado) =>
+    novedades.filter((n) => n.estado_codigo === estado).reduce((total, n) => total + n.minutos_penalizacion, 0);
+  const programados = Math.max(0, ...novedades.map((n) => n.minutos_programados ?? 0));
+  const penalizacion = suma("REGISTRADA");
+  return {
+    minutos_programados: programados,
+    minutos_penalizacion: penalizacion,
+    minutos_justificados: suma("JUSTIFICADA"),
+    minutos_efectivos: Math.max(0, programados - penalizacion),
+  };
+}
+
+// Cuerpo del evento para compensaciones: las novedades de una jornada, la penalización que suman y las horas efectivas.
+function armarCargaConsolidacion(novedades, evento = TIPO_EVENTO.JORNADA_CONSOLIDADA) {
   const [primera] = novedades;
   return {
-    evento: TIPO_EVENTO.JORNADA_CONSOLIDADA,
+    evento,
     id_empleado: primera.id_empleado,
     fecha_jornada: primera.fecha_jornada,
     turno: {
@@ -134,9 +149,7 @@ function armarCargaConsolidacion(novedades) {
       inicio_programado: new Date(primera.inicio_programado).toISOString(),
       fin_programado: new Date(primera.fin_programado).toISOString(),
     },
-    minutos_penalizacion: novedades
-      .filter((n) => n.estado_codigo === "REGISTRADA")
-      .reduce((total, n) => total + n.minutos_penalizacion, 0),
+    ...totalesJornada(novedades),
     novedades: novedades.map((n) => ({
       id_novedad: n.id_novedad,
       tipo: n.tipo_codigo,
@@ -156,5 +169,6 @@ module.exports = {
   estadoJornada,
   filasNovedades,
   agruparPorJornada,
+  totalesJornada,
   armarCargaConsolidacion,
 };

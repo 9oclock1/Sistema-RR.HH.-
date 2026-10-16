@@ -111,7 +111,93 @@ async function listarPorNovedades(idsNovedades) {
   return rows;
 }
 
+// Bandeja de revisión: solicitudes del personal indicado; las pendientes primero, de la más antigua a la más nueva.
+async function listarBandeja(idsEmpleados, idEstado = null, limite = 200) {
+  if (idsEmpleados.length === 0) return [];
+  const { rows } = await pool.query(
+    `${SOLICITUD}
+     WHERE s.id_empleado = ANY($1::uuid[]) AND ($2::smallint IS NULL OR s.id_estado_justificacion = $2)
+     ORDER BY s.id_estado_justificacion <> 1, CASE WHEN s.id_estado_justificacion = 1 THEN s.creado_en END,
+              s.revisada_en DESC
+     LIMIT $3`,
+    [idsEmpleados, idEstado, limite]
+  );
+  return rows;
+}
+
+async function contarPorEstado(idsEmpleados) {
+  if (idsEmpleados.length === 0) return [];
+  const { rows } = await pool.query(
+    `SELECT es.codigo, count(*)::int AS cantidad
+     FROM solicitudes_justificacion s
+     JOIN catalogos_estado_justificacion es USING (id_estado_justificacion)
+     WHERE s.id_empleado = ANY($1::uuid[])
+     GROUP BY es.codigo`,
+    [idsEmpleados]
+  );
+  return rows;
+}
+
+async function listarNovedades(idsNovedades) {
+  if (idsNovedades.length === 0) return [];
+  const { rows } = await pool.query(`${NOVEDAD} WHERE n.id_novedad = ANY($1::uuid[])`, [idsNovedades]);
+  return rows;
+}
+
+async function obtenerAdjunto(idSolicitud, idAdjunto) {
+  const { rows } = await pool.query(
+    `SELECT id_adjunto, nombre_original, tipo_mime, tamano_bytes, clave_almacenamiento
+     FROM adjuntos_justificacion
+     WHERE id_solicitud = $1 AND id_adjunto = $2`,
+    [idSolicitud, idAdjunto]
+  );
+  return rows[0] ?? null;
+}
+
+// Solicitud bloqueada hasta el fin de la transacción: dos revisores no pueden decidir la misma a la vez.
+async function bloquearSolicitud(cliente, idSolicitud) {
+  if (!(await bloquear(cliente, "solicitudes_justificacion", "id_solicitud", idSolicitud))) return null;
+  return obtener(cliente, idSolicitud);
+}
+
+async function registrarRevision(cliente, idSolicitud, { idEstado, idRevisor, nombreRevisor, comentario }) {
+  await cliente.query(
+    `UPDATE solicitudes_justificacion
+     SET id_estado_justificacion = $2, id_revisor = $3, nombre_revisor = $4, comentario_revision = $5,
+         revisada_en = CURRENT_TIMESTAMP
+     WHERE id_solicitud = $1`,
+    [idSolicitud, idEstado, idRevisor, nombreRevisor, comentario]
+  );
+}
+
+// La novedad deja de sumar penalización. Devuelve si su jornada ya se había informado a compensaciones.
+async function marcarJustificada(cliente, idNovedad) {
+  const { rows } = await cliente.query(
+    `UPDATE novedades_asistencia SET id_estado_novedad = 2
+     WHERE id_novedad = $1
+     RETURNING id_empleado, fecha_jornada, consolidada_en`,
+    [idNovedad]
+  );
+  return rows[0];
+}
+
+async function listarNovedadesDeJornada(db, idEmpleado, fechaJornada) {
+  const { rows } = await db.query(
+    `${NOVEDAD} WHERE n.id_empleado = $1 AND n.fecha_jornada = $2 ORDER BY n.id_tipo_novedad`,
+    [idEmpleado, fechaJornada]
+  );
+  return rows;
+}
+
 module.exports = {
+  listarBandeja,
+  contarPorEstado,
+  listarNovedades,
+  obtenerAdjunto,
+  bloquearSolicitud,
+  registrarRevision,
+  marcarJustificada,
+  listarNovedadesDeJornada,
   listarMotivos,
   bloquearNovedadDelEmpleado,
   obtenerVigente,

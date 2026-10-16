@@ -1,12 +1,24 @@
 const pool = require("../config/db");
 const modelo = require("../models/justificaciones.model");
 const { momentoActual } = require("../models/novedades.model");
+const empleados = require("./empleados.service");
+const eventos = require("./eventos.service");
 const almacen = require("../utils/adjuntosJustificacion");
 const { enTransaccion } = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const { esFechaValida, sumarDias } = require("../utils/periodos");
-const { horasPlazo, evaluarPlazo, errorDePlazo, validarSolicitud, nombreVisible } = require("../utils/justificaciones");
+const { TIPO_EVENTO } = require("../utils/eventos");
+const { totalesJornada, armarCargaConsolidacion } = require("../utils/novedades");
+const {
+  ESTADO_JUSTIFICACION,
+  horasPlazo,
+  evaluarPlazo,
+  errorDePlazo,
+  validarSolicitud,
+  validarRevision,
+  nombreVisible,
+} = require("../utils/justificaciones");
 
 const DIAS_CONSULTA = 30;
 const DIAS_MAXIMOS_CONSULTA = 92;
@@ -17,6 +29,8 @@ function verificarIdentidad(idEmpleado) {
 }
 
 const noEncontrada = () => new ErrorApp(404, "Novedad no encontrada");
+const solicitudNoEncontrada = () => new ErrorApp(404, "Solicitud de justificación no encontrada");
+const archivoNoEncontrado = () => new ErrorApp(404, "Comprobante no encontrado");
 
 const resumirNovedad = (n) => ({
   id_novedad: n.id_novedad,
@@ -163,4 +177,116 @@ async function registrar(idEmpleado, cuerpo, archivos = []) {
   }
 }
 
-module.exports = { listarMotivos, misNovedades, registrar, detalle, resumirNovedad, resumirSolicitud };
+function leerFiltrosBandeja({ id_sucursal, id_departamento, estado } = {}) {
+  const errores = [];
+  if (!id_sucursal) errores.push({ campo: "id_sucursal", mensaje: "Seleccione la sucursal." });
+  else if (!UUID_RE.test(id_sucursal)) errores.push({ campo: "id_sucursal", mensaje: "Sucursal inválida." });
+  if (id_departamento && !UUID_RE.test(id_departamento)) errores.push({ campo: "id_departamento", mensaje: "Área inválida." });
+  const codigo = (estado || "PENDIENTE").toUpperCase();
+  if (codigo !== "TODAS" && !Object.hasOwn(ESTADO_JUSTIFICACION, codigo)) {
+    errores.push({ campo: "estado", mensaje: "Use PENDIENTE, APROBADA, RECHAZADA o TODAS." });
+  }
+  if (errores.length > 0) throw new ErrorApp(400, "Filtros inválidos", errores);
+  return {
+    idSucursal: id_sucursal.toLowerCase(),
+    idDepartamento: id_departamento?.toLowerCase() || null,
+    idEstado: codigo === "TODAS" ? null : ESTADO_JUSTIFICACION[codigo],
+  };
+}
+
+const resumirEmpleado = (e, id) =>
+  e
+    ? { id_empleado: e.id_empleado, nombre_completo: e.nombre_completo, cargo: e.cargo ?? null, area: e.area ?? null }
+    : { id_empleado: id, nombre_completo: "Empleado no encontrado", cargo: null, area: null };
+
+// Bandeja del supervisor o de RRHH: solicitudes del personal de una sucursal (y área).
+async function bandeja(filtros) {
+  const { idSucursal, idDepartamento, idEstado } = leerFiltrosBandeja(filtros);
+  const personal = await empleados.listarPorArea(idSucursal, idDepartamento);
+  const porId = new Map(personal.map((e) => [e.id_empleado, e]));
+  const ids = [...porId.keys()];
+
+  const [solicitudes, conteo] = await Promise.all([modelo.listarBandeja(ids, idEstado), modelo.contarPorEstado(ids)]);
+  const [novedades, adjuntos] = await Promise.all([
+    modelo.listarNovedades([...new Set(solicitudes.map((s) => s.id_novedad))]),
+    modelo.listarAdjuntos(pool, solicitudes.map((s) => s.id_solicitud)),
+  ]);
+  const novedadPorId = new Map(novedades.map((n) => [n.id_novedad, n]));
+  const cantidad = (codigo) => conteo.find((c) => c.codigo === codigo)?.cantidad ?? 0;
+
+  return {
+    resumen: { pendientes: cantidad("PENDIENTE"), aprobadas: cantidad("APROBADA"), rechazadas: cantidad("RECHAZADA") },
+    solicitudes: solicitudes.map((s) => ({
+      ...resumirSolicitud(s, adjuntos),
+      empleado: resumirEmpleado(porId.get(s.id_empleado), s.id_empleado),
+      novedad: resumirNovedad(novedadPorId.get(s.id_novedad)),
+    })),
+  };
+}
+
+// Detalle para revisar: la solicitud, el colaborador y las solicitudes anteriores de la misma novedad.
+async function obtener(idSolicitud) {
+  if (!UUID_RE.test(idSolicitud)) throw solicitudNoEncontrada();
+  const solicitud = await detalle(pool, idSolicitud.toLowerCase());
+  if (!solicitud) throw solicitudNoEncontrada();
+  const anteriores = (await modelo.listarPorNovedades([solicitud.id_novedad])).filter(
+    (s) => s.id_solicitud !== solicitud.id_solicitud
+  );
+  const adjuntos = await modelo.listarAdjuntos(pool, anteriores.map((s) => s.id_solicitud));
+  return {
+    ...solicitud,
+    empleado: { id_empleado: solicitud.id_empleado, nombre_completo: await empleados.obtenerNombre(solicitud.id_empleado) },
+    anteriores: anteriores.map((s) => resumirSolicitud(s, adjuntos)),
+  };
+}
+
+// Ruta en disco y datos para enviar el comprobante.
+async function adjunto(idSolicitud, idAdjunto) {
+  if (!UUID_RE.test(idSolicitud) || !UUID_RE.test(idAdjunto)) throw archivoNoEncontrado();
+  const fila = await modelo.obtenerAdjunto(idSolicitud.toLowerCase(), idAdjunto.toLowerCase());
+  if (!fila) throw archivoNoEncontrado();
+  return { ruta: almacen.rutaDe(fila.clave_almacenamiento), tipo: fila.tipo_mime, nombre: fila.nombre_original };
+}
+
+async function verificarRevisor(idRevisor) {
+  verificarIdentidad(idRevisor);
+  const revisor = await empleados.obtener(idRevisor);
+  if (!revisor) throw new ErrorApp(403, "El revisor no corresponde a un empleado registrado.");
+  if (revisor.activo !== true) throw new ErrorApp(403, "El revisor no está activo.");
+  return `${revisor.nombres} ${revisor.apellidos}`.trim();
+}
+
+// Aprueba o rechaza. Al aprobar, la novedad queda justificada y, si su jornada ya se había informado
+// a compensaciones, se envía la jornada recalculada.
+async function revisar(idSolicitud, idRevisor, cuerpo) {
+  if (!UUID_RE.test(idSolicitud)) throw solicitudNoEncontrada();
+  const datos = validarRevision(cuerpo);
+  const nombreRevisor = await verificarRevisor(idRevisor);
+
+  const recalculo = await enTransaccion(async (cliente) => {
+    const solicitud = await modelo.bloquearSolicitud(cliente, idSolicitud.toLowerCase());
+    if (!solicitud) throw solicitudNoEncontrada();
+    if (solicitud.estado_codigo !== "PENDIENTE") {
+      throw new ErrorApp(409, `La solicitud ya fue ${solicitud.estado_nombre.toLowerCase()}.`);
+    }
+    if (solicitud.id_empleado === idRevisor) throw new ErrorApp(403, "No puede revisar su propia justificación.");
+
+    await modelo.registrarRevision(cliente, solicitud.id_solicitud, { ...datos, idRevisor, nombreRevisor });
+    if (datos.decision !== "APROBADA") return false;
+
+    const novedad = await modelo.marcarJustificada(cliente, solicitud.id_novedad);
+    if (!novedad.consolidada_en) return false;
+    const jornada = await modelo.listarNovedadesDeJornada(cliente, novedad.id_empleado, novedad.fecha_jornada);
+    await eventos.registrarConsolidacion(cliente, {
+      ...armarCargaConsolidacion(jornada, TIPO_EVENTO.JORNADA_RECALCULADA),
+      id_solicitud: solicitud.id_solicitud,
+    });
+    return true;
+  });
+
+  const resultado = await detalle(pool, idSolicitud.toLowerCase());
+  const jornada = await modelo.listarNovedadesDeJornada(pool, resultado.id_empleado, resultado.novedad.fecha_jornada);
+  return { ...resultado, jornada: { ...totalesJornada(jornada), recalculo_enviado: recalculo } };
+}
+
+module.exports = { listarMotivos, misNovedades, registrar, bandeja, obtener, adjunto, revisar };

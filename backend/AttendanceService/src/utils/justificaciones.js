@@ -5,6 +5,7 @@ const { coincideFirma } = require("./firmaArchivo");
 const ESTADO_JUSTIFICACION = { PENDIENTE: 1, APROBADA: 2, RECHAZADA: 3 };
 const MOTIVO_OTRO = "OTRO";
 const MAX_DESCRIPCION = 500;
+const MAX_COMENTARIO = 500;
 const HORA_MS = 60 * 60 * 1000;
 
 const TIPOS_ADJUNTO = {
@@ -94,6 +95,24 @@ function validarSolicitud(cuerpo = {}, archivos = [], motivos = []) {
   return { idNovedad, idMotivo, descripcion: descripcion || null };
 }
 
+const DECISIONES = { APROBADA: ESTADO_JUSTIFICACION.APROBADA, RECHAZADA: ESTADO_JUSTIFICACION.RECHAZADA };
+
+function validarRevision(cuerpo = {}) {
+  const errores = [];
+  const decision = texto(cuerpo.decision).toUpperCase();
+  const comentario = texto(cuerpo.comentario);
+  if (!Object.hasOwn(DECISIONES, decision)) {
+    errores.push({ campo: "decision", mensaje: "Indique si aprueba o rechaza la solicitud." });
+  }
+  if (comentario.length > MAX_COMENTARIO) {
+    errores.push({ campo: "comentario", mensaje: `Use como máximo ${MAX_COMENTARIO} caracteres.` });
+  } else if (decision === "RECHAZADA" && !comentario) {
+    errores.push({ campo: "comentario", mensaje: "Explique el motivo del rechazo." });
+  }
+  if (errores.length > 0) throw new ErrorApp(400, "Datos inválidos", errores);
+  return { decision, idEstado: DECISIONES[decision], comentario: comentario || null };
+}
+
 // Nombre para mostrar: sin rutas ni caracteres de control, hasta 255 caracteres.
 function nombreVisible(nombre) {
   const limpio = String(nombre ?? "")
@@ -112,5 +131,6 @@ module.exports = {
   evaluarPlazo,
   errorDePlazo,
   validarSolicitud,
+  validarRevision,
   nombreVisible,
 };
