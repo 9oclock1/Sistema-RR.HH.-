@@ -6,6 +6,7 @@ const marcajesRoutes = require("./src/routes/marcajes.routes");
 const rolesTurnoRoutes = require("./src/routes/rolesTurno.routes");
 const eventosRoutes = require("./src/routes/eventos.routes");
 const novedadesRoutes = require("./src/routes/novedades.routes");
+const justificacionesRoutes = require("./src/routes/justificaciones.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 const { iniciarDespachador } = require("./src/services/eventos.service");
 const { iniciarContraste } = require("./src/services/novedades.service");
@@ -45,6 +46,7 @@ app.use(marcajesRoutes);
 app.use(rolesTurnoRoutes);
 app.use(eventosRoutes);
 app.use(novedadesRoutes);
+app.use(justificacionesRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
