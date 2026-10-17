@@ -5,8 +5,10 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: "0.0.0.0",
+    host: true,
     port: 5173,
+    strictPort: true,
+    allowedHosts: [".62344037.xyz"],
     watch: {
       usePolling: true,
     },
