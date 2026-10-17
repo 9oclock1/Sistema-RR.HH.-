@@ -264,19 +264,6 @@
   margin-top: var(--space-2);
 }
 
-.jf-revisor {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  margin: var(--space-3) 0 0;
-  color: var(--color-text-secondary);
-}
-
-.jf-revisor strong {
-  color: var(--color-text);
-}
-
 .jf-celda {
   display: flex;
   flex-direction: column;
