@@ -31,3 +31,31 @@ export const listarPeriodos = () => solicitar(`${RUTA}/periodos`);
 
 export const consolidarPeriodo = (idResponsable, { desde, hasta }) =>
   solicitar(`${RUTA}/periodos`, { metodo: "POST", cuerpo: { desde, hasta }, cabeceras: comoEmpleado(idResponsable) });
+
+// decision: APROBADA | RECHAZADA; minutos_aprobados opcional (por defecto, lo marcado después del turno).
+export const revisarHorasExtra = (idHorasJornada, idRevisor, { decision, minutosAprobados, comentario }) =>
+  solicitar(`${RUTA}/${idHorasJornada}`, {
+    metodo: "PATCH",
+    cuerpo: { decision, minutos_aprobados: minutosAprobados, comentario },
+    cabeceras: comoEmpleado(idRevisor),
+  });
+
+// { desde, hasta, autorizaciones }: por defecto de hoy a 30 días.
+export const listarAutorizaciones = (filtros) => solicitar(`${RUTA}/autorizaciones?${parametros(filtros)}`);
+
+export const autorizarHorasExtra = (idAutorizador, { idEmpleado, fecha, minutos, motivo }) =>
+  solicitar(`${RUTA}/autorizaciones`, {
+    metodo: "POST",
+    cuerpo: { id_empleado: idEmpleado, fecha_jornada: fecha, minutos_autorizados: minutos, motivo },
+    cabeceras: comoEmpleado(idAutorizador),
+  });
+
+export const anularAutorizacion = (idAutorizacion, idSolicitante) =>
+  solicitar(`${RUTA}/autorizaciones/${idAutorizacion}`, { metodo: "DELETE", cabeceras: comoEmpleado(idSolicitante) });
+
+// Personal de la sucursal (y área) para elegir a quién autorizar.
+export const listarPersonal = ({ idSucursal, idDepartamento }) => {
+  const p = new URLSearchParams({ id_sucursal: idSucursal });
+  if (idDepartamento) p.set("id_departamento", idDepartamento);
+  return solicitar(`/empl/empleados?${p}`);
+};

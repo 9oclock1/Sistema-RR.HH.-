@@ -1,8 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { CircleCheck, Clock, Download, Hourglass, Lock, MoonStar, RefreshCw, Timer } from "lucide-react";
 import {
+  CircleCheck,
+  Clock,
+  Download,
+  Hourglass,
+  Lock,
+  MoonStar,
+  RefreshCw,
+  ShieldCheck,
+  Timer,
+  Trash2,
+} from "lucide-react";
+import {
+  anularAutorizacion,
   consolidarPeriodo,
+  listarAutorizaciones,
   listarHorasExtra,
   listarPeriodos,
   resumenHorasExtra,
@@ -26,6 +39,8 @@ import {
 } from "../../components/ui";
 import Revisor from "../marcaje/Revisor";
 import useRevisor from "../marcaje/useRevisor";
+import AutorizacionHorasExtra from "./AutorizacionHorasExtra";
+import RevisionHorasExtra from "./RevisionHorasExtra";
 import {
   ESTADOS_HORAS,
   formatearFechaLarga,
@@ -42,6 +57,7 @@ const PESTANAS = [
   { id: "PENDIENTE", etiqueta: "Por revisar" },
   { id: "TODAS", etiqueta: "Todas las jornadas" },
   { id: "TOTALES", etiqueta: "Totales por colaborador" },
+  { id: "AUTORIZACIONES", etiqueta: "Autorizaciones previas" },
 ];
 
 function leerSucursal() {
@@ -181,12 +197,83 @@ const columnasJornadas = (accion) => [
         {j.minutos_anticipados > 0 && (
           <span className="he-sutil">{formatearMinutos(j.minutos_anticipados)} antes del turno</span>
         )}
+        {j.autorizacion && (
+          <span className="he-sutil">{formatearMinutos(j.autorizacion.minutos_autorizados)} autorizadas</span>
+        )}
       </div>
     ),
   },
   { clave: "pagadas", titulo: "Extra a pagar", ancho: "14%", celda: (j) => <Pagadas pago={j.pago} /> },
   { clave: "estado", titulo: "Estado", ancho: accion ? "10%" : "16%", celda: (j) => <EstadoHoras jornada={j} /> },
   ...(accion ? [accion] : []),
+];
+
+// Revisar las pendientes; ver las ya decididas. Sin extra no hay nada que revisar.
+const accionRevisar = (onAbrir) => ({
+  clave: "accion",
+  titulo: <span className="ds-solo-lector">Acción</span>,
+  ancho: "6%",
+  alinear: "fin",
+  celda: (j) => {
+    if (j.estado.codigo === "SIN_EXTRA") return null;
+    const pendiente = j.estado.codigo === "PENDIENTE" && !j.consolidada;
+    return (
+      <Boton
+        tamano="sm"
+        variante={pendiente ? "primario" : "predeterminado"}
+        onClick={() => onAbrir(j)}
+        aria-label={`${pendiente ? "Revisar" : "Ver"} las horas extra de ${j.empleado.nombre_completo} del ${formatearJornada(j.fecha_jornada)}`}
+      >
+        {pendiente ? "Revisar" : "Ver"}
+      </Boton>
+    );
+  },
+});
+
+const columnasAutorizaciones = (onAnular, hoy) => [
+  {
+    clave: "colaborador",
+    titulo: "Colaborador",
+    ancho: "24%",
+    celda: (a) => (
+      <div className="he-celda">
+        <span className="he-celda__principal">{a.empleado.nombre_completo}</span>
+        {a.empleado.cargo && <span className="he-sutil">{a.empleado.cargo}</span>}
+      </div>
+    ),
+  },
+  {
+    clave: "dia",
+    titulo: "Día",
+    ancho: "14%",
+    celda: (a) => <span className="he-capital">{formatearJornada(a.fecha_jornada)}</span>,
+  },
+  {
+    clave: "minutos",
+    titulo: "Autorizado",
+    ancho: "12%",
+    celda: (a) => <span className="he-numero">{formatearMinutos(a.minutos_autorizados)}</span>,
+  },
+  { clave: "motivo", titulo: "Motivo", ancho: "26%", celda: (a) => <span className="he-texto">{a.motivo}</span> },
+  { clave: "autorizo", titulo: "Autorizó", ancho: "16%", celda: (a) => a.autorizador.nombre_completo },
+  {
+    clave: "accion",
+    titulo: <span className="ds-solo-lector">Acción</span>,
+    ancho: "8%",
+    alinear: "fin",
+    celda: (a) =>
+      a.fecha_jornada >= hoy && (
+        <Boton
+          tamano="sm"
+          variante="sutil"
+          icono={Trash2}
+          onClick={() => onAnular(a)}
+          aria-label={`Anular la autorización de ${a.empleado.nombre_completo} del ${formatearJornada(a.fecha_jornada)}`}
+        >
+          Anular
+        </Boton>
+      ),
+  },
 ];
 
 const columnasTotales = [
@@ -348,6 +435,11 @@ export default function HorasExtraPage() {
   const [consolidando, setConsolidando] = useState(false);
   const [confirmarCierre, setConfirmarCierre] = useState(false);
   const [errorCierre, setErrorCierre] = useState(null);
+  const [abierta, setAbierta] = useState(null);
+  const [autorizando, setAutorizando] = useState(false);
+  const [anulando, setAnulando] = useState(null);
+  const [procesandoAnulacion, setProcesandoAnulacion] = useState(false);
+  const [errorAnulacion, setErrorAnulacion] = useState(null);
   const { revisor, verificando, identificar, cambiar } = useRevisor();
   const avisar = useAvisos();
 
@@ -379,6 +471,18 @@ export default function HorasExtraPage() {
   const jornadas = useConsulta(base, () => listarHorasExtra(consulta), intento);
   const totales = useConsulta(vista === "TOTALES" ? base : null, () => resumenHorasExtra(consulta), intento);
   const periodos = useConsulta(vista === "TOTALES" ? "periodos" : null, listarPeriodos, intento);
+  const claveAutorizaciones =
+    vista === "AUTORIZACIONES" && catalogos && sucursalValida
+      ? `${filtros.id_sucursal}|${filtros.id_departamento}`
+      : null;
+  const autorizaciones = useConsulta(
+    claveAutorizaciones,
+    () =>
+      listarAutorizaciones(
+        consulta.idSucursal ? { idSucursal: consulta.idSucursal, idDepartamento: consulta.idDepartamento } : {}
+      ),
+    intento
+  );
 
   const errorDeCampo = (campo) => jornadas.error?.detalles?.find((d) => d.campo === campo)?.mensaje;
   const errorGeneral = jornadas.error ? (jornadas.error.detalles?.[0]?.mensaje ?? jornadas.error.message) : null;
@@ -407,6 +511,60 @@ export default function HorasExtraPage() {
       : jornadas.datos?.jornadas;
   const ultimoPeriodo = periodos.datos?.[0];
   const periodoTerminado = filtros.hasta < hoy;
+
+  // Tras decidir, el foco vuelve a la pestaña activa (la fila puede salir de «Por revisar»).
+  const volverAPestana = () =>
+    requestAnimationFrame(() => document.querySelector('.he-desglose [role="tab"][aria-selected="true"]')?.focus());
+
+  const alRevisar = (revisada) => {
+    setAbierta(null);
+    const textos = {
+      APROBADA: ["exito", "Horas extra aprobadas"],
+      AJUSTADA: ["exito", "Horas extra aprobadas con ajuste"],
+      RECHAZADA: ["info", "Horas extra rechazadas"],
+    };
+    const [tono, titulo] = textos[revisada.estado.codigo];
+    avisar({
+      tono,
+      titulo,
+      mensaje:
+        revisada.estado.codigo === "RECHAZADA"
+          ? `${revisada.empleado.nombre_completo}, ${formatearJornada(revisada.fecha_jornada)}: no se pagan horas extra.`
+          : `${revisada.empleado.nombre_completo}, ${formatearJornada(revisada.fecha_jornada)}: ${formatearMinutos(revisada.minutos_extra_aprobados)} a pagar como extra.`,
+    });
+    actualizar();
+    volverAPestana();
+  };
+
+  const alAutorizar = (autorizacion, colaborador) => {
+    setAutorizando(false);
+    avisar({
+      tono: "exito",
+      titulo: "Horas extra autorizadas",
+      mensaje: `${colaborador?.nombre_completo ?? "El colaborador"} puede quedarse ${formatearMinutos(autorizacion.minutos_autorizados)} el ${formatearJornada(autorizacion.fecha_jornada)}.`,
+    });
+    actualizar();
+  };
+
+  const anular = async () => {
+    setProcesandoAnulacion(true);
+    setErrorAnulacion(null);
+    try {
+      await anularAutorizacion(anulando.id_autorizacion, revisor.id);
+      setAnulando(null);
+      avisar({
+        tono: "info",
+        titulo: "Autorización anulada",
+        mensaje: "Si la jornada ya cerró, sus horas extra vuelven a quedar por revisar.",
+      });
+      actualizar();
+      volverAPestana();
+    } catch (error) {
+      setErrorAnulacion(error.message);
+    } finally {
+      setProcesandoAnulacion(false);
+    }
+  };
 
   const consolidar = async () => {
     setConsolidando(true);
@@ -443,7 +601,7 @@ export default function HorasExtraPage() {
   ) : (
     <Tabla
       className="he-tabla"
-      columnas={columnasJornadas()}
+      columnas={columnasJornadas(accionRevisar(setAbierta))}
       filas={filasPorVista ?? []}
       claveFila="id_horas_jornada"
       descripcion={vista === "PENDIENTE" ? "Jornadas con horas extra por revisar" : "Jornadas del periodo"}
@@ -516,6 +674,54 @@ export default function HorasExtraPage() {
     </div>
   );
 
+  const tablaAutorizaciones = autorizaciones.error ? (
+    <Alerta
+      tono="peligro"
+      role="alert"
+      titulo="No se pudieron cargar las autorizaciones"
+      acciones={
+        <Boton tamano="sm" onClick={actualizar}>
+          Reintentar
+        </Boton>
+      }
+    >
+      {autorizaciones.error.message}
+    </Alerta>
+  ) : (
+    <div className="he-totales">
+      <p className="he-sutil he-totales__nota">
+        Autorizaciones de hoy en adelante. Al cerrar la jornada se aprueban solas hasta lo autorizado.
+      </p>
+      <Tabla
+        className="he-tabla"
+        columnas={columnasAutorizaciones((a) => {
+          setErrorAnulacion(null);
+          setAnulando(a);
+        }, hoy)}
+        filas={autorizaciones.datos?.autorizaciones ?? []}
+        claveFila="id_autorizacion"
+        descripcion="Autorizaciones previas de horas extra"
+        cargando={!autorizaciones.datos}
+        vacio={
+          <EstadoVacio
+            icono={ShieldCheck}
+            titulo="No hay horas extra autorizadas"
+            mensaje="Autorice antes del día a quien deba quedarse más tiempo."
+            accion={
+              revisor && (
+                <Boton icono={ShieldCheck} onClick={() => setAutorizando(true)}>
+                  Autorizar horas extra
+                </Boton>
+              )
+            }
+          />
+        }
+      />
+    </div>
+  );
+
+  const contenidoDe = { TOTALES: tablaTotales, AUTORIZACIONES: tablaAutorizaciones };
+
   return (
     <section className="he-pagina" aria-labelledby="he-titulo">
       <EncabezadoPagina
@@ -525,10 +731,16 @@ export default function HorasExtraPage() {
         idTitulo="he-titulo"
         descripcion="Horas ordinarias, recargo nocturno (20:00 a 06:00) y horas extra de cada jornada, para conciliar y enviar a planillas."
         acciones={
-          base && (
-            <Boton icono={RefreshCw} onClick={actualizar}>
-              Actualizar
-            </Boton>
+          sucursalValida &&
+          catalogos && (
+            <>
+              <Boton icono={ShieldCheck} onClick={() => setAutorizando(true)} disabled={!revisor}>
+                Autorizar horas extra
+              </Boton>
+              <Boton icono={RefreshCw} onClick={actualizar}>
+                Actualizar
+              </Boton>
+            </>
           )
         }
       />
@@ -619,11 +831,55 @@ export default function HorasExtraPage() {
               id: p.id,
               etiqueta: p.etiqueta,
               contador: p.id === "PENDIENTE" && jornadas.datos ? pendientes : undefined,
-              contenido: p.id === "TOTALES" ? tablaTotales : tablaJornadas,
+              contenido: contenidoDe[p.id] ?? tablaJornadas,
             }))}
           />
         </Tarjeta>
       )}
+
+      {abierta && (
+        <RevisionHorasExtra
+          key={abierta.id_horas_jornada}
+          jornada={abierta}
+          revisor={revisor}
+          onCerrar={() => setAbierta(null)}
+          onRevisada={alRevisar}
+        />
+      )}
+
+      {autorizando && (
+        <AutorizacionHorasExtra
+          abierto
+          sucursal={
+            sucursalValida ? { idSucursal: filtros.id_sucursal, idDepartamento: filtros.id_departamento } : null
+          }
+          revisor={revisor}
+          onCerrar={() => setAutorizando(false)}
+          onAutorizada={alAutorizar}
+        />
+      )}
+
+      <ModalConfirmacion
+        abierto={Boolean(anulando)}
+        titulo="Anular autorización"
+        textoConfirmar="Anular"
+        procesando={procesandoAnulacion}
+        onConfirmar={anular}
+        onCancelar={() => setAnulando(null)}
+      >
+        {anulando && (
+          <p>
+            {anulando.empleado.nombre_completo} ya no tendrá autorizadas{" "}
+            {formatearMinutos(anulando.minutos_autorizados)} extra el {formatearJornada(anulando.fecha_jornada)}. Lo que
+            marque fuera del turno quedará para revisar.
+          </p>
+        )}
+        {errorAnulacion && (
+          <Alerta tono="peligro" role="alert" titulo="No se pudo anular">
+            {errorAnulacion}
+          </Alerta>
+        )}
+      </ModalConfirmacion>
 
       <ModalConfirmacion
         abierto={confirmarCierre}
