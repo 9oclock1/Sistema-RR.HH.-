@@ -1,10 +1,11 @@
-import { AlarmClock, Briefcase, Building2, CalendarClock, CalendarRange, FileCheck, FileUser, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Briefcase, Building2, CalendarClock, CalendarRange, FileCheck, FileUser, Fingerprint, ListTree, Mail, Megaphone, Network, Send, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
 import CargosList from "../features/Cargos/CargosList";
+import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import GestionComunicacionesPage from "../features/comunicaciones/GestionComunicacionesPage";
 import JerarquiaView from "../features/Jerarquia/JerarquiaView";
 import MarcajePage from "../features/marcaje/MarcajePage";
@@ -137,6 +138,14 @@ export const SECCIONES = [
         icono: FileCheck,
         roles: ["supervisor"],
         pagina: BandejaJustificacionesPage,
+      },
+      {
+        ruta: "/asistencia/horas-extra",
+        etiqueta: "Horas extra",
+        descripcion: "Horas ordinarias, nocturnas y extra de cada jornada, conciliadas para planillas.",
+        icono: Timer,
+        roles: ["supervisor"],
+        pagina: HorasExtraPage,
       },
     ],
   },
