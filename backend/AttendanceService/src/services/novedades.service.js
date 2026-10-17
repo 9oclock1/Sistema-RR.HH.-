@@ -122,10 +122,11 @@ const resumirNovedad = (n) => ({
   },
 });
 
-// Contrasta las jornadas de ayer y hoy del empleado que acaba de marcar y devuelve las novedades de sus marcajes.
+// Contrasta las jornadas de ayer, hoy y mañana (turno que empieza a medianoche) del empleado que acaba de marcar
+// y devuelve las novedades de sus marcajes.
 async function alMarcar(idEmpleado, idsMarcajes) {
   const { ahora, hoy } = await modelo.momentoActual();
-  await contrastar({ desde: sumarDias(hoy, -1), hasta: hoy, ids: [idEmpleado], ahora });
+  await contrastar({ desde: sumarDias(hoy, -1), hasta: sumarDias(hoy, 1), ids: [idEmpleado], ahora });
   return (await modelo.listarPorMarcajes(idsMarcajes)).map(resumirNovedad);
 }
 

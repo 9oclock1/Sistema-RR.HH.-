@@ -16,10 +16,10 @@
 
 - El campo id_empleado debería hacer referencia a id_empleado de EmployeeDB.
 - `fecha_hora_marcaje` la pone el servidor de base de datos, nunca el cliente.
-- `fecha_jornada` es la fecha en hora de Bolivia al momento del marcaje; la salida toma la de su entrada.
+- `fecha_jornada` de una entrada es la del turno programado (de ayer, hoy o mañana) cuya ventana de entrada la contiene: desde 4 horas antes del inicio hasta el fin. Quien llega pasada la medianoche a un turno nocturno marca en la jornada del día en que empezó el turno. Sin turno en la ventana, es la fecha en hora de Bolivia al momento del marcaje. La salida toma la de su entrada.
 - Un empleado tiene como máximo un marcaje por tipo (entrada o salida) en cada jornada (`uq_marcaje_empleado_tipo_jornada`).
 - El origen indica cómo se tomó la marca: portal o biométrico. `codigo_dispositivo` solo se llena en marcajes biométricos.
-- La salida cierra la entrada de la jornada en curso: la de hoy o, si la del día anterior sigue abierta y tiene menos de 16 horas, esa (turnos que cruzan la medianoche).
+- La salida cierra la entrada de la jornada en curso: la de la última entrada si sigue abierta y tiene menos de 16 horas (turnos que cruzan la medianoche) o, si no, la de hoy.
 - Sin entrada abierta, una salida marcada hace menos de 8 horas cuenta como ya registrada y no se guarda otra.
 - Horas trabajadas = salida - entrada en minutos completos, sin descontar el refrigerio.
 - Estado del marcaje (`CATALOGOS_ESTADO_MARCAJE`): `REGISTRADO` o `PENDIENTE_JUSTIFICACION`. Una salida sin entrada en la jornada se guarda como pendiente de justificación, no tiene horas trabajadas y cierra la jornada: no se acepta una entrada posterior.

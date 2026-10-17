@@ -89,10 +89,10 @@ test("el contraste programado revisa los últimos 7 días y sigue si EmployeeSer
   assert.deepEqual(resultado, { nuevas: 1, consolidadas: 0 });
 });
 
-test("al marcar se contrasta solo al empleado, ayer y hoy, sin registrar faltas", async () => {
+test("al marcar se contrasta solo al empleado, de ayer a mañana, sin registrar faltas", async () => {
   mock.method(modelo, "listarPorMarcajes", async () => []);
   await servicio.alMarcar(ANA, [`e-${ANA}`]);
-  assert.deepEqual(modelo.listarProgramacion.mock.calls[0].arguments, ["2026-10-11", HOY, [ANA]]);
+  assert.deepEqual(modelo.listarProgramacion.mock.calls[0].arguments, ["2026-10-11", "2026-10-13", [ANA]]);
   assert.ok(registrar.mock.calls[0].arguments[0].every((f) => f.id_tipo_novedad !== TIPO_NOVEDAD.INASISTENCIA));
   assert.deepEqual(modelo.listarPorMarcajes.mock.calls[0].arguments, [[`e-${ANA}`]]);
 });

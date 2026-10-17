@@ -9,6 +9,7 @@ const {
   esEntrada,
   esSalida,
   jornadaEnCurso,
+  fechaJornadaEntrada,
   salidaRegistrada,
 } = require("../src/utils/marcajes");
 const { horaBolivia } = require("../src/utils/jornada");
@@ -147,4 +148,49 @@ test("solo la salida pendiente de justificación describe una inconsistencia", (
   assert.match(describirInconsistencia({ estado_codigo: "PENDIENTE_JUSTIFICACION" }), /pendiente de justificación/);
   assert.equal(describirInconsistencia({ estado_codigo: "REGISTRADO" }), null);
   assert.equal(describirInconsistencia(null), null);
+});
+
+const turno = (fecha, hora_inicio, hora_fin, extra = {}) => ({ fecha, hora_inicio, hora_fin, minutos_tolerancia: 5, minutos_refrigerio: 0, ...extra });
+const enLaPaz = (texto) => new Date(`${texto}-04:00`).getTime();
+
+test("entrada sin turno en la ventana: no hay jornada programada", () => {
+  const programacion = [turno("2026-09-24", "08:00", "16:00")];
+  assert.equal(fechaJornadaEntrada(programacion, [], { hoy: "2026-09-24", ahoraMs: enLaPaz("2026-09-24T17:00:00") }), null);
+  assert.equal(fechaJornadaEntrada([], [], { hoy: "2026-09-24", ahoraMs: enLaPaz("2026-09-24T09:00:00") }), null);
+});
+
+test("entrada a las 00:30 de un turno de 22:00 a 06:00: jornada del día en que empezó", () => {
+  const programacion = [turno("2026-09-23", "22:00", "06:00"), turno("2026-09-24", "22:00", "06:00")];
+  const fecha = fechaJornadaEntrada(programacion, [], { hoy: "2026-09-24", ahoraMs: enLaPaz("2026-09-24T00:30:00") });
+  assert.equal(fecha, "2026-09-23");
+});
+
+test("entrada anticipada a un turno que empieza a medianoche: jornada del día siguiente", () => {
+  const programacion = [turno("2026-09-25", "00:00", "08:00")];
+  const fecha = fechaJornadaEntrada(programacion, [], { hoy: "2026-09-24", ahoraMs: enLaPaz("2026-09-24T23:45:00") });
+  assert.equal(fecha, "2026-09-25");
+});
+
+test("los descansos no cuentan como turno", () => {
+  const programacion = [{ ...turno("2026-09-24", "08:00", "16:00"), descanso: true }];
+  assert.equal(fechaJornadaEntrada(programacion, [], { hoy: "2026-09-24", ahoraMs: enLaPaz("2026-09-24T08:00:00") }), null);
+});
+
+test("dos ventanas a la vez: elige el turno sin entrada con el inicio más cercano", () => {
+  const programacion = [turno("2026-09-23", "22:00", "06:00"), turno("2026-09-24", "08:00", "16:00")];
+  const cerrada = [
+    marcaje("ENTRADA", "2026-09-23", "2026-09-23T21:58:00-04:00"),
+    marcaje("SALIDA", "2026-09-23", "2026-09-24T05:00:00-04:00"),
+  ];
+  const ahora = { hoy: "2026-09-24", ahoraMs: enLaPaz("2026-09-24T05:30:00") };
+  assert.equal(fechaJornadaEntrada(programacion, cerrada, ahora), "2026-09-24");
+  assert.equal(fechaJornadaEntrada(programacion, [], ahora), "2026-09-24");
+  assert.equal(fechaJornadaEntrada(programacion, cerrada.slice(0, 1), ahora), "2026-09-23");
+});
+
+test("la jornada en curso es la de una entrada abierta guardada en la jornada siguiente", () => {
+  const entrada = marcaje("ENTRADA", "2026-09-25", "2026-09-24T23:50:00-04:00");
+  const jornada = jornadaEnCurso([entrada], momento("2026-09-24T23:55:00-04:00"));
+  assert.equal(jornada.fecha_jornada, "2026-09-25");
+  assert.equal(jornada.entrada, entrada);
 });
