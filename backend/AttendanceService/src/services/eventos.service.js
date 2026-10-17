@@ -43,7 +43,7 @@ async function registrarPublicacion(cliente, detalle) {
   }
 }
 
-// Se llama dentro de la transacción que consolida la jornada o la recalcula al aprobar un justificativo.
+// Se llama dentro de la transacción que consolida la jornada (o un periodo de horas extra) o la recalcula al aprobar un justificativo.
 async function registrarConsolidacion(cliente, carga) {
   await modelo.registrar(cliente, {
     topico: TOPICO.COMPENSACIONES,

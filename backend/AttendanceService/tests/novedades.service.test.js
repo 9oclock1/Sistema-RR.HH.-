@@ -4,6 +4,7 @@ const pool = require("../src/config/db");
 const modelo = require("../src/models/novedades.model");
 const empleados = require("../src/services/empleados.service");
 const eventos = require("../src/services/eventos.service");
+const horasExtra = require("../src/services/horasExtra.service");
 const servicio = require("../src/services/novedades.service");
 const { armarCargaConsolidacion, agruparPorJornada, TIPO_NOVEDAD } = require("../src/utils/novedades");
 
@@ -45,6 +46,7 @@ beforeEach(() => {
   mock.method(modelo, "listarMarcajes", async () => [entrada(ANA, "08:20")]);
   mock.method(modelo, "sumarAtrasosDelMes", async () => [{ id_empleado: ANA, minutos: 45, cantidad: 2 }]);
   registrar = mock.method(modelo, "registrar", async (filas) => filas.length);
+  mock.method(horasExtra, "calcular", async () => 3);
 });
 
 test("contrastar guarda el atraso con la copia del turno y la falta solo de empleados activos", async () => {
@@ -86,7 +88,8 @@ test("el contraste programado revisa los últimos 7 días y sigue si EmployeeSer
     registrar.mock.calls[0].arguments[0].map((f) => f.id_tipo_novedad),
     [TIPO_NOVEDAD.ATRASO]
   );
-  assert.deepEqual(resultado, { nuevas: 1, consolidadas: 0 });
+  assert.deepEqual(resultado, { nuevas: 1, consolidadas: 0, horas: 3 });
+  assert.deepEqual(horasExtra.calcular.mock.calls[0].arguments, [{ desde: "2026-10-05", hasta: HOY }]);
 });
 
 test("al marcar se contrasta solo al empleado, de ayer a mañana, sin registrar faltas", async () => {

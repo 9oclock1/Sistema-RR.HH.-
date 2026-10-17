@@ -1,6 +1,7 @@
 const modelo = require("../models/novedades.model");
 const empleados = require("./empleados.service");
 const eventos = require("./eventos.service");
+const horasExtra = require("./horasExtra.service");
 const { enTransaccion } = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
@@ -85,7 +86,13 @@ async function ejecutarContraste() {
     lote = await consolidar();
     consolidadas += lote;
   } while (lote === LOTE_CONSOLIDACION);
-  return { nuevas, consolidadas };
+
+  // Horas ordinarias, nocturnas y extra de las jornadas ya cerradas con su salida.
+  const horas = await horasExtra.calcular({ desde: sumarDias(hoy, -DIAS_REVISION), hasta: hoy }).catch((error) => {
+    console.error("No se pudieron calcular las horas extra:", error.message);
+    return 0;
+  });
+  return { nuevas, consolidadas, horas };
 }
 
 function iniciarContraste() {

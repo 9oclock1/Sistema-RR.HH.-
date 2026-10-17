@@ -83,6 +83,26 @@
 - La jefatura o RRHH revisa en `GET /justificaciones?id_sucursal=&id_departamento=&estado=` y decide con `PATCH /justificaciones/:id` (`decision`: `APROBADA` o `RECHAZADA`, `comentario`). Nadie revisa su propia solicitud.
 - Al aprobar, la novedad pasa a `JUSTIFICADA` y deja de sumar penalización. Si la jornada ya se había consolidado, se registra un evento `JORNADA_RECALCULADA` para `compensaciones` con todas las novedades de la jornada.
 
+## Horas extra y recargo nocturno
+
+- `HORAS_JORNADA` guarda una fila por empleado y jornada con entrada y salida: la copia del turno programado (NULL si se trabajó en descanso o sin turno), las horas marcadas y su separación, en minutos completos.
+  - **Ordinarias:** tiempo dentro del turno menos el refrigerio.
+  - **Nocturnas:** las que caen entre las 20:00 y las 06:00 (hora de Bolivia). El refrigerio se descuenta primero del tiempo diurno.
+  - **Extra:** tiempo después del fin del turno. Sin turno, todo lo trabajado es extra.
+  - **Anticipadas:** tiempo antes del inicio del turno. No se paga salvo que el supervisor lo apruebe.
+  - Un tramo fuera del turno menor a `MINUTOS_MINIMOS_EXTRA` (por defecto 15) no cuenta.
+- Estado (`CATALOGOS_ESTADO_HORAS_EXTRA`): `SIN_EXTRA`, `PENDIENTE` (hay tiempo fuera del turno por revisar), `APROBADA`, `AJUSTADA` (aprobada con otros minutos) o `RECHAZADA`. Solo se pagan las extra aprobadas (`minutos_extra_aprobados`).
+- Pago de la jornada (columnas `minutos_extra_*`, `minutos_feriado`, `minutos_nocturnos`):
+  - Extra simples: las primeras 2 horas extra aprobadas del día. Extra dobles: las que pasan de 2 horas.
+  - En feriado (`FERIADOS`, nacionales de Bolivia 2026 y 2027) todas las extra aprobadas son dobles, y el tiempo ordinario trabajado también se paga doble (`minutos_feriado`, incluido en las dobles).
+  - Nocturnos: ordinarios nocturnos más los extra aprobados que caen en la franja. Los minutos aprobados se toman primero después del turno y luego del tiempo anticipado.
+  - Las tasas de recargo las aplica planillas (CompensationService); aquí solo se entregan los minutos.
+- El cálculo corre en el mismo proceso del contraste (últimos 7 días) y antes de cada consulta. Repetirlo no duplica filas; una jornada ya consolidada no cambia.
+- `GET /horas-extra?id_sucursal=&id_departamento=&desde=&hasta=&estado=` devuelve el desglose por jornada del personal (por defecto, desde el primer día del mes hasta hoy; máximo 92 días).
+- `GET /horas-extra/resumen?desde=&hasta=&id_sucursal=` totaliza por empleado (sin sucursal, toda la empresa); con `formato=csv` se descarga para hojas de cálculo (separador `;`, decimales con coma).
+- `PERIODOS_HORAS_EXTRA`: `POST /horas-extra/periodos` (`desde`, `hasta`, hasta 62 días ya terminados) cierra el periodo para planillas. Se rechaza si quedan jornadas pendientes de revisión o si se superpone con otro periodo. Al cerrar se registra un evento `HORAS_EXTRA_CONSOLIDADAS` con tópico `compensaciones` y los totales por empleado.
+- `id_empleado` e `id_responsable` deberían hacer referencia a `id_empleado` de EmployeeDB.
+
 ## Eventos salientes
 
 - `EVENTOS_SALIENTES` guarda, en la misma transacción que la publicación, los avisos para otros módulos (patrón outbox). Un proceso los envía después y reintenta si fallan.
