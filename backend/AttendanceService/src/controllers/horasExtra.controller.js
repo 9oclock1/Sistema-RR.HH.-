@@ -25,4 +25,32 @@ async function consolidar(req, res) {
   res.status(201).json(await servicio.consolidar(req.idEmpleado, req.body));
 }
 
-module.exports = { listar, resumen, listarPeriodos, consolidar };
+async function revisar(req, res) {
+  res.json(await servicio.revisar(req.params.idHorasJornada, req.idEmpleado, req.body));
+}
+
+async function listarAutorizaciones(req, res) {
+  res.json(await servicio.listarAutorizaciones(req.query));
+}
+
+// 201 si es nueva; 200 si reemplaza la del mismo día.
+async function autorizar(req, res) {
+  const { creada, ...autorizacion } = await servicio.autorizar(req.idEmpleado, req.body);
+  res.status(creada ? 201 : 200).json(autorizacion);
+}
+
+async function eliminarAutorizacion(req, res) {
+  await servicio.eliminarAutorizacion(req.params.idAutorizacion, req.idEmpleado);
+  res.status(204).end();
+}
+
+module.exports = {
+  listar,
+  resumen,
+  listarPeriodos,
+  consolidar,
+  revisar,
+  listarAutorizaciones,
+  autorizar,
+  eliminarAutorizacion,
+};

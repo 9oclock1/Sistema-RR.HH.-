@@ -15,6 +15,9 @@ const {
   segregarJornada,
   liquidarJornada,
   estadoInicial,
+  validarRevision,
+  validarAutorizacion,
+  calculoDesdeFila,
 } = require("../utils/horasExtra");
 
 const DIAS_MAXIMOS_CONSULTA = 92;
@@ -34,8 +37,9 @@ function agruparJornadas(marcajes) {
   return [...jornadas.values()].filter((j) => j.entrada && j.salida);
 }
 
-// Fila de HORAS_JORNADA de una jornada con entrada y salida, con la copia de su turno programado.
-function filaCalculo(jornada, turno, { esFeriado, minimo }) {
+// Fila de HORAS_JORNADA de una jornada con entrada y salida, con la copia de su turno programado
+// y, si la hay, la autorización previa del día.
+function filaCalculo(jornada, turno, { esFeriado, minimo, autorizacion = null }) {
   const conTurno = turno && !turno.descanso;
   const horario = conTurno ? horarioProgramado(turno, jornada.fecha) : null;
   const calculo = segregarJornada(
@@ -48,7 +52,7 @@ function filaCalculo(jornada, turno, { esFeriado, minimo }) {
     },
     minimo
   );
-  const { idEstado, aprobados } = estadoInicial(calculo);
+  const { idEstado, aprobados } = estadoInicial(calculo, autorizacion);
   const pago = liquidarJornada(calculo, { aprobados: aprobados ?? 0, esFeriado });
   return {
     id_empleado: jornada.id_empleado,
@@ -72,6 +76,7 @@ function filaCalculo(jornada, turno, { esFeriado, minimo }) {
     id_estado_horas_extra: idEstado,
     minutos_extra_aprobados: aprobados,
     ...pago,
+    id_autorizacion: autorizacion?.id_autorizacion ?? null,
   };
 }
 
@@ -80,16 +85,23 @@ async function calcular({ desde, hasta, ids = null }) {
   const jornadas = agruparJornadas(await modelo.listarMarcajes(desde, hasta, ids));
   if (jornadas.length === 0) return 0;
   const idsEmpleados = [...new Set(jornadas.map((j) => j.id_empleado))];
-  const [turnos, feriados] = await Promise.all([
+  const [turnos, feriados, autorizaciones] = await Promise.all([
     programacion.listarProgramacion(desde, hasta, idsEmpleados),
     modelo.listarFeriados(desde, hasta),
+    modelo.listarAutorizaciones(desde, hasta, idsEmpleados),
   ]);
   const turnoDe = new Map(turnos.map((t) => [`${t.id_empleado}|${t.fecha}`, t]));
+  const autorizacionDe = new Map(autorizaciones.map((a) => [`${a.id_empleado}|${a.fecha_jornada}`, a]));
   const esFeriado = new Set(feriados.map((f) => f.fecha));
   const minimo = minutosMinimosExtra();
-  const filas = jornadas.map((j) =>
-    filaCalculo(j, turnoDe.get(`${j.id_empleado}|${j.fecha}`), { esFeriado: esFeriado.has(j.fecha), minimo })
-  );
+  const filas = jornadas.map((j) => {
+    const clave = `${j.id_empleado}|${j.fecha}`;
+    return filaCalculo(j, turnoDe.get(clave), {
+      esFeriado: esFeriado.has(j.fecha),
+      minimo,
+      autorizacion: autorizacionDe.get(clave),
+    });
+  });
   return modelo.guardarCalculos(filas);
 }
 
@@ -156,6 +168,22 @@ const resumirJornada = (h, empleado) => ({
   minutos_anticipados: h.minutos_anticipados,
   estado: { codigo: h.estado_codigo, nombre: h.estado_nombre },
   minutos_extra_aprobados: h.minutos_extra_aprobados,
+  autorizacion: h.id_autorizacion
+    ? {
+        id_autorizacion: h.id_autorizacion,
+        minutos_autorizados: h.minutos_autorizados,
+        motivo: h.motivo_autorizacion,
+        autorizador: { id_empleado: h.id_autorizador, nombre_completo: h.nombre_autorizador },
+      }
+    : null,
+  revision: h.revisada_en
+    ? {
+        id_revisor: h.id_revisor,
+        nombre_revisor: h.nombre_revisor,
+        comentario: h.comentario_revision,
+        revisada_en: h.revisada_en,
+      }
+    : null,
   pago: {
     minutos_extra_simples: h.minutos_extra_simples,
     minutos_extra_dobles: h.minutos_extra_dobles,
@@ -302,12 +330,13 @@ function aCsv({ desde, hasta, empleados: filas }) {
   };
 }
 
-async function verificarResponsable(idResponsable) {
-  if (!UUID_RE.test(idResponsable ?? "")) throw new ErrorApp(401, "Identificación de empleado inválida.");
-  const responsable = await empleados.obtener(idResponsable);
-  if (!responsable) throw new ErrorApp(403, "El responsable no corresponde a un empleado registrado.");
-  if (responsable.activo !== true) throw new ErrorApp(403, "El responsable no está activo.");
-  return `${responsable.nombres} ${responsable.apellidos}`.trim();
+// Quien revisa, autoriza o consolida debe ser un empleado activo; devuelve su nombre para el registro.
+async function verificarActivo(idEmpleado, quien = "El responsable") {
+  if (!UUID_RE.test(idEmpleado ?? "")) throw new ErrorApp(401, "Identificación de empleado inválida.");
+  const empleado = await empleados.obtener(idEmpleado);
+  if (!empleado) throw new ErrorApp(403, `${quien} no corresponde a un empleado registrado.`);
+  if (empleado.activo !== true) throw new ErrorApp(403, `${quien} no está activo.`);
+  return `${empleado.nombres} ${empleado.apellidos}`.trim();
 }
 
 const resumirPeriodo = (p) => ({
@@ -334,7 +363,7 @@ async function consolidar(idResponsable, cuerpo = {}) {
     errores.push({ campo: "hasta", mensaje: "Solo se consolidan días que ya terminaron: elija hasta ayer." });
   }
   if (errores.length > 0) throw new ErrorApp(400, "Periodo inválido", errores);
-  const nombreResponsable = await verificarResponsable(idResponsable);
+  const nombreResponsable = await verificarActivo(idResponsable);
 
   await calcular({ desde, hasta });
   const personal = await empleados.listarPersonal().catch(() => []);
@@ -387,4 +416,114 @@ async function listarPeriodos() {
   return (await modelo.listarPeriodos()).map(resumirPeriodo);
 }
 
-module.exports = { calcular, listar, resumen, aCsv, consolidar, listarPeriodos };
+const noEncontrada = () => new ErrorApp(404, "Jornada no encontrada");
+
+// Aprueba (lo marcado o con ajuste) o rechaza las horas extra de una jornada. Se puede corregir
+// la decisión mientras el periodo no esté consolidado.
+async function revisar(idHorasJornada, idRevisor, cuerpo) {
+  if (!UUID_RE.test(idHorasJornada ?? "")) throw noEncontrada();
+  const id = idHorasJornada.toLowerCase();
+  const nombreRevisor = await verificarActivo(idRevisor, "El revisor");
+
+  await enTransaccion(async (cliente) => {
+    const fila = await modelo.bloquear(cliente, id);
+    if (!fila) throw noEncontrada();
+    if (fila.id_empleado === idRevisor) throw new ErrorApp(403, "No puede revisar sus propias horas extra.");
+    if (fila.id_periodo) throw new ErrorApp(409, "La jornada ya se consolidó para planillas: no se puede modificar.");
+    if (fila.id_estado_horas_extra === ESTADO_HORAS_EXTRA.SIN_EXTRA) {
+      throw new ErrorApp(409, "La jornada no tiene horas extra por revisar.");
+    }
+    const calculo = calculoDesdeFila(fila);
+    const { idEstado, aprobados, comentario } = validarRevision(cuerpo, calculo);
+    const pago = liquidarJornada(calculo, { aprobados, esFeriado: fila.es_feriado });
+    await modelo.registrarRevision(cliente, id, { idEstado, aprobados, pago, idRevisor, nombreRevisor, comentario });
+  });
+
+  const fila = await modelo.obtener(pool, id);
+  const empleado = { id_empleado: fila.id_empleado, nombre_completo: await empleados.obtenerNombre(fila.id_empleado) };
+  return resumirJornada(fila, { ...empleado, cargo: null, area: null });
+}
+
+const resumirAutorizacion = (a, empleado = null) => ({
+  id_autorizacion: a.id_autorizacion,
+  id_empleado: a.id_empleado,
+  ...(empleado && { empleado }),
+  fecha_jornada: a.fecha_jornada,
+  minutos_autorizados: a.minutos_autorizados,
+  motivo: a.motivo,
+  autorizador: { id_empleado: a.id_autorizador, nombre_completo: a.nombre_autorizador },
+  creado_en: a.creado_en,
+  actualizado_en: a.actualizado_en,
+});
+
+// Autorización previa de horas extra para un colaborador y un día (hoy o después).
+async function autorizar(idAutorizador, cuerpo) {
+  const { hoy } = await modelo.momentoActual();
+  const datos = validarAutorizacion(cuerpo, hoy);
+  const nombreAutorizador = await verificarActivo(idAutorizador, "Quien autoriza");
+  if (datos.idEmpleado === idAutorizador) throw new ErrorApp(403, "No puede autorizar sus propias horas extra.");
+  const colaborador = await empleados.obtener(datos.idEmpleado);
+  if (!colaborador) throw new ErrorApp(404, "Colaborador no encontrado");
+
+  const autorizacion = await modelo.guardarAutorizacion({ ...datos, idAutorizador, nombreAutorizador });
+  // Si la jornada ya terminó (hoy, antes de la revisión), se aprueba con lo autorizado.
+  await calcular({ desde: datos.fecha, hasta: datos.fecha, ids: [datos.idEmpleado] });
+  return { ...resumirAutorizacion(autorizacion), creada: autorizacion.creada };
+}
+
+function leerFiltrosAutorizaciones({ id_sucursal, id_departamento, desde, hasta } = {}, hoy) {
+  const inicio = desde || hoy;
+  const rango = leerRango({ desde: inicio, hasta: hasta || (esFechaValida(inicio) ? sumarDias(inicio, 30) : inicio) }, hoy);
+  const { errores } = rango;
+  if (!id_sucursal) errores.push({ campo: "id_sucursal", mensaje: "Seleccione la sucursal." });
+  else if (!UUID_RE.test(id_sucursal)) errores.push({ campo: "id_sucursal", mensaje: "Sucursal inválida." });
+  if (id_departamento && !UUID_RE.test(id_departamento)) errores.push({ campo: "id_departamento", mensaje: "Área inválida." });
+  if (errores.length > 0) throw new ErrorApp(400, "Filtros inválidos", errores);
+  return {
+    desde: rango.desde,
+    hasta: rango.hasta,
+    idSucursal: id_sucursal.toLowerCase(),
+    idDepartamento: id_departamento?.toLowerCase() || null,
+  };
+}
+
+// Autorizaciones previas del personal de una sucursal (por defecto, de hoy a 30 días).
+async function listarAutorizaciones(filtros) {
+  const { hoy } = await modelo.momentoActual();
+  const { desde, hasta, idSucursal, idDepartamento } = leerFiltrosAutorizaciones(filtros, hoy);
+  const personal = await empleados.listarPorArea(idSucursal, idDepartamento);
+  const porId = new Map(personal.map((e) => [e.id_empleado, e]));
+  const lista = porId.size > 0 ? await modelo.listarAutorizaciones(desde, hasta, [...porId.keys()]) : [];
+  return {
+    desde,
+    hasta,
+    autorizaciones: lista.map((a) => resumirAutorizacion(a, resumirEmpleado(porId.get(a.id_empleado), a.id_empleado))),
+  };
+}
+
+// Solo se anula la autorización de un día que todavía no pasó; la jornada vuelve a quedar pendiente.
+async function eliminarAutorizacion(idAutorizacion, idSolicitante) {
+  if (!UUID_RE.test(idAutorizacion ?? "")) throw new ErrorApp(404, "Autorización no encontrada");
+  await verificarActivo(idSolicitante, "Quien anula");
+  const { hoy } = await modelo.momentoActual();
+  const autorizacion = await modelo.obtenerAutorizacion(idAutorizacion.toLowerCase());
+  if (!autorizacion) throw new ErrorApp(404, "Autorización no encontrada");
+  if (autorizacion.fecha_jornada < hoy) {
+    throw new ErrorApp(409, "El día ya pasó: revise las horas extra de la jornada en lugar de anular la autorización.");
+  }
+  await modelo.eliminarAutorizacion(autorizacion.id_autorizacion);
+  await calcular({ desde: autorizacion.fecha_jornada, hasta: autorizacion.fecha_jornada, ids: [autorizacion.id_empleado] });
+}
+
+module.exports = {
+  calcular,
+  listar,
+  resumen,
+  aCsv,
+  consolidar,
+  listarPeriodos,
+  revisar,
+  autorizar,
+  listarAutorizaciones,
+  eliminarAutorizacion,
+};

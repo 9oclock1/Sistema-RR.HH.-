@@ -126,3 +126,90 @@ test("los tramos guardados se rehacen igual que al calcular", () => {
   assert.deepEqual(rehecho.tramos_extra, calculo.tramos_extra);
   assert.deepEqual(rehecho.tramo_anticipado, calculo.tramo_anticipado);
 });
+
+const { validarRevision, validarAutorizacion, MAXIMO_MINUTOS_EXTRA } = require("../src/utils/horasExtra");
+const conExtra = { minutos_extra: 120, minutos_anticipados: 30 };
+const errorEn = (campo) => (e) => e.estado === 400 && e.detalles.some((d) => d.campo === campo);
+
+test("autorización previa: se aprueba sola hasta lo autorizado", () => {
+  const calculo = segregarJornada(jornada("2026-10-05T08:00", "2026-10-05T19:00", turno("2026-10-05", "08:00", "2026-10-05", "16:00")));
+  assert.deepEqual(estadoInicial(calculo, { minutos_autorizados: 180 }), { idEstado: ESTADO_HORAS_EXTRA.APROBADA, aprobados: 180 });
+  assert.deepEqual(estadoInicial(calculo, { minutos_autorizados: 300 }), { idEstado: ESTADO_HORAS_EXTRA.APROBADA, aprobados: 180 });
+  assert.deepEqual(estadoInicial(calculo, { minutos_autorizados: 120 }), { idEstado: ESTADO_HORAS_EXTRA.AJUSTADA, aprobados: 120 });
+});
+
+test("autorización previa sin tiempo fuera del turno: nada que aprobar", () => {
+  const calculo = segregarJornada(jornada("2026-10-05T08:00", "2026-10-05T16:00", turno("2026-10-05", "08:00", "2026-10-05", "16:00")));
+  assert.deepEqual(estadoInicial(calculo, { minutos_autorizados: 60 }), { idEstado: ESTADO_HORAS_EXTRA.SIN_EXTRA, aprobados: null });
+});
+
+test("aprobar sin minutos aprueba lo marcado después del turno", () => {
+  assert.deepEqual(validarRevision({ decision: "APROBADA" }, conExtra), {
+    idEstado: ESTADO_HORAS_EXTRA.APROBADA,
+    aprobados: 120,
+    comentario: null,
+  });
+});
+
+test("aprobar otros minutos es un ajuste y exige comentario", () => {
+  assert.throws(() => validarRevision({ decision: "APROBADA", minutos_aprobados: 60 }, conExtra), errorEn("comentario"));
+  const ajuste = validarRevision({ decision: "APROBADA", minutos_aprobados: 150, comentario: " Llegó antes por inventario " }, conExtra);
+  assert.deepEqual(ajuste, { idEstado: ESTADO_HORAS_EXTRA.AJUSTADA, aprobados: 150, comentario: "Llegó antes por inventario" });
+});
+
+test("no se aprueba más de lo marcado fuera del turno ni cero minutos", () => {
+  for (const minutos of [151, 0, -5, 1.5, "60"]) {
+    assert.throws(
+      () => validarRevision({ decision: "APROBADA", minutos_aprobados: minutos, comentario: "x" }, conExtra),
+      errorEn("minutos_aprobados")
+    );
+  }
+});
+
+test("rechazar exige comentario y deja cero minutos aprobados", () => {
+  assert.throws(() => validarRevision({ decision: "RECHAZADA", comentario: "  " }, conExtra), errorEn("comentario"));
+  assert.deepEqual(validarRevision({ decision: "RECHAZADA", comentario: "No se pidió" }, conExtra), {
+    idEstado: ESTADO_HORAS_EXTRA.RECHAZADA,
+    aprobados: 0,
+    comentario: "No se pidió",
+  });
+});
+
+test("la decisión debe ser APROBADA o RECHAZADA y el comentario texto corto", () => {
+  assert.throws(() => validarRevision({ decision: "OTRA" }, conExtra), errorEn("decision"));
+  assert.throws(() => validarRevision(undefined, conExtra), errorEn("decision"));
+  assert.throws(() => validarRevision({ decision: "RECHAZADA", comentario: 5 }, conExtra), errorEn("comentario"));
+  assert.throws(() => validarRevision({ decision: "RECHAZADA", comentario: "x".repeat(501) }, conExtra), errorEn("comentario"));
+});
+
+const ID = "4192f252-acf0-4522-a109-e051cad9a50b";
+const autorizacion = (extra = {}) => ({
+  id_empleado: ID,
+  fecha_jornada: "2026-10-16",
+  minutos_autorizados: 120,
+  motivo: "Inventario",
+  ...extra,
+});
+
+test("autorización válida: hoy o después, entre 1 minuto y 24 horas, con motivo", () => {
+  assert.deepEqual(validarAutorizacion(autorizacion({ id_empleado: ` ${ID.toUpperCase()} `, motivo: " Inventario " }), "2026-10-16"), {
+    idEmpleado: ID,
+    fecha: "2026-10-16",
+    minutos: 120,
+    motivo: "Inventario",
+  });
+  assert.equal(validarAutorizacion(autorizacion({ minutos_autorizados: MAXIMO_MINUTOS_EXTRA }), "2026-10-16").minutos, 1440);
+});
+
+test("autorización inválida: cada campo con su mensaje", () => {
+  const hoy = "2026-10-16";
+  assert.throws(() => validarAutorizacion(autorizacion({ id_empleado: "x" }), hoy), errorEn("id_empleado"));
+  assert.throws(() => validarAutorizacion(autorizacion({ fecha_jornada: "2026-10-15" }), hoy), errorEn("fecha_jornada"));
+  assert.throws(() => validarAutorizacion(autorizacion({ fecha_jornada: "2026-02-30" }), hoy), errorEn("fecha_jornada"));
+  for (const minutos of [0, 1441, 30.5, "60", null]) {
+    assert.throws(() => validarAutorizacion(autorizacion({ minutos_autorizados: minutos }), hoy), errorEn("minutos_autorizados"));
+  }
+  assert.throws(() => validarAutorizacion(autorizacion({ motivo: " " }), hoy), errorEn("motivo"));
+  assert.throws(() => validarAutorizacion(autorizacion({ motivo: "x".repeat(501) }), hoy), errorEn("motivo"));
+  assert.throws(() => validarAutorizacion(undefined, hoy), errorEn("id_empleado"));
+});

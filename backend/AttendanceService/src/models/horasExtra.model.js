@@ -49,10 +49,12 @@ const COLUMNAS_CALCULO = [
   ["minutos_extra_nocturnos", "int"],
   ["minutos_feriado", "int"],
   ["minutos_nocturnos", "int"],
+  ["id_autorizacion", "uuid"],
 ];
 const ACTUALIZABLES = COLUMNAS_CALCULO.map(([c]) => c).filter((c) => c !== "id_empleado" && c !== "fecha_jornada");
 
-// Guarda el cálculo de cada jornada. Una jornada ya consolidada no se toca; las demás se actualizan solo si cambió algo.
+// Guarda el cálculo de cada jornada. Una jornada consolidada o revisada a mano no se toca; las demás se actualizan
+// solo si cambió algo.
 async function guardarCalculos(filas) {
   if (filas.length === 0) return 0;
   const nombres = COLUMNAS_CALCULO.map(([c]) => c);
@@ -62,7 +64,7 @@ async function guardarCalculos(filas) {
      ON CONFLICT (id_empleado, fecha_jornada) DO UPDATE SET
        ${ACTUALIZABLES.map((c) => `${c} = EXCLUDED.${c}`).join(",\n       ")},
        calculada_en = CURRENT_TIMESTAMP
-     WHERE horas_jornada.id_periodo IS NULL
+     WHERE horas_jornada.id_periodo IS NULL AND horas_jornada.revisada_en IS NULL
        AND (${ACTUALIZABLES.map((c) => `horas_jornada.${c}`).join(", ")})
            IS DISTINCT FROM (${ACTUALIZABLES.map((c) => `EXCLUDED.${c}`).join(", ")})`,
     nombres.map((c) => filas.map((f) => f[c] ?? null))
@@ -71,10 +73,82 @@ async function guardarCalculos(filas) {
 }
 
 const conCatalogos = `
-  SELECT h.*, e.codigo AS estado_codigo, e.nombre AS estado_nombre, f.nombre AS nombre_feriado
+  SELECT h.*, e.codigo AS estado_codigo, e.nombre AS estado_nombre, f.nombre AS nombre_feriado,
+         a.minutos_autorizados, a.motivo AS motivo_autorizacion, a.id_autorizador, a.nombre_autorizador
   FROM horas_jornada h
   JOIN catalogos_estado_horas_extra e USING (id_estado_horas_extra)
-  LEFT JOIN feriados f ON f.fecha = h.fecha_jornada`;
+  LEFT JOIN feriados f ON f.fecha = h.fecha_jornada
+  LEFT JOIN autorizaciones_horas_extra a ON a.id_autorizacion = h.id_autorizacion`;
+
+async function obtener(db, id) {
+  const { rows } = await db.query(`${conCatalogos} WHERE h.id_horas_jornada = $1`, [id]);
+  return rows[0] ?? null;
+}
+
+// Bloquea la jornada hasta el fin de la transacción (primero la fila sola: con los JOIN, un cambio
+// concurrente la haría desaparecer del resultado).
+async function bloquear(cliente, id) {
+  const { rows } = await cliente.query("SELECT id_horas_jornada FROM horas_jornada WHERE id_horas_jornada = $1 FOR UPDATE", [id]);
+  return rows.length > 0 ? obtener(cliente, id) : null;
+}
+
+async function registrarRevision(cliente, id, { idEstado, aprobados, pago, idRevisor, nombreRevisor, comentario }) {
+  await cliente.query(
+    `UPDATE horas_jornada SET id_estado_horas_extra = $2, minutos_extra_aprobados = $3,
+            minutos_extra_simples = $4, minutos_extra_dobles = $5, minutos_extra_nocturnos = $6,
+            minutos_feriado = $7, minutos_nocturnos = $8,
+            id_revisor = $9, nombre_revisor = $10, comentario_revision = $11, revisada_en = CURRENT_TIMESTAMP
+     WHERE id_horas_jornada = $1`,
+    [
+      id,
+      idEstado,
+      aprobados,
+      pago.minutos_extra_simples,
+      pago.minutos_extra_dobles,
+      pago.minutos_extra_nocturnos,
+      pago.minutos_feriado,
+      pago.minutos_nocturnos,
+      idRevisor,
+      nombreRevisor,
+      comentario,
+    ]
+  );
+}
+
+// Autorizaciones previas del rango. `ids` NULL incluye a todos los empleados.
+async function listarAutorizaciones(desde, hasta, ids = null) {
+  const { rows } = await pool.query(
+    `SELECT * FROM autorizaciones_horas_extra
+     WHERE fecha_jornada BETWEEN $1 AND $2 AND ($3::uuid[] IS NULL OR id_empleado = ANY($3::uuid[]))
+     ORDER BY fecha_jornada, creado_en`,
+    [desde, hasta, ids]
+  );
+  return rows;
+}
+
+// Una autorización por colaborador y día: autorizar de nuevo reemplaza los minutos y el motivo.
+async function guardarAutorizacion({ idEmpleado, fecha, minutos, motivo, idAutorizador, nombreAutorizador }) {
+  const { rows } = await pool.query(
+    `INSERT INTO autorizaciones_horas_extra (id_empleado, fecha_jornada, minutos_autorizados, motivo, id_autorizador, nombre_autorizador)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (id_empleado, fecha_jornada) DO UPDATE SET
+       minutos_autorizados = EXCLUDED.minutos_autorizados, motivo = EXCLUDED.motivo,
+       id_autorizador = EXCLUDED.id_autorizador, nombre_autorizador = EXCLUDED.nombre_autorizador,
+       actualizado_en = CURRENT_TIMESTAMP
+     RETURNING *, (xmax = 0) AS creada`,
+    [idEmpleado, fecha, minutos, motivo, idAutorizador, nombreAutorizador]
+  );
+  return rows[0];
+}
+
+async function obtenerAutorizacion(id) {
+  const { rows } = await pool.query("SELECT * FROM autorizaciones_horas_extra WHERE id_autorizacion = $1", [id]);
+  return rows[0] ?? null;
+}
+
+async function eliminarAutorizacion(id) {
+  await pool.query("DELETE FROM autorizaciones_horas_extra WHERE id_autorizacion = $1", [id]);
+}
 
 // Jornadas calculadas de los empleados en el rango; `estados` NULL incluye todas.
 async function listar(ids, desde, hasta, estados = null) {
@@ -155,6 +229,13 @@ async function momentoActual() {
 
 module.exports = {
   listarMarcajes,
+  obtener,
+  bloquear,
+  registrarRevision,
+  listarAutorizaciones,
+  guardarAutorizacion,
+  obtenerAutorizacion,
+  eliminarAutorizacion,
   listarFeriados,
   guardarCalculos,
   listar,

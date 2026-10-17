@@ -1,3 +1,7 @@
+const { ErrorApp } = require("./errores");
+const { esFechaValida } = require("./periodos");
+const { UUID_RE } = require("./formatos");
+
 const ESTADO_HORAS_EXTRA = { SIN_EXTRA: 1, PENDIENTE: 2, APROBADA: 3, AJUSTADA: 4, RECHAZADA: 5 };
 
 const MINUTOS_DIA = 24 * 60;
@@ -8,6 +12,9 @@ const INICIO_NOCHE = 20 * 60;
 const DURACION_NOCHE = 10 * 60;
 // Ley General del Trabajo: hasta 2 horas extra por día; lo que pase de ahí se paga como extra doble.
 const MINUTOS_EXTRA_SIMPLES_DIA = 120;
+// Un turno no dura más de 24 horas: tampoco se autorizan más horas extra que eso.
+const MAXIMO_MINUTOS_EXTRA = MINUTOS_DIA;
+const MAX_COMENTARIO = 500;
 
 const aMinutos = (valor) => Math.floor(new Date(valor).getTime() / 60000);
 const largo = ([desde, hasta]) => Math.max(0, hasta - desde);
@@ -115,10 +122,80 @@ function liquidarJornada(calculo, { aprobados = 0, esFeriado = false } = {}) {
 }
 
 // Estado inicial de la jornada calculada: con tiempo fuera del turno queda pendiente de revisión.
-const estadoInicial = (calculo) =>
-  maximoAprobable(calculo) === 0
-    ? { idEstado: ESTADO_HORAS_EXTRA.SIN_EXTRA, aprobados: null }
-    : { idEstado: ESTADO_HORAS_EXTRA.PENDIENTE, aprobados: null };
+// Con autorización previa se aprueba sola hasta lo autorizado; si eso no coincide con lo marcado
+// después del turno, queda como ajustada.
+function estadoInicial(calculo, autorizacion = null) {
+  const maximo = maximoAprobable(calculo);
+  if (maximo === 0) return { idEstado: ESTADO_HORAS_EXTRA.SIN_EXTRA, aprobados: null };
+  if (!autorizacion) return { idEstado: ESTADO_HORAS_EXTRA.PENDIENTE, aprobados: null };
+  const aprobados = Math.min(autorizacion.minutos_autorizados, maximo);
+  return {
+    idEstado: aprobados === calculo.minutos_extra ? ESTADO_HORAS_EXTRA.APROBADA : ESTADO_HORAS_EXTRA.AJUSTADA,
+    aprobados,
+  };
+}
+
+const leerComentario = (valor, campo, errores) => {
+  if (valor != null && typeof valor !== "string") {
+    errores.push({ campo, mensaje: "Debe ser texto." });
+    return "";
+  }
+  const texto = (valor ?? "").trim();
+  if (texto.length > MAX_COMENTARIO) errores.push({ campo, mensaje: `Use como máximo ${MAX_COMENTARIO} caracteres.` });
+  return texto;
+};
+
+// Decisión del supervisor: aprobar (lo marcado o un ajuste) o rechazar. Ajustar o rechazar exige comentario.
+function validarRevision(cuerpo, calculo) {
+  const { decision, minutos_aprobados, comentario } = cuerpo ?? {};
+  const errores = [];
+  const texto = leerComentario(comentario, "comentario", errores);
+  if (decision !== "APROBADA" && decision !== "RECHAZADA") {
+    errores.push({ campo: "decision", mensaje: "Indique APROBADA o RECHAZADA." });
+    throw new ErrorApp(400, "Datos de revisión inválidos", errores);
+  }
+
+  const maximo = maximoAprobable(calculo);
+  const aprobados = decision === "APROBADA" ? (minutos_aprobados ?? calculo.minutos_extra) : 0;
+  if (decision === "APROBADA" && (!Number.isInteger(aprobados) || aprobados <= 0 || aprobados > maximo)) {
+    errores.push({ campo: "minutos_aprobados", mensaje: `Apruebe entre 1 y ${maximo} minutos: lo marcado fuera del turno.` });
+  }
+  const ajustada = decision === "APROBADA" && aprobados !== calculo.minutos_extra;
+  if ((decision === "RECHAZADA" || ajustada) && !texto && !errores.some((e) => e.campo === "comentario")) {
+    errores.push({
+      campo: "comentario",
+      mensaje: decision === "RECHAZADA" ? "Explique el motivo del rechazo." : "Explique el motivo del ajuste.",
+    });
+  }
+  if (errores.length > 0) throw new ErrorApp(400, "Datos de revisión inválidos", errores);
+
+  let idEstado = ESTADO_HORAS_EXTRA.APROBADA;
+  if (decision === "RECHAZADA") idEstado = ESTADO_HORAS_EXTRA.RECHAZADA;
+  else if (ajustada) idEstado = ESTADO_HORAS_EXTRA.AJUSTADA;
+  return { idEstado, aprobados, comentario: texto || null };
+}
+
+// Autorización previa: un colaborador, un día que todavía no pasó y los minutos que puede quedarse.
+function validarAutorizacion(cuerpo, hoy) {
+  const { id_empleado, fecha_jornada, minutos_autorizados, motivo } = cuerpo ?? {};
+  const errores = [];
+  if (typeof id_empleado !== "string" || !UUID_RE.test(id_empleado.trim())) {
+    errores.push({ campo: "id_empleado", mensaje: "Seleccione al colaborador." });
+  }
+  if (!esFechaValida(fecha_jornada)) errores.push({ campo: "fecha_jornada", mensaje: "Use el formato AAAA-MM-DD." });
+  else if (fecha_jornada < hoy) {
+    errores.push({ campo: "fecha_jornada", mensaje: "La autorización es previa: elija hoy o un día posterior." });
+  }
+  if (!Number.isInteger(minutos_autorizados) || minutos_autorizados <= 0 || minutos_autorizados > MAXIMO_MINUTOS_EXTRA) {
+    errores.push({ campo: "minutos_autorizados", mensaje: `Autorice entre 1 y ${MAXIMO_MINUTOS_EXTRA} minutos.` });
+  }
+  const texto = leerComentario(motivo, "motivo", errores);
+  if (!texto && !errores.some((e) => e.campo === "motivo")) {
+    errores.push({ campo: "motivo", mensaje: "Indique el motivo de las horas extra." });
+  }
+  if (errores.length > 0) throw new ErrorApp(400, "Datos de autorización inválidos", errores);
+  return { idEmpleado: id_empleado.trim().toLowerCase(), fecha: fecha_jornada, minutos: minutos_autorizados, motivo: texto };
+}
 
 // Rehace los tramos a partir de lo guardado en HORAS_JORNADA, sin depender del mínimo configurado hoy.
 function calculoDesdeFila(fila) {
@@ -140,6 +217,7 @@ function calculoDesdeFila(fila) {
 module.exports = {
   ESTADO_HORAS_EXTRA,
   MINUTOS_EXTRA_SIMPLES_DIA,
+  MAXIMO_MINUTOS_EXTRA,
   minutosNocturnos,
   minutosMinimosExtra,
   segregarJornada,
@@ -147,5 +225,7 @@ module.exports = {
   maximoAprobable,
   liquidarJornada,
   estadoInicial,
+  validarRevision,
+  validarAutorizacion,
   calculoDesdeFila,
 };

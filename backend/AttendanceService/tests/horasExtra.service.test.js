@@ -45,6 +45,7 @@ beforeEach(() => {
   mock.method(modelo, "listar", async () => []);
   mock.method(programacion, "listarProgramacion", async () => []);
   mock.method(modelo, "listarMarcajes", async () => []);
+  mock.method(modelo, "listarAutorizaciones", async () => []);
   guardar = mock.method(modelo, "guardarCalculos", async (filas) => filas.length);
   mock.method(empleados, "listarPorArea", async () => [
     { id_empleado: ANA, nombre_completo: "Ana Quispe", cargo: "Cajera", area: "Cajas", activo: true },
@@ -295,4 +296,99 @@ test("al consolidar cierra las jornadas y envía los totales por empleado a comp
     minutos_extra_dobles: 30,
     minutos_feriado: 0,
   });
+});
+
+test("con autorización previa la jornada se aprueba sola y queda enlazada", async () => {
+  modelo.listarMarcajes.mock.mockImplementation(async () => [
+    marca(ANA, "ENTRADA", "2026-10-14", "2026-10-14T08:00"),
+    marca(ANA, "SALIDA", "2026-10-14", "2026-10-14T18:30"),
+  ]);
+  programacion.listarProgramacion.mock.mockImplementation(async () => [turno(ANA, "2026-10-14")]);
+  modelo.listarAutorizaciones.mock.mockImplementation(async () => [
+    { id_autorizacion: "eeeeeeee-0000-4000-8000-000000000001", id_empleado: ANA, fecha_jornada: "2026-10-14", minutos_autorizados: 120 },
+  ]);
+  await servicio.calcular({ desde: "2026-10-14", hasta: "2026-10-14" });
+  const [fila] = guardar.mock.calls[0].arguments[0];
+  assert.equal(fila.id_estado_horas_extra, ESTADO_HORAS_EXTRA.AJUSTADA);
+  assert.equal(fila.minutos_extra_aprobados, 120);
+  assert.equal(fila.minutos_extra_simples, 120);
+  assert.equal(fila.id_autorizacion, "eeeeeeee-0000-4000-8000-000000000001");
+});
+
+const ID_JORNADA = "cccccccc-0000-4000-8000-000000000001";
+const transaccionCon = (fila) => {
+  transaccion();
+  mock.method(modelo, "bloquear", async () => fila);
+  mock.method(modelo, "obtener", async () => fila);
+  mock.method(empleados, "obtenerNombre", async () => "Ana Quispe");
+  return mock.method(modelo, "registrarRevision", async () => {});
+};
+
+test("revisar: aprueba con ajuste y recalcula el pago", async () => {
+  const registrar = transaccionCon(filaGuardada({ minutos_extra: 150 }));
+  const revisada = await servicio.revisar(ID_JORNADA, JEFA, { decision: "APROBADA", minutos_aprobados: 140, comentario: "Se fue a las 18:20" });
+  const [, id, datos] = registrar.mock.calls[0].arguments;
+  assert.equal(id, ID_JORNADA);
+  assert.equal(datos.idEstado, ESTADO_HORAS_EXTRA.AJUSTADA);
+  assert.equal(datos.aprobados, 140);
+  assert.equal(datos.pago.minutos_extra_simples, 120);
+  assert.equal(datos.pago.minutos_extra_dobles, 20);
+  assert.equal(datos.nombreRevisor, "Rosa Choque");
+  assert.equal(datos.comentario, "Se fue a las 18:20");
+  assert.equal(revisada.empleado.nombre_completo, "Ana Quispe");
+});
+
+test("revisar: reglas de la jornada y del revisor", async () => {
+  transaccionCon(null);
+  await assert.rejects(servicio.revisar("abc", JEFA, { decision: "APROBADA" }), { estado: 404 });
+  await assert.rejects(servicio.revisar(ID_JORNADA, JEFA, { decision: "APROBADA" }), { estado: 404 });
+  await assert.rejects(servicio.revisar(ID_JORNADA, "abc", { decision: "APROBADA" }), { estado: 401 });
+  await assert.rejects(servicio.revisar(ID_JORNADA, LUIS, { decision: "APROBADA" }), { estado: 403 });
+
+  transaccionCon(filaGuardada({ id_empleado: JEFA }));
+  await assert.rejects(servicio.revisar(ID_JORNADA, JEFA, { decision: "APROBADA" }), {
+    estado: 403,
+    message: "No puede revisar sus propias horas extra.",
+  });
+  transaccionCon(filaGuardada({ id_periodo: "dddddddd-0000-4000-8000-000000000001" }));
+  await assert.rejects(servicio.revisar(ID_JORNADA, JEFA, { decision: "APROBADA" }), { estado: 409 });
+  transaccionCon(filaGuardada({ id_estado_horas_extra: ESTADO_HORAS_EXTRA.SIN_EXTRA, minutos_extra: 0 }));
+  await assert.rejects(servicio.revisar(ID_JORNADA, JEFA, { decision: "APROBADA" }), {
+    estado: 409,
+    message: "La jornada no tiene horas extra por revisar.",
+  });
+});
+
+test("autorizar: guarda con el nombre de quien autoriza y recalcula ese día", async () => {
+  mock.method(empleados, "obtener", async (id) => ({ nombres: id === JEFA ? "Rosa" : "Ana", apellidos: "Choque", activo: true }));
+  const guardarAutorizacion = mock.method(modelo, "guardarAutorizacion", async (datos) => ({
+    id_autorizacion: "eeeeeeee-0000-4000-8000-000000000002",
+    id_empleado: datos.idEmpleado,
+    fecha_jornada: datos.fecha,
+    minutos_autorizados: datos.minutos,
+    motivo: datos.motivo,
+    id_autorizador: datos.idAutorizador,
+    nombre_autorizador: datos.nombreAutorizador,
+    creada: true,
+  }));
+  const resultado = await servicio.autorizar(JEFA, { id_empleado: ANA, fecha_jornada: HOY, minutos_autorizados: 90, motivo: "Inventario" });
+  assert.equal(guardarAutorizacion.mock.calls[0].arguments[0].nombreAutorizador, "Rosa Choque");
+  assert.equal(resultado.creada, true);
+  assert.equal(resultado.autorizador.nombre_completo, "Rosa Choque");
+  assert.deepEqual(modelo.listarMarcajes.mock.calls[0].arguments, [HOY, HOY, [ANA]]);
+});
+
+test("autorizar: nadie se autoriza a sí mismo ni a un colaborador inexistente", async () => {
+  const datos = { fecha_jornada: HOY, minutos_autorizados: 60, motivo: "Inventario" };
+  await assert.rejects(servicio.autorizar(JEFA, { ...datos, id_empleado: JEFA }), { estado: 403 });
+  await assert.rejects(servicio.autorizar(JEFA, { ...datos, id_empleado: LUIS }), { estado: 404 });
+  await assert.rejects(servicio.autorizar(JEFA, { ...datos, id_empleado: ANA, fecha_jornada: "2026-10-15" }), { estado: 400 });
+});
+
+test("anular una autorización de un día que ya pasó: 409", async () => {
+  mock.method(modelo, "obtenerAutorizacion", async () => ({ id_autorizacion: "x", id_empleado: ANA, fecha_jornada: "2026-10-15" }));
+  const eliminar = mock.method(modelo, "eliminarAutorizacion", async () => {});
+  await assert.rejects(servicio.eliminarAutorizacion("eeeeeeee-0000-4000-8000-000000000002", JEFA), { estado: 409 });
+  assert.equal(eliminar.mock.callCount(), 0);
+  await assert.rejects(servicio.eliminarAutorizacion("abc", JEFA), { estado: 404 });
 });

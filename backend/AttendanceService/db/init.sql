@@ -329,6 +329,23 @@ CREATE TABLE PERIODOS_HORAS_EXTRA (
     -- Un día se consolida una sola vez.
     CONSTRAINT ex_periodo_horas_sin_solapamiento EXCLUDE USING gist (daterange(fecha_inicio, fecha_fin, '[]') WITH &&)
 );
+-- Tabla: AUTORIZACIONES_HORAS_EXTRA
+-- Autorización previa del supervisor: cuántos minutos extra puede quedarse un colaborador un día.
+CREATE TABLE AUTORIZACIONES_HORAS_EXTRA (
+    id_autorizacion UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    fecha_jornada date NOT NULL,
+    minutos_autorizados int NOT NULL,
+    motivo varchar(500) NOT NULL,
+    id_autorizador UUID NOT NULL,
+    nombre_autorizador varchar(150) NOT NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT AUTORIZACIONES_HORAS_EXTRA_pk PRIMARY KEY (id_autorizacion),
+    CONSTRAINT uq_autorizacion_empleado_fecha UNIQUE (id_empleado, fecha_jornada),
+    CONSTRAINT chk_autorizacion_minutos CHECK (minutos_autorizados BETWEEN 1 AND 1440)
+);
+CREATE INDEX idx_autorizaciones_horas_extra_fecha ON AUTORIZACIONES_HORAS_EXTRA (fecha_jornada);
 -- Tabla: HORAS_JORNADA
 -- Jornada marcada separada en horas ordinarias, nocturnas y extra, con la revisión del supervisor.
 CREATE TABLE HORAS_JORNADA (
@@ -362,6 +379,12 @@ CREATE TABLE HORAS_JORNADA (
     minutos_extra_nocturnos int NOT NULL DEFAULT 0,
     minutos_feriado int NOT NULL DEFAULT 0,
     minutos_nocturnos int NOT NULL DEFAULT 0,
+    -- Autorización previa aplicada al calcular (aprobación automática hasta lo autorizado).
+    id_autorizacion UUID NULL,
+    id_revisor UUID NULL,
+    nombre_revisor varchar(150) NULL,
+    comentario_revision varchar(500) NULL,
+    revisada_en TIMESTAMPTZ NULL,
     id_periodo UUID NULL,
     calculada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT HORAS_JORNADA_pk PRIMARY KEY (id_horas_jornada),
@@ -375,6 +398,12 @@ CREATE TABLE HORAS_JORNADA (
     ),
     CONSTRAINT chk_horas_jornada_aprobados CHECK (
         minutos_extra_aprobados IS NULL OR minutos_extra_aprobados BETWEEN 0 AND minutos_extra + minutos_anticipados
+    ),
+    -- Revisada a mano: con revisor y fecha.
+    CONSTRAINT chk_horas_jornada_revision CHECK ((revisada_en IS NULL) = (id_revisor IS NULL)),
+    -- El rechazo exige un comentario.
+    CONSTRAINT chk_horas_jornada_rechazo CHECK (
+        id_estado_horas_extra <> 5 OR length(btrim(coalesce(comentario_revision, ''))) > 0
     )
 );
 CREATE INDEX idx_horas_jornada_fecha ON HORAS_JORNADA (fecha_jornada);
@@ -382,6 +411,7 @@ CREATE INDEX idx_horas_jornada_estado ON HORAS_JORNADA (id_estado_horas_extra, f
 CREATE INDEX idx_horas_jornada_id_periodo ON HORAS_JORNADA (id_periodo);
 CREATE INDEX idx_horas_jornada_id_turno ON HORAS_JORNADA (id_turno);
 CREATE INDEX idx_horas_jornada_id_rol ON HORAS_JORNADA (id_rol);
+CREATE INDEX idx_horas_jornada_id_autorizacion ON HORAS_JORNADA (id_autorizacion);
 -- llaves foráneas
 -- Referencia: TURNOS_CATALOGOS_TIPO_JORNADA (tabla: TURNOS)
 ALTER TABLE TURNOS
@@ -461,6 +491,9 @@ ADD CONSTRAINT HORAS_JORNADA_MARCAJES_ENTRADA FOREIGN KEY (id_marcaje_entrada) R
 -- Referencia: HORAS_JORNADA_MARCAJES_SALIDA (tabla: HORAS_JORNADA)
 ALTER TABLE HORAS_JORNADA
 ADD CONSTRAINT HORAS_JORNADA_MARCAJES_SALIDA FOREIGN KEY (id_marcaje_salida) REFERENCES MARCAJES (id_marcaje) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: HORAS_JORNADA_AUTORIZACIONES_HORAS_EXTRA (tabla: HORAS_JORNADA)
+ALTER TABLE HORAS_JORNADA
+ADD CONSTRAINT HORAS_JORNADA_AUTORIZACIONES_HORAS_EXTRA FOREIGN KEY (id_autorizacion) REFERENCES AUTORIZACIONES_HORAS_EXTRA (id_autorizacion) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- Referencia: HORAS_JORNADA_PERIODOS_HORAS_EXTRA (tabla: HORAS_JORNADA)
 ALTER TABLE HORAS_JORNADA
 ADD CONSTRAINT HORAS_JORNADA_PERIODOS_HORAS_EXTRA FOREIGN KEY (id_periodo) REFERENCES PERIODOS_HORAS_EXTRA (id_periodo) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE;
