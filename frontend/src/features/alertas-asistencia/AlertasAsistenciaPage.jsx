@@ -5,6 +5,7 @@ import {
   CalendarOff,
   CircleCheck,
   Clock,
+  FileCheck,
   Hourglass,
   LogOut,
   RefreshCw,
@@ -35,13 +36,18 @@ const CLAVE_SUCURSAL = "rrhh.alertas.sucursal";
 
 const ESTADOS = {
   INASISTENCIA: { tono: "peligro", icono: UserX },
+  INASISTENCIA_JUSTIFICADA: { tono: "info", icono: FileCheck },
   SIN_MARCAR: { tono: "aviso", icono: Clock },
   ATRASO: { tono: "aviso", icono: AlarmClock },
+  ATRASO_JUSTIFICADO: { tono: "info", icono: FileCheck },
   POR_LLEGAR: { tono: "info", icono: Hourglass },
   PUNTUAL: { tono: "exito", icono: CircleCheck },
   DESCANSO: { tono: "neutral", icono: CalendarOff },
   SIN_TURNO: { tono: "neutral", icono: CalendarOff },
 };
+
+const justificada = (fila, tipo) => fila.justificadas.includes(tipo);
+const salidaSinJustificar = (f) => f.minutos_salida_anticipada !== null && !justificada(f, "SALIDA_ANTICIPADA");
 
 // Indicadores del día; cada uno filtra la tabla.
 const INDICADORES = [
@@ -54,7 +60,7 @@ const INDICADORES = [
     campo: "salidas_anticipadas",
     tono: "aviso",
     icono: LogOut,
-    coincide: (f) => f.minutos_salida_anticipada !== null,
+    coincide: salidaSinJustificar,
   },
   {
     clave: "OMISION_SALIDA",
@@ -64,13 +70,20 @@ const INDICADORES = [
     icono: TimerOff,
     coincide: (f) => f.omision_salida,
   },
+  {
+    clave: "JUSTIFICADA",
+    etiqueta: "Justificadas",
+    campo: "justificadas",
+    tono: "info",
+    icono: FileCheck,
+    coincide: (f) => f.justificadas.length > 0,
+  },
   { clave: "PUNTUAL", etiqueta: "Puntuales", campo: "puntuales", coincide: (f) => f.estado.codigo === "PUNTUAL" },
   { clave: "POR_LLEGAR", etiqueta: "Por llegar", campo: "por_llegar", soloHoy: true, coincide: (f) => f.estado.codigo === "POR_LLEGAR" },
 ].map((indicador) => ({ ...ESTADOS[indicador.clave], ...indicador }));
 
 const ESTADOS_CON_ALERTA = ["INASISTENCIA", "SIN_MARCAR", "ATRASO"];
-const tieneAlerta = (f) =>
-  ESTADOS_CON_ALERTA.includes(f.estado.codigo) || f.minutos_salida_anticipada !== null || f.omision_salida;
+const tieneAlerta = (f) => ESTADOS_CON_ALERTA.includes(f.estado.codigo) || salidaSinJustificar(f) || f.omision_salida;
 
 function leerSucursalGuardada() {
   try {
@@ -136,13 +149,17 @@ const Hora = ({ marcaje }) =>
 
 function detallesDe(fila) {
   const detalles = [];
-  if (fila.minutos_atraso !== null) detalles.push(`${formatearMinutos(fila.minutos_atraso)} de atraso`);
-  if (fila.minutos_inasistencia !== null) detalles.push(`${formatearMinutos(fila.minutos_inasistencia)} no trabajadas`);
+  const nota = (tipo, texto) =>
+    justificada(fila, tipo) ? `${texto}, ${tipo === "INASISTENCIA" ? "justificadas" : "justificado"}` : texto;
+  if (fila.minutos_atraso !== null) detalles.push(nota("ATRASO", `${formatearMinutos(fila.minutos_atraso)} de atraso`));
+  if (fila.minutos_inasistencia !== null) {
+    detalles.push(nota("INASISTENCIA", `${formatearMinutos(fila.minutos_inasistencia)} no trabajadas`));
+  }
   if (fila.estado.codigo === "SIN_MARCAR") {
     detalles.push(`Tolerancia vencida a las ${formatearHora(fila.turno.limite_puntualidad)}`);
   }
   if (fila.minutos_salida_anticipada !== null) {
-    detalles.push(`Salió ${formatearMinutos(fila.minutos_salida_anticipada)} antes del fin`);
+    detalles.push(nota("SALIDA_ANTICIPADA", `Salió ${formatearMinutos(fila.minutos_salida_anticipada)} antes del fin`));
   }
   if (fila.omision_salida) detalles.push("No marcó la salida");
   return detalles;

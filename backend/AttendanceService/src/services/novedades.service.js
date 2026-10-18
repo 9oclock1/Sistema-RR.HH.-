@@ -17,7 +17,17 @@ const {
 // Días hacia atrás que revisa cada contraste (recupera lo que no se procesó si el servicio estuvo detenido).
 const DIAS_REVISION = 7;
 const LOTE_CONSOLIDACION = 200;
-const ORDEN_ESTADO = ["INASISTENCIA", "SIN_MARCAR", "ATRASO", "POR_LLEGAR", "PUNTUAL", "DESCANSO", "SIN_TURNO"];
+const ORDEN_ESTADO = [
+  "INASISTENCIA",
+  "SIN_MARCAR",
+  "ATRASO",
+  "POR_LLEGAR",
+  "INASISTENCIA_JUSTIFICADA",
+  "ATRASO_JUSTIFICADO",
+  "PUNTUAL",
+  "DESCANSO",
+  "SIN_TURNO",
+];
 
 // Tiempo que se espera después del fin del turno para cerrar la jornada (por defecto 2 horas).
 function minutosCierre() {
@@ -156,8 +166,10 @@ const SIN_TURNO = { horario: null, entrada: null, salida: null, novedades: [] };
 const resumirMarcaje = (marcaje) =>
   marcaje ? { id_marcaje: marcaje.id_marcaje, fecha_hora_marcaje: marcaje.fecha_hora_marcaje } : null;
 
-function armarFila(empleado, { turno = null, resultado = SIN_TURNO } = {}, ahoraMs, atrasoMes) {
+// `justificadas`: tipos de novedad de la jornada con justificación aprobada; ya no descuentan tiempo.
+function armarFila(empleado, { turno = null, resultado = SIN_TURNO } = {}, ahoraMs, atrasoMes, justificadas = new Set()) {
   const minutosDe = (tipo) => resultado.novedades.find((n) => n.tipo === tipo)?.minutos ?? null;
+  const pendientes = resultado.novedades.filter((n) => !justificadas.has(n.tipo));
   return {
     id_empleado: empleado.id_empleado,
     nombre_completo: empleado.nombre_completo,
@@ -179,12 +191,13 @@ function armarFila(empleado, { turno = null, resultado = SIN_TURNO } = {}, ahora
         : null,
     entrada: resumirMarcaje(resultado.entrada),
     salida: resumirMarcaje(resultado.salida),
-    estado: estadoJornada(turno, resultado, ahoraMs),
+    estado: estadoJornada(turno, resultado, ahoraMs, justificadas),
     minutos_atraso: minutosDe("ATRASO"),
     minutos_inasistencia: minutosDe("INASISTENCIA"),
     minutos_salida_anticipada: minutosDe("SALIDA_ANTICIPADA"),
     omision_salida: resultado.novedades.some((n) => n.tipo === "OMISION_SALIDA"),
-    minutos_penalizacion: resultado.novedades.reduce((total, n) => total + n.minutos_penalizacion, 0),
+    minutos_penalizacion: pendientes.reduce((total, n) => total + n.minutos_penalizacion, 0),
+    justificadas: resultado.novedades.filter((n) => justificadas.has(n.tipo)).map((n) => n.tipo),
     atraso_del_mes: { minutos: atrasoMes?.minutos ?? 0, cantidad: atrasoMes?.cantidad ?? 0 },
   };
 }
@@ -200,8 +213,11 @@ function resumirPanel(filas) {
     por_llegar: conEstado("POR_LLEGAR"),
     sin_marcar: conEstado("SIN_MARCAR"),
     inasistencias: conEstado("INASISTENCIA"),
-    salidas_anticipadas: contar((f) => f.minutos_salida_anticipada !== null),
+    salidas_anticipadas: contar(
+      (f) => f.minutos_salida_anticipada !== null && !f.justificadas.includes("SALIDA_ANTICIPADA")
+    ),
     omisiones_salida: contar((f) => f.omision_salida),
+    justificadas: contar((f) => f.justificadas.length > 0),
     descansos: conEstado("DESCANSO"),
     sin_turno: conEstado("SIN_TURNO"),
   };
@@ -219,9 +235,22 @@ async function panel(filtros) {
       ? await contrastar({ desde: dia, hasta: dia, ids, activos: new Set(ids), ahora })
       : { resultados: new Map() };
   const atrasos = new Map((await modelo.sumarAtrasosDelMes(ids, dia)).map((fila) => [fila.id_empleado, fila]));
+  const justificadas = new Map();
+  for (const { id_empleado, tipo_codigo } of await modelo.listarJustificadas(ids, dia)) {
+    if (!justificadas.has(id_empleado)) justificadas.set(id_empleado, new Set());
+    justificadas.get(id_empleado).add(tipo_codigo);
+  }
 
   const filas = personal
-    .map((e) => armarFila(e, resultados.get(`${e.id_empleado}|${dia}`), ahora.getTime(), atrasos.get(e.id_empleado)))
+    .map((e) =>
+      armarFila(
+        e,
+        resultados.get(`${e.id_empleado}|${dia}`),
+        ahora.getTime(),
+        atrasos.get(e.id_empleado),
+        justificadas.get(e.id_empleado)
+      )
+    )
     .sort(
       (a, b) =>
         ORDEN_ESTADO.indexOf(a.estado.codigo) - ORDEN_ESTADO.indexOf(b.estado.codigo) ||

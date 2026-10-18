@@ -184,3 +184,14 @@ test("estado de la jornada para el panel según la hora", () => {
   assert.equal(estado({ marcajes: [marcaje("e", "ENTRADA", `${FECHA}T08:03:00`)], ahora: `${FECHA}T09:00:00` }), "PUNTUAL");
   assert.equal(estado({ marcajes: [marcaje("e", "ENTRADA", `${FECHA}T08:40:00`)], ahora: `${FECHA}T09:00:00` }), "ATRASO");
 });
+
+test("estado de la jornada con la novedad justificada", () => {
+  const estado = (opciones, justificadas) =>
+    estadoJornada(manana, contrastar({ ...opciones, turno: manana }), enBolivia(opciones.ahora).getTime(), justificadas)
+      .codigo;
+  const tarde = { marcajes: [marcaje("e", "ENTRADA", `${FECHA}T08:40:00`)], ahora: `${FECHA}T09:00:00` };
+  assert.equal(estado({ ahora: `${FECHA}T16:00:00` }, new Set(["INASISTENCIA"])), "INASISTENCIA_JUSTIFICADA");
+  assert.equal(estado(tarde, new Set(["ATRASO"])), "ATRASO_JUSTIFICADO");
+  assert.equal(estado(tarde, new Set(["SALIDA_ANTICIPADA"])), "ATRASO");
+  assert.equal(estado({ ahora: `${FECHA}T16:00:00` }, new Set()), "INASISTENCIA");
+});
