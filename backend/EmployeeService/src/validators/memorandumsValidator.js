@@ -64,4 +64,4 @@ const validarClasificacion = (valor) => {
   return clasificacion;
 };
 
-module.exports = { validarMemorandum, validarClasificacion };
+module.exports = { validarMemorandum, validarClasificacion, normalizarIdTipoMemo };

@@ -73,6 +73,7 @@ const crearPoolFalso = () => {
       (fila) =>
         fila.id_empleado_receptor === idReceptor &&
         fila.estado_sancion !== 'ANULADO' &&
+        fila.naturaleza_falta != null &&
         fila.fecha_emision >= desde
     ).length;
   };
@@ -82,7 +83,8 @@ const crearPoolFalso = () => {
     return estado.contadores[gestion];
   };
 
-  const insertarMemorandum = (params) => {
+  // Sirve para la amonestación (13 parámetros, BORRADOR) y para el reconocimiento (10 parámetros, EMITIDO).
+  const insertarMemorandum = (params, texto) => {
     const [
       id_memorandum,
       id_empleado_receptor,
@@ -94,9 +96,9 @@ const crearPoolFalso = () => {
       fecha_emision,
       gestion,
       numero_correlativo,
-      naturaleza_falta,
-      gravedad_falta,
-      evidencia_adjunto_url,
+      naturaleza_falta = null,
+      gravedad_falta = null,
+      evidencia_adjunto_url = null,
     ] = params;
 
     if (!estado.empleados[id_empleado_receptor]) throw llaveForanea('id_empleado_receptor', id_empleado_receptor, 'empleados');
@@ -123,7 +125,7 @@ const crearPoolFalso = () => {
       numero_correlativo,
       naturaleza_falta,
       gravedad_falta,
-      estado_sancion: 'EMITIDO',
+      estado_sancion: /'EMITIDO'/.test(texto) ? 'EMITIDO' : 'BORRADOR',
       evidencia_adjunto_url,
       documento_pdf_url: null,
     };
@@ -165,6 +167,26 @@ const crearPoolFalso = () => {
     return { ...fila };
   };
 
+  const obtenerResumen = ([idEmpleado]) => {
+    const empleado = estado.empleados[idEmpleado];
+    return empleado ? { id_empleado: idEmpleado, nombres: empleado.nombre, apellidos: '', activo: true } : null;
+  };
+
+  const listarPorEmpleado = ([idEmpleado]) =>
+    estado.memorandums
+      .filter((fila) => fila.id_empleado_receptor === idEmpleado && fila.estado_sancion !== 'ANULADO')
+      .sort((a, b) => b.fecha_emision.localeCompare(a.fecha_emision) || b.numero_correlativo - a.numero_correlativo)
+      .map((fila) => ({
+        id_memorandum: fila.id_memorandum,
+        codigo_cite: fila.codigo_cite,
+        asunto: fila.asunto,
+        fecha_emision: fila.fecha_emision,
+        gravedad_falta: fila.gravedad_falta,
+        documento_pdf_url: fila.documento_pdf_url,
+        tipo_nombre: estado.tipos[fila.id_tipo_memo].nombre,
+        es_reconocimiento: estado.tipos[fila.id_tipo_memo].clasificacion === 'RECONOCIMIENTO',
+      }));
+
   const obtenerTipo = ([idTipoMemo]) => {
     const tipo = estado.tipos[idTipoMemo];
     return tipo ? { id_tipo_memo: tipo.id_tipo_memo, clasificacion: tipo.clasificacion, nombre: tipo.nombre } : null;
@@ -200,7 +222,9 @@ const crearPoolFalso = () => {
     if (/SELECT CURRENT_DATE/i.test(texto)) return filas({ hoy: estado.hoy });
     if (/SELECT COUNT\(\*\)::int AS total FROM memorandums/i.test(texto)) return filas({ total: contarRecientes(params) });
     if (/INSERT INTO correlativos_memorandum/i.test(texto)) return filas({ ultimo_numero: siguienteCorrelativo(params) });
-    if (/INSERT INTO memorandums/i.test(texto)) return filas(insertarMemorandum(params));
+    if (/INSERT INTO memorandums/i.test(texto)) return filas(insertarMemorandum(params, texto));
+    if (/permite_acceso AS activo FROM empleados e/i.test(texto)) return filas(obtenerResumen(params));
+    if (/WHERE m\.id_empleado_receptor = \$1/i.test(texto)) return { rows: listarPorEmpleado(params) };
     if (/FROM memorandums m JOIN tipos_memorandum/i.test(texto)) return filas(obtenerParaDocumento(params));
     if (/UPDATE memorandums SET documento_pdf_url/i.test(texto)) return filas(guardarRutaPdf(params));
 

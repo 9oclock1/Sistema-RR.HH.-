@@ -1,4 +1,4 @@
-import { Briefcase, Building2, CalendarClock, FileText, FileUser, FileWarning, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
+import { Award, Briefcase, Building2, CalendarClock, FileText, FileUser, FileWarning, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
@@ -11,6 +11,7 @@ import MemorandumsView from "../features/Memorandums/MemorandumsView";
 import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
+import ReconocimientosView from "../features/Reconocimientos/ReconocimientosView";
 import TurnosPage from "../features/turnos/TurnosPage";
 import VacantesView from "../features/Vacantes/VacantesView";
 import { puedeAcceder } from "../utils/permisos";
@@ -133,6 +134,19 @@ export const SECCIONES = [
         icono: FileWarning,
         roles: ["supervisor"],
         pagina: MemorandumsView,
+      },
+    ],
+  },
+  {
+    titulo: "Reconocimientos",
+    modulos: [
+      {
+        ruta: "/reconocimientos/felicitaciones",
+        etiqueta: "Felicitaciones",
+        descripcion: "Emisión de memorándums de felicitación por méritos laborales, con vista previa del documento.",
+        icono: Award,
+        roles: ["supervisor"],
+        pagina: ReconocimientosView,
       },
     ],
   },
