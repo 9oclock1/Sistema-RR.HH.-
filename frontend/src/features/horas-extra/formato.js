@@ -1,6 +1,29 @@
 import { Ban, CircleCheck, Hourglass, Minus, SlidersHorizontal } from "lucide-react";
+import { formatearMinutos } from "../justificaciones/formato";
 
 export { formatearFechaHora, formatearHora, formatearJornada, formatearMinutos } from "../justificaciones/formato";
+
+// Ley General del Trabajo: jornada de 8 horas (art. 46) y hasta 2 horas extra por día (art. 50).
+export const MINUTOS_JORNADA_DIA = 480;
+export const MINUTOS_EXTRA_DIA = 120;
+export const MAXIMO_MINUTOS_AUTORIZABLES = MINUTOS_JORNADA_DIA + MINUTOS_EXTRA_DIA;
+
+// Minutos a pagar de una jornada (o de un total), como los separa el servicio para planillas.
+const PARTES_PAGO = [
+  ["minutos_extra_habil", "extra"],
+  ["minutos_domingo", "en domingo"],
+  ["minutos_extra_domingo", "extra en domingo"],
+  ["minutos_feriado", "en feriado"],
+  ["minutos_extra_feriado", "extra en feriado"],
+  ["minutos_descanso", "en día de descanso"],
+];
+
+export const partesPago = (pago) =>
+  PARTES_PAGO.filter(([campo]) => pago?.[campo] > 0).map(
+    ([campo, texto]) => `${formatearMinutos(pago[campo])} ${texto}`
+  );
+
+export const totalPago = (pago) => PARTES_PAGO.reduce((total, [campo]) => total + (pago?.[campo] ?? 0), 0);
 
 const ZONA_BOLIVIA = "America/La_Paz";
 const fechaLarga = new Intl.DateTimeFormat("es-BO", {

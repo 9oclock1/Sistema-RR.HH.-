@@ -48,6 +48,8 @@ import {
   formatearJornada,
   formatearMinutos,
   hoyBolivia,
+  partesPago,
+  totalPago,
 } from "./formato";
 import "../marcaje/marcaje.css";
 import "./horasExtra.css";
@@ -108,14 +110,9 @@ function EstadoHoras({ jornada }) {
   );
 }
 
-// Lo que se paga de extra: simples, dobles y feriado.
+// Lo que se paga con recargo: extra, domingo, feriado y descanso, cada uno aparte.
 function Pagadas({ pago }) {
-  const partes = [
-    pago.minutos_extra_simples > 0 && `${formatearMinutos(pago.minutos_extra_simples)} simples`,
-    pago.minutos_extra_dobles - pago.minutos_feriado > 0 &&
-      `${formatearMinutos(pago.minutos_extra_dobles - pago.minutos_feriado)} dobles`,
-    pago.minutos_feriado > 0 && `${formatearMinutos(pago.minutos_feriado)} de feriado (dobles)`,
-  ].filter(Boolean);
+  const partes = partesPago(pago);
   if (partes.length === 0) return <span className="he-sutil">—</span>;
   return (
     <div className="he-celda">
@@ -153,6 +150,11 @@ const columnasJornadas = (accion) => [
             ? `${j.turno.nombre}, ${formatearHora(j.turno.inicio_programado)}–${formatearHora(j.turno.fin_programado)}`
             : "Sin turno (descanso)"}
         </span>
+        {j.tipo_dia === "DOMINGO" && (
+          <span>
+            <Etiqueta tono="morado">Domingo</Etiqueta>
+          </span>
+        )}
         {j.feriado && (
           <span>
             <Etiqueta tono="morado">Feriado: {j.feriado}</Etiqueta>
@@ -200,10 +202,13 @@ const columnasJornadas = (accion) => [
         {j.autorizacion && (
           <span className="he-sutil">{formatearMinutos(j.autorizacion.minutos_autorizados)} autorizadas</span>
         )}
+        {j.minutos_extra + j.minutos_anticipados > j.maximo_aprobable && (
+          <span className="he-sutil">Máximo a pagar: {formatearMinutos(j.maximo_aprobable)}</span>
+        )}
       </div>
     ),
   },
-  { clave: "pagadas", titulo: "Extra a pagar", ancho: "14%", celda: (j) => <Pagadas pago={j.pago} /> },
+  { clave: "pagadas", titulo: "A pagar con recargo", ancho: "14%", celda: (j) => <Pagadas pago={j.pago} /> },
   { clave: "estado", titulo: "Estado", ancho: accion ? "10%" : "16%", celda: (j) => <EstadoHoras jornada={j} /> },
   ...(accion ? [accion] : []),
 ];
@@ -276,11 +281,21 @@ const columnasAutorizaciones = (onAnular, hoy) => [
   },
 ];
 
+// Tiempo ordinario de un tipo de día con sus extra debajo.
+function ConExtra({ minutos: ordinarios, extra }) {
+  return (
+    <div className="he-celda he-celda--fin">
+      <span className="he-numero">{minutos(ordinarios)}</span>
+      {extra > 0 && <span className="he-sutil">+ {formatearMinutos(extra)} extra</span>}
+    </div>
+  );
+}
+
 const columnasTotales = [
   {
     clave: "colaborador",
     titulo: "Colaborador",
-    ancho: "22%",
+    ancho: "16%",
     celda: (t) => (
       <div className="he-celda">
         <span className="he-celda__principal">{t.empleado.nombre_completo}</span>
@@ -291,60 +306,70 @@ const columnasTotales = [
   {
     clave: "jornadas",
     titulo: "Jornadas",
-    ancho: "8%",
+    ancho: "7%",
     alinear: "fin",
     celda: (t) => <span className="he-numero">{t.jornadas}</span>,
   },
   {
     clave: "ordinarias",
     titulo: "Ordinarias",
-    ancho: "11%",
+    ancho: "9%",
     alinear: "fin",
     celda: (t) => <span className="he-numero">{minutos(t.minutos_ordinarios)}</span>,
   },
   {
     clave: "nocturnas",
     titulo: "Nocturnas",
-    ancho: "11%",
+    ancho: "9%",
     alinear: "fin",
     celda: (t) => <span className="he-numero">{minutos(t.minutos_nocturnos)}</span>,
   },
   {
-    clave: "simples",
-    titulo: "Extra simples",
-    ancho: "11%",
+    clave: "extra",
+    titulo: "Extra",
+    ancho: "9%",
     alinear: "fin",
-    celda: (t) => <span className="he-numero">{minutos(t.minutos_extra_simples)}</span>,
+    celda: (t) => <span className="he-numero">{minutos(t.minutos_extra_habil)}</span>,
   },
   {
-    clave: "dobles",
-    titulo: "Extra dobles",
-    ancho: "12%",
+    clave: "domingos",
+    titulo: "Domingos",
+    ancho: "9%",
+    alinear: "fin",
+    celda: (t) => <ConExtra minutos={t.minutos_domingo} extra={t.minutos_extra_domingo} />,
+  },
+  {
+    clave: "feriados",
+    titulo: "Feriados",
+    ancho: "9%",
+    alinear: "fin",
+    celda: (t) => <ConExtra minutos={t.minutos_feriado} extra={t.minutos_extra_feriado} />,
+  },
+  {
+    clave: "descanso",
+    titulo: "Descanso",
+    ancho: "9%",
+    alinear: "fin",
+    celda: (t) => <span className="he-numero">{minutos(t.minutos_descanso)}</span>,
+  },
+  {
+    clave: "conciliacion",
+    titulo: "Extra marcadas",
+    ancho: "15%",
     alinear: "fin",
     celda: (t) => (
       <div className="he-celda he-celda--fin">
-        <span className="he-numero">{minutos(t.minutos_extra_dobles)}</span>
-        {t.minutos_feriado > 0 && (
-          <span className="he-sutil">incluye {formatearMinutos(t.minutos_feriado)} de feriado</span>
+        <span className="he-numero">{minutos(t.minutos_extra + t.minutos_anticipados)}</span>
+        {t.minutos_extra_aprobados > 0 && (
+          <span className="he-sutil">{formatearMinutos(t.minutos_extra_aprobados)} aprobadas</span>
         )}
       </div>
     ),
   },
   {
-    clave: "conciliacion",
-    titulo: "Marcadas / aprobadas",
-    ancho: "15%",
-    alinear: "fin",
-    celda: (t) => (
-      <span className="he-numero">
-        {minutos(t.minutos_extra + t.minutos_anticipados)} / {minutos(t.minutos_extra_aprobados)}
-      </span>
-    ),
-  },
-  {
     clave: "pendientes",
     titulo: "Por revisar",
-    ancho: "10%",
+    ancho: "8%",
     alinear: "fin",
     celda: (t) =>
       t.pendientes > 0 ? <Etiqueta tono="info">{t.pendientes}</Etiqueta> : <span className="he-sutil">—</span>,
@@ -352,17 +377,7 @@ const columnasTotales = [
 ];
 
 function Indicadores({ resumen }) {
-  const feriado = resumen?.minutos_feriado ?? 0;
-  const dobles = (resumen?.minutos_extra_dobles ?? 0) - feriado;
-  const simples = resumen?.minutos_extra_simples ?? 0;
-  const detallePago =
-    [
-      simples > 0 && `${formatearMinutos(simples)} simples`,
-      dobles > 0 && `${formatearMinutos(dobles)} dobles`,
-      feriado > 0 && `${formatearMinutos(feriado)} en feriado`,
-    ]
-      .filter(Boolean)
-      .join(" · ") || "Nada aprobado todavía";
+  const detallePago = partesPago(resumen).join(" · ") || "Nada aprobado todavía";
   const lista = [
     { etiqueta: "Horas ordinarias", valor: minutos(resumen?.minutos_ordinarios), icono: Clock },
     { etiqueta: "Horas nocturnas", valor: minutos(resumen?.minutos_nocturnos), icono: MoonStar },
@@ -373,8 +388,8 @@ function Indicadores({ resumen }) {
     },
     { etiqueta: "Jornadas por revisar", valor: resumen?.pendientes ?? 0, icono: Hourglass },
     {
-      etiqueta: "Extra y feriados a pagar",
-      valor: minutos(simples + (resumen?.minutos_extra_dobles ?? 0)),
+      etiqueta: "A pagar con recargo",
+      valor: minutos(totalPago(resumen)),
       icono: CircleCheck,
       detalle: detallePago,
     },
@@ -530,7 +545,7 @@ export default function HorasExtraPage() {
       mensaje:
         revisada.estado.codigo === "RECHAZADA"
           ? `${revisada.empleado.nombre_completo}, ${formatearJornada(revisada.fecha_jornada)}: no se pagan horas extra.`
-          : `${revisada.empleado.nombre_completo}, ${formatearJornada(revisada.fecha_jornada)}: ${formatearMinutos(revisada.minutos_extra_aprobados)} a pagar como extra.`,
+          : `${revisada.empleado.nombre_completo}, ${formatearJornada(revisada.fecha_jornada)}: ${formatearMinutos(revisada.minutos_extra_aprobados)} aprobadas.`,
     });
     actualizar();
     volverAPestana();
