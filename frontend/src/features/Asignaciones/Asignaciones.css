@@ -198,6 +198,26 @@
   line-height: var(--line-height-small);
 }
 
+.asig-celda--inicio {
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding-block: var(--space-2);
+}
+
+.asig-memos .ds-tabla {
+  min-width: calc(var(--size-sidebar) * 3);
+}
+
+.asig-documento {
+  display: block;
+  padding-block: var(--space-1);
+  overflow-wrap: anywhere;
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
 @media (max-width: 1024px) {
   .asig-split {
     grid-template-columns: minmax(0, 1fr);

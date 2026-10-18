@@ -199,4 +199,4 @@ const descartarPdf = async (rutaPdf) => {
   }
 };
 
-module.exports = { generarPdfMemorandum, descartarPdf };
+module.exports = { generarPdfMemorandum, descartarPdf, MEMBRETE, FUENTE, fechaLarga, normalizarSaltos };

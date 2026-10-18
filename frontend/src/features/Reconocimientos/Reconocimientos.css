@@ -1,0 +1,225 @@
+.reco {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.reco .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+/* Formulario a la izquierda, previsualización a la derecha. */
+.reco-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+/* ---------- Resultado de la emisión ---------- */
+.reco-resultado {
+  border-radius: var(--radius-card);
+}
+
+.reco-resultado:focus {
+  outline: none;
+}
+
+.reco-resultado:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-border-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.reco-documento {
+  display: flex;
+  margin-top: var(--space-2);
+}
+
+/* ---------- Formulario ---------- */
+.reco-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.reco-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.reco-form__pie {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---------- Previsualización del documento ---------- */
+.reco-preview__nota {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+/* Marco doble del PDF: dorado por fuera, primario por dentro. */
+.reco-doc {
+  padding: var(--space-1);
+  border: var(--border-width-strong) solid var(--color-warning);
+  background: var(--color-bg-surface);
+}
+
+.reco-doc__hoja {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--color-primary);
+  overflow-wrap: anywhere;
+}
+
+.reco-doc p {
+  margin: 0;
+}
+
+.reco-doc__membrete {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-width-strong) solid var(--color-warning);
+}
+
+.reco-doc__institucion {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.reco-doc__meta {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.reco-doc__mayusculas {
+  text-transform: uppercase;
+}
+
+.reco-doc__titulo,
+.reco-doc__homenajeado,
+.reco-doc__firma {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  text-align: center;
+}
+
+.reco-doc__insignia {
+  display: grid;
+  place-items: center;
+  width: var(--size-touch);
+  height: var(--size-touch);
+  border: var(--border-width-strong) solid var(--color-warning);
+  border-radius: var(--radius-round);
+  color: var(--color-warning);
+}
+
+.reco-doc__insignia .ds-icono {
+  width: var(--space-6);
+  height: var(--space-6);
+  fill: currentColor;
+}
+
+.reco-doc__nombre-documento {
+  color: var(--color-primary);
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+}
+
+.reco-doc__distintivo {
+  margin-block: var(--space-2);
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-round);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+}
+
+.reco-doc__colaborador {
+  color: var(--color-text);
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
+  font-weight: var(--font-weight-semibold);
+}
+
+.reco-doc__motivo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-left: var(--space-1) solid var(--color-warning);
+  background: var(--color-bg-selected);
+}
+
+.reco-doc__asunto {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.reco-doc__texto {
+  color: var(--color-text);
+  text-align: justify;
+  white-space: pre-wrap;
+}
+
+.reco-doc__felicitacion {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
+
+.reco-doc__firma {
+  align-self: center;
+  gap: 0;
+  min-width: calc(var(--size-sidebar) - var(--space-8));
+  margin-top: var(--space-6);
+  padding-top: var(--space-1);
+  border-top: var(--border-width) solid var(--color-text);
+}
+
+.reco-doc__firmante {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Va al final para imponerse al color propio de cada dato. */
+.reco-doc__pendiente {
+  color: var(--color-text-subtle);
+  font-weight: var(--font-weight-regular);
+  font-style: italic;
+}
+
+@media (max-width: 1024px) {
+  .reco-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .reco-doc__hoja {
+    padding: var(--space-4);
+  }
+
+  .reco-doc__nombre-documento {
+    font-size: var(--font-size-section);
+    line-height: var(--line-height-section);
+  }
+}

@@ -1,6 +1,7 @@
 const pool = require('../../db/pool');
 const empleadosModel = require('../models/empleadosModel');
 const asignacionesModel = require('../models/asignacionesModel');
+const memorandumsModel = require('../models/memorandumsModel');
 const HttpError = require('../utils/HttpError');
 
 const noEncontrado = () => new HttpError(404, 'El empleado solicitado no existe.');
@@ -46,4 +47,9 @@ const obtenerResumen = async (idEmpleado) => {
   return resumen;
 };
 
-module.exports = { listarEmpleados, obtenerFicha, obtenerResumen, construirFicha, noEncontrado };
+const listarMemorandums = async (idEmpleado) => {
+  await obtenerResumen(idEmpleado);
+  return memorandumsModel.listarPorEmpleado(pool, idEmpleado);
+};
+
+module.exports = { listarEmpleados, obtenerFicha, obtenerResumen, listarMemorandums, construirFicha, noEncontrado };
