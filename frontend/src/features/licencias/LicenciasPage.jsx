@@ -103,7 +103,7 @@ export default function LicenciasPage() {
         enlace={Link}
         titulo="Licencias y permisos"
         idTitulo="licencias-titulo"
-        descripcion="Solicite licencias médicas, de maternidad o paternidad, duelo, académicas o personales con su respaldo."
+        descripcion="Solicite licencias médicas, de maternidad, de paternidad, duelo, académicas o personales con su respaldo."
         acciones={
           idEmpleado && (
             <Boton variante="sutil" icono={ArrowLeftRight} onClick={cambiarEmpleado}>
