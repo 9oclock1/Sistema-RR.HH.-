@@ -7,11 +7,29 @@ CREATE TABLE CAPACITACIONES_CERTIFICACION (
     id_empleado UUID NOT NULL,
     id_curso UUID NOT NULL,
     institucion_emisora varchar(120) NOT NULL,
+    fecha_inicio date NULL,
+    fecha_fin date NULL,
     fecha_emision date NOT NULL,
     fecha_vencimiento date NULL,
     certificado_adjunto_url varchar(255) NULL,
+    certificado_nombre_original varchar(255) NULL,
+    certificado_tipo_mime varchar(50) NULL,
+    certificado_tamano_bytes int NULL,
     registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT CAPACITACIONES_CERTIFICACION_pk PRIMARY KEY (id_capacitacion)
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT CAPACITACIONES_CERTIFICACION_pk PRIMARY KEY (id_capacitacion),
+    CONSTRAINT uq_capacitacion_empleado_curso_emision UNIQUE (id_empleado, id_curso, fecha_emision),
+    CONSTRAINT ck_capacitacion_rango_realizacion CHECK (fecha_inicio IS NULL OR fecha_fin IS NULL OR fecha_fin >= fecha_inicio),
+    CONSTRAINT ck_capacitacion_vencimiento_posterior CHECK (fecha_vencimiento IS NULL OR fecha_vencimiento > fecha_emision),
+    CONSTRAINT ck_capacitacion_certificado_mime CHECK (
+        certificado_tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png', 'image/webp')
+    ),
+    CONSTRAINT ck_capacitacion_certificado_tamano CHECK (certificado_tamano_bytes > 0),
+    CONSTRAINT ck_capacitacion_certificado_completo CHECK (
+        (certificado_adjunto_url IS NULL) = (certificado_nombre_original IS NULL)
+        AND (certificado_adjunto_url IS NULL) = (certificado_tipo_mime IS NULL)
+        AND (certificado_adjunto_url IS NULL) = (certificado_tamano_bytes IS NULL)
+    )
 );
 -- Table: CARGOS
 CREATE TABLE CARGOS (
@@ -60,12 +78,20 @@ CREATE TABLE CONVOCATORIAS_ASCENSO (
 -- Table: CURSOS_CAPACITACION
 CREATE TABLE CURSOS_CAPACITACION (
     id_curso UUID NOT NULL,
-    codigo varchar(30) NOT NULL DEFAULT true,
+    codigo varchar(30) NOT NULL,
     nombre varchar(150) NOT NULL,
     descripcion text NULL,
     horas_academicas int NOT NULL,
+    tipo_capacitacion varchar(20) NOT NULL DEFAULT 'TECNICA',
+    requiere_vencimiento boolean NOT NULL DEFAULT FALSE,
+    meses_vigencia int NULL,
     esta_activo boolean NOT NULL DEFAULT TRUE,
-    CONSTRAINT CURSOS_CAPACITACION_pk PRIMARY KEY (id_curso)
+    CONSTRAINT CURSOS_CAPACITACION_pk PRIMARY KEY (id_curso),
+    CONSTRAINT uq_curso_capacitacion_codigo UNIQUE (codigo),
+    CONSTRAINT ck_curso_tipo_capacitacion CHECK (tipo_capacitacion IN ('INDUCCION', 'CARNET_SANITARIO', 'TECNICA', 'CERTIFICACION')),
+    CONSTRAINT ck_curso_horas_positivas CHECK (horas_academicas > 0),
+    CONSTRAINT ck_curso_carnet_con_vencimiento CHECK (tipo_capacitacion <> 'CARNET_SANITARIO' OR requiere_vencimiento),
+    CONSTRAINT ck_curso_meses_vigencia CHECK (meses_vigencia IS NULL OR (requiere_vencimiento AND meses_vigencia > 0))
 );
 -- Table: DEPARTAMENTOS
 CREATE TABLE DEPARTAMENTOS (
@@ -425,3 +451,7 @@ SELECT e.id_empleado,
          FROM CAPACITACIONES_CERTIFICACION cc
         WHERE cc.id_empleado = e.id_empleado
   ) cap ON TRUE;
+
+CREATE INDEX IF NOT EXISTS ix_capacitacion_vencimiento
+    ON CAPACITACIONES_CERTIFICACION (fecha_vencimiento)
+    WHERE fecha_vencimiento IS NOT NULL;
