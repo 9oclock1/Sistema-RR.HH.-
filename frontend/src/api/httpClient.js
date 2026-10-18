@@ -1,6 +1,9 @@
 // Cliente HTTP compartido. Todas las peticiones pasan por el API Gateway (NGINX), nunca por el puerto directo de un microservicio.
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '');
 
+// URL absoluta del gateway para recursos que el navegador abre directo (descargas), fuera de fetch.
+export const urlApi = (path) => `${API_URL}${path}`;
+
 export class ApiError extends Error {
   constructor(message, status, data = null) {
     super(message);
@@ -12,13 +15,17 @@ export class ApiError extends Error {
 }
 
 export async function request(path, { method = 'GET', body, signal } = {}) {
+  // Con FormData (archivos adjuntos) el navegador define el Content-Type con su boundary.
+  const esFormData = body instanceof FormData;
+  const enviaJson = body !== undefined && !esFormData;
+
   let response;
   try {
     response = await fetch(`${API_URL}${path}`, {
       method,
       signal,
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      headers: enviaJson ? { 'Content-Type': 'application/json' } : undefined,
+      body: enviaJson ? JSON.stringify(body) : body,
     });
   } catch (error) {
     if (error.name === 'AbortError') throw error;

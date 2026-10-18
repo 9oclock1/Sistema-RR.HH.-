@@ -11,5 +11,7 @@ npm-debug.log*
 .env.local
 .env.*.local
 
-# uploads
+# adjuntos subidos (evidencia y PDF de memorándums)
 uploads/
+# archivos temporales de las pruebas
+tests/.tmp/
