@@ -1,7 +1,9 @@
-import { Award, Briefcase, Building2, CalendarClock, FileUser, FileWarning, Fingerprint, IdCard, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
+import { Award, Briefcase, Building2, CalendarClock, FileUser, FileWarning, Fingerprint, GraduationCap, IdCard, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
+import CapacitacionesView from "../features/Capacitaciones/CapacitacionesView";
+import { RUTA_CAPACITACIONES } from "../features/Capacitaciones/utils/opciones";
 import CargosList from "../features/Cargos/CargosList";
 import GestionComunicacionesPage from "../features/comunicaciones/GestionComunicacionesPage";
 import JerarquiaView from "../features/Jerarquia/JerarquiaView";
@@ -128,6 +130,14 @@ export const SECCIONES = [
         icono: IdCard,
         roles: ["gerente"],
         pagina: KardexView,
+      },
+      {
+        ruta: RUTA_CAPACITACIONES,
+        etiqueta: "Capacitaciones",
+        descripcion: "Registro de cursos, carnets y certificaciones del personal con su vigencia y certificado.",
+        icono: GraduationCap,
+        roles: ["gerente"],
+        pagina: CapacitacionesView,
       },
     ],
   },
