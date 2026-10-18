@@ -2,6 +2,7 @@ const { esVacio, faltante, invalido, cuerpoComoObjeto, normalizarTexto, normaliz
 
 const NATURALEZAS_FALTA = ['OPERATIVA', 'CONDUCTA'];
 const GRAVEDADES_FALTA = ['LEVE', 'MODERADA', 'GRAVE'];
+const CLASIFICACIONES = ['AMONESTACION', 'RECONOCIMIENTO'];
 const SMALLINT_MAX = 32767;
 
 // En multipart/form-data todos los campos llegan como texto.
@@ -53,4 +54,14 @@ const validarMemorandum = (body) => {
   return memorandum;
 };
 
-module.exports = { validarMemorandum, normalizarIdTipoMemo };
+// Filtro opcional ?clasificacion= del catálogo de tipos; devuelve null cuando no se envía.
+const validarClasificacion = (valor) => {
+  if (esVacio(valor)) return null;
+
+  const errores = [];
+  const clasificacion = normalizarOpcion(valor, 'clasificacion', CLASIFICACIONES, errores);
+  lanzarSiHayErrores(errores);
+  return clasificacion;
+};
+
+module.exports = { validarMemorandum, validarClasificacion, normalizarIdTipoMemo };

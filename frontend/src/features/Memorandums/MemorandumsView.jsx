@@ -1,14 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { createMemorandum } from '../../api/memorandumsApi';
-import { Alerta, EncabezadoPagina } from '../../components/ui';
+import { Download } from 'lucide-react';
+import { createMemorandum, urlPdfMemorandum } from '../../api/memorandumsApi';
+import { Alerta, Boton, EncabezadoPagina } from '../../components/ui';
+import { useEmpleados } from '../Asignaciones/hooks/useEmpleados';
+import { leerEmpleado } from '../marcaje/sesionEmpleado';
 import MemorandumForm from './components/MemorandumForm';
+import { useTiposMemorandum } from './hooks/useTiposMemorandum';
+import { CLASIFICACION_AMONESTACION } from './utils/opciones';
 import './Memorandums.css';
 
 export default function MemorandumsView() {
   const [resultado, setResultado] = useState(null);
   const [formKey, setFormKey] = useState(0);
+  // Temporal hasta contar con inicio de sesión: quien emite se elige y se recuerda para los siguientes memorándums.
+  // Parte de la persona identificada en el módulo de marcaje, si la hay.
+  const [idEmisor, setIdEmisor] = useState(leerEmpleado);
   const refResultado = useRef(null);
+  const empleados = useEmpleados();
+  const tipos = useTiposMemorandum(CLASIFICACION_AMONESTACION);
 
   // El resultado aparece arriba del formulario: se lleva el foco para que no pase inadvertido.
   useEffect(() => {
@@ -46,15 +56,51 @@ export default function MemorandumsView() {
 
             <Alerta tono="exito" role="status" titulo={`Memorándum ${memorandum.codigo_cite} emitido correctamente`}>
               <p>El documento oficial quedó generado y asociado al Kardex del empleado.</p>
-              <p className="memo-documento">
-                <span className="memo-documento__etiqueta">Documento PDF</span>
-                <code className="memo-documento__ruta">{memorandum.documento_pdf_url}</code>
-              </p>
+              <div className="memo-documento">
+                <Boton
+                  variante="primario"
+                  tamano="sm"
+                  icono={Download}
+                  href={urlPdfMemorandum(memorandum.id_memorandum)}
+                  download={`${memorandum.codigo_cite}.pdf`}
+                >
+                  Descargar PDF
+                </Boton>
+              </div>
             </Alerta>
           </div>
         )}
 
-        <MemorandumForm key={formKey} onEmitir={emitir} />
+        {(empleados.error || tipos.error) && (
+          <Alerta
+            tono="peligro"
+            role="alert"
+            titulo="No se pudieron cargar los datos del formulario"
+            acciones={
+              <Boton
+                tamano="sm"
+                onClick={() => {
+                  if (empleados.error) empleados.recargar();
+                  if (tipos.error) tipos.recargar();
+                }}
+              >
+                Reintentar
+              </Boton>
+            }
+          >
+            {(empleados.error ?? tipos.error).message}
+          </Alerta>
+        )}
+
+        <MemorandumForm
+          key={formKey}
+          empleados={empleados.empleados}
+          tipos={tipos.tipos}
+          cargando={empleados.cargando || tipos.cargando}
+          idEmisorInicial={idEmisor}
+          onCambiarEmisor={setIdEmisor}
+          onEmitir={emitir}
+        />
       </div>
     </section>
   );

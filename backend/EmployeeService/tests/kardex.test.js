@@ -137,6 +137,45 @@ describe('GET /empleados/:id/memorandums (KAN-277)', () => {
       ]);
     });
 
+    test('el tipo del memorándum decide si es reconocimiento, aunque traiga datos de falta', async () => {
+      pool.reiniciar({
+        memorandums: [
+          registrado({ codigo_cite: 'MEM-2026-0001', id_tipo_memo: TIPO_RECONOCIMIENTO, fecha_emision: '2026-08-01' }),
+          registrado({ codigo_cite: 'MEM-2026-0002', id_tipo_memo: TIPO_DISCIPLINARIO, fecha_emision: '2026-07-01' }),
+        ],
+      });
+
+      const { body } = await kardex();
+
+      expect(body.map(({ codigo_cite, es_reconocimiento }) => ({ codigo_cite, es_reconocimiento }))).toEqual([
+        { codigo_cite: 'MEM-2026-0001', es_reconocimiento: true },
+        { codigo_cite: 'MEM-2026-0002', es_reconocimiento: false },
+      ]);
+    });
+
+    test('un reconocimiento no se cuela como llamada de atención ni aparece en el Kardex como tal', async () => {
+      const rechazado = await emitirLlamadaDeAtencion({ id_tipo_memo: TIPO_RECONOCIMIENTO, naturaleza_falta: 'CONDUCTA' });
+      await emitirReconocimiento();
+
+      const { body } = await kardex();
+
+      expect(rechazado.status).toBe(400);
+      expect(body.map(({ codigo_cite, es_reconocimiento }) => ({ codigo_cite, es_reconocimiento }))).toEqual([
+        { codigo_cite: 'REC-2026-0001', es_reconocimiento: true },
+      ]);
+    });
+
+    test('el PDF de un reconocimiento listado en el Kardex se puede descargar', async () => {
+      await emitirReconocimiento();
+      const { body: memorandums } = await kardex();
+
+      const respuesta = await request(app).get(`/memorandums/${memorandums[0].id_memorandum}/pdf`);
+
+      expect(respuesta.status).toBe(200);
+      expect(respuesta.headers['content-type']).toContain('application/pdf');
+      expect(respuesta.headers['content-disposition']).toContain('REC-2026-0001.pdf');
+    });
+
     test('ordena del más reciente al más antiguo y, en la misma fecha, por correlativo', async () => {
       pool.reiniciar({
         memorandums: [

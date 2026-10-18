@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Award, FileText, FileWarning } from 'lucide-react';
+import { Award, Download, FileText, FileWarning } from 'lucide-react';
+import { urlPdfMemorandum } from '../../../api/memorandumsApi';
 import { Alerta, Boton, EstadoVacio, Etiqueta, Pestanas, Tabla, TextoTruncado } from '../../../components/ui';
 import { formatearFecha } from '../../Vacantes/utils/formato';
 import { useMemorandumsEmpleado } from '../hooks/useMemorandumsEmpleado';
@@ -85,7 +86,16 @@ const COLUMNAS = [
     ancho: '26%',
     celda: (memo) =>
       memo.documento_pdf_url ? (
-        <code className="asig-documento">{memo.documento_pdf_url}</code>
+        <Boton
+          variante="sutil"
+          tamano="sm"
+          icono={Download}
+          href={urlPdfMemorandum(memo.id_memorandum)}
+          download={`${memo.codigo_cite}.pdf`}
+          aria-label={`Descargar el PDF del memorándum ${memo.codigo_cite}`}
+        >
+          Descargar
+        </Boton>
       ) : (
         <span className="asig-sin-dato">—</span>
       ),

@@ -36,28 +36,7 @@
 
 .memo-documento {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
   margin-top: var(--space-2);
-}
-
-.memo-documento__etiqueta {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-small);
-  line-height: var(--line-height-small);
-  font-weight: var(--font-weight-semibold);
-}
-
-.memo-documento__ruta {
-  padding: var(--space-1) var(--space-2);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-bg-surface);
-  color: var(--color-text);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-small);
-  line-height: var(--line-height-small);
-  overflow-wrap: anywhere;
 }
 
 /* ---------- Formulario ---------- */

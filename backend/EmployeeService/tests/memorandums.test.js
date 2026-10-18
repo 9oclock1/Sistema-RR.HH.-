@@ -21,7 +21,9 @@ const ID_RECEPTOR = 'e0000000-0000-4000-8000-000000000001';
 const ID_EMISOR = 'e0000000-0000-4000-8000-000000000002';
 const ID_OTRO_EMPLEADO = 'e0000000-0000-4000-8000-000000000003';
 const ID_INEXISTENTE = 'e0000000-0000-4000-8000-00000000dead';
-const TIPO_DISCIPLINARIO = 1;
+const TIPO_AMONESTACION = 1;
+const TIPO_RECONOCIMIENTO = 2;
+const TIPO_INEXISTENTE = 99;
 
 const CONTADOR = /INSERT INTO correlativos_memorandum/i;
 const INSERT_MEMORANDUM = /INSERT INTO memorandums/i;
@@ -30,7 +32,7 @@ const UPDATE_PDF = /UPDATE memorandums SET documento_pdf_url/i;
 const memorandumValido = (cambios = {}) => ({
   id_empleado_receptor: ID_RECEPTOR,
   id_empleado_emisor: ID_EMISOR,
-  id_tipo_memo: TIPO_DISCIPLINARIO,
+  id_tipo_memo: TIPO_AMONESTACION,
   asunto: 'Incumplimiento reiterado del horario de ingreso',
   contenido_descripcion: 'Ingresó con retraso los días 5, 6 y 8 de octubre sin presentar justificación.',
   naturaleza_falta: 'CONDUCTA',
@@ -294,10 +296,10 @@ describe('POST /memorandums (KAN-272)', () => {
       expect(body.memorandum).toMatchObject({
         id_empleado_receptor: ID_RECEPTOR,
         id_empleado_emisor: ID_EMISOR,
-        id_tipo_memo: TIPO_DISCIPLINARIO,
+        id_tipo_memo: TIPO_AMONESTACION,
         naturaleza_falta: 'CONDUCTA',
         gravedad_falta: 'MODERADA',
-        estado_sancion: 'BORRADOR',
+        estado_sancion: 'EMITIDO',
         fecha_emision: '2026-10-10',
       });
       expect(pool.memorandums).toHaveLength(1);
@@ -425,6 +427,168 @@ describe('POST /memorandums (KAN-272)', () => {
       const { body } = await crear();
 
       expect(body.alerta_roja).toBe(true);
+    });
+  });
+
+  describe('estado de la amonestación', () => {
+    test('queda EMITIDA al confirmarse, con el CITE y el PDF ya asignados', async () => {
+      const { status, body } = await crear();
+
+      expect(status).toBe(201);
+      expect(body.memorandum).toMatchObject({
+        estado_sancion: 'EMITIDO',
+        codigo_cite: 'MEM-2026-0001',
+        documento_pdf_url: `/${CARPETA_PDF}/MEM-2026-0001.pdf`,
+      });
+      expect(pool.memorandums.map((fila) => fila.estado_sancion)).toEqual(['EMITIDO']);
+    });
+
+    test('el INSERT guarda el estado EMITIDO y no un borrador', async () => {
+      await crear();
+
+      const insert = pool.consultas.find((consulta) => INSERT_MEMORANDUM.test(consulta));
+      expect(insert).toContain("'EMITIDO'");
+      expect(insert).not.toContain('BORRADOR');
+    });
+  });
+
+  describe('tipo de memorándum de la llamada de atención', () => {
+    test('rechaza con 400 un tipo de reconocimiento y no deja rastro', async () => {
+      const mensaje = "El tipo de memorándum 'Felicitación por puntualidad' no corresponde a una llamada de atención.";
+
+      const respuesta = await crear(memorandumValido({ id_tipo_memo: TIPO_RECONOCIMIENTO }));
+
+      expect(respuesta.status).toBe(400);
+      expect(respuesta.body).toEqual({ error: mensaje, campos_faltantes: [], errores: [{ campo: 'id_tipo_memo', mensaje }] });
+      expect(pool.memorandums).toHaveLength(0);
+      expect(archivosEn(CARPETA_PDF)).toHaveLength(0);
+      expect(pool.huboConsulta(CONTADOR)).toBe(false);
+      expect(pool.liberaciones).toBe(pool.conexiones);
+    });
+
+    test('rechaza con 400 un tipo inexistente', async () => {
+      const mensaje = `No existe un tipo de memorándum con id_tipo_memo = ${TIPO_INEXISTENTE}.`;
+
+      const respuesta = await crear(memorandumValido({ id_tipo_memo: TIPO_INEXISTENTE }));
+
+      expect(respuesta.status).toBe(400);
+      expect(respuesta.body.errores).toEqual([{ campo: 'id_tipo_memo', mensaje }]);
+      expect(pool.memorandums).toHaveLength(0);
+    });
+
+    test('un intento con tipo de reconocimiento no consume número de CITE', async () => {
+      await crear(memorandumValido({ id_tipo_memo: TIPO_RECONOCIMIENTO }));
+
+      const { body } = await crear();
+
+      expect(body.memorandum.codigo_cite).toBe('MEM-2026-0001');
+    });
+
+    test('las felicitaciones rechazadas no alimentan la alerta roja', async () => {
+      await crearVarios(3, memorandumValido({ id_tipo_memo: TIPO_RECONOCIMIENTO }));
+
+      const { body } = await crear();
+
+      expect(body.alerta_roja).toBe(false);
+      expect(pool.memorandums).toHaveLength(1);
+    });
+  });
+
+  describe('GET /memorandums/tipos', () => {
+    test('lista el catálogo completo ordenado', async () => {
+      const { status, body } = await request(app).get('/memorandums/tipos');
+
+      expect(status).toBe(200);
+      expect(body.map((tipo) => tipo.id_tipo_memo)).toEqual([1, 2]);
+    });
+
+    test.each([
+      ['AMONESTACION', [1]],
+      ['reconocimiento', [2]],
+    ])('filtra por la clasificación %s', async (clasificacion, ids) => {
+      const { status, body } = await request(app).get('/memorandums/tipos').query({ clasificacion });
+
+      expect(status).toBe(200);
+      expect(body.map((tipo) => tipo.id_tipo_memo)).toEqual(ids);
+    });
+
+    test('rechaza con 400 una clasificación desconocida', async () => {
+      const { status, body } = await request(app).get('/memorandums/tipos').query({ clasificacion: 'SANCION' });
+
+      expect(status).toBe(400);
+      expect(body.errores).toEqual([
+        { campo: 'clasificacion', mensaje: "El campo 'clasificacion' debe ser uno de: AMONESTACION, RECONOCIMIENTO." },
+      ]);
+    });
+  });
+
+  describe('GET /memorandums/:id/pdf (descarga del documento)', () => {
+    const ID_DESCONOCIDO = '00000000-0000-4000-8000-0000000000aa';
+
+    const memorandumSinPdf = (cambios = {}) => ({
+      ...amonestacionPrevia(),
+      id_memorandum: ID_DESCONOCIDO,
+      codigo_cite: 'MEM-2026-0009',
+      documento_pdf_url: null,
+      ...cambios,
+    });
+
+    const binario = (res, cb) => {
+      const trozos = [];
+      res.on('data', (trozo) => trozos.push(trozo));
+      res.on('end', () => cb(null, Buffer.concat(trozos)));
+    };
+
+    test('descarga el PDF generado como adjunto con el CITE como nombre', async () => {
+      const emitido = await crear();
+      const { id_memorandum: id } = emitido.body.memorandum;
+
+      const respuesta = await request(app).get(`/memorandums/${id}/pdf`).buffer(true).parse(binario);
+
+      expect(respuesta.status).toBe(200);
+      expect(respuesta.headers['content-type']).toContain('application/pdf');
+      expect(respuesta.headers['content-disposition']).toContain('attachment');
+      expect(respuesta.headers['content-disposition']).toContain('MEM-2026-0001.pdf');
+      expect(respuesta.body.equals(leerPdf(emitido))).toBe(true);
+    });
+
+    test('rechaza con 400 un identificador que no es UUID', async () => {
+      const { status } = await request(app).get('/memorandums/abc/pdf');
+
+      expect(status).toBe(400);
+    });
+
+    test('responde 404 si el memorándum no existe', async () => {
+      const { status, body } = await request(app).get(`/memorandums/${ID_DESCONOCIDO}/pdf`);
+
+      expect(status).toBe(404);
+      expect(body.error).toBe('No existe el memorándum solicitado.');
+    });
+
+    test('responde 404 si el memorándum aún no tiene PDF', async () => {
+      pool.reiniciar({ memorandums: [memorandumSinPdf()] });
+
+      const { status, body } = await request(app).get(`/memorandums/${ID_DESCONOCIDO}/pdf`);
+
+      expect(status).toBe(404);
+      expect(body.error).toBe('El memorándum aún no tiene un documento PDF generado.');
+    });
+
+    test('responde 404 si el archivo ya no está en disco', async () => {
+      const emitido = await crear();
+      fs.rmSync(enDisco(emitido.body.memorandum.documento_pdf_url));
+
+      const { status } = await request(app).get(`/memorandums/${emitido.body.memorandum.id_memorandum}/pdf`);
+
+      expect(status).toBe(404);
+    });
+
+    test('no sirve archivos fuera de la aplicación aunque la ruta guardada apunte afuera', async () => {
+      pool.reiniciar({ memorandums: [memorandumSinPdf({ documento_pdf_url: '/../../../../Windows/win.ini' })] });
+
+      const { status } = await request(app).get(`/memorandums/${ID_DESCONOCIDO}/pdf`);
+
+      expect(status).toBe(404);
     });
   });
 
