@@ -136,6 +136,19 @@ async function sumarAtrasosDelMes(ids, fecha) {
   return rows;
 }
 
+// Tipos de novedad ya justificados de cada empleado en una jornada.
+async function listarJustificadas(ids, fecha) {
+  if (ids.length === 0) return [];
+  const { rows } = await pool.query(
+    `SELECT n.id_empleado, t.codigo AS tipo_codigo
+     FROM novedades_asistencia n
+     JOIN catalogos_tipo_novedad t USING (id_tipo_novedad)
+     WHERE n.id_empleado = ANY($1::uuid[]) AND n.fecha_jornada = $2::date AND n.id_estado_novedad = 2`,
+    [ids, fecha]
+  );
+  return rows;
+}
+
 async function momentoActual() {
   const { rows } = await pool.query(`SELECT CURRENT_TIMESTAMP AS ahora, ${HOY_BOLIVIA} AS hoy`);
   return rows[0];
@@ -149,5 +162,6 @@ module.exports = {
   reservarPorConsolidar,
   marcarConsolidadas,
   sumarAtrasosDelMes,
+  listarJustificadas,
   momentoActual,
 };
