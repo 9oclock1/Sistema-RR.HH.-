@@ -17,6 +17,7 @@ import {
 import { useRol } from '../../context/sesion';
 import { useEmpleados } from '../Asignaciones/hooks/useEmpleados';
 import DatosPersonales from './components/DatosPersonales';
+import KardexResumen from './components/KardexResumen';
 import LineaTiempoTrayectoria from './components/LineaTiempoTrayectoria';
 import TablaCapacitaciones from './components/TablaCapacitaciones';
 import TablaContratos from './components/TablaContratos';
@@ -32,6 +33,11 @@ function Cargando() {
       <div className="kardex-identidad">
         <Esqueleto forma="circulo" ancho="var(--size-avatar-lg)" alto="var(--size-avatar-lg)" />
         <Esqueleto ancho="30%" />
+      </div>
+      <div className="kardex-resumen">
+        {[0, 1, 2, 3].map((i) => (
+          <Esqueleto key={i} forma="bloque" alto="calc(var(--size-row) * 3)" />
+        ))}
       </div>
       <Tarjeta>
         <div className="kardex-cargando">
@@ -93,7 +99,7 @@ function Expediente({ kardex }) {
         <Etiqueta tono={datos.estado.codigo === 'ACTIVO' ? 'exito' : 'neutral'}>{datos.estado.nombre}</Etiqueta>
       </div>
 
-      <div className="kardex-resumen">{/* KAN-266: tarjetas resumen */}</div>
+      <KardexResumen resumen={kardex.resumen} fechaIngreso={datos.fecha_ingreso} />
 
       <Tarjeta>
         <Pestanas etiqueta="Secciones del Kardex" pestanas={pestanas} activa={pestana} onCambiar={setPestana} />
