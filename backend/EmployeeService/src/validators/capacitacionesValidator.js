@@ -161,6 +161,9 @@ const validarFiltrosCapacitaciones = (query) => {
 const validarId = (valor) => validarIdRuta(valor, 'id');
 
 module.exports = {
+  normalizarOpcion,
+  normalizarEntero,
+  normalizarFecha,
   validarCurso,
   validarFiltrosCursos,
   validarCapacitacion,

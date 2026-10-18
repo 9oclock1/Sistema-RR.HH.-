@@ -1,2 +1,4 @@
 # Configuracion de VSCode
 .vscode/*
+credentials/
+project-a96e5fe1-*.json
