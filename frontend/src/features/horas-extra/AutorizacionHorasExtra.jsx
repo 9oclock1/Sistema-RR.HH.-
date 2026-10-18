@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { autorizarHorasExtra, listarPersonal } from "../../api/horasExtra";
 import { Alerta, Boton, CampoAreaTexto, CampoTexto, Esqueleto, Modal, Selector } from "../../components/ui";
-import { formatearMinutos, hoyBolivia } from "./formato";
+import { MAXIMO_MINUTOS_AUTORIZABLES, MINUTOS_EXTRA_DIA, formatearMinutos, hoyBolivia } from "./formato";
 
 const MAX_MOTIVO = 500;
-const MAX_MINUTOS = 24 * 60;
+const MAX_MINUTOS = MAXIMO_MINUTOS_AUTORIZABLES;
 const CAMPOS = { id_empleado: "colaborador", fecha_jornada: "fecha", minutos_autorizados: "minutos", motivo: "motivo" };
 const ETIQUETAS = { colaborador: "Colaborador", fecha: "Día", minutos: "Minutos autorizados", motivo: "Motivo" };
 
@@ -200,9 +200,11 @@ export default function AutorizacionHorasExtra({ abierto, sucursal, revisor, onC
             value={datos.minutos}
             onChange={cambiar("minutos")}
             error={errores.minutos}
-            ayuda={
-              Number.isInteger(minutos) && minutos > 0 ? `${formatearMinutos(minutos)} después del turno.` : undefined
-            }
+            ayuda={`${Number.isInteger(minutos) && minutos > 0 ? `${formatearMinutos(minutos)}. ` : ""}${
+              minutos > MINUTOS_EXTRA_DIA
+                ? "Solo para un día sin turno: con turno, la ley permite hasta 2 horas extra."
+                : "Con turno, la ley permite hasta 2 horas extra por día."
+            }`}
             disabled={guardando}
           />
         </div>

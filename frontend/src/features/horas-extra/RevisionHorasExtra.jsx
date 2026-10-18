@@ -2,25 +2,47 @@ import { useEffect, useRef, useState } from "react";
 import { Ban, CircleCheck } from "lucide-react";
 import { revisarHorasExtra } from "../../api/horasExtra";
 import { Alerta, Boton, CampoAreaTexto, CampoTexto, Etiqueta, Modal } from "../../components/ui";
-import { ESTADOS_HORAS, formatearFechaHora, formatearHora, formatearJornada, formatearMinutos } from "./formato";
+import {
+  ESTADOS_HORAS,
+  MINUTOS_EXTRA_DIA,
+  MINUTOS_JORNADA_DIA,
+  formatearFechaHora,
+  formatearHora,
+  formatearJornada,
+  formatearMinutos,
+} from "./formato";
 
 const MAX_COMENTARIO = 500;
-// Ley General del Trabajo: hasta 2 horas extra simples por día; el resto se paga doble.
-const MINUTOS_SIMPLES_DIA = 120;
+const EN_DIA = { HABIL: "", DOMINGO: " en domingo", FERIADO: " en feriado" };
+const DESCANSO = { HABIL: "día de descanso", DOMINGO: "domingo", FERIADO: "feriado" };
 
-const valorInicial = (j) => j.minutos_extra_aprobados || j.minutos_extra || j.minutos_extra + j.minutos_anticipados;
+const marcadoDe = (j) => j.minutos_extra + j.minutos_anticipados;
+// Lo que se aprueba si no se ajusta: lo marcado después del turno, hasta el máximo legal.
+const propuestos = (j) => Math.min(j.minutos_extra, j.maximo_aprobable);
+const valorInicial = (j) => j.minutos_extra_aprobados || propuestos(j) || j.maximo_aprobable;
+
+function mensajeMaximo(j) {
+  const maximo = j.maximo_aprobable;
+  if (marcadoDe(j) <= maximo) return `Apruebe entre 1 y ${maximo} minutos: lo marcado fuera del turno.`;
+  return j.turno
+    ? `Apruebe entre 1 y ${maximo} minutos: la ley permite hasta 2 horas extra por día.`
+    : `Apruebe entre 1 y ${maximo} minutos: sin turno, la ley permite la jornada de 8 horas y hasta 2 horas extra.`;
+}
 
 // Cómo se pagarían los minutos aprobados: lo mismo que calcula el servicio.
-function vistaPago(minutos, feriado) {
+function vistaPago(minutos, jornada) {
   if (!Number.isInteger(minutos) || minutos <= 0) return "Sin horas extra a pagar.";
-  if (feriado) return `Se pagarán ${formatearMinutos(minutos)} dobles (feriado).`;
-  const simples = Math.min(minutos, MINUTOS_SIMPLES_DIA);
-  const dobles = minutos - simples;
-  return `Se pagarán ${formatearMinutos(simples)} simples${dobles ? ` y ${formatearMinutos(dobles)} dobles` : ""}.`;
+  const enJornada = jornada.turno ? 0 : Math.min(minutos, MINUTOS_JORNADA_DIA);
+  const extra = Math.min(minutos - enJornada, MINUTOS_EXTRA_DIA);
+  const partes = [
+    enJornada > 0 && `${formatearMinutos(enJornada)} de jornada en ${DESCANSO[jornada.tipo_dia]}`,
+    extra > 0 && `${formatearMinutos(extra)} extra${EN_DIA[jornada.tipo_dia]}`,
+  ].filter(Boolean);
+  return `Se pagarán ${partes.join(" y ")}.`;
 }
 
 function Conciliacion({ jornada }) {
-  const marcado = jornada.minutos_extra + jornada.minutos_anticipados;
+  const marcado = marcadoDe(jornada);
   const autorizado = jornada.autorizacion?.minutos_autorizados ?? null;
   return (
     <dl className="he-detalle">
@@ -31,6 +53,7 @@ function Conciliacion({ jornada }) {
           {jornada.turno
             ? ` · ${jornada.turno.nombre}, ${formatearHora(jornada.turno.inicio_programado)}–${formatearHora(jornada.turno.fin_programado)}`
             : " · Sin turno (descanso)"}
+          {jornada.tipo_dia === "DOMINGO" && " · Domingo"}
           {jornada.feriado && ` · Feriado: ${jornada.feriado}`}
         </dd>
       </div>
@@ -72,6 +95,18 @@ function Conciliacion({ jornada }) {
           <dd>{formatearMinutos(marcado - autorizado)} marcadas sin autorizar</dd>
         </div>
       )}
+      {marcado > jornada.maximo_aprobable && (
+        <div>
+          <dt>Máximo a pagar</dt>
+          <dd>
+            {formatearMinutos(jornada.maximo_aprobable)}:{" "}
+            {jornada.turno
+              ? "la ley permite hasta 2 horas extra por día."
+              : "sin turno, la jornada de 8 horas y hasta 2 horas extra."}{" "}
+            Lo demás no se paga.
+          </dd>
+        </div>
+      )}
     </dl>
   );
 }
@@ -92,7 +127,7 @@ export default function RevisionHorasExtra({ jornada, revisor, onCerrar, onRevis
     if (errorGeneral) refError.current?.focus();
   }, [errorGeneral]);
 
-  const marcado = jornada.minutos_extra + jornada.minutos_anticipados;
+  const maximo = jornada.maximo_aprobable;
   const valor = Number(minutos);
   const editable = !jornada.consolidada && Boolean(revisor);
   const estado = ESTADOS_HORAS[jornada.estado.codigo];
@@ -103,10 +138,10 @@ export default function RevisionHorasExtra({ jornada, revisor, onCerrar, onRevis
 
   const decidir = async (decision) => {
     const nuevos = {};
-    if (decision === "APROBADA" && (!Number.isInteger(valor) || valor <= 0 || valor > marcado)) {
-      nuevos.minutos = `Apruebe entre 1 y ${marcado} minutos: lo marcado fuera del turno.`;
+    if (decision === "APROBADA" && (!Number.isInteger(valor) || valor <= 0 || valor > maximo)) {
+      nuevos.minutos = mensajeMaximo(jornada);
     }
-    const ajusta = decision === "APROBADA" && valor !== jornada.minutos_extra;
+    const ajusta = decision === "APROBADA" && valor !== propuestos(jornada);
     if ((decision === "RECHAZADA" || ajusta) && !comentario.trim()) {
       nuevos.comentario =
         decision === "RECHAZADA" ? "Explique el motivo del rechazo." : "Explique el motivo del ajuste.";
@@ -135,14 +170,21 @@ export default function RevisionHorasExtra({ jornada, revisor, onCerrar, onRevis
     }
   };
 
+  // Sugerencias sin repetir valores: todas dentro del máximo legal.
   const atajos = [
-    jornada.minutos_extra > 0 && { etiqueta: "Lo marcado después del turno", valor: jornada.minutos_extra },
+    jornada.minutos_extra > 0 && {
+      etiqueta: jornada.minutos_extra > maximo ? "El máximo legal" : "Lo marcado después del turno",
+      valor: propuestos(jornada),
+    },
     jornada.autorizacion && {
       etiqueta: "Lo autorizado",
-      valor: Math.min(jornada.autorizacion.minutos_autorizados, marcado),
+      valor: Math.min(jornada.autorizacion.minutos_autorizados, maximo),
     },
-    jornada.minutos_anticipados > 0 && { etiqueta: "Todo lo marcado", valor: marcado },
-  ].filter(Boolean);
+    jornada.minutos_anticipados > 0 && {
+      etiqueta: marcadoDe(jornada) > maximo ? "El máximo legal" : "Todo lo marcado",
+      valor: maximo,
+    },
+  ].filter((a, i, lista) => a && lista.findIndex((b) => b && b.valor === a.valor) === i);
 
   return (
     <Modal
@@ -225,7 +267,7 @@ export default function RevisionHorasExtra({ jornada, revisor, onCerrar, onRevis
                 type="number"
                 inputMode="numeric"
                 min={1}
-                max={marcado}
+                max={maximo}
                 step={1}
                 etiqueta="Minutos a aprobar"
                 value={minutos}
@@ -234,7 +276,7 @@ export default function RevisionHorasExtra({ jornada, revisor, onCerrar, onRevis
                   if (errores.minutos) setErrores((actual) => ({ ...actual, minutos: undefined }));
                 }}
                 error={errores.minutos}
-                ayuda={`${Number.isInteger(valor) && valor > 0 ? `${formatearMinutos(valor)}. ` : ""}${vistaPago(valor, Boolean(jornada.feriado))}`}
+                ayuda={`${Number.isInteger(valor) && valor > 0 ? `${formatearMinutos(valor)}. ` : ""}${vistaPago(valor, jornada)}`}
                 disabled={Boolean(decidiendo)}
                 data-autofocus
               />
