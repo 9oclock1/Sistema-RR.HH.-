@@ -1,9 +1,10 @@
-import { Briefcase, Building2, CalendarClock, FileUser, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
+import { Briefcase, Building2, CalendarClock, FileText, FileUser, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
 import CargosList from "../features/Cargos/CargosList";
 import GestionComunicacionesPage from "../features/comunicaciones/GestionComunicacionesPage";
+import LicenciasPage from "../features/licencias/LicenciasPage";
 import JerarquiaView from "../features/Jerarquia/JerarquiaView";
 import MarcajePage from "../features/marcaje/MarcajePage";
 import OrganigramaView from "../features/organigrama/OrganigramaView";
@@ -102,6 +103,14 @@ export const SECCIONES = [
         icono: Fingerprint,
         roles: ["empleado"],
         pagina: MarcajePage,
+      },
+      {
+        ruta: "/asistencia/licencias",
+        etiqueta: "Licencias",
+        descripcion: "Solicitud de licencias y permisos con respaldo digital.",
+        icono: FileText,
+        roles: ["empleado"],
+        pagina: LicenciasPage,
       },
       {
         ruta: "/asistencia/turnos",

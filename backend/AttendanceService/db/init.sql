@@ -105,4 +105,112 @@ INSERT INTO CATALOGOS_ORIGEN_MARCAJE (id_origen_marcaje, codigo, nombre) VALUES
 INSERT INTO CATALOGOS_ESTADO_MARCAJE (id_estado_marcaje, codigo, nombre) VALUES
     (1, 'REGISTRADO', 'Registrado'),
     (2, 'PENDIENTE_JUSTIFICACION', 'Pendiente de justificación');
+-- KAN-51 (RF-31): solicitudes de licencias y permisos especiales.
+-- Bloque idempotente: se puede ejecutar a mano sobre una AttendanceDB ya creada.
+-- id_empleado e id_empleado_resolutor referencian EMPLEADOS (EmployeeDB): sin FK por ser otro servicio,
+-- igual que MARCAJES y ASIGNACIONES_TURNO.
+-- btree_gist: permite combinar UUID y rangos de fechas en una restricción EXCLUDE.
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+-- Tabla: CATALOGOS_ESTADO_SOLICITUD
+CREATE TABLE IF NOT EXISTS CATALOGOS_ESTADO_SOLICITUD (
+    id_estado_solicitud SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_ESTADO_SOLICITUD_pk PRIMARY KEY (id_estado_solicitud),
+    CONSTRAINT uq_estado_solicitud_codigo UNIQUE (codigo)
+);
+-- Tabla: CATALOGOS_TIPO_LICENCIA (la causal es el tipo; los topes y reglas viven en el catálogo)
+CREATE TABLE IF NOT EXISTS CATALOGOS_TIPO_LICENCIA (
+    id_tipo_licencia SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(80) NOT NULL,
+    es_con_goce_haberes boolean NOT NULL,
+    dias_maximos_continuos SMALLINT NULL,
+    requiere_adjunto boolean NOT NULL DEFAULT FALSE,
+    esta_activo boolean NOT NULL DEFAULT TRUE,
+    CONSTRAINT CATALOGOS_TIPO_LICENCIA_pk PRIMARY KEY (id_tipo_licencia),
+    CONSTRAINT uq_tipo_licencia_codigo UNIQUE (codigo),
+    CONSTRAINT chk_tipo_licencia_tope CHECK (dias_maximos_continuos IS NULL OR dias_maximos_continuos > 0)
+);
+-- Tabla: SOLICITUDES_LICENCIA
+CREATE TABLE IF NOT EXISTS SOLICITUDES_LICENCIA (
+    id_solicitud UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    id_tipo_licencia SMALLINT NOT NULL,
+    id_estado_solicitud SMALLINT NOT NULL DEFAULT 1,
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    dias_solicitados SMALLINT GENERATED ALWAYS AS (fecha_fin - fecha_inicio + 1) STORED,
+    es_con_goce_haberes boolean NOT NULL,
+    excede_limite_dias boolean NOT NULL DEFAULT FALSE,
+    motivo text NULL,
+    id_empleado_resolutor UUID NULL,
+    resuelto_en TIMESTAMPTZ NULL,
+    motivo_resolucion text NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT SOLICITUDES_LICENCIA_pk PRIMARY KEY (id_solicitud),
+    CONSTRAINT chk_solicitud_licencia_fechas CHECK (fecha_fin >= fecha_inicio),
+    CONSTRAINT chk_solicitud_licencia_resolucion CHECK ((id_empleado_resolutor IS NULL) = (resuelto_en IS NULL)),
+    -- Un empleado no puede tener dos licencias activas (pendiente o aprobada) que se solapen.
+    CONSTRAINT ex_solicitud_licencia_solape EXCLUDE USING gist (
+        id_empleado WITH =,
+        daterange(fecha_inicio, fecha_fin, '[]') WITH &&
+    ) WHERE (id_estado_solicitud IN (1, 2))
+);
+-- Tabla: ADJUNTOS_SOLICITUD_LICENCIA (respaldo digital: baja médica, certificado de defunción, etc.)
+CREATE TABLE IF NOT EXISTS ADJUNTOS_SOLICITUD_LICENCIA (
+    id_adjunto UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_solicitud UUID NOT NULL,
+    nombre_original varchar(255) NOT NULL,
+    archivo_url varchar(255) NOT NULL,
+    formato_mimetype varchar(100) NOT NULL,
+    tamano_bytes integer NOT NULL,
+    subido_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ADJUNTOS_SOLICITUD_LICENCIA_pk PRIMARY KEY (id_adjunto),
+    CONSTRAINT chk_adjunto_licencia_tamano CHECK (tamano_bytes > 0)
+);
+-- índices
+-- Historial de un empleado (pantalla "mis solicitudes").
+CREATE INDEX IF NOT EXISTS ix_solicitud_licencia_empleado ON SOLICITUDES_LICENCIA (id_empleado, fecha_inicio DESC);
+-- Bandeja de pendientes del aprobador (KAN-53).
+CREATE INDEX IF NOT EXISTS ix_solicitud_licencia_estado ON SOLICITUDES_LICENCIA (id_estado_solicitud, creado_en);
+-- Cronograma de ausencias aprobadas por rango de fechas (KAN-55).
+CREATE INDEX IF NOT EXISTS ix_solicitud_licencia_aprobadas_fechas ON SOLICITUDES_LICENCIA (fecha_inicio, fecha_fin) WHERE id_estado_solicitud = 2;
+CREATE INDEX IF NOT EXISTS ix_adjunto_licencia_solicitud ON ADJUNTOS_SOLICITUD_LICENCIA (id_solicitud);
+-- llaves foráneas
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'solicitudes_licencia_catalogos_tipo_licencia') THEN
+        ALTER TABLE SOLICITUDES_LICENCIA
+        ADD CONSTRAINT SOLICITUDES_LICENCIA_CATALOGOS_TIPO_LICENCIA FOREIGN KEY (id_tipo_licencia) REFERENCES CATALOGOS_TIPO_LICENCIA (id_tipo_licencia) NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'solicitudes_licencia_catalogos_estado_solicitud') THEN
+        ALTER TABLE SOLICITUDES_LICENCIA
+        ADD CONSTRAINT SOLICITUDES_LICENCIA_CATALOGOS_ESTADO_SOLICITUD FOREIGN KEY (id_estado_solicitud) REFERENCES CATALOGOS_ESTADO_SOLICITUD (id_estado_solicitud) NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'adjuntos_solicitud_licencia_solicitudes_licencia') THEN
+        ALTER TABLE ADJUNTOS_SOLICITUD_LICENCIA
+        ADD CONSTRAINT ADJUNTOS_SOLICITUD_LICENCIA_SOLICITUDES_LICENCIA FOREIGN KEY (id_solicitud) REFERENCES SOLICITUDES_LICENCIA (id_solicitud) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+END $$;
+-- datos iniciales (topes y goce referenciales: confirmar con RRHH / normativa vigente)
+INSERT INTO CATALOGOS_ESTADO_SOLICITUD (id_estado_solicitud, codigo, nombre) VALUES
+    (1, 'PENDIENTE', 'Pendiente'),
+    (2, 'APROBADA', 'Aprobada'),
+    (3, 'RECHAZADA', 'Rechazada'),
+    (4, 'CANCELADA', 'Cancelada')
+ON CONFLICT DO NOTHING;
+INSERT INTO CATALOGOS_TIPO_LICENCIA (id_tipo_licencia, codigo, nombre, es_con_goce_haberes, dias_maximos_continuos, requiere_adjunto) VALUES
+    (1, 'MEDICA', 'Licencia médica', TRUE, NULL, TRUE),
+    (2, 'MATERNIDAD', 'Maternidad', TRUE, 90, TRUE),
+    (3, 'DUELO', 'Duelo', TRUE, 3, TRUE),
+    (4, 'ACADEMICA', 'Académica', FALSE, 5, TRUE),
+    (5, 'PERSONAL', 'Personal', FALSE, 2, FALSE),
+    (6, 'PATERNIDAD', 'Paternidad', TRUE, 3, TRUE)
+ON CONFLICT DO NOTHING;
+-- Si la BD ya tenía el tipo unificado, pasa a ser Maternidad (la paternidad es el tipo 6).
+UPDATE CATALOGOS_TIPO_LICENCIA
+SET codigo = 'MATERNIDAD', nombre = 'Maternidad'
+WHERE id_tipo_licencia = 2 AND codigo = 'MATERNIDAD_PATERNIDAD';
 -- Fin del archivo.
