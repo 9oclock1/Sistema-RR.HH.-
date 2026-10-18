@@ -257,6 +257,24 @@
   line-height: var(--line-height-small);
 }
 
+.kardex-seccion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.kardex-seccion__acciones {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.kardex-certificado {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
 .kardex-archivo {
   display: block;
   overflow-wrap: anywhere;

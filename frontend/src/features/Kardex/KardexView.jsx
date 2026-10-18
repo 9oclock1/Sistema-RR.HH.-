@@ -74,7 +74,9 @@ function Expediente({ kardex }) {
       id: 'capacitaciones',
       etiqueta: 'Capacitaciones',
       contador: capacitaciones.length,
-      contenido: <TablaCapacitaciones capacitaciones={capacitaciones} nombre={nombre} />,
+      contenido: (
+        <TablaCapacitaciones capacitaciones={capacitaciones} nombre={nombre} idEmpleado={kardex.id_empleado} />
+      ),
     },
     {
       id: 'trayectoria',

@@ -35,3 +35,19 @@ export async function request(path, { method = 'GET', body, signal, headers } = 
   }
   return data;
 }
+
+export async function requestArchivo(path, { signal, headers } = {}) {
+  let response;
+  try {
+    response = await fetch(`${API_URL}${path}`, { signal, headers });
+  } catch (error) {
+    if (error.name === 'AbortError') throw error;
+    throw new ApiError('No se pudo conectar con el servidor.', 0);
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new ApiError(data?.error || `Error inesperado (${response.status}).`, response.status, data);
+  }
+  return response.blob();
+}

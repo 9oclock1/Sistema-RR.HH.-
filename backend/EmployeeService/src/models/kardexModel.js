@@ -1,4 +1,5 @@
 const { NIVELES_SALARIALES } = require('../utils/nivelesSalariales');
+const { ESTADO_VIGENCIA } = require('./capacitacionesModel');
 
 const obtenerResumen = async (db, idEmpleado) => {
   const { rows } = await db.query('SELECT * FROM vw_kardex_resumen WHERE id_empleado = $1', [idEmpleado]);
@@ -103,13 +104,21 @@ const listarCapacitaciones = async (db, idEmpleado) => {
             cu.codigo AS curso_codigo,
             cu.nombre AS curso,
             cu.horas_academicas,
+            cu.tipo_capacitacion,
             cc.institucion_emisora,
+            cc.fecha_inicio,
+            cc.fecha_fin,
             cc.fecha_emision,
             cc.fecha_vencimiento,
             (cc.fecha_vencimiento IS NULL OR cc.fecha_vencimiento >= CURRENT_DATE) AS esta_vigente,
-            cc.certificado_adjunto_url
+            ${ESTADO_VIGENCIA} AS estado_vigencia,
+            (cc.fecha_vencimiento - CURRENT_DATE) AS dias_para_vencer,
+            cc.certificado_adjunto_url,
+            cc.certificado_nombre_original,
+            ss.numero_orden_servicio
        FROM capacitaciones_certificacion cc
        JOIN cursos_capacitacion cu ON cu.id_curso = cc.id_curso
+       LEFT JOIN solicitudes_servicio_capacitacion ss ON ss.id_solicitud_servicio = cc.id_solicitud_servicio
       WHERE cc.id_empleado = $1
       ORDER BY cc.fecha_emision DESC, cc.registrado_en DESC`,
     [idEmpleado]

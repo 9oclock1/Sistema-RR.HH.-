@@ -209,6 +209,7 @@ const eliminar = async (db, idCapacitacion) => {
 
 module.exports = {
   DIAS_AVISO_VENCIMIENTO,
+  ESTADO_VIGENCIA,
   listar,
   obtenerPorId,
   bloquearPorId,
