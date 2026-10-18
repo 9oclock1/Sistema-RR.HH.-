@@ -14,6 +14,7 @@ const reconocimientosRoutes = require("./src/routes/reconocimientos"); // RF-38
 const cursosCapacitacionRoutes = require("./src/routes/cursosCapacitacion");
 const capacitacionesRoutes = require("./src/routes/capacitaciones");
 const errorHandler = require("./src/middlewares/errorHandler");
+const { iniciarCronCertificaciones } = require("./src/jobs/certificacionesCron");
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -65,6 +66,7 @@ if (require.main === module) {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`EmployeeService corriendo en http://0.0.0.0:${PORT}`);
   });
+  iniciarCronCertificaciones();
 }
 
 module.exports = app;

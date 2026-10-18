@@ -179,6 +179,30 @@ const guardarCertificado = async (db, idCapacitacion, certificado) => {
   );
 };
 
+const listarQueVencenEn = async (db, dias) => {
+  const { rows } = await db.query(
+    `SELECT cc.id_capacitacion,
+            cc.id_empleado,
+            concat_ws(' ', e.nombres, e.primer_apellido, e.segundo_apellido) AS empleado,
+            e.correo_personal,
+            cu.codigo AS curso_codigo,
+            cu.nombre AS curso,
+            cu.tipo_capacitacion,
+            cc.institucion_emisora,
+            cc.fecha_emision,
+            cc.fecha_vencimiento
+       FROM capacitaciones_certificacion cc
+       JOIN cursos_capacitacion cu ON cu.id_curso = cc.id_curso
+       JOIN empleados e            ON e.id_empleado = cc.id_empleado
+       JOIN estados_empleado ee    ON ee.id_estado_empleado = e.id_estado_empleado
+      WHERE cc.fecha_vencimiento = CURRENT_DATE + $1::int
+        AND ee.permite_acceso
+      ORDER BY e.primer_apellido, e.nombres, cu.nombre`,
+    [dias]
+  );
+  return rows;
+};
+
 const eliminar = async (db, idCapacitacion) => {
   await db.query('DELETE FROM capacitaciones_certificacion WHERE id_capacitacion = $1', [idCapacitacion]);
 };
@@ -194,5 +218,6 @@ module.exports = {
   insertar,
   reemplazar,
   guardarCertificado,
+  listarQueVencenEn,
   eliminar,
 };
