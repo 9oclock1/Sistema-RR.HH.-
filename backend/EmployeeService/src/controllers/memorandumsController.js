@@ -1,5 +1,6 @@
 const memorandumsService = require('../services/memorandumsService');
-const { validarMemorandum } = require('../validators/memorandumsValidator');
+const { validarMemorandum, validarClasificacion } = require('../validators/memorandumsValidator');
+const { validarIdRuta } = require('../validators/comunes');
 const { rutaEvidencia, descartarEvidencia } = require('../middlewares/evidenciaUpload');
 
 const crearMemorandum = async (req, res) => {
@@ -14,4 +15,18 @@ const crearMemorandum = async (req, res) => {
   }
 };
 
-module.exports = { crearMemorandum };
+const listarTipos = async (req, res) => {
+  const clasificacion = validarClasificacion(req.query.clasificacion);
+  res.status(200).json(await memorandumsService.listarTipos(clasificacion));
+};
+
+const descargarPdf = async (req, res, next) => {
+  const idMemorandum = validarIdRuta(req.params.id, 'id');
+  const { ruta, nombre } = await memorandumsService.obtenerDocumentoPdf(idMemorandum);
+  // La ruta ya se validó contra la carpeta de la aplicación, así que se permiten carpetas con punto (p. ej. .tmp).
+  res.download(ruta, nombre, { dotfiles: 'allow' }, (error) => {
+    if (error && !res.headersSent) next(error);
+  });
+};
+
+module.exports = { crearMemorandum, listarTipos, descargarPdf };

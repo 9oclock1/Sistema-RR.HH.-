@@ -1,5 +1,6 @@
 const TIPOS_MEMORANDUM = {
-  1: { id_tipo_memo: 1, clasificacion: 'DISCIPLINARIO', nombre: 'Llamada de atención' },
+  1: { id_tipo_memo: 1, clasificacion: 'AMONESTACION', nombre: 'Llamada de atención', descripcion: 'Amonestación formal' },
+  2: { id_tipo_memo: 2, clasificacion: 'RECONOCIMIENTO', nombre: 'Felicitación por puntualidad', descripcion: 'Reconocimiento por puntualidad' },
 };
 
 const EMPLEADOS = {
@@ -122,7 +123,7 @@ const crearPoolFalso = () => {
       numero_correlativo,
       naturaleza_falta,
       gravedad_falta,
-      estado_sancion: 'BORRADOR',
+      estado_sancion: 'EMITIDO',
       evidencia_adjunto_url,
       documento_pdf_url: null,
     };
@@ -164,6 +165,19 @@ const crearPoolFalso = () => {
     return { ...fila };
   };
 
+  const obtenerTipo = ([idTipoMemo]) => {
+    const tipo = estado.tipos[idTipoMemo];
+    return tipo ? { id_tipo_memo: tipo.id_tipo_memo, clasificacion: tipo.clasificacion, nombre: tipo.nombre } : null;
+  };
+
+  const listarTipos = ([clasificacion]) =>
+    Object.values(estado.tipos).filter((tipo) => clasificacion === null || tipo.clasificacion === clasificacion);
+
+  const obtenerDocumento = ([idMemorandum]) => {
+    const fila = estado.memorandums.find((memo) => memo.id_memorandum === idMemorandum);
+    return fila ? { codigo_cite: fila.codigo_cite, documento_pdf_url: fila.documento_pdf_url ?? null } : null;
+  };
+
   const filas = (fila) => ({ rows: fila ? [fila] : [] });
 
   const query = async (sql, params = []) => {
@@ -180,6 +194,9 @@ const crearPoolFalso = () => {
       estado.memorandums.length = estado.respaldo.cantidad;
       return { rows: [] };
     }
+    if (/FROM tipos_memorandum WHERE id_tipo_memo/i.test(texto)) return filas(obtenerTipo(params));
+    if (/FROM tipos_memorandum WHERE \(\$1::text IS NULL/i.test(texto)) return { rows: listarTipos(params) };
+    if (/SELECT codigo_cite, documento_pdf_url FROM memorandums/i.test(texto)) return filas(obtenerDocumento(params));
     if (/SELECT CURRENT_DATE/i.test(texto)) return filas({ hoy: estado.hoy });
     if (/SELECT COUNT\(\*\)::int AS total FROM memorandums/i.test(texto)) return filas({ total: contarRecientes(params) });
     if (/INSERT INTO correlativos_memorandum/i.test(texto)) return filas({ ultimo_numero: siguienteCorrelativo(params) });

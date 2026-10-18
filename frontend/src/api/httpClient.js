@@ -1,6 +1,9 @@
 // Cliente HTTP compartido. Todas las peticiones pasan por el API Gateway (NGINX), nunca por el puerto directo de un microservicio.
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '');
 
+// URL absoluta del gateway para recursos que el navegador abre directo (descargas), fuera de fetch.
+export const urlApi = (path) => `${API_URL}${path}`;
+
 export class ApiError extends Error {
   constructor(message, status, data = null) {
     super(message);
