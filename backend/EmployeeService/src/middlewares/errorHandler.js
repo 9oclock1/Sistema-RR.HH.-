@@ -32,6 +32,10 @@ const errorHandler = (err, req, res, next) => {
     return res.status(400).json({ error: mensaje, campos_faltantes: [], errores: campo ? [{ campo, mensaje }] : [] });
   }
 
+  if (err.code === '23505') {
+    return res.status(409).json({ error: 'Ya existe un registro con los mismos datos.', campos_faltantes: [], errores: [] });
+  }
+
   console.error(err);
   return res.status(500).json({ error: 'Error interno del servidor.' });
 };
