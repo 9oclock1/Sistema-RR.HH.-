@@ -1,10 +1,12 @@
-import { Award, Briefcase, Building2, CalendarClock, FileUser, FileWarning, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
+import { Award, Briefcase, Building2, CalendarClock, FileUser, FileWarning, Fingerprint, IdCard, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
 import CargosList from "../features/Cargos/CargosList";
 import GestionComunicacionesPage from "../features/comunicaciones/GestionComunicacionesPage";
 import JerarquiaView from "../features/Jerarquia/JerarquiaView";
+import KardexView from "../features/Kardex/KardexView";
+import { RUTA_KARDEX } from "../features/Kardex/ruta";
 import MarcajePage from "../features/marcaje/MarcajePage";
 import MemorandumsView from "../features/Memorandums/MemorandumsView";
 import OrganigramaView from "../features/organigrama/OrganigramaView";
@@ -112,6 +114,20 @@ export const SECCIONES = [
         icono: CalendarClock,
         roles: ["admin"],
         pagina: TurnosPage,
+      },
+    ],
+  },
+  {
+    titulo: "Expediente",
+    modulos: [
+      {
+        ruta: RUTA_KARDEX,
+        parametroOpcional: "idEmpleado",
+        etiqueta: "Kardex laboral",
+        descripcion: "Ficha consolidada de cada colaborador: contratos, trayectoria, memorándums y capacitaciones.",
+        icono: IdCard,
+        roles: ["gerente"],
+        pagina: KardexView,
       },
     ],
   },
