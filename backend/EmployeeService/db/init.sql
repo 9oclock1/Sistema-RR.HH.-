@@ -15,6 +15,7 @@ CREATE TABLE CAPACITACIONES_CERTIFICACION (
     certificado_nombre_original varchar(255) NULL,
     certificado_tipo_mime varchar(50) NULL,
     certificado_tamano_bytes int NULL,
+    id_solicitud_servicio UUID NULL,
     registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT CAPACITACIONES_CERTIFICACION_pk PRIMARY KEY (id_capacitacion),
@@ -132,6 +133,26 @@ CREATE TABLE ESTADOS_EMPLEADO (
     permite_acceso boolean NOT NULL,
     CONSTRAINT ESTADOS_EMPLEADO_pk PRIMARY KEY (id_estado_empleado)
 );
+CREATE TABLE HISTORIAL_SOLICITUD_SERVICIO (
+    id_evento UUID NOT NULL,
+    id_solicitud_servicio UUID NOT NULL,
+    estado_anterior varchar(20) NULL,
+    estado_nuevo varchar(20) NOT NULL,
+    origen varchar(10) NOT NULL,
+    id_mensaje_externo varchar(64) NULL,
+    detalle text NULL,
+    carga_mensaje jsonb NULL,
+    registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT HISTORIAL_SOLICITUD_SERVICIO_pk PRIMARY KEY (id_evento),
+    CONSTRAINT uq_historial_solicitud_mensaje_externo UNIQUE (id_mensaje_externo),
+    CONSTRAINT ck_historial_solicitud_origen CHECK (origen IN ('RRHH', 'COMPRAS')),
+    CONSTRAINT ck_historial_solicitud_estado_nuevo CHECK (
+        estado_nuevo IN ('PENDIENTE_ENVIO', 'ENVIADA', 'EN_PROCESO', 'ORDEN_EMITIDA', 'RECHAZADA', 'CANCELADA')
+    ),
+    CONSTRAINT ck_historial_solicitud_estado_anterior CHECK (
+        estado_anterior IN ('PENDIENTE_ENVIO', 'ENVIADA', 'EN_PROCESO', 'ORDEN_EMITIDA', 'RECHAZADA', 'CANCELADA')
+    )
+);
 -- Table: MEMORANDUMS
 CREATE TABLE MEMORANDUMS (
     id_memorandum UUID NOT NULL,
@@ -171,6 +192,40 @@ CREATE TABLE REQUISITOS_CAPACITACION_CARGO (
     meses_validez_requerida int NULL,
     CONSTRAINT REQUISITOS_CAPACITACION_CARGO_pk PRIMARY KEY (id_requisito_cargo),
     CONSTRAINT uq_requisito_cargo_curso UNIQUE (id_cargo, id_curso)
+);
+CREATE TABLE SOLICITUDES_SERVICIO_CAPACITACION (
+    id_solicitud_servicio UUID NOT NULL,
+    id_curso UUID NOT NULL,
+    id_empleado_solicitante UUID NOT NULL,
+    descripcion_requerimiento text NOT NULL,
+    cantidad_participantes int NOT NULL,
+    fecha_requerida date NULL,
+    monto_estimado numeric(12, 2) NULL,
+    estado varchar(20) NOT NULL DEFAULT 'PENDIENTE_ENVIO',
+    numero_orden_servicio varchar(40) NULL,
+    proveedor_nombre varchar(150) NULL,
+    proveedor_nit varchar(20) NULL,
+    monto_adjudicado numeric(12, 2) NULL,
+    intentos_envio int NOT NULL DEFAULT 0,
+    proximo_intento_en TIMESTAMPTZ NULL,
+    ultimo_error text NULL,
+    enviada_en TIMESTAMPTZ NULL,
+    registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT SOLICITUDES_SERVICIO_CAPACITACION_pk PRIMARY KEY (id_solicitud_servicio),
+    CONSTRAINT uq_solicitud_servicio_numero_orden UNIQUE (numero_orden_servicio),
+    CONSTRAINT ck_solicitud_servicio_estado CHECK (
+        estado IN ('PENDIENTE_ENVIO', 'ENVIADA', 'EN_PROCESO', 'ORDEN_EMITIDA', 'RECHAZADA', 'CANCELADA')
+    ),
+    CONSTRAINT ck_solicitud_servicio_participantes CHECK (cantidad_participantes > 0),
+    CONSTRAINT ck_solicitud_servicio_montos CHECK (
+        (monto_estimado IS NULL OR monto_estimado >= 0) AND (monto_adjudicado IS NULL OR monto_adjudicado >= 0)
+    ),
+    CONSTRAINT ck_solicitud_servicio_intentos CHECK (intentos_envio >= 0),
+    CONSTRAINT ck_solicitud_servicio_enviada CHECK (estado IN ('PENDIENTE_ENVIO', 'CANCELADA') OR enviada_en IS NOT NULL),
+    CONSTRAINT ck_solicitud_servicio_orden_emitida CHECK (
+        estado <> 'ORDEN_EMITIDA' OR (numero_orden_servicio IS NOT NULL AND proveedor_nombre IS NOT NULL)
+    )
 );
 -- Table: SUCURSALES
 CREATE TABLE SUCURSALES (
@@ -267,6 +322,14 @@ ADD CONSTRAINT REQUISITOS_CAPACITACION_CARGO_CARGOS FOREIGN KEY (id_cargo) REFER
 -- Reference: REQUISITOS_CAPACITACION_CARGO_CURSOS_CAPACITACION (table: REQUISITOS_CAPACITACION_CARGO)
 ALTER TABLE REQUISITOS_CAPACITACION_CARGO
 ADD CONSTRAINT REQUISITOS_CAPACITACION_CARGO_CURSOS_CAPACITACION FOREIGN KEY (id_curso) REFERENCES CURSOS_CAPACITACION (id_curso) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE CAPACITACIONES_CERTIFICACION
+ADD CONSTRAINT CAPACITACIONES_CERTIFICACION_SOLICITUDES_SERVICIO FOREIGN KEY (id_solicitud_servicio) REFERENCES SOLICITUDES_SERVICIO_CAPACITACION (id_solicitud_servicio) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE SOLICITUDES_SERVICIO_CAPACITACION
+ADD CONSTRAINT SOLICITUDES_SERVICIO_CAPACITACION_CURSOS_CAPACITACION FOREIGN KEY (id_curso) REFERENCES CURSOS_CAPACITACION (id_curso) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE SOLICITUDES_SERVICIO_CAPACITACION
+ADD CONSTRAINT SOLICITUDES_SERVICIO_CAPACITACION_EMPLEADOS FOREIGN KEY (id_empleado_solicitante) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE HISTORIAL_SOLICITUD_SERVICIO
+ADD CONSTRAINT HISTORIAL_SOLICITUD_SERVICIO_SOLICITUDES_SERVICIO FOREIGN KEY (id_solicitud_servicio) REFERENCES SOLICITUDES_SERVICIO_CAPACITACION (id_solicitud_servicio) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- End of file.
 
 -- KAN-125 (RF-19.1): historial de asignaciones cargo + sucursal por empleado.
@@ -455,3 +518,14 @@ SELECT e.id_empleado,
 CREATE INDEX IF NOT EXISTS ix_capacitacion_vencimiento
     ON CAPACITACIONES_CERTIFICACION (fecha_vencimiento)
     WHERE fecha_vencimiento IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS ix_capacitacion_solicitud_servicio
+    ON CAPACITACIONES_CERTIFICACION (id_solicitud_servicio)
+    WHERE id_solicitud_servicio IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_solicitud_servicio_pendiente_envio
+    ON SOLICITUDES_SERVICIO_CAPACITACION (proximo_intento_en)
+    WHERE estado = 'PENDIENTE_ENVIO';
+CREATE INDEX IF NOT EXISTS ix_solicitud_servicio_curso_estado
+    ON SOLICITUDES_SERVICIO_CAPACITACION (id_curso, estado);
+CREATE INDEX IF NOT EXISTS ix_historial_solicitud_servicio_fecha
+    ON HISTORIAL_SOLICITUD_SERVICIO (id_solicitud_servicio, registrado_en DESC);
