@@ -10,3 +10,5 @@ npm-debug.log*
 .env
 .env.local
 .env.*.local
+# llave de la cuenta de servicio de Pub/Sub
+credenciales/

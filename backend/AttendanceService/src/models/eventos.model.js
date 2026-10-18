@@ -6,10 +6,11 @@ const conEstado = (origen) => `
          es.codigo AS estado_codigo, es.nombre AS estado_nombre
   FROM ${origen} ev JOIN catalogos_estado_evento es USING (id_estado_evento)`;
 
-async function registrar(cliente, { topico, tipoEvento, idRol, carga }) {
+async function registrar(cliente, { idEvento = null, topico, tipoEvento, idRol, carga }) {
   await cliente.query(
-    "INSERT INTO eventos_salientes (topico, tipo_evento, id_rol, carga) VALUES ($1, $2, $3, $4)",
-    [topico, tipoEvento, idRol, carga]
+    `INSERT INTO eventos_salientes (id_evento, topico, tipo_evento, id_rol, carga)
+     VALUES (COALESCE($1::uuid, gen_random_uuid()), $2, $3, $4, $5)`,
+    [idEvento, topico, tipoEvento, idRol, carga]
   );
 }
 
@@ -58,21 +59,4 @@ async function listarPorRol(idRol) {
   return rows;
 }
 
-async function listar({ topico = null, estado = null, limite }) {
-  const { rows } = await pool.query(
-    `SELECT ev.*, es.codigo AS estado_codigo FROM eventos_salientes ev
-     JOIN catalogos_estado_evento es USING (id_estado_evento)
-     WHERE ($1::text IS NULL OR ev.topico = $1) AND ($2::text IS NULL OR es.codigo = $2)
-     ORDER BY ev.creado_en
-     LIMIT $3`,
-    [topico, estado, limite]
-  );
-  return rows;
-}
-
-async function obtener(id) {
-  const { rows } = await pool.query(`${conEstado("eventos_salientes")} WHERE ev.id_evento = $1`, [id]);
-  return rows[0];
-}
-
-module.exports = { registrar, reservarPendientes, marcarEntregado, marcarError, listarPorRol, listar, obtener };
+module.exports = { registrar, reservarPendientes, marcarEntregado, marcarError, listarPorRol };
