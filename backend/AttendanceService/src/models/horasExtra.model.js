@@ -36,7 +36,7 @@ const COLUMNAS_CALCULO = [
   ["id_marcaje_salida", "uuid"],
   ["entrada_en", "timestamptz"],
   ["salida_en", "timestamptz"],
-  ["es_feriado", "boolean"],
+  ["tipo_dia", "varchar"],
   ["minutos_trabajados", "int"],
   ["minutos_ordinarios", "int"],
   ["minutos_ordinarios_nocturnos", "int"],
@@ -44,14 +44,29 @@ const COLUMNAS_CALCULO = [
   ["minutos_anticipados", "int"],
   ["id_estado_horas_extra", "smallint"],
   ["minutos_extra_aprobados", "int"],
-  ["minutos_extra_simples", "int"],
-  ["minutos_extra_dobles", "int"],
-  ["minutos_extra_nocturnos", "int"],
+  ["minutos_extra_habil", "int"],
+  ["minutos_extra_domingo", "int"],
+  ["minutos_extra_feriado", "int"],
+  ["minutos_domingo", "int"],
   ["minutos_feriado", "int"],
+  ["minutos_descanso", "int"],
+  ["minutos_extra_nocturnos", "int"],
   ["minutos_nocturnos", "int"],
   ["id_autorizacion", "uuid"],
 ];
 const ACTUALIZABLES = COLUMNAS_CALCULO.map(([c]) => c).filter((c) => c !== "id_empleado" && c !== "fecha_jornada");
+
+// Minutos a pagar que cambian con la revisión.
+const COLUMNAS_PAGO = [
+  "minutos_extra_habil",
+  "minutos_extra_domingo",
+  "minutos_extra_feriado",
+  "minutos_domingo",
+  "minutos_feriado",
+  "minutos_descanso",
+  "minutos_extra_nocturnos",
+  "minutos_nocturnos",
+];
 
 // Guarda el cálculo de cada jornada. Una jornada consolidada o revisada a mano no se toca; las demás se actualizan
 // solo si cambió algo.
@@ -95,23 +110,10 @@ async function bloquear(cliente, id) {
 async function registrarRevision(cliente, id, { idEstado, aprobados, pago, idRevisor, nombreRevisor, comentario }) {
   await cliente.query(
     `UPDATE horas_jornada SET id_estado_horas_extra = $2, minutos_extra_aprobados = $3,
-            minutos_extra_simples = $4, minutos_extra_dobles = $5, minutos_extra_nocturnos = $6,
-            minutos_feriado = $7, minutos_nocturnos = $8,
-            id_revisor = $9, nombre_revisor = $10, comentario_revision = $11, revisada_en = CURRENT_TIMESTAMP
+            id_revisor = $4, nombre_revisor = $5, comentario_revision = $6, revisada_en = CURRENT_TIMESTAMP,
+            ${COLUMNAS_PAGO.map((c, i) => `${c} = $${i + 7}`).join(", ")}
      WHERE id_horas_jornada = $1`,
-    [
-      id,
-      idEstado,
-      aprobados,
-      pago.minutos_extra_simples,
-      pago.minutos_extra_dobles,
-      pago.minutos_extra_nocturnos,
-      pago.minutos_feriado,
-      pago.minutos_nocturnos,
-      idRevisor,
-      nombreRevisor,
-      comentario,
-    ]
+    [id, idEstado, aprobados, idRevisor, nombreRevisor, comentario, ...COLUMNAS_PAGO.map((c) => pago[c])]
   );
 }
 
@@ -173,10 +175,9 @@ async function totalizar(db, desde, hasta, ids = null) {
             SUM(minutos_extra)::int AS minutos_extra,
             SUM(minutos_anticipados)::int AS minutos_anticipados,
             COALESCE(SUM(minutos_extra_aprobados), 0)::int AS minutos_extra_aprobados,
-            SUM(minutos_extra_simples)::int AS minutos_extra_simples,
-            SUM(minutos_extra_dobles)::int AS minutos_extra_dobles,
-            SUM(minutos_extra_nocturnos)::int AS minutos_extra_nocturnos,
-            SUM(minutos_feriado)::int AS minutos_feriado,
+            ${COLUMNAS_PAGO.filter((c) => c !== "minutos_nocturnos")
+              .map((c) => `SUM(${c})::int AS ${c}`)
+              .join(", ")},
             COUNT(*) FILTER (WHERE id_estado_horas_extra = 2)::int AS pendientes
      FROM horas_jornada
      WHERE fecha_jornada BETWEEN $1 AND $2 AND ($3::uuid[] IS NULL OR id_empleado = ANY($3::uuid[]))

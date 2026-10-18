@@ -305,7 +305,7 @@ CREATE TABLE CATALOGOS_ESTADO_HORAS_EXTRA (
     CONSTRAINT uq_estado_horas_extra_codigo UNIQUE (codigo)
 );
 -- Tabla: FERIADOS
--- Feriados nacionales: lo trabajado en ellos se paga doble.
+-- Feriados nacionales: lo trabajado en ellos se paga con recargo del 100%.
 CREATE TABLE FERIADOS (
     id_feriado UUID NOT NULL DEFAULT gen_random_uuid(),
     fecha date NOT NULL,
@@ -343,7 +343,8 @@ CREATE TABLE AUTORIZACIONES_HORAS_EXTRA (
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT AUTORIZACIONES_HORAS_EXTRA_pk PRIMARY KEY (id_autorizacion),
     CONSTRAINT uq_autorizacion_empleado_fecha UNIQUE (id_empleado, fecha_jornada),
-    CONSTRAINT chk_autorizacion_minutos CHECK (minutos_autorizados BETWEEN 1 AND 1440)
+    -- Con turno, hasta 2 horas extra; sin turno, la jornada de 8 horas y 2 extra.
+    CONSTRAINT chk_autorizacion_minutos CHECK (minutos_autorizados BETWEEN 1 AND 600)
 );
 CREATE INDEX idx_autorizaciones_horas_extra_fecha ON AUTORIZACIONES_HORAS_EXTRA (fecha_jornada);
 -- Tabla: HORAS_JORNADA
@@ -363,7 +364,8 @@ CREATE TABLE HORAS_JORNADA (
     id_marcaje_salida UUID NOT NULL,
     entrada_en TIMESTAMPTZ NOT NULL,
     salida_en TIMESTAMPTZ NOT NULL,
-    es_feriado boolean NOT NULL DEFAULT FALSE,
+    -- HABIL, DOMINGO o FERIADO (un feriado en domingo cuenta como domingo).
+    tipo_dia varchar(10) NOT NULL DEFAULT 'HABIL',
     minutos_trabajados int NOT NULL DEFAULT 0,
     minutos_ordinarios int NOT NULL DEFAULT 0,
     minutos_ordinarios_nocturnos int NOT NULL DEFAULT 0,
@@ -373,11 +375,16 @@ CREATE TABLE HORAS_JORNADA (
     minutos_anticipados int NOT NULL DEFAULT 0,
     id_estado_horas_extra SMALLINT NOT NULL DEFAULT 1,
     minutos_extra_aprobados int NULL,
-    -- Lo que se paga según lo aprobado.
-    minutos_extra_simples int NOT NULL DEFAULT 0,
-    minutos_extra_dobles int NOT NULL DEFAULT 0,
-    minutos_extra_nocturnos int NOT NULL DEFAULT 0,
+    -- Lo que se paga según lo aprobado, separado por tipo de día. Las extra no pasan de 2 horas por día.
+    minutos_extra_habil int NOT NULL DEFAULT 0,
+    minutos_extra_domingo int NOT NULL DEFAULT 0,
+    minutos_extra_feriado int NOT NULL DEFAULT 0,
+    -- Tiempo ordinario trabajado en domingo o feriado.
+    minutos_domingo int NOT NULL DEFAULT 0,
     minutos_feriado int NOT NULL DEFAULT 0,
+    -- Sin turno en día hábil: las primeras 8 horas aprobadas.
+    minutos_descanso int NOT NULL DEFAULT 0,
+    minutos_extra_nocturnos int NOT NULL DEFAULT 0,
     minutos_nocturnos int NOT NULL DEFAULT 0,
     -- Autorización previa aplicada al calcular (aprobación automática hasta lo autorizado).
     id_autorizacion UUID NULL,
@@ -391,10 +398,16 @@ CREATE TABLE HORAS_JORNADA (
     CONSTRAINT uq_horas_jornada_empleado_fecha UNIQUE (id_empleado, fecha_jornada),
     CONSTRAINT chk_horas_jornada_marcajes CHECK (salida_en >= entrada_en),
     CONSTRAINT chk_horas_jornada_turno CHECK ((inicio_programado IS NULL) = (fin_programado IS NULL)),
+    CONSTRAINT chk_horas_jornada_tipo_dia CHECK (tipo_dia IN ('HABIL', 'DOMINGO', 'FERIADO')),
     CONSTRAINT chk_horas_jornada_minutos CHECK (
         minutos_trabajados >= 0 AND minutos_ordinarios >= 0 AND minutos_ordinarios_nocturnos >= 0
-        AND minutos_extra >= 0 AND minutos_anticipados >= 0 AND minutos_extra_simples >= 0
-        AND minutos_extra_dobles >= 0 AND minutos_extra_nocturnos >= 0 AND minutos_feriado >= 0 AND minutos_nocturnos >= 0
+        AND minutos_extra >= 0 AND minutos_anticipados >= 0 AND minutos_domingo >= 0 AND minutos_feriado >= 0
+        AND minutos_descanso >= 0 AND minutos_extra_nocturnos >= 0 AND minutos_nocturnos >= 0
+    ),
+    -- Ley General del Trabajo, art. 50: hasta 2 horas extra por día.
+    CONSTRAINT chk_horas_jornada_extra_dia CHECK (
+        minutos_extra_habil >= 0 AND minutos_extra_domingo >= 0 AND minutos_extra_feriado >= 0
+        AND minutos_extra_habil + minutos_extra_domingo + minutos_extra_feriado <= 120
     ),
     CONSTRAINT chk_horas_jornada_aprobados CHECK (
         minutos_extra_aprobados IS NULL OR minutos_extra_aprobados BETWEEN 0 AND minutos_extra + minutos_anticipados

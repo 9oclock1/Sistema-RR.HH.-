@@ -10,11 +10,21 @@ const DESFASE_MINUTOS = 4 * 60;
 // Franja nocturna legal: de 20:00 a 06:00.
 const INICIO_NOCHE = 20 * 60;
 const DURACION_NOCHE = 10 * 60;
-// Ley General del Trabajo: hasta 2 horas extra por día; lo que pase de ahí se paga como extra doble.
-const MINUTOS_EXTRA_SIMPLES_DIA = 120;
-// Un turno no dura más de 24 horas: tampoco se autorizan más horas extra que eso.
-const MAXIMO_MINUTOS_EXTRA = MINUTOS_DIA;
+// Ley General del Trabajo: jornada de 8 horas (art. 46) y hasta 2 horas extra por día (art. 50).
+// Lo que pase de 2 horas extra no se paga.
+const MINUTOS_JORNADA_DIA = 480;
+const MINUTOS_EXTRA_DIA = 120;
+// Sin turno (descanso) se aprueba como mucho una jornada más sus 2 horas extra.
+const MAXIMO_MINUTOS_AUTORIZABLES = MINUTOS_JORNADA_DIA + MINUTOS_EXTRA_DIA;
 const MAX_COMENTARIO = 500;
+
+// Domingo: recargo del 200%; feriado: 100%. Un feriado en domingo se paga como domingo.
+const TIPO_DIA = { HABIL: "HABIL", DOMINGO: "DOMINGO", FERIADO: "FERIADO" };
+
+function tipoDia(fecha, esFeriado = false) {
+  if (new Date(`${fecha}T00:00:00Z`).getUTCDay() === 0) return TIPO_DIA.DOMINGO;
+  return esFeriado ? TIPO_DIA.FERIADO : TIPO_DIA.HABIL;
+}
 
 const aMinutos = (valor) => Math.floor(new Date(valor).getTime() / 60000);
 const largo = ([desde, hasta]) => Math.max(0, hasta - desde);
@@ -42,7 +52,7 @@ const tramoValido = (tramo, minimo) => (largo(tramo) > 0 && largo(tramo) >= mini
 
 // Separa la jornada marcada en tiempo ordinario (dentro del turno, menos el refrigerio), horas extra después
 // del fin del turno y tiempo anticipado antes del inicio, que solo cuenta si se autoriza.
-// Sin turno programado (descanso o día libre), todo el tiempo trabajado es extra.
+// Sin turno programado (descanso o día libre), todo el tiempo trabajado queda por aprobar como extra.
 // Todo en minutos completos, como se muestran las horas al empleado.
 function segregarJornada({ entrada, salida, inicioProgramado = null, finProgramado = null, minutosRefrigerio = 0 }, minimo = 0) {
   const e = aMinutos(entrada);
@@ -52,6 +62,7 @@ function segregarJornada({ entrada, salida, inicioProgramado = null, finPrograma
   if (inicioProgramado == null || finProgramado == null) {
     const extra = tramoValido([e, s], minimo);
     return {
+      con_turno: false,
       minutos_trabajados: trabajados,
       minutos_ordinarios: 0,
       minutos_ordinarios_nocturnos: 0,
@@ -74,6 +85,7 @@ function segregarJornada({ entrada, salida, inicioProgramado = null, finPrograma
   const antes = tramoValido([e, Math.min(s, inicio)], minimo);
 
   return {
+    con_turno: true,
     minutos_trabajados: trabajados,
     minutos_ordinarios: enTurno - refrigerio,
     minutos_ordinarios_nocturnos: nocturnoEnTurno - refrigerioNocturno,
@@ -101,36 +113,63 @@ function tramosAprobados({ tramos_extra, tramo_anticipado }, aprobados) {
   return tramos;
 }
 
-const maximoAprobable = (calculo) => calculo.minutos_extra + calculo.minutos_anticipados;
+// Tope legal de lo que se puede aprobar: 2 horas extra con turno; sin turno, la jornada y sus 2 horas extra.
+const topeLegal = (calculo) => (calculo.con_turno ? MINUTOS_EXTRA_DIA : MAXIMO_MINUTOS_AUTORIZABLES);
+const maximoAprobable = (calculo) => Math.min(calculo.minutos_extra + calculo.minutos_anticipados, topeLegal(calculo));
+// Lo que se aprueba si el supervisor no indica minutos: lo marcado después del turno, hasta el tope.
+const minutosPropuestos = (calculo) => Math.min(calculo.minutos_extra, maximoAprobable(calculo));
 
-// Lo que se paga de la jornada: horas extra simples (hasta 2 por día), dobles (el resto, o todas en feriado)
-// y minutos nocturnos (ordinarios más los extra aprobados dentro de la franja). En feriado, el tiempo ordinario
-// trabajado también se paga doble.
-function liquidarJornada(calculo, { aprobados = 0, esFeriado = false } = {}) {
+// Separa los tramos en los primeros `minutos` y el resto.
+function partirTramos(tramos, minutos) {
+  const primeros = [];
+  const resto = [];
+  let falta = minutos;
+  for (const [desde, hasta] of tramos) {
+    const corte = Math.min(hasta, desde + Math.max(0, falta));
+    if (corte > desde) primeros.push([desde, corte]);
+    if (hasta > corte) resto.push([corte, hasta]);
+    falta -= corte - desde;
+  }
+  return [primeros, resto];
+}
+
+const sumarNocturnos = (tramos) => tramos.reduce((total, tramo) => total + minutosNocturnos(...tramo), 0);
+
+// Lo que se paga de la jornada, separado para planillas según el día:
+// - extra aprobadas (hasta 2 h): en día hábil, en domingo o en feriado;
+// - tiempo ordinario trabajado en domingo o en feriado;
+// - sin turno, las primeras 8 h aprobadas son la jornada del día (descanso, domingo o feriado) y lo que sigue es extra;
+// - minutos nocturnos: ordinarios más los aprobados dentro de la franja.
+function liquidarJornada(calculo, { aprobados = 0, tipoDia: tipo = TIPO_DIA.HABIL } = {}) {
   const pagables = Math.min(Math.max(0, aprobados), maximoAprobable(calculo));
-  const extraNocturnos = tramosAprobados(calculo, pagables).reduce((total, tramo) => total + minutosNocturnos(...tramo), 0);
-  const simples = esFeriado ? 0 : Math.min(pagables, MINUTOS_EXTRA_SIMPLES_DIA);
-  const feriado = esFeriado ? calculo.minutos_ordinarios : 0;
+  const enJornada = calculo.con_turno ? 0 : Math.min(pagables, MINUTOS_JORNADA_DIA);
+  const [tramosJornada, tramosExtra] = partirTramos(tramosAprobados(calculo, pagables), enJornada);
+  const extra = pagables - enJornada;
+  const ordinarios = calculo.con_turno ? calculo.minutos_ordinarios : enJornada;
+  const extraNocturnos = sumarNocturnos(tramosExtra);
   return {
     minutos_extra_pagables: pagables,
-    minutos_extra_simples: simples,
-    minutos_extra_dobles: pagables - simples + feriado,
+    minutos_extra_habil: tipo === TIPO_DIA.HABIL ? extra : 0,
+    minutos_extra_domingo: tipo === TIPO_DIA.DOMINGO ? extra : 0,
+    minutos_extra_feriado: tipo === TIPO_DIA.FERIADO ? extra : 0,
+    minutos_domingo: tipo === TIPO_DIA.DOMINGO ? ordinarios : 0,
+    minutos_feriado: tipo === TIPO_DIA.FERIADO ? ordinarios : 0,
+    minutos_descanso: tipo === TIPO_DIA.HABIL ? enJornada : 0,
     minutos_extra_nocturnos: extraNocturnos,
-    minutos_feriado: feriado,
-    minutos_nocturnos: calculo.minutos_ordinarios_nocturnos + extraNocturnos,
+    minutos_nocturnos: calculo.minutos_ordinarios_nocturnos + sumarNocturnos(tramosJornada) + extraNocturnos,
   };
 }
 
 // Estado inicial de la jornada calculada: con tiempo fuera del turno queda pendiente de revisión.
-// Con autorización previa se aprueba sola hasta lo autorizado; si eso no coincide con lo marcado
-// después del turno, queda como ajustada.
+// Con autorización previa se aprueba sola hasta lo autorizado (y el tope legal); si eso no coincide con
+// lo marcado después del turno, queda como ajustada.
 function estadoInicial(calculo, autorizacion = null) {
   const maximo = maximoAprobable(calculo);
   if (maximo === 0) return { idEstado: ESTADO_HORAS_EXTRA.SIN_EXTRA, aprobados: null };
   if (!autorizacion) return { idEstado: ESTADO_HORAS_EXTRA.PENDIENTE, aprobados: null };
   const aprobados = Math.min(autorizacion.minutos_autorizados, maximo);
   return {
-    idEstado: aprobados === calculo.minutos_extra ? ESTADO_HORAS_EXTRA.APROBADA : ESTADO_HORAS_EXTRA.AJUSTADA,
+    idEstado: aprobados === minutosPropuestos(calculo) ? ESTADO_HORAS_EXTRA.APROBADA : ESTADO_HORAS_EXTRA.AJUSTADA,
     aprobados,
   };
 }
@@ -145,6 +184,14 @@ const leerComentario = (valor, campo, errores) => {
   return texto;
 };
 
+function mensajeMaximo(calculo, maximo) {
+  const marcado = calculo.minutos_extra + calculo.minutos_anticipados;
+  if (marcado <= topeLegal(calculo)) return `Apruebe entre 1 y ${maximo} minutos: lo marcado fuera del turno.`;
+  return calculo.con_turno
+    ? `Apruebe entre 1 y ${maximo} minutos: la ley permite hasta 2 horas extra por día.`
+    : `Apruebe entre 1 y ${maximo} minutos: sin turno, la ley permite la jornada de 8 horas y hasta 2 horas extra.`;
+}
+
 // Decisión del supervisor: aprobar (lo marcado o un ajuste) o rechazar. Ajustar o rechazar exige comentario.
 function validarRevision(cuerpo, calculo) {
   const { decision, minutos_aprobados, comentario } = cuerpo ?? {};
@@ -156,11 +203,12 @@ function validarRevision(cuerpo, calculo) {
   }
 
   const maximo = maximoAprobable(calculo);
-  const aprobados = decision === "APROBADA" ? (minutos_aprobados ?? calculo.minutos_extra) : 0;
+  const propuestos = minutosPropuestos(calculo);
+  const aprobados = decision === "APROBADA" ? (minutos_aprobados ?? propuestos) : 0;
   if (decision === "APROBADA" && (!Number.isInteger(aprobados) || aprobados <= 0 || aprobados > maximo)) {
-    errores.push({ campo: "minutos_aprobados", mensaje: `Apruebe entre 1 y ${maximo} minutos: lo marcado fuera del turno.` });
+    errores.push({ campo: "minutos_aprobados", mensaje: mensajeMaximo(calculo, maximo) });
   }
-  const ajustada = decision === "APROBADA" && aprobados !== calculo.minutos_extra;
+  const ajustada = decision === "APROBADA" && aprobados !== propuestos;
   if ((decision === "RECHAZADA" || ajustada) && !texto && !errores.some((e) => e.campo === "comentario")) {
     errores.push({
       campo: "comentario",
@@ -186,8 +234,12 @@ function validarAutorizacion(cuerpo, hoy) {
   else if (fecha_jornada < hoy) {
     errores.push({ campo: "fecha_jornada", mensaje: "La autorización es previa: elija hoy o un día posterior." });
   }
-  if (!Number.isInteger(minutos_autorizados) || minutos_autorizados <= 0 || minutos_autorizados > MAXIMO_MINUTOS_EXTRA) {
-    errores.push({ campo: "minutos_autorizados", mensaje: `Autorice entre 1 y ${MAXIMO_MINUTOS_EXTRA} minutos.` });
+  if (
+    !Number.isInteger(minutos_autorizados) ||
+    minutos_autorizados <= 0 ||
+    minutos_autorizados > MAXIMO_MINUTOS_AUTORIZABLES
+  ) {
+    errores.push({ campo: "minutos_autorizados", mensaje: `Autorice entre 1 y ${MAXIMO_MINUTOS_AUTORIZABLES} minutos.` });
   }
   const texto = leerComentario(motivo, "motivo", errores);
   if (!texto && !errores.some((e) => e.campo === "motivo")) {
@@ -205,6 +257,7 @@ function calculoDesdeFila(fila) {
   const desdeExtra = conTurno ? Math.max(e, aMinutos(fila.fin_programado)) : e;
   const hastaAnticipado = conTurno ? Math.min(s, aMinutos(fila.inicio_programado)) : null;
   return {
+    con_turno: conTurno,
     minutos_ordinarios: fila.minutos_ordinarios,
     minutos_ordinarios_nocturnos: fila.minutos_ordinarios_nocturnos,
     minutos_extra: fila.minutos_extra,
@@ -216,13 +269,17 @@ function calculoDesdeFila(fila) {
 
 module.exports = {
   ESTADO_HORAS_EXTRA,
-  MINUTOS_EXTRA_SIMPLES_DIA,
-  MAXIMO_MINUTOS_EXTRA,
+  TIPO_DIA,
+  MINUTOS_JORNADA_DIA,
+  MINUTOS_EXTRA_DIA,
+  MAXIMO_MINUTOS_AUTORIZABLES,
+  tipoDia,
   minutosNocturnos,
   minutosMinimosExtra,
   segregarJornada,
   tramosAprobados,
   maximoAprobable,
+  minutosPropuestos,
   liquidarJornada,
   estadoInicial,
   validarRevision,

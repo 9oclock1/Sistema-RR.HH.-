@@ -11,6 +11,8 @@ const { TIPO_EVENTO } = require("../utils/eventos");
 const { horarioProgramado } = require("../utils/novedades");
 const {
   ESTADO_HORAS_EXTRA,
+  MINUTOS_EXTRA_DIA,
+  tipoDia,
   minutosMinimosExtra,
   segregarJornada,
   liquidarJornada,
@@ -18,6 +20,7 @@ const {
   validarRevision,
   validarAutorizacion,
   calculoDesdeFila,
+  maximoAprobable,
 } = require("../utils/horasExtra");
 
 const DIAS_MAXIMOS_CONSULTA = 92;
@@ -39,7 +42,7 @@ function agruparJornadas(marcajes) {
 
 // Fila de HORAS_JORNADA de una jornada con entrada y salida, con la copia de su turno programado
 // y, si la hay, la autorización previa del día.
-function filaCalculo(jornada, turno, { esFeriado, minimo, autorizacion = null }) {
+function filaCalculo(jornada, turno, { tipo, minimo, autorizacion = null }) {
   const conTurno = turno && !turno.descanso;
   const horario = conTurno ? horarioProgramado(turno, jornada.fecha) : null;
   const calculo = segregarJornada(
@@ -53,7 +56,7 @@ function filaCalculo(jornada, turno, { esFeriado, minimo, autorizacion = null })
     minimo
   );
   const { idEstado, aprobados } = estadoInicial(calculo, autorizacion);
-  const pago = liquidarJornada(calculo, { aprobados: aprobados ?? 0, esFeriado });
+  const pago = liquidarJornada(calculo, { aprobados: aprobados ?? 0, tipoDia: tipo });
   return {
     id_empleado: jornada.id_empleado,
     fecha_jornada: jornada.fecha,
@@ -67,7 +70,7 @@ function filaCalculo(jornada, turno, { esFeriado, minimo, autorizacion = null })
     id_marcaje_salida: jornada.salida.id_marcaje,
     entrada_en: jornada.entrada.fecha_hora_marcaje,
     salida_en: jornada.salida.fecha_hora_marcaje,
-    es_feriado: esFeriado,
+    tipo_dia: tipo,
     minutos_trabajados: calculo.minutos_trabajados,
     minutos_ordinarios: calculo.minutos_ordinarios,
     minutos_ordinarios_nocturnos: calculo.minutos_ordinarios_nocturnos,
@@ -97,7 +100,7 @@ async function calcular({ desde, hasta, ids = null }) {
   const filas = jornadas.map((j) => {
     const clave = `${j.id_empleado}|${j.fecha}`;
     return filaCalculo(j, turnoDe.get(clave), {
-      esFeriado: esFeriado.has(j.fecha),
+      tipo: tipoDia(j.fecha, esFeriado.has(j.fecha)),
       minimo,
       autorizacion: autorizacionDe.get(clave),
     });
@@ -150,7 +153,8 @@ const resumirJornada = (h, empleado) => ({
   id_horas_jornada: h.id_horas_jornada,
   empleado,
   fecha_jornada: h.fecha_jornada,
-  feriado: h.es_feriado ? (h.nombre_feriado ?? "Feriado") : null,
+  tipo_dia: h.tipo_dia,
+  feriado: h.nombre_feriado ?? null,
   turno: h.inicio_programado
     ? {
         nombre: h.nombre_turno,
@@ -166,6 +170,8 @@ const resumirJornada = (h, empleado) => ({
   minutos_ordinarios_nocturnos: h.minutos_ordinarios_nocturnos,
   minutos_extra: h.minutos_extra,
   minutos_anticipados: h.minutos_anticipados,
+  // Tope legal de lo aprobable: 2 h extra con turno; sin turno, la jornada de 8 h y 2 h extra.
+  maximo_aprobable: maximoAprobable(calculoDesdeFila(h)),
   estado: { codigo: h.estado_codigo, nombre: h.estado_nombre },
   minutos_extra_aprobados: h.minutos_extra_aprobados,
   autorizacion: h.id_autorizacion
@@ -184,30 +190,37 @@ const resumirJornada = (h, empleado) => ({
         revisada_en: h.revisada_en,
       }
     : null,
-  pago: {
-    minutos_extra_simples: h.minutos_extra_simples,
-    minutos_extra_dobles: h.minutos_extra_dobles,
-    minutos_extra_nocturnos: h.minutos_extra_nocturnos,
-    minutos_feriado: h.minutos_feriado,
-    minutos_nocturnos: h.minutos_nocturnos,
-  },
+  pago: Object.fromEntries(CAMPOS_PAGO.map((c) => [c, h[c]])),
   consolidada: h.id_periodo !== null,
   calculada_en: h.calculada_en,
 });
+
+// Minutos a pagar de cada jornada, separados para planillas.
+const CAMPOS_PAGO = [
+  "minutos_extra_habil",
+  "minutos_extra_domingo",
+  "minutos_extra_feriado",
+  "minutos_domingo",
+  "minutos_feriado",
+  "minutos_descanso",
+  "minutos_extra_nocturnos",
+  "minutos_nocturnos",
+];
+const CAMPOS_TOTALES = [
+  "minutos_ordinarios",
+  "minutos_nocturnos",
+  "minutos_extra",
+  "minutos_anticipados",
+  "minutos_extra_aprobados",
+  ...CAMPOS_PAGO.filter((c) => c !== "minutos_nocturnos"),
+];
 
 const sumar = (filas, campo) => filas.reduce((total, f) => total + (f[campo] ?? 0), 0);
 
 function resumirTotales(filas) {
   return {
     jornadas: filas.length,
-    minutos_ordinarios: sumar(filas, "minutos_ordinarios"),
-    minutos_nocturnos: sumar(filas, "minutos_nocturnos"),
-    minutos_extra: sumar(filas, "minutos_extra"),
-    minutos_anticipados: sumar(filas, "minutos_anticipados"),
-    minutos_extra_aprobados: sumar(filas, "minutos_extra_aprobados"),
-    minutos_extra_simples: sumar(filas, "minutos_extra_simples"),
-    minutos_extra_dobles: sumar(filas, "minutos_extra_dobles"),
-    minutos_feriado: sumar(filas, "minutos_feriado"),
+    ...Object.fromEntries(CAMPOS_TOTALES.map((c) => [c, sumar(filas, c)])),
     pendientes: filas.filter((f) => f.id_estado_horas_extra === ESTADO_HORAS_EXTRA.PENDIENTE).length,
   };
 }
@@ -254,14 +267,7 @@ async function personalDe(idSucursal, idDepartamento) {
 const filaResumen = (t, empleado) => ({
   empleado,
   jornadas: t.jornadas,
-  minutos_ordinarios: t.minutos_ordinarios,
-  minutos_nocturnos: t.minutos_nocturnos,
-  minutos_extra: t.minutos_extra,
-  minutos_anticipados: t.minutos_anticipados,
-  minutos_extra_aprobados: t.minutos_extra_aprobados,
-  minutos_extra_simples: t.minutos_extra_simples,
-  minutos_extra_dobles: t.minutos_extra_dobles,
-  minutos_feriado: t.minutos_feriado,
+  ...Object.fromEntries(CAMPOS_TOTALES.map((c) => [c, t[c]])),
   pendientes: t.pendientes,
 });
 
@@ -272,7 +278,7 @@ async function armarResumen(db, { desde, hasta, ids, porId }) {
     .sort((a, b) => a.empleado.nombre_completo.localeCompare(b.empleado.nombre_completo, "es"));
 }
 
-// Totales del periodo por empleado para planillas: horas extra simples, dobles y nocturnas.
+// Totales del periodo por empleado para planillas: horas extra, domingos, feriados, descansos y nocturnas.
 async function resumen(filtros) {
   const { hoy } = await modelo.momentoActual();
   const { desde, hasta, idSucursal, idDepartamento } = leerFiltros(filtros, hoy, { sucursalObligatoria: false });
@@ -299,9 +305,12 @@ function aCsv({ desde, hasta, empleados: filas }) {
     "Jornadas",
     "Horas ordinarias",
     "Horas nocturnas",
-    "Horas extra simples",
-    "Horas extra dobles (incluye feriados)",
+    "Horas extra en día hábil",
+    "Horas trabajadas en domingo",
+    "Horas extra en domingo",
     "Horas trabajadas en feriado",
+    "Horas extra en feriado",
+    "Horas trabajadas en descanso",
     "Horas extra marcadas",
     "Horas extra aprobadas",
     "Jornadas por revisar",
@@ -314,9 +323,12 @@ function aCsv({ desde, hasta, empleados: filas }) {
       f.jornadas,
       horas(f.minutos_ordinarios),
       horas(f.minutos_nocturnos),
-      horas(f.minutos_extra_simples),
-      horas(f.minutos_extra_dobles),
+      horas(f.minutos_extra_habil),
+      horas(f.minutos_domingo),
+      horas(f.minutos_extra_domingo),
       horas(f.minutos_feriado),
+      horas(f.minutos_extra_feriado),
+      horas(f.minutos_descanso),
       horas(f.minutos_extra + f.minutos_anticipados),
       horas(f.minutos_extra_aprobados),
       f.pendientes,
@@ -398,9 +410,7 @@ async function consolidar(idResponsable, cuerpo = {}) {
           jornadas: t.jornadas,
           minutos_ordinarios: t.minutos_ordinarios,
           minutos_nocturnos: t.minutos_nocturnos,
-          minutos_extra_simples: t.minutos_extra_simples,
-          minutos_extra_dobles: t.minutos_extra_dobles,
-          minutos_feriado: t.minutos_feriado,
+          ...Object.fromEntries(CAMPOS_PAGO.filter((c) => c !== "minutos_nocturnos").map((c) => [c, t[c]])),
         })),
       });
       return { periodo: cerrado, filas: totales };
@@ -435,7 +445,7 @@ async function revisar(idHorasJornada, idRevisor, cuerpo) {
     }
     const calculo = calculoDesdeFila(fila);
     const { idEstado, aprobados, comentario } = validarRevision(cuerpo, calculo);
-    const pago = liquidarJornada(calculo, { aprobados, esFeriado: fila.es_feriado });
+    const pago = liquidarJornada(calculo, { aprobados, tipoDia: fila.tipo_dia });
     await modelo.registrarRevision(cliente, id, { idEstado, aprobados, pago, idRevisor, nombreRevisor, comentario });
   });
 
@@ -464,6 +474,17 @@ async function autorizar(idAutorizador, cuerpo) {
   if (datos.idEmpleado === idAutorizador) throw new ErrorApp(403, "No puede autorizar sus propias horas extra.");
   const colaborador = await empleados.obtener(datos.idEmpleado);
   if (!colaborador) throw new ErrorApp(404, "Colaborador no encontrado");
+  if (datos.minutos > MINUTOS_EXTRA_DIA) {
+    const [turno] = await programacion.listarProgramacion(datos.fecha, datos.fecha, [datos.idEmpleado]);
+    if (turno && !turno.descanso) {
+      throw new ErrorApp(400, "Datos de autorización inválidos", [
+        {
+          campo: "minutos_autorizados",
+          mensaje: `Ese día tiene turno: autorice como máximo ${MINUTOS_EXTRA_DIA} minutos, la ley permite hasta 2 horas extra por día.`,
+        },
+      ]);
+    }
+  }
 
   const autorizacion = await modelo.guardarAutorizacion({ ...datos, idAutorizador, nombreAutorizador });
   // Si la jornada ya terminó (hoy, antes de la revisión), se aprueba con lo autorizado.

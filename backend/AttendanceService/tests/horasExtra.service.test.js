@@ -73,7 +73,8 @@ test("calcula solo jornadas con entrada y salida, con la copia del turno", async
   assert.equal(fila.minutos_extra, 150);
   assert.equal(fila.id_estado_horas_extra, ESTADO_HORAS_EXTRA.PENDIENTE);
   assert.equal(fila.minutos_extra_aprobados, null);
-  assert.equal(fila.minutos_extra_simples, 0);
+  assert.equal(fila.tipo_dia, "HABIL");
+  assert.equal(fila.minutos_extra_habil, 0);
   assert.deepEqual(programacion.listarProgramacion.mock.calls[0].arguments, ["2026-10-14", "2026-10-14", [ANA]]);
 });
 
@@ -97,7 +98,7 @@ test("en día de descanso o sin turno todo lo trabajado queda por revisar como e
   assert.equal(fila.minutos_extra, 240);
 });
 
-test("en feriado lo trabajado en el turno se paga doble aunque no haya extra", async () => {
+test("en feriado lo trabajado en el turno se separa aunque no haya extra", async () => {
   modelo.listarMarcajes.mock.mockImplementation(async () => [
     marca(ANA, "ENTRADA", "2026-11-02", "2026-11-02T08:00"),
     marca(ANA, "SALIDA", "2026-11-02", "2026-11-02T16:00"),
@@ -106,10 +107,31 @@ test("en feriado lo trabajado en el turno se paga doble aunque no haya extra", a
   modelo.listarFeriados.mock.mockImplementation(async () => [{ fecha: "2026-11-02", nombre: "Todos Santos" }]);
   await servicio.calcular({ desde: "2026-11-02", hasta: "2026-11-02" });
   const [fila] = guardar.mock.calls[0].arguments[0];
-  assert.equal(fila.es_feriado, true);
+  assert.equal(fila.tipo_dia, "FERIADO");
   assert.equal(fila.id_estado_horas_extra, ESTADO_HORAS_EXTRA.SIN_EXTRA);
   assert.equal(fila.minutos_feriado, 420);
-  assert.equal(fila.minutos_extra_dobles, 420);
+  assert.equal(fila.minutos_extra_feriado, 0);
+  assert.equal(fila.minutos_domingo, 0);
+});
+
+test("en domingo lo trabajado en el turno va aparte, también si es feriado", async () => {
+  for (const [fecha, feriados] of [
+    ["2026-10-18", []],
+    ["2026-06-21", [{ fecha: "2026-06-21", nombre: "Año Nuevo Andino Amazónico" }]],
+  ]) {
+    guardar.mock.resetCalls();
+    modelo.listarMarcajes.mock.mockImplementation(async () => [
+      marca(ANA, "ENTRADA", fecha, `${fecha}T08:00`),
+      marca(ANA, "SALIDA", fecha, `${fecha}T16:00`),
+    ]);
+    programacion.listarProgramacion.mock.mockImplementation(async () => [turno(ANA, fecha)]);
+    modelo.listarFeriados.mock.mockImplementation(async () => feriados);
+    await servicio.calcular({ desde: fecha, hasta: fecha });
+    const [fila] = guardar.mock.calls[0].arguments[0];
+    assert.equal(fila.tipo_dia, "DOMINGO", fecha);
+    assert.equal(fila.minutos_domingo, 420, fecha);
+    assert.equal(fila.minutos_feriado, 0, fecha);
+  }
 });
 
 test("el desglose exige la sucursal y valida fechas, rango y estado", async () => {
@@ -138,7 +160,7 @@ const filaGuardada = (extra = {}) => ({
   id_horas_jornada: "cccccccc-0000-4000-8000-000000000001",
   id_empleado: ANA,
   fecha_jornada: "2026-10-14",
-  es_feriado: false,
+  tipo_dia: "HABIL",
   nombre_feriado: null,
   nombre_turno: "Mañana",
   inicio_programado: new Date("2026-10-14T12:00:00Z"),
@@ -155,10 +177,13 @@ const filaGuardada = (extra = {}) => ({
   estado_codigo: "PENDIENTE",
   estado_nombre: "Pendiente de revisión",
   minutos_extra_aprobados: null,
-  minutos_extra_simples: 0,
-  minutos_extra_dobles: 0,
-  minutos_extra_nocturnos: 0,
+  minutos_extra_habil: 0,
+  minutos_extra_domingo: 0,
+  minutos_extra_feriado: 0,
+  minutos_domingo: 0,
   minutos_feriado: 0,
+  minutos_descanso: 0,
+  minutos_extra_nocturnos: 0,
   minutos_nocturnos: 0,
   id_periodo: null,
   ...extra,
@@ -176,6 +201,9 @@ test("el filtro de estado deja el resumen con todas las jornadas del rango", asy
   assert.equal(datos.resumen.jornadas, 2);
   assert.equal(datos.resumen.pendientes, 1);
   assert.equal(datos.resumen.minutos_extra, 150);
+  assert.equal(datos.jornadas[0].tipo_dia, "HABIL");
+  assert.equal(datos.jornadas[0].maximo_aprobable, 120);
+  assert.equal(datos.jornadas[0].pago.minutos_extra_habil, 0);
 });
 
 test("el CSV usa punto y coma, horas con coma decimal y escapa los textos", () => {
@@ -191,9 +219,12 @@ test("el CSV usa punto y coma, horas con coma decimal y escapa los textos", () =
         minutos_extra: 150,
         minutos_anticipados: 30,
         minutos_extra_aprobados: 150,
-        minutos_extra_simples: 120,
-        minutos_extra_dobles: 30,
+        minutos_extra_habil: 120,
+        minutos_domingo: 480,
+        minutos_extra_domingo: 30,
         minutos_feriado: 0,
+        minutos_extra_feriado: 0,
+        minutos_descanso: 0,
         pendientes: 0,
       },
     ],
@@ -201,19 +232,19 @@ test("el CSV usa punto y coma, horas con coma decimal y escapa los textos", () =
   assert.equal(nombre, "horas-extra_2026-10-01_2026-10-15.csv");
   assert.ok(contenido.startsWith("﻿Empleado;Cargo;Área;"));
   const [, linea] = contenido.split("\r\n");
-  assert.equal(linea, '"Ana ""La Rápida""; Quispe";Cajera;Cajas;2;14,00;1,50;2,00;0,50;0,00;3,00;2,50;0');
+  assert.equal(linea, '"Ana ""La Rápida""; Quispe";Cajera;Cajas;2;14,00;1,50;2,00;8,00;0,50;0,00;0,00;0,00;3,00;2,50;0');
 });
 
 test("el resumen de toda la empresa calcula para todo el personal", async () => {
   mock.method(modelo, "totalizar", async () => [
-    { id_empleado: LUIS, jornadas: 1, minutos_ordinarios: 420, minutos_extra_simples: 60, pendientes: 1 },
-    { id_empleado: ANA, jornadas: 2, minutos_ordinarios: 840, minutos_extra_simples: 120, pendientes: 0 },
+    { id_empleado: LUIS, jornadas: 1, minutos_ordinarios: 420, minutos_extra_habil: 60, pendientes: 1 },
+    { id_empleado: ANA, jornadas: 2, minutos_ordinarios: 840, minutos_extra_habil: 120, pendientes: 0 },
   ]);
   const datos = await servicio.resumen({ desde: "2026-10-01", hasta: "2026-10-15" });
   assert.deepEqual(modelo.listarMarcajes.mock.calls[0].arguments, ["2026-10-01", "2026-10-15", null]);
   assert.deepEqual(datos.empleados.map((e) => e.empleado.nombre_completo), ["Ana Quispe", "Luis Mamani"]);
   assert.equal(datos.totales.jornadas, 3);
-  assert.equal(datos.totales.minutos_extra_simples, 180);
+  assert.equal(datos.totales.minutos_extra_habil, 180);
   assert.equal(datos.totales.pendientes, 1);
 });
 
@@ -277,7 +308,19 @@ test("al consolidar cierra las jornadas y envía los totales por empleado a comp
   mock.method(modelo, "crearPeriodo", async () => periodo);
   mock.method(modelo, "cerrarJornadas", async () => ({ ...periodo, cantidad_jornadas: 3 }));
   mock.method(modelo, "totalizar", async () => [
-    { id_empleado: ANA, jornadas: 3, minutos_ordinarios: 1260, minutos_nocturnos: 0, minutos_extra_simples: 120, minutos_extra_dobles: 30, minutos_feriado: 0 },
+    {
+      id_empleado: ANA,
+      jornadas: 3,
+      minutos_ordinarios: 1260,
+      minutos_nocturnos: 0,
+      minutos_extra_habil: 120,
+      minutos_extra_domingo: 30,
+      minutos_extra_feriado: 0,
+      minutos_domingo: 420,
+      minutos_feriado: 0,
+      minutos_descanso: 0,
+      minutos_extra_nocturnos: 0,
+    },
   ]);
   const registrar = mock.method(eventos, "registrarConsolidacion", async () => {});
   const resultado = await servicio.consolidar(JEFA, { desde: "2026-10-01", hasta: "2026-10-15" });
@@ -292,9 +335,13 @@ test("al consolidar cierra las jornadas y envía los totales por empleado a comp
     jornadas: 3,
     minutos_ordinarios: 1260,
     minutos_nocturnos: 0,
-    minutos_extra_simples: 120,
-    minutos_extra_dobles: 30,
+    minutos_extra_habil: 120,
+    minutos_extra_domingo: 30,
+    minutos_extra_feriado: 0,
+    minutos_domingo: 420,
     minutos_feriado: 0,
+    minutos_descanso: 0,
+    minutos_extra_nocturnos: 0,
   });
 });
 
@@ -309,9 +356,10 @@ test("con autorización previa la jornada se aprueba sola y queda enlazada", asy
   ]);
   await servicio.calcular({ desde: "2026-10-14", hasta: "2026-10-14" });
   const [fila] = guardar.mock.calls[0].arguments[0];
-  assert.equal(fila.id_estado_horas_extra, ESTADO_HORAS_EXTRA.AJUSTADA);
+  // 2 h 30 min después del turno: lo autorizado llega al tope legal de 2 h, así que no es un ajuste.
+  assert.equal(fila.id_estado_horas_extra, ESTADO_HORAS_EXTRA.APROBADA);
   assert.equal(fila.minutos_extra_aprobados, 120);
-  assert.equal(fila.minutos_extra_simples, 120);
+  assert.equal(fila.minutos_extra_habil, 120);
   assert.equal(fila.id_autorizacion, "eeeeeeee-0000-4000-8000-000000000001");
 });
 
@@ -326,16 +374,32 @@ const transaccionCon = (fila) => {
 
 test("revisar: aprueba con ajuste y recalcula el pago", async () => {
   const registrar = transaccionCon(filaGuardada({ minutos_extra: 150 }));
-  const revisada = await servicio.revisar(ID_JORNADA, JEFA, { decision: "APROBADA", minutos_aprobados: 140, comentario: "Se fue a las 18:20" });
+  const revisada = await servicio.revisar(ID_JORNADA, JEFA, { decision: "APROBADA", minutos_aprobados: 100, comentario: "Se fue a las 17:40" });
   const [, id, datos] = registrar.mock.calls[0].arguments;
   assert.equal(id, ID_JORNADA);
   assert.equal(datos.idEstado, ESTADO_HORAS_EXTRA.AJUSTADA);
-  assert.equal(datos.aprobados, 140);
-  assert.equal(datos.pago.minutos_extra_simples, 120);
-  assert.equal(datos.pago.minutos_extra_dobles, 20);
+  assert.equal(datos.aprobados, 100);
+  assert.equal(datos.pago.minutos_extra_habil, 100);
+  assert.equal(datos.pago.minutos_extra_domingo, 0);
   assert.equal(datos.nombreRevisor, "Rosa Choque");
-  assert.equal(datos.comentario, "Se fue a las 18:20");
+  assert.equal(datos.comentario, "Se fue a las 17:40");
   assert.equal(revisada.empleado.nombre_completo, "Ana Quispe");
+});
+
+test("revisar: no se aprueban más de 2 horas extra; sin minutos se aprueba hasta el tope", async () => {
+  transaccionCon(filaGuardada({ minutos_extra: 150 }));
+  await assert.rejects(
+    servicio.revisar(ID_JORNADA, JEFA, { decision: "APROBADA", minutos_aprobados: 140, comentario: "x" }),
+    (e) => e.estado === 400 && e.detalles.some((d) => d.campo === "minutos_aprobados" && d.mensaje.includes("2 horas extra"))
+  );
+  const registrar = transaccionCon(filaGuardada({ minutos_extra: 150, tipo_dia: "DOMINGO", minutos_domingo: 420 }));
+  await servicio.revisar(ID_JORNADA, JEFA, { decision: "APROBADA" });
+  const [, , datos] = registrar.mock.calls[0].arguments;
+  assert.equal(datos.idEstado, ESTADO_HORAS_EXTRA.APROBADA);
+  assert.equal(datos.aprobados, 120);
+  assert.equal(datos.pago.minutos_extra_domingo, 120);
+  assert.equal(datos.pago.minutos_domingo, 420);
+  assert.equal(datos.pago.minutos_extra_habil, 0);
 });
 
 test("revisar: reglas de la jornada y del revisor", async () => {
@@ -376,6 +440,21 @@ test("autorizar: guarda con el nombre de quien autoriza y recalcula ese día", a
   assert.equal(resultado.creada, true);
   assert.equal(resultado.autorizador.nombre_completo, "Rosa Choque");
   assert.deepEqual(modelo.listarMarcajes.mock.calls[0].arguments, [HOY, HOY, [ANA]]);
+});
+
+test("autorizar: con turno ese día, como máximo 2 horas; sin turno, hasta la jornada y 2 extra", async () => {
+  mock.method(empleados, "obtener", async (id) => ({ nombres: id === JEFA ? "Rosa" : "Ana", apellidos: "Choque", activo: true }));
+  const guardarAutorizacion = mock.method(modelo, "guardarAutorizacion", async (datos) => ({ ...datos, creada: true }));
+  const datos = { id_empleado: ANA, fecha_jornada: HOY, minutos_autorizados: 180, motivo: "Inventario" };
+  programacion.listarProgramacion.mock.mockImplementation(async () => [turno(ANA, HOY)]);
+  await assert.rejects(
+    servicio.autorizar(JEFA, datos),
+    (e) => e.estado === 400 && e.detalles.some((d) => d.campo === "minutos_autorizados" && d.mensaje.includes("120"))
+  );
+  assert.equal(guardarAutorizacion.mock.callCount(), 0);
+  programacion.listarProgramacion.mock.mockImplementation(async () => [{ ...turno(ANA, HOY), descanso: true }]);
+  await servicio.autorizar(JEFA, datos);
+  assert.equal(guardarAutorizacion.mock.calls[0].arguments[0].minutos, 180);
 });
 
 test("autorizar: nadie se autoriza a sí mismo ni a un colaborador inexistente", async () => {

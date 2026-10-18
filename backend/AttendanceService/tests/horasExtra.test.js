@@ -2,6 +2,9 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const {
   ESTADO_HORAS_EXTRA,
+  TIPO_DIA,
+  tipoDia,
+  maximoAprobable,
   minutosNocturnos,
   minutosMinimosExtra,
   segregarJornada,
@@ -69,32 +72,70 @@ test("mínimo de minutos extra configurable, 15 por defecto", () => {
   else process.env.MINUTOS_MINIMOS_EXTRA = anterior;
 });
 
-test("hasta 2 horas extra por día son simples y el resto dobles", () => {
+test("tipo de día: domingo, feriado o hábil; un feriado en domingo es domingo", () => {
+  assert.equal(tipoDia("2026-10-18"), TIPO_DIA.DOMINGO);
+  assert.equal(tipoDia("2026-10-19"), TIPO_DIA.HABIL);
+  assert.equal(tipoDia("2026-11-02", true), TIPO_DIA.FERIADO);
+  assert.equal(tipoDia("2026-06-21", true), TIPO_DIA.DOMINGO);
+});
+
+test("en día hábil se pagan como máximo 2 horas extra; el resto no cuenta", () => {
   const calculo = segregarJornada(jornada("2026-10-05T08:00", "2026-10-05T19:30", turno("2026-10-05", "08:00", "2026-10-05", "16:00", 60)));
+  assert.equal(maximoAprobable(calculo), 120);
   const pago = liquidarJornada(calculo, { aprobados: 210 });
-  assert.equal(pago.minutos_extra_simples, 120);
-  assert.equal(pago.minutos_extra_dobles, 90);
+  assert.equal(pago.minutos_extra_pagables, 120);
+  assert.equal(pago.minutos_extra_habil, 120);
   assert.equal(pago.minutos_feriado, 0);
+  assert.equal(pago.minutos_domingo, 0);
 });
 
 test("sin aprobación no se paga ninguna hora extra", () => {
   const calculo = segregarJornada(jornada("2026-10-05T08:00", "2026-10-05T19:00", turno("2026-10-05", "08:00", "2026-10-05", "16:00")));
   assert.deepEqual(liquidarJornada(calculo), {
     minutos_extra_pagables: 0,
-    minutos_extra_simples: 0,
-    minutos_extra_dobles: 0,
-    minutos_extra_nocturnos: 0,
+    minutos_extra_habil: 0,
+    minutos_extra_domingo: 0,
+    minutos_extra_feriado: 0,
+    minutos_domingo: 0,
     minutos_feriado: 0,
+    minutos_descanso: 0,
+    minutos_extra_nocturnos: 0,
     minutos_nocturnos: 0,
   });
 });
 
-test("en feriado lo trabajado y las extra aprobadas se pagan dobles", () => {
+test("en feriado lo ordinario y las extra van en columnas separadas", () => {
   const calculo = segregarJornada(jornada("2026-10-05T08:00", "2026-10-05T17:00", turno("2026-10-05", "08:00", "2026-10-05", "16:00", 60)));
-  const pago = liquidarJornada(calculo, { aprobados: 60, esFeriado: true });
-  assert.equal(pago.minutos_extra_simples, 0);
+  const pago = liquidarJornada(calculo, { aprobados: 60, tipoDia: TIPO_DIA.FERIADO });
   assert.equal(pago.minutos_feriado, 420);
-  assert.equal(pago.minutos_extra_dobles, 480);
+  assert.equal(pago.minutos_extra_feriado, 60);
+  assert.equal(pago.minutos_extra_habil, 0);
+});
+
+test("en domingo lo ordinario y las extra van aparte, aunque no se apruebe extra", () => {
+  const calculo = segregarJornada(jornada("2026-10-04T08:00", "2026-10-04T17:00", turno("2026-10-04", "08:00", "2026-10-04", "16:00", 60)));
+  const pago = liquidarJornada(calculo, { aprobados: 60, tipoDia: TIPO_DIA.DOMINGO });
+  assert.equal(pago.minutos_domingo, 420);
+  assert.equal(pago.minutos_extra_domingo, 60);
+  assert.equal(pago.minutos_extra_habil, 0);
+  assert.equal(liquidarJornada(calculo, { tipoDia: TIPO_DIA.DOMINGO }).minutos_domingo, 420);
+});
+
+test("sin turno: las primeras 8 h aprobadas son la jornada del día y luego hasta 2 h extra", () => {
+  const calculo = segregarJornada(jornada("2026-10-05T08:00", "2026-10-05T19:00"));
+  assert.equal(calculo.minutos_extra, 660);
+  assert.equal(maximoAprobable(calculo), 600);
+  const habil = liquidarJornada(calculo, { aprobados: 660 });
+  assert.equal(habil.minutos_extra_pagables, 600);
+  assert.equal(habil.minutos_descanso, 480);
+  assert.equal(habil.minutos_extra_habil, 120);
+  const domingo = liquidarJornada(calculo, { aprobados: 300, tipoDia: TIPO_DIA.DOMINGO });
+  assert.equal(domingo.minutos_domingo, 300);
+  assert.equal(domingo.minutos_extra_domingo, 0);
+  assert.equal(domingo.minutos_descanso, 0);
+  const feriado = liquidarJornada(calculo, { aprobados: 540, tipoDia: TIPO_DIA.FERIADO });
+  assert.equal(feriado.minutos_feriado, 480);
+  assert.equal(feriado.minutos_extra_feriado, 60);
 });
 
 test("lo aprobado se toma primero después del turno y luego del tiempo anticipado", () => {
@@ -127,15 +168,17 @@ test("los tramos guardados se rehacen igual que al calcular", () => {
   assert.deepEqual(rehecho.tramo_anticipado, calculo.tramo_anticipado);
 });
 
-const { validarRevision, validarAutorizacion, MAXIMO_MINUTOS_EXTRA } = require("../src/utils/horasExtra");
-const conExtra = { minutos_extra: 120, minutos_anticipados: 30 };
+const { validarRevision, validarAutorizacion, MAXIMO_MINUTOS_AUTORIZABLES } = require("../src/utils/horasExtra");
+const conExtra = { con_turno: true, minutos_extra: 90, minutos_anticipados: 30 };
 const errorEn = (campo) => (e) => e.estado === 400 && e.detalles.some((d) => d.campo === campo);
 
-test("autorización previa: se aprueba sola hasta lo autorizado", () => {
-  const calculo = segregarJornada(jornada("2026-10-05T08:00", "2026-10-05T19:00", turno("2026-10-05", "08:00", "2026-10-05", "16:00")));
-  assert.deepEqual(estadoInicial(calculo, { minutos_autorizados: 180 }), { idEstado: ESTADO_HORAS_EXTRA.APROBADA, aprobados: 180 });
-  assert.deepEqual(estadoInicial(calculo, { minutos_autorizados: 300 }), { idEstado: ESTADO_HORAS_EXTRA.APROBADA, aprobados: 180 });
-  assert.deepEqual(estadoInicial(calculo, { minutos_autorizados: 120 }), { idEstado: ESTADO_HORAS_EXTRA.AJUSTADA, aprobados: 120 });
+test("autorización previa: se aprueba sola hasta lo autorizado y el tope de 2 h", () => {
+  const calculo = segregarJornada(jornada("2026-10-05T08:00", "2026-10-05T17:30", turno("2026-10-05", "08:00", "2026-10-05", "16:00")));
+  assert.deepEqual(estadoInicial(calculo, { minutos_autorizados: 90 }), { idEstado: ESTADO_HORAS_EXTRA.APROBADA, aprobados: 90 });
+  assert.deepEqual(estadoInicial(calculo, { minutos_autorizados: 300 }), { idEstado: ESTADO_HORAS_EXTRA.APROBADA, aprobados: 90 });
+  assert.deepEqual(estadoInicial(calculo, { minutos_autorizados: 60 }), { idEstado: ESTADO_HORAS_EXTRA.AJUSTADA, aprobados: 60 });
+  const largo = segregarJornada(jornada("2026-10-05T08:00", "2026-10-05T19:00", turno("2026-10-05", "08:00", "2026-10-05", "16:00")));
+  assert.deepEqual(estadoInicial(largo, { minutos_autorizados: 180 }), { idEstado: ESTADO_HORAS_EXTRA.APROBADA, aprobados: 120 });
 });
 
 test("autorización previa sin tiempo fuera del turno: nada que aprobar", () => {
@@ -146,24 +189,43 @@ test("autorización previa sin tiempo fuera del turno: nada que aprobar", () => 
 test("aprobar sin minutos aprueba lo marcado después del turno", () => {
   assert.deepEqual(validarRevision({ decision: "APROBADA" }, conExtra), {
     idEstado: ESTADO_HORAS_EXTRA.APROBADA,
-    aprobados: 120,
+    aprobados: 90,
     comentario: null,
   });
 });
 
 test("aprobar otros minutos es un ajuste y exige comentario", () => {
   assert.throws(() => validarRevision({ decision: "APROBADA", minutos_aprobados: 60 }, conExtra), errorEn("comentario"));
-  const ajuste = validarRevision({ decision: "APROBADA", minutos_aprobados: 150, comentario: " Llegó antes por inventario " }, conExtra);
-  assert.deepEqual(ajuste, { idEstado: ESTADO_HORAS_EXTRA.AJUSTADA, aprobados: 150, comentario: "Llegó antes por inventario" });
+  const ajuste = validarRevision({ decision: "APROBADA", minutos_aprobados: 120, comentario: " Llegó antes por inventario " }, conExtra);
+  assert.deepEqual(ajuste, { idEstado: ESTADO_HORAS_EXTRA.AJUSTADA, aprobados: 120, comentario: "Llegó antes por inventario" });
 });
 
 test("no se aprueba más de lo marcado fuera del turno ni cero minutos", () => {
-  for (const minutos of [151, 0, -5, 1.5, "60"]) {
+  for (const minutos of [121, 0, -5, 1.5, "60"]) {
     assert.throws(
       () => validarRevision({ decision: "APROBADA", minutos_aprobados: minutos, comentario: "x" }, conExtra),
       errorEn("minutos_aprobados")
     );
   }
+});
+
+test("con más de 2 h marcadas se aprueba hasta el tope legal y el mensaje lo explica", () => {
+  const largo = { con_turno: true, minutos_extra: 200, minutos_anticipados: 0 };
+  assert.deepEqual(validarRevision({ decision: "APROBADA" }, largo), {
+    idEstado: ESTADO_HORAS_EXTRA.APROBADA,
+    aprobados: 120,
+    comentario: null,
+  });
+  assert.throws(
+    () => validarRevision({ decision: "APROBADA", minutos_aprobados: 150, comentario: "x" }, largo),
+    (e) => e.detalles[0].mensaje === "Apruebe entre 1 y 120 minutos: la ley permite hasta 2 horas extra por día."
+  );
+  const descanso = { con_turno: false, minutos_extra: 700, minutos_anticipados: 0 };
+  assert.equal(validarRevision({ decision: "APROBADA" }, descanso).aprobados, 600);
+  assert.throws(
+    () => validarRevision({ decision: "APROBADA", minutos_aprobados: 601, comentario: "x" }, descanso),
+    (e) => e.detalles[0].mensaje.includes("jornada de 8 horas")
+  );
 });
 
 test("rechazar exige comentario y deja cero minutos aprobados", () => {
@@ -191,14 +253,14 @@ const autorizacion = (extra = {}) => ({
   ...extra,
 });
 
-test("autorización válida: hoy o después, entre 1 minuto y 24 horas, con motivo", () => {
+test("autorización válida: hoy o después, entre 1 minuto y 10 horas, con motivo", () => {
   assert.deepEqual(validarAutorizacion(autorizacion({ id_empleado: ` ${ID.toUpperCase()} `, motivo: " Inventario " }), "2026-10-16"), {
     idEmpleado: ID,
     fecha: "2026-10-16",
     minutos: 120,
     motivo: "Inventario",
   });
-  assert.equal(validarAutorizacion(autorizacion({ minutos_autorizados: MAXIMO_MINUTOS_EXTRA }), "2026-10-16").minutos, 1440);
+  assert.equal(validarAutorizacion(autorizacion({ minutos_autorizados: MAXIMO_MINUTOS_AUTORIZABLES }), "2026-10-16").minutos, 600);
 });
 
 test("autorización inválida: cada campo con su mensaje", () => {
@@ -206,7 +268,7 @@ test("autorización inválida: cada campo con su mensaje", () => {
   assert.throws(() => validarAutorizacion(autorizacion({ id_empleado: "x" }), hoy), errorEn("id_empleado"));
   assert.throws(() => validarAutorizacion(autorizacion({ fecha_jornada: "2026-10-15" }), hoy), errorEn("fecha_jornada"));
   assert.throws(() => validarAutorizacion(autorizacion({ fecha_jornada: "2026-02-30" }), hoy), errorEn("fecha_jornada"));
-  for (const minutos of [0, 1441, 30.5, "60", null]) {
+  for (const minutos of [0, 601, 30.5, "60", null]) {
     assert.throws(() => validarAutorizacion(autorizacion({ minutos_autorizados: minutos }), hoy), errorEn("minutos_autorizados"));
   }
   assert.throws(() => validarAutorizacion(autorizacion({ motivo: " " }), hoy), errorEn("motivo"));
