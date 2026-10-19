@@ -77,7 +77,7 @@ function DescargaDocumento({ version }) {
   return (
     <div className="kardex-certificado">
       <Boton
-        variante="sutil"
+        variante="enlace"
         tamano="sm"
         soloIcono
         icono={Download}
