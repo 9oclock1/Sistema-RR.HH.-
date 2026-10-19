@@ -7,6 +7,7 @@ const applicantRoutes = require("./routes/applicantRoutes");
 const postulacionRoutes = require("./routes/postulacionRoutes");
 const cvDataRoutes = require("./routes/cvDataRoutes");
 const errorHandler = require("./middlewares/errorHandler");
+const affinityRoutes = require("./routes/affinityRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -58,6 +59,12 @@ app.use((req, res) => {
     message: "Ruta no encontrada.",
   });
 });
+
+// RF-11: datos extraídos del CV.
+app.use(cvDataRoutes);
+
+// RF-12: cálculo y desglose de afinidad CV vs requisitos.
+app.use(affinityRoutes);
 
 // Debe ir después de todas las rutas.
 app.use(errorHandler);
