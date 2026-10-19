@@ -3,6 +3,7 @@ import { Contador, EncabezadoPagina, EstadoVacio, Tarjeta } from "../../componen
 import { useRol } from "../../context/sesion";
 import { seccionesPara } from "../../router/modulos";
 import { ROLES } from "../../utils/permisos";
+import VacacionesInicio from "../vacaciones/VacacionesInicio";
 import "./inicio.css";
 
 const ZONA_BOLIVIA = "America/La_Paz";
@@ -56,6 +57,8 @@ export default function InicioPage() {
         titulo={saludo(ahora)}
         descripcion={`${fechaHoy(ahora)}. Estos son los módulos disponibles para su rol, ${ROLES[rol].nombre}.`}
       />
+
+      <VacacionesInicio />
 
       {secciones.length === 0 && (
         <Tarjeta>

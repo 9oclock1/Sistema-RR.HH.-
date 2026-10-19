@@ -213,4 +213,51 @@ ON CONFLICT DO NOTHING;
 UPDATE CATALOGOS_TIPO_LICENCIA
 SET codigo = 'MATERNIDAD', nombre = 'Maternidad'
 WHERE id_tipo_licencia = 2 AND codigo = 'MATERNIDAD_PATERNIDAD';
+-- KAN-52 (RF-32): saldo de vacaciones.
+-- Bloque idempotente: se puede ejecutar a mano sobre una AttendanceDB ya creada.
+-- Los días ganados NO se guardan: se calculan con EMPLEADOS.fecha_ingreso (EmployeeDB) y la escala legal.
+-- Aquí solo se registran los días consumidos o reservados; las solicitudes (KAN-50) y su aprobación (KAN-53)
+-- insertan y cambian de estado estos movimientos. id_empleado e id_solicitud_origen no tienen FK por ser otro servicio o historia.
+-- Tabla: CATALOGOS_ESTADO_MOVIMIENTO_VACACION
+CREATE TABLE IF NOT EXISTS CATALOGOS_ESTADO_MOVIMIENTO_VACACION (
+    id_estado_movimiento SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_ESTADO_MOVIMIENTO_VACACION_pk PRIMARY KEY (id_estado_movimiento),
+    CONSTRAINT uq_estado_movimiento_vacacion_codigo UNIQUE (codigo)
+);
+-- Tabla: MOVIMIENTOS_VACACION
+CREATE TABLE IF NOT EXISTS MOVIMIENTOS_VACACION (
+    id_movimiento UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    id_estado_movimiento SMALLINT NOT NULL DEFAULT 1,
+    id_solicitud_origen UUID NULL,
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    dias SMALLINT NOT NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT MOVIMIENTOS_VACACION_pk PRIMARY KEY (id_movimiento),
+    CONSTRAINT chk_movimiento_vacacion_fechas CHECK (fecha_fin >= fecha_inicio),
+    CONSTRAINT chk_movimiento_vacacion_dias CHECK (dias > 0)
+);
+-- índices
+-- Saldo e historial de un empleado.
+CREATE INDEX IF NOT EXISTS ix_movimiento_vacacion_empleado ON MOVIMIENTOS_VACACION (id_empleado, fecha_inicio DESC);
+-- Una solicitud origina un solo movimiento: evita descontar dos veces los mismos días.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_movimiento_vacacion_solicitud ON MOVIMIENTOS_VACACION (id_solicitud_origen) WHERE id_solicitud_origen IS NOT NULL;
+-- llaves foráneas
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'movimientos_vacacion_catalogos_estado_movimiento_vacacion') THEN
+        ALTER TABLE MOVIMIENTOS_VACACION
+        ADD CONSTRAINT MOVIMIENTOS_VACACION_CATALOGOS_ESTADO_MOVIMIENTO_VACACION FOREIGN KEY (id_estado_movimiento) REFERENCES CATALOGOS_ESTADO_MOVIMIENTO_VACACION (id_estado_movimiento) NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+END $$;
+-- datos iniciales
+INSERT INTO CATALOGOS_ESTADO_MOVIMIENTO_VACACION (id_estado_movimiento, codigo, nombre) VALUES
+    (1, 'EN_PROCESO', 'En proceso de aprobación'),
+    (2, 'GOZADO', 'Gozado'),
+    (3, 'CANCELADO', 'Cancelado')
+ON CONFLICT DO NOTHING;
 -- Fin del archivo.
