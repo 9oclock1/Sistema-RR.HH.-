@@ -39,28 +39,40 @@ const enviarMensajeDirecto = async (mensaje) => {
   return respuesta.json();
 };
 
+const plazo = (dias) => {
+  if (dias === 0) return 'vence hoy';
+  if (dias === 1) return 'vence mañana';
+  return `vence en ${dias} días`;
+};
+
 const describirCertificacion = (c) =>
   `«${c.curso}» (${c.curso_codigo}) emitida por ${c.institucion_emisora}, vence el ${c.fecha_vencimiento}`;
 
-const alertarColaborador = (certificacion, dias) =>
+const alertarColaborador = (certificacion) =>
   enviarMensajeDirecto({
     id_empleado_destinatario: certificacion.id_empleado,
     correo: certificacion.correo_personal,
-    asunto: `Su certificación «${certificacion.curso}» vence en ${dias} días`,
+    asunto: `Su certificación «${certificacion.curso}» ${plazo(certificacion.dias_para_vencer)}`,
     contenido:
       `Estimado(a) ${certificacion.empleado}:\n\n` +
       `Le recordamos que su certificación ${describirCertificacion(certificacion)}. ` +
       'Coordine su renovación con Recursos Humanos antes de esa fecha para mantener su expediente al día.',
   });
 
-const alertarRRHH = (certificaciones, dias) =>
+const alertarRRHH = (certificaciones, diasAviso, idsSinAviso = new Set()) =>
   enviarMensajeDirecto({
     id_empleado_destinatario: process.env.ALERTAS_ID_EMPLEADO_RRHH || 'RRHH',
     correo: process.env.ALERTAS_CORREO_RRHH,
-    asunto: `${certificaciones.length} certificación(es) del personal vencen en ${dias} días`,
+    asunto: `${certificaciones.length} certificación(es) del personal vencen en los próximos ${diasAviso} días`,
     contenido:
-      `Las siguientes certificaciones vencen dentro de ${dias} días:\n\n` +
-      certificaciones.map((c) => `- ${c.empleado}: ${describirCertificacion(c)}`).join('\n'),
+      `Las siguientes certificaciones vencen en los próximos ${diasAviso} días:\n\n` +
+      certificaciones
+        .map(
+          (c) =>
+            `- ${c.empleado}: ${describirCertificacion(c)} (${plazo(c.dias_para_vencer)})` +
+            (idsSinAviso.has(c.id_capacitacion) ? ' — no se pudo avisar al colaborador' : '')
+        )
+        .join('\n'),
   });
 
 module.exports = { alertarColaborador, alertarRRHH };

@@ -31,6 +31,7 @@ const SELECT_CAPACITACION = `
          cc.certificado_nombre_original,
          cc.certificado_tipo_mime,
          cc.certificado_tamano_bytes,
+         cc.alerta_vencimiento_enviada_en,
          cc.id_solicitud_servicio,
          ss.numero_orden_servicio,
          ss.proveedor_nombre,
@@ -143,6 +144,10 @@ const reemplazar = async (db, idCapacitacion, capacitacion) => {
             fecha_inicio = $3,
             fecha_fin = $4,
             fecha_emision = $5,
+            alerta_vencimiento_enviada_en = CASE
+              WHEN fecha_vencimiento IS DISTINCT FROM $6::date THEN NULL
+              ELSE alerta_vencimiento_enviada_en
+            END,
             fecha_vencimiento = $6,
             id_solicitud_servicio = $7,
             actualizado_en = CURRENT_TIMESTAMP
@@ -179,7 +184,7 @@ const guardarCertificado = async (db, idCapacitacion, certificado) => {
   );
 };
 
-const listarQueVencenEn = async (db, dias) => {
+const listarAlertasPendientes = async (db, dias) => {
   const { rows } = await db.query(
     `SELECT cc.id_capacitacion,
             cc.id_empleado,
@@ -190,17 +195,29 @@ const listarQueVencenEn = async (db, dias) => {
             cu.tipo_capacitacion,
             cc.institucion_emisora,
             cc.fecha_emision,
-            cc.fecha_vencimiento
+            cc.fecha_vencimiento,
+            (cc.fecha_vencimiento - CURRENT_DATE) AS dias_para_vencer
        FROM capacitaciones_certificacion cc
        JOIN cursos_capacitacion cu ON cu.id_curso = cc.id_curso
        JOIN empleados e            ON e.id_empleado = cc.id_empleado
        JOIN estados_empleado ee    ON ee.id_estado_empleado = e.id_estado_empleado
-      WHERE cc.fecha_vencimiento = CURRENT_DATE + $1::int
+      WHERE cc.fecha_vencimiento BETWEEN CURRENT_DATE AND CURRENT_DATE + $1::int
+        AND cc.alerta_vencimiento_enviada_en IS NULL
         AND ee.permite_acceso
-      ORDER BY e.primer_apellido, e.nombres, cu.nombre`,
+      ORDER BY cc.fecha_vencimiento, e.primer_apellido, e.nombres, cu.nombre`,
     [dias]
   );
   return rows;
+};
+
+const marcarAlertasEnviadas = async (db, idsCapacitacion) => {
+  if (idsCapacitacion.length === 0) return;
+  await db.query(
+    `UPDATE capacitaciones_certificacion
+        SET alerta_vencimiento_enviada_en = CURRENT_TIMESTAMP
+      WHERE id_capacitacion = ANY($1::uuid[])`,
+    [idsCapacitacion]
+  );
 };
 
 const eliminar = async (db, idCapacitacion) => {
@@ -219,6 +236,7 @@ module.exports = {
   insertar,
   reemplazar,
   guardarCertificado,
-  listarQueVencenEn,
+  listarAlertasPendientes,
+  marcarAlertasEnviadas,
   eliminar,
 };
