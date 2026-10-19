@@ -1,0 +1,245 @@
+@startuml epica-6-clases
+!pragma layout smetana
+title Épica 6 · Historial de seguimiento, Kardex y memorándums\nDiagrama de clases (resumen de la épica)
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 70
+skinparam class {
+  BackgroundColor #DAE8FC
+  BorderColor #6C8EBF
+  ArrowColor #444444
+  StereotypeFontColor #555555
+}
+skinparam package {
+  BackgroundColor #FAFAFA
+  BorderColor #BBBBBB
+  FontColor #555555
+}
+
+package "Organización (contexto)" {
+  class Empleado {
+    id_empleado: UUID
+    numero_documento: String
+    nombres: String
+    primer_apellido: String
+    fecha_ingreso: Date
+    --
+    + antiguedad(): Periodo
+  }
+  class Cargo {
+    nombre: String
+    nivel_salarial: String
+  }
+  class Sucursal {
+    nombre: String
+    ciudad: String
+  }
+  class AsignacionEmpleado <<trayectoria>> {
+    fecha_inicio: Date
+    fecha_fin: Date [0..1]
+    es_vigente: Boolean
+  }
+}
+
+package "KAN-56 · Kardex laboral (RF-36)" {
+  class KardexLaboral <<vista>> #E1F5FE {
+    /antiguedad: Periodo
+    /contrato_vigente: Contrato [0..1]
+    /total_adendas: Integer
+    /balance_disciplinario: Integer
+    /memorandums_sin_acuse: Integer
+    /capacitaciones_vencidas: Integer
+    --
+    + consultar(idEmpleado, rol)
+  }
+  class HistorialAsistencia <<AttendanceService>> #F8CECC {
+    resumen: {jornadas, atrasos, inasistencias}
+    jornadas: Jornada [0..*]
+  }
+}
+
+package "KAN-57 · KAN-58 · KAN-59 · Memorándums (RF-37 a RF-39)" {
+  class Memorandum {
+    codigo_cite: String
+    asunto: String
+    fecha_emision: Date
+    naturaleza_falta: NaturalezaFalta [0..1]
+    gravedad_falta: GravedadFalta [0..1]
+    estado_sancion: EstadoSancion
+    evidencia_adjunto_url: String [0..1]
+    documento_pdf_url: String
+    estado_acuse: EstadoAcuse
+    fecha_limite_acuse: DateTime [0..1]
+    fecha_hora_acuse: DateTime [0..1]
+    ip_acuse: String [0..1]
+    --
+    + emitir(): codigo_cite
+    + generarPdf(): ruta
+    + notificar(plazoHoras = 72)
+    + registrarApertura()
+    + acusarRecibo(ip, usuario, comentario)
+    + marcarVencido()
+  }
+  class TipoMemorandum {
+    clasificacion: ClasificacionMemorandum
+    nombre: String
+  }
+  class CorrelativoMemorandum {
+    gestion: Integer
+    ultimo_numero: Integer
+    --
+    + siguiente(): Integer
+  }
+}
+
+package "KAN-60 · Capacitaciones y certificaciones (RF-40)" {
+  class CursoCapacitacion {
+    codigo: String
+    nombre: String
+    tipo_capacitacion: TipoCapacitacion
+    requiere_vencimiento: Boolean
+    meses_vigencia: Integer [0..1]
+    --
+    + darDeBaja()
+  }
+  class CapacitacionCertificacion {
+    institucion_emisora: String
+    fecha_emision: Date
+    fecha_vencimiento: Date [0..1]
+    certificado_adjunto_url: String [0..1]
+    /estado_vigencia: EstadoVigencia
+    --
+    + calcularVencimiento()
+    + diasParaVencer(): Integer
+  }
+  class SolicitudServicioCapacitacion {
+    estado: EstadoSolicitudServicio
+    numero_orden_servicio: String [0..1]
+    proveedor_nombre: String [0..1]
+    intentos_envio: Integer
+    --
+    + publicarEnCompras()
+    + aplicarRespuestaCompras(respuesta)
+  }
+  class HistorialSolicitudServicio {
+    estado_nuevo: EstadoSolicitudServicio
+    origen: RRHH | COMPRAS
+    registrado_en: DateTime
+  }
+}
+
+package "KAN-61 · Modificaciones contractuales y adendas (RF-41)" {
+  class Contrato <<versión inmutable>> {
+    numero_contrato: String {único}
+    tipo_modificacion: TipoModificacion
+    es_adenda: Boolean
+    periodo_vigencia: DateRange
+    haber_mensual_pactado: Decimal
+    motivo_adenda: Text [0..1]
+    documento_hash_sha256: String [0..1]
+    registrado_rol: String [0..1]
+    /numero_version: Integer
+    /vigente_hasta: Date [0..1]
+    --
+    + registrarModificacion(datos, documento): Contrato
+    + rigeEn(fecha): Boolean
+  }
+  class TipoContrato {
+    nombre: String
+  }
+  class TipoJornada {
+    nombre: String
+    horas_semanales: Integer
+  }
+}
+
+package "Enumeraciones" {
+  enum EstadoAcuse #FFF2CC {
+    PENDIENTE
+    RECIBIDO
+    VENCIDO
+  }
+  enum TipoModificacion #FFF2CC {
+    CONTRATO_INICIAL
+    RENOVACION
+    CAMBIO_JORNADA
+    AJUSTE_SALARIAL
+    AJUSTE_CONDICIONES
+  }
+  enum EstadoSolicitudServicio #FFF2CC {
+    PENDIENTE_ENVIO
+    ENVIADA
+    EN_PROCESO
+    ORDEN_EMITIDA
+    RECHAZADA
+    CANCELADA
+  }
+  enum EstadoVigencia #FFF2CC {
+    VIGENTE
+    POR_VENCER
+    VENCIDA
+    SIN_VENCIMIENTO
+  }
+}
+
+package "Sistemas externos" {
+  class NotificationService <<microservicio>> #F8CECC {
+    + enviarAvisoPrioritario(aviso)
+  }
+  class "Compras (Pub/Sub)" as Compras <<módulo del ERP>> #F8CECC {
+    + recibirSolicitudCompra(evento)
+  }
+}
+
+Empleado "*" --> "1" Cargo : cargo actual
+Empleado "*" --> "1" Sucursal : sucursal actual
+Empleado "1" *-- "0..*" AsignacionEmpleado : trayectoria
+AsignacionEmpleado "*" --> "1" Cargo
+
+KardexLaboral "1" --> "1" Empleado : consolida
+KardexLaboral ..> HistorialAsistencia : <<HTTP>>
+
+Empleado "1" -- "0..*" Memorandum : receptor
+Empleado "1" -- "0..*" Memorandum : emisor
+Memorandum "*" --> "1" TipoMemorandum
+Memorandum "*" --> "1" CorrelativoMemorandum : CITE de la gestión
+Memorandum ..> NotificationService : avisa al emitir\ny alerta si vence
+
+Empleado "1" *-- "0..*" CapacitacionCertificacion
+CapacitacionCertificacion "*" --> "1" CursoCapacitacion
+CapacitacionCertificacion "0..*" --> "0..1" SolicitudServicioCapacitacion : respaldada por
+SolicitudServicioCapacitacion "*" --> "1" CursoCapacitacion
+SolicitudServicioCapacitacion "1" *-- "1..*" HistorialSolicitudServicio : trazabilidad
+SolicitudServicioCapacitacion ..> Compras : <<publica>>
+CapacitacionCertificacion ..> NotificationService : alerta 30 días antes
+
+Empleado "1" *-- "0..*" Contrato : historial contractual
+Contrato "0..1" -- "0..1" Contrato : reemplaza a
+Contrato "*" --> "1" TipoContrato
+Contrato "*" --> "1" TipoJornada
+
+
+note right of KardexLaboral
+  Reúne en una sola consulta los contratos,
+  la trayectoria, los memorándums emitidos
+  y las capacitaciones del empleado, más la
+  asistencia que entrega AttendanceService.
+end note
+
+note bottom of Contrato
+  Cada fila es una versión: nunca se actualiza ni se borra.
+  Una adenda o renovación inserta una versión que reemplaza
+  a la anterior; las fechas inconsistentes o solapadas se rechazan.
+end note
+
+note bottom of Memorandum
+  El acuse guarda fecha, IP y usuario (estado RECIBIDO).
+  Sin acuse en 72 h se alerta a RRHH (estado VENCIDO).
+end note
+@enduml

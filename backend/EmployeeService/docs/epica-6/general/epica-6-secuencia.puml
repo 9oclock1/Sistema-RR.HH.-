@@ -1,0 +1,155 @@
+@startuml epica-6-secuencia
+title Épica 6 · Historial de seguimiento, Kardex y memorándums\nDiagrama de secuencia (resumen de la épica)
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 260
+skinparam sequence {
+  LifeLineBorderColor #888888
+  ParticipantBorderColor #6C8EBF
+  ParticipantBackgroundColor #DAE8FC
+  ActorBorderColor #333333
+  ActorBackgroundColor #FFFFFF
+  GroupBorderColor #888888
+  GroupBackgroundColor #F5F5F5
+  DividerBackgroundColor #EEEEEE
+  DividerBorderColor #BBBBBB
+}
+autonumber "<b>00"
+
+actor "Administrador\nde RRHH" as RRHH
+actor "Supervisor" as SUP
+actor "Colaborador" as COL
+boundary "Frontend\n(React)" as FE #D5E8D4
+participant "API Gateway\n(NGINX)" as GW #F5F5F5
+control "EmployeeService\n(controladores · servicios · modelos)" as ES
+database "EmployeeDB\n(PostgreSQL)" as DB #FFF2CC
+participant "NotificationService" as NS #F8CECC
+participant "AttendanceService" as AS #F8CECC
+queue "Google Pub/Sub\n→ Compras" as PS #F8CECC
+
+== KAN-61 · Modificación contractual: renovación o adenda (RF-41) ==
+RRHH -> FE : tipo, vigencia, condiciones,\njustificación y documento firmado
+FE -> FE : valida fechas contra la versión vigente
+FE -> GW : POST /contratos/modificaciones (multipart)
+GW -> ES : reenvía [X-Rol]
+activate ES
+ES -> ES : ExigirRol · documento PDF/JPG/PNG · SHA-256
+ES -> DB : BEGIN · bloquear colaborador (FOR NO KEY UPDATE)\n· versión vigente
+activate DB
+DB --> ES : versión que nadie reemplaza
+deactivate DB
+alt fecha anterior al inicio vigente, fuera del contrato o solapada
+  ES --> FE : <color:#B85450>409 inconsistencia temporal (ROLLBACK)</color>
+else fechas consistentes
+  ES -> DB : INSERT nueva versión (id_contrato_anterior) · COMMIT
+  note right of DB : solo INSERT: las versiones\nanteriores no cambian
+  ES --> FE : 201 versión N
+end
+deactivate ES
+
+== KAN-60 · Capacitación con certificado y compra del servicio (RF-40) ==
+RRHH -> FE : curso, fechas, vigencia y certificado
+FE -> GW : POST /capacitaciones (multipart)
+GW -> ES : reenvía [X-Rol]
+activate ES
+ES -> DB : curso activo · vencimiento según meses de vigencia\n· orden de servicio emitida · INSERT
+ES --> FE : 201 capacitación con estado de vigencia
+deactivate ES
+opt el curso es un servicio externo
+  RRHH -> GW : POST /cursos-capacitacion/{id}/solicitar-compra
+  GW -> ES : reenvía
+  activate ES
+  ES -> DB : INSERT solicitud PENDIENTE_ENVIO + historial
+  ES -> PS : publishMessage(SOLICITUD_COMPRA_CAPACITACION)
+  PS --> ES : id de mensaje (o error: se reintenta por cron)
+  ES -> DB : ENVIADA · historial
+  ES --> RRHH : 201 solicitud con historial
+  deactivate ES
+  PS -> GW : POST /solicitudes-servicio/{id}/respuesta-compras
+  GW -> ES : reenvía
+  activate ES
+  ES -> DB : ORDEN_EMITIDA · proveedor · historial (idempotente)
+  ES --> PS : 200
+  deactivate ES
+end
+
+== KAN-57 · KAN-58 · Emisión de memorándum: llamada de atención o felicitación (RF-37, RF-38) ==
+SUP -> FE : receptor, tipo y contenido\n(falta y evidencia, o motivo del reconocimiento)
+FE -> GW : POST /memorandums · POST /reconocimientos
+GW -> ES : reenvía
+activate ES
+ES -> DB : BEGIN · correlativo de la gestión · INSERT (CITE MEM-/REC-)
+ES -> ES : genera el PDF oficial
+ES -> DB : guarda la ruta del PDF · COMMIT
+ES -> NS : aviso prioritario al colaborador (KAN-59)
+activate NS
+NS ->> COL : bandeja del portal + correo
+NS --> ES : enviado
+deactivate NS
+ES -> DB : fue_notificado · fecha límite de acuse (72 h)
+ES --> FE : 201 CITE · PDF · alerta roja si hay 3 o más\namonestaciones en 6 meses
+deactivate ES
+
+== KAN-59 · Lectura y acuse de recibo (RF-39) ==
+COL -> FE : abre «Mis memorándums»
+FE -> GW : GET /memorandums/recibidos/{id} [X-Empleado-Id]
+GW -> ES : reenvía
+activate ES
+ES -> DB : solo si es suyo y está EMITIDO · registra la primera apertura
+ES --> FE : contenido del memorándum
+deactivate ES
+COL -> FE : «Acuso recibo» (comentario opcional)
+FE -> GW : POST /memorandums/recibidos/{id}/acuse
+GW -> ES : reenvía
+activate ES
+alt ya acusó recibo
+  ES --> FE : <color:#B85450>409 Ya acusó recibo</color>
+else pendiente
+  ES -> DB : fecha y hora · IP · usuario · estado RECIBIDO
+  ES --> FE : 200 «Notificado y Recibido»
+end
+deactivate ES
+
+== Tareas programadas de la épica ==
+par cada 15 minutos (KAN-59)
+  ES -> DB : acuses vencidos (FOR UPDATE SKIP LOCKED)
+  ES -> NS : alerta al emisor y a RRHH
+  NS ->> RRHH : sin acuse de recibo: seguimiento presencial
+  ES -> DB : estado VENCIDO
+else todos los días a las 08:00 (KAN-60)
+  ES -> DB : certificaciones que vencen en 30 días
+  ES -> NS : aviso al colaborador y resumen a RRHH
+  NS ->> COL : su certificación vence en 30 días
+  NS ->> RRHH : certificaciones por vencer
+else cada 10 minutos (KAN-60)
+  ES -> PS : reintenta las solicitudes de compra pendientes
+end
+
+== KAN-56 · Consulta del Kardex laboral consolidado (RF-36) ==
+RRHH -> FE : elige al colaborador
+FE -> GW : GET /empleados/{id}/kardex [X-Rol]
+GW -> ES : reenvía
+activate ES
+alt sin rol admin o gerente
+  ES --> FE : <color:#B85450>401 / 403</color>
+else autorizado
+  par datos del expediente
+    ES -> DB : resumen · contratos · trayectoria · memorándums · capacitaciones
+    activate DB
+    DB --> ES : filas
+    deactivate DB
+  else asistencia
+    ES -> AS : GET /empleados/{id}/historial-asistencia (timeout 3 s)
+    activate AS
+    AS --> ES : resumen y jornadas (o «no disponible»)
+    deactivate AS
+  end
+  ES --> FE : 200 Kardex consolidado
+end
+deactivate ES
+FE --> RRHH : línea de tiempo contractual, memorándums con estado de acuse,\ncapacitaciones con vigencia, trayectoria y asistencia
+@enduml
