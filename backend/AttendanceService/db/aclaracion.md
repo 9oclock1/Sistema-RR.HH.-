@@ -64,7 +64,7 @@
 ### Aviso a compensaciones
 
 - Al cerrar la jornada, sus novedades se consolidan y se registra un evento `JORNADA_CONSOLIDADA` con tópico `compensaciones` en `EVENTOS_SALIENTES`: empleado, fecha, turno, horas efectivas del turno (`minutos_programados`), minutos de penalización (de las novedades registradas, no justificadas), minutos justificados, horas efectivas reconocidas (`minutos_efectivos`) y el detalle de cada novedad.
-- Se envía igual que los demás eventos: con `URL_COMPENSACIONES` el despachador hace `POST`; sin URL, CompensationService lo lee con `GET /eventos?topico=compensaciones`.
+- Se envía por REST (Compensaciones es del mismo proyecto): con `URL_COMPENSACIONES` el despachador hace `POST`; sin URL, CompensationService lo lee con `GET /eventos?topico=compensaciones`.
 - Cada novedad se consolida una sola vez. Si una novedad aparece después del cierre, llega en otro evento de la misma jornada: el consumidor debe sumar por `id_novedad`.
 
 ## Justificaciones
@@ -126,5 +126,5 @@
   - `AREAS_PRODUCCION` (panadería, fraccionamiento…) → tópico `produccion-logistica` (Producción y Logística).
   - `AREAS_REPARTO` (choferes de reparto) → tópico `entregas-despachos` (Gestión de Entregas y Despachos).
 - La carga trae el periodo, la sucursal, el área, la disponibilidad por día (cuántos en mañana, tarde, noche y descanso) y el turno de cada colaborador. Cada nueva publicación del rol genera eventos nuevos con la versión.
-- Si el tópico tiene URL (`URL_PRODUCCION_LOGISTICA`, `URL_ENTREGAS_DESPACHOS`), el despachador hace `POST` con la carga y las cabeceras `X-Evento-Id` y `X-Topico`; una respuesta 2xx lo marca como entregado. Reintenta con espera creciente (30 s, 1 min, 2 min… hasta 1 h) y tras 8 intentos queda fallido.
-- Sin URL, el módulo puede leer los eventos con `GET /eventos?topico=&estado=PENDIENTE` y confirmarlos con `POST /eventos/:id/confirmar`. Los consumidores deben ignorar un `X-Evento-Id` ya procesado (un evento puede llegar más de una vez).
+- Producción y Logística y Entregas y Despachos son módulos externos: sus eventos salen por Google Pub/Sub. Todo lo que sale de RRHH se publica en el tópico de RRHH (`PUBSUB_PREFIJO_TOPICO` + la letra del grupo, `f`); a qué módulo va cada mensaje se indica en el `encabezado` (`origen` y `destino`), y el cuerpo va en `datos`. El `id_mensaje` del encabezado es el `id_evento` guardado, y se conserva en los reintentos. Sin credenciales (`GOOGLE_APPLICATION_CREDENTIALS`) o emulador (`PUBSUB_EMULATOR_HOST`), los eventos quedan `PENDIENTE` hasta que haya. Si Pub/Sub falla, reintenta con espera creciente (30 s, 1 min, 2 min… hasta 1 h); solo un tópico inexistente o un mensaje inválido lo dejan `FALLIDO`.
+- Compensaciones es del mismo proyecto y va por REST. Con `URL_COMPENSACIONES`, el despachador hace `POST` con la carga y las cabeceras `X-Evento-Id` y `X-Topico`; una respuesta 2xx lo marca como entregado. Reintenta con la misma espera creciente y tras 8 intentos queda fallido. Sin URL, CompensationService puede leer los eventos con `GET /eventos?topico=compensaciones&estado=PENDIENTE` y confirmarlos con `POST /eventos/:id/confirmar`. Los consumidores deben ignorar un `X-Evento-Id` ya procesado (un evento puede llegar más de una vez).

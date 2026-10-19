@@ -12,6 +12,15 @@ const TOPICO = {
   COMPENSACIONES: "compensaciones",
 };
 
+// Remitente y grupos destino dentro del proyecto de Pub/Sub que comparten los módulos del ERP.
+const ORIGEN = { grupo: "F", modulo: "RRHH" };
+const DESTINOS = {
+  [TOPICO.PRODUCCION_LOGISTICA]: { grupo: "G", modulo: "Producción y Logística" },
+  [TOPICO.ENTREGAS_DESPACHOS]: { grupo: "H", modulo: "Entregas y Despachos" },
+};
+const VERSION_ESQUEMA = 1;
+
+// Reintentos del envío por HTTP (Compensaciones); Pub/Sub solo da por fallido un error permanente.
 const MAXIMO_INTENTOS = 8;
 const ESPERA_BASE_MS = 30 * 1000;
 const ESPERA_MAXIMA_MS = 60 * 60 * 1000;
@@ -36,6 +45,45 @@ function topicosDelArea(codigoArea, { areasProduccion, areasReparto }) {
 // Espera exponencial entre reintentos: 30 s, 1 min, 2 min… hasta 1 h.
 const esperaReintento = (intentos) => Math.min(ESPERA_BASE_MS * 2 ** Math.max(intentos - 1, 0), ESPERA_MAXIMA_MS);
 
+// Cada grupo lee su propio tópico: <prefijo><letra>, p. ej. ucb-sis323-sub-g.
+const topicoDelGrupo = (prefijo, grupo) => `${prefijo}${grupo.toLowerCase()}`;
+
+// El encabezado dice de quién es el mensaje y para quién; el contenido va en `datos`.
+function armarMensaje({ idMensaje, destino, tipo, fecha, datos }) {
+  return {
+    encabezado: { id_mensaje: idMensaje, origen: ORIGEN, destino, tipo, fecha, version_esquema: VERSION_ESQUEMA },
+    datos,
+  };
+}
+
+// Mismo encabezado como atributos de Pub/Sub, para filtrar sin leer el cuerpo.
+const atributosDe = ({ encabezado }) => ({
+  id_mensaje: encabezado.id_mensaje,
+  origen: encabezado.origen.grupo,
+  origen_modulo: encabezado.origen.modulo,
+  destino: encabezado.destino.grupo,
+  destino_modulo: encabezado.destino.modulo,
+  tipo: encabezado.tipo,
+  version_esquema: String(encabezado.version_esquema),
+});
+
+// Un tópico inexistente o un mensaje inválido no se arreglan reintentando; la red o las credenciales, sí.
+function errorDePublicacion(error, topico) {
+  switch (error?.code) {
+    case 5:
+      return { mensaje: `El tópico ${topico} no existe en Pub/Sub`, permanente: true };
+    case 3:
+      return { mensaje: "Pub/Sub rechazó el mensaje", permanente: true };
+    case 7:
+    case 16:
+      return { mensaje: "Pub/Sub rechazó las credenciales", permanente: false };
+    case "ENOENT":
+      return { mensaje: "No se encontró la llave de la cuenta de servicio", permanente: false };
+    default:
+      return { mensaje: "No se pudo conectar con Pub/Sub", permanente: false };
+  }
+}
+
 const FRANJA_POR_TIPO = { DIURNO: "manana", VESPERTINO: "tarde", NOCTURNO: "noche" };
 
 const hora = (valor) => valor?.slice(0, 5) ?? null;
@@ -58,7 +106,6 @@ function armarCargaPublicacion(detalle) {
   });
 
   return {
-    evento: TIPO_EVENTO.ROL_TURNOS_PUBLICADO,
     id_rol: detalle.id_rol,
     version: detalle.version_publicada,
     publicado_en: detalle.publicado_en,
@@ -92,8 +139,14 @@ module.exports = {
   TIPO_EVENTO,
   ESTADO_EVENTO,
   TOPICO,
+  ORIGEN,
+  DESTINOS,
   MAXIMO_INTENTOS,
   topicosDelArea,
   esperaReintento,
+  topicoDelGrupo,
+  armarMensaje,
+  atributosDe,
+  errorDePublicacion,
   armarCargaPublicacion,
 };

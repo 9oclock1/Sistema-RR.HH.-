@@ -6,10 +6,11 @@ const conEstado = (origen) => `
          es.codigo AS estado_codigo, es.nombre AS estado_nombre
   FROM ${origen} ev JOIN catalogos_estado_evento es USING (id_estado_evento)`;
 
-async function registrar(cliente, { topico, tipoEvento, idRol, carga }) {
+async function registrar(cliente, { idEvento = null, topico, tipoEvento, idRol, carga }) {
   await cliente.query(
-    "INSERT INTO eventos_salientes (topico, tipo_evento, id_rol, carga) VALUES ($1, $2, $3, $4)",
-    [topico, tipoEvento, idRol, carga]
+    `INSERT INTO eventos_salientes (id_evento, topico, tipo_evento, id_rol, carga)
+     VALUES (COALESCE($1::uuid, gen_random_uuid()), $2, $3, $4, $5)`,
+    [idEvento, topico, tipoEvento, idRol, carga]
   );
 }
 

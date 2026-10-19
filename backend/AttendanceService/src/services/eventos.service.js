@@ -23,9 +23,9 @@ const LOTE = 10;
 const SEGUNDOS_RESERVA = 60;
 const LIMITE_CONSULTA = 100;
 
-const prefijoTopico = () => process.env.PUBSUB_PREFIJO_TOPICO || "ucb-sis323-sub-";
+const prefijoTopico = () =>
+  process.env.PUBSUB_PREFIJO_TOPICO || "ucb-sis323-sub-";
 
-// Compensaciones es del mismo proyecto: va por REST. Sin URL, el evento queda pendiente para que el módulo lo consulte.
 const destinosHttp = () => ({
   [TOPICO.COMPENSACIONES]: process.env.URL_COMPENSACIONES || null,
 });
@@ -70,14 +70,21 @@ async function registrarConsolidacion(cliente, carga) {
   });
 }
 
-// Todo lo que sale de RRHH va al tópico de RRHH (<prefijo><letra del grupo origen>); el destino viaja en el encabezado.
 async function publicar(clientePubSub, evento) {
   const topico = topicoDelGrupo(prefijoTopico(), ORIGEN.grupo);
   try {
-    await clientePubSub.topic(topico).publishMessage({ json: evento.carga, attributes: atributosDe(evento.carga) });
+    await clientePubSub
+      .topic(topico)
+      .publishMessage({
+        json: evento.carga,
+        attributes: atributosDe(evento.carga),
+      });
     await modelo.marcarEntregado(evento.id_evento);
   } catch (error) {
-    console.error(`Error al publicar el evento ${evento.id_evento} en ${topico}:`, error.message);
+    console.error(
+      `Error al publicar el evento ${evento.id_evento} en ${topico}:`,
+      error.message,
+    );
     const { mensaje, permanente } = errorDePublicacion(error, topico);
     await modelo.marcarError(evento.id_evento, {
       error: mensaje,
@@ -91,7 +98,11 @@ async function enviarHttp(evento, url) {
   try {
     const respuesta = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Evento-Id": evento.id_evento, "X-Topico": evento.topico },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Evento-Id": evento.id_evento,
+        "X-Topico": evento.topico,
+      },
       body: JSON.stringify(evento.carga),
       signal: AbortSignal.timeout(TIEMPO_ESPERA_MS),
     });
@@ -103,15 +114,17 @@ async function enviarHttp(evento, url) {
   } catch (error) {
     const intentos = evento.intentos + 1;
     await modelo.marcarError(evento.id_evento, {
-      error: error.name === "TimeoutError" ? "El destino no respondió a tiempo" : error.message,
+      error:
+        error.name === "TimeoutError"
+          ? "El destino no respondió a tiempo"
+          : error.message,
       esperaMs: esperaReintento(intentos),
       fallido: intentos >= MAXIMO_INTENTOS,
     });
   }
 }
 
-// Producción y Entregas salen por Pub/Sub (sin configurar, quedan en la base hasta que lo esté);
-// Compensaciones sale por HTTP si hay URL.
+// Envía a Pub/Sub los eventos pendientes; sin Pub/Sub configurado quedan en la base hasta que lo esté.
 async function despachar() {
   const clientePubSub = pubsub.obtenerCliente();
   const urls = destinosHttp();
@@ -120,9 +133,17 @@ async function despachar() {
     ...Object.keys(urls).filter((topico) => urls[topico]),
   ];
   if (topicos.length === 0) return 0;
-  const eventos = await modelo.reservarPendientes(topicos, LOTE, SEGUNDOS_RESERVA);
+  const eventos = await modelo.reservarPendientes(
+    topicos,
+    LOTE,
+    SEGUNDOS_RESERVA,
+  );
   await Promise.all(
-    eventos.map((evento) => (DESTINOS[evento.topico] ? publicar(clientePubSub, evento) : enviarHttp(evento, urls[evento.topico])))
+    eventos.map((evento) =>
+      DESTINOS[evento.topico]
+        ? publicar(clientePubSub, evento)
+        : enviarHttp(evento, urls[evento.topico]),
+    ),
   );
   return eventos.length;
 }
@@ -162,13 +183,26 @@ async function listarDeRol(idRol) {
 async function listar({ topico, estado } = {}) {
   const errores = [];
   if (topico !== undefined && !Object.values(TOPICO).includes(topico)) {
-    errores.push({ campo: "topico", mensaje: `Use uno de: ${Object.values(TOPICO).join(", ")}.` });
+    errores.push({
+      campo: "topico",
+      mensaje: `Use uno de: ${Object.values(TOPICO).join(", ")}.`,
+    });
   }
-  if (estado !== undefined && !["PENDIENTE", "ENTREGADO", "FALLIDO"].includes(estado)) {
-    errores.push({ campo: "estado", mensaje: "Use PENDIENTE, ENTREGADO o FALLIDO." });
+  if (
+    estado !== undefined &&
+    !["PENDIENTE", "ENTREGADO", "FALLIDO"].includes(estado)
+  ) {
+    errores.push({
+      campo: "estado",
+      mensaje: "Use PENDIENTE, ENTREGADO o FALLIDO.",
+    });
   }
   if (errores.length > 0) throw new ErrorApp(400, "Filtros inválidos", errores);
-  const eventos = await modelo.listar({ topico: topico ?? null, estado: estado ?? null, limite: LIMITE_CONSULTA });
+  const eventos = await modelo.listar({
+    topico: topico ?? null,
+    estado: estado ?? null,
+    limite: LIMITE_CONSULTA,
+  });
   return eventos.map((evento) => ({
     id_evento: evento.id_evento,
     topico: evento.topico,

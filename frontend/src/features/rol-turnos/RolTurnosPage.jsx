@@ -189,7 +189,11 @@ function EditorRol({ rol, paleta, onActualizar, onEliminado }) {
                 {TOPICOS[evento.topico]}:{" "}
                 <Etiqueta tono={TONO_EVENTO[evento.estado.codigo]}>{evento.estado.nombre}</Etiqueta>
                 {evento.ultimo_error && evento.estado.codigo !== "ENTREGADO" && (
-                  <span className="rt-eventos__error"> ({evento.ultimo_error}; se reintentará)</span>
+                  <span className="rt-eventos__error">
+                    {" "}
+                    ({evento.ultimo_error}
+                    {evento.estado.codigo === "PENDIENTE" && "; se reintentará"})
+                  </span>
                 )}
               </li>
             ))}
