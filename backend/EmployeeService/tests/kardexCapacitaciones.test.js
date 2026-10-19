@@ -32,9 +32,9 @@ INSERT INTO cursos_capacitacion (id_curso, codigo, nombre, horas_academicas, tip
   ('${CARNET}', 'BPM-01', 'Manipulación de alimentos', 20, 'CARNET_SANITARIO', TRUE, 12),
   ('${INDUCCION}', 'IND-01', 'Inducción institucional', 8, 'INDUCCION', FALSE, NULL),
   ('${MONTACARGAS}', 'MON-01', 'Operación de montacargas', 40, 'CERTIFICACION', TRUE, NULL);
-INSERT INTO solicitudes_servicio_capacitacion (id_solicitud_servicio, id_curso, id_empleado_solicitante, descripcion_requerimiento,
+INSERT INTO solicitudes_servicio_capacitacion (id_solicitud_servicio, id_mensaje, id_curso, id_empleado_solicitante, descripcion_requerimiento,
                                                cantidad_participantes, estado, enviada_en, numero_orden_servicio, proveedor_nombre) VALUES
-  ('${ORDEN}', '${CARNET}', '${LUIS}', 'Curso BPM', 10, 'ORDEN_EMITIDA', now(), 'OS-2026-0042', 'Capacita SRL');
+  ('${ORDEN}', gen_random_uuid(), '${CARNET}', '${LUIS}', 'Curso BPM', 10, 'ORDEN_EMITIDA', now(), 'OS-2026-0042', 'Capacita SRL');
 INSERT INTO capacitaciones_certificacion (id_capacitacion, id_empleado, id_curso, institucion_emisora, fecha_inicio, fecha_fin,
                                           fecha_emision, fecha_vencimiento, id_solicitud_servicio,
                                           certificado_adjunto_url, certificado_nombre_original, certificado_tipo_mime, certificado_tamano_bytes) VALUES

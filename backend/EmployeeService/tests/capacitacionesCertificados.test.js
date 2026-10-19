@@ -37,10 +37,10 @@ INSERT INTO cursos_capacitacion (id_curso, codigo, nombre, horas_academicas, tip
   ('${INDUCCION}', 'IND-01', 'Inducción institucional', 8, 'INDUCCION', FALSE, NULL, TRUE),
   ('${CERTIFICACION}', 'MON-01', 'Operación de montacargas', 40, 'CERTIFICACION', TRUE, NULL, TRUE),
   ('${CURSO_BAJA}', 'OLD-01', 'Curso antiguo', 4, 'TECNICA', FALSE, NULL, FALSE);
-INSERT INTO solicitudes_servicio_capacitacion (id_solicitud_servicio, id_curso, id_empleado_solicitante, descripcion_requerimiento,
+INSERT INTO solicitudes_servicio_capacitacion (id_solicitud_servicio, id_mensaje, id_curso, id_empleado_solicitante, descripcion_requerimiento,
                                                cantidad_participantes, estado, enviada_en, numero_orden_servicio, proveedor_nombre) VALUES
-  ('${ORDEN_EMITIDA}', '${CARNET}', '${LUIS}', 'Curso BPM para cajeros', 12, 'ORDEN_EMITIDA', now(), 'OS-2026-0007', 'Capacita SRL'),
-  ('${EN_PROCESO}', '${CARNET}', '${LUIS}', 'Segundo grupo', 10, 'EN_PROCESO', now(), NULL, NULL);
+  ('${ORDEN_EMITIDA}', gen_random_uuid(), '${CARNET}', '${LUIS}', 'Curso BPM para cajeros', 12, 'ORDEN_EMITIDA', now(), 'OS-2026-0007', 'Capacita SRL'),
+  ('${EN_PROCESO}', gen_random_uuid(), '${CARNET}', '${LUIS}', 'Segundo grupo', 10, 'EN_PROCESO', now(), NULL, NULL);
 `;
 
 const PDF = { contenido: Buffer.from('%PDF-1.4 certificado'), filename: 'carnet sanitario año 2026.pdf', contentType: 'application/pdf' };
