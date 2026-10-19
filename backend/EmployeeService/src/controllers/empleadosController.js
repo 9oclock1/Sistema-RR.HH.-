@@ -1,8 +1,12 @@
 const empleadosService = require('../services/empleadosService');
-const { validarIdRuta } = require('../validators/comunes');
+const { validarIdRuta, normalizarUuid, lanzarSiHayErrores } = require('../validators/comunes');
 
 const listarEmpleados = async (req, res) => {
-  res.status(200).json(await empleadosService.listarEmpleados());
+  const errores = [];
+  const idSucursal = normalizarUuid(req.query.id_sucursal, 'id_sucursal', {}, errores);
+  const idDepartamento = normalizarUuid(req.query.id_departamento, 'id_departamento', {}, errores);
+  lanzarSiHayErrores(errores);
+  res.status(200).json(await empleadosService.listarEmpleados({ idSucursal, idDepartamento }));
 };
 
 const obtenerFicha = async (req, res) => {

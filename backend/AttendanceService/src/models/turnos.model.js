@@ -63,7 +63,11 @@ async function eliminar(id) {
 
 async function contarEmpleadosAsignados(id) {
   const { rows } = await pool.query(
-    "SELECT COUNT(DISTINCT id_empleado)::int AS total FROM asignaciones_turno WHERE id_turno = $1",
+    `SELECT COUNT(DISTINCT id_empleado)::int AS total FROM (
+       SELECT id_empleado FROM asignaciones_turno WHERE id_turno = $1
+       UNION SELECT id_empleado FROM asignaciones_rol_turno WHERE id_turno = $1
+       UNION SELECT id_empleado FROM turnos_publicados WHERE id_turno = $1
+     ) asignados`,
     [id]
   );
   return rows[0].total;

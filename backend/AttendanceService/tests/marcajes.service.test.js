@@ -2,6 +2,7 @@ const { test, beforeEach, mock } = require("node:test");
 const assert = require("node:assert/strict");
 const modelo = require("../src/models/marcajes.model");
 const empleados = require("../src/services/empleados.service");
+const novedades = require("../src/services/novedades.service");
 const servicio = require("../src/services/marcajes.service");
 const { ORIGEN_MARCAJE, TIPO_MARCAJE, ESTADO_MARCAJE } = require("../src/utils/marcajes");
 
@@ -19,6 +20,7 @@ beforeEach(() => {
   mock.restoreAll();
   mock.method(empleados, "obtener", async (id) => (id === ANA ? { nombres: "Ana", apellidos: "Quispe", activo: true } : null));
   mock.method(modelo, "listarRecientes", async () => []);
+  mock.method(novedades, "alMarcar", async () => []);
   mock.method(modelo, "momentoActual", async () => ({ ahora: new Date("2026-09-24T21:10:00Z"), hoy: "2026-09-24" }));
   registrar = mock.method(modelo, "registrar", async (datos) => ({ ...entradaDeAna, ...datos }));
 });
@@ -239,4 +241,35 @@ test("la consulta de jornada muestra entrada, salida y horas trabajadas", async 
   assert.equal(jornada.salida, salidaDeAna);
   assert.equal(jornada.minutos_trabajados, 547);
   assert.equal(jornada.inconsistencia, null);
+});
+
+const atrasoDeAna = { tipo: { codigo: "ATRASO", nombre: "Atraso" }, minutos: 12, turno: { nombre: "Mañana" } };
+
+test("la entrada tardía devuelve el atraso calculado", async () => {
+  novedades.alMarcar.mock.mockImplementation(async () => [atrasoDeAna]);
+  const entrada = await servicio.registrarEntrada(ANA);
+  assert.equal(entrada.atraso, atrasoDeAna);
+  assert.equal(novedades.alMarcar.mock.calls[0].arguments[0], ANA);
+});
+
+test("si falla el cálculo de novedades, el marcaje se guarda igual y sin atraso", async () => {
+  novedades.alMarcar.mock.mockImplementation(async () => {
+    throw new Error("fallo");
+  });
+  mock.method(console, "error", () => {});
+  const entrada = await servicio.registrarEntrada(ANA);
+  assert.equal(registrar.mock.callCount(), 1);
+  assert.equal(entrada.atraso, null);
+});
+
+test("la salida antes del fin devuelve la salida anticipada y la consulta de jornada las novedades", async () => {
+  const anticipada = { tipo: { codigo: "SALIDA_ANTICIPADA", nombre: "Salida anticipada" }, minutos: 45 };
+  novedades.alMarcar.mock.mockImplementation(async () => [atrasoDeAna, anticipada]);
+  conMarcajes(entradaDeAna);
+  devolver(salidaDeAna);
+  const resumen = await servicio.registrarSalida(ANA);
+  assert.equal(resumen.salida_anticipada, anticipada);
+  assert.equal(resumen.atraso, atrasoDeAna);
+  const jornada = await servicio.consultarJornada(ANA);
+  assert.equal(jornada.salida_anticipada, anticipada);
 });
