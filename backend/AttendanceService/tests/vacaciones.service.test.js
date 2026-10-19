@@ -44,6 +44,16 @@ test("empleado inexistente o con identificador inválido: 404", async () => {
   }
 });
 
-test("sin fecha de ingreso en EmployeeService: 502", async () => {
+test("sin fecha de ingreso o con formato inesperado en EmployeeService: 502", async () => {
   await assert.rejects(servicio.consultarSaldo(SIN_FECHA, AHORA), (error) => error.estado === 502);
+  mock.method(empleados, "obtener", async () => ({ activo: true, fecha_ingreso: "2023-01-10T00:00:00.000Z" }));
+  await assert.rejects(servicio.consultarSaldo(ANA, AHORA), (error) => error.estado === 502);
+});
+
+test("consulta propia de un empleado no registrado: 403 (identidad rechazada); la de RRHH sigue siendo 404", async () => {
+  const inexistente = "00000000-0000-4000-8000-000000000000";
+  await assert.rejects(servicio.consultarMiSaldo(inexistente, AHORA), (error) => error.estado === 403);
+  await assert.rejects(servicio.consultarMiSaldo("no-es-uuid", AHORA), (error) => error.estado === 403);
+  await assert.rejects(servicio.consultarSaldo(inexistente, AHORA), (error) => error.estado === 404);
+  assert.equal((await servicio.consultarMiSaldo(ANA, AHORA)).id_empleado, ANA);
 });

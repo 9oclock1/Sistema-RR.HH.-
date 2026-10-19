@@ -8,8 +8,8 @@ import HistorialVacaciones from "./HistorialVacaciones";
 import SaldoVacaciones from "./SaldoVacaciones";
 import { useSaldoVacaciones } from "./useSaldoVacaciones";
 
-// El servidor responde 401 sin identificador y 404 si el empleado no existe: en ambos se vuelve a pedirlo.
-const esRechazoDeIdentidad = (error) => error?.estado === 401 || error?.estado === 404;
+// El servidor responde 401 sin identificador y 403 si no corresponde a un empleado: en ambos se vuelve a pedirlo.
+const esRechazoDeIdentidad = (error) => error?.estado === 401 || error?.estado === 403;
 
 export default function MiSaldo() {
   const [idEmpleado, setIdEmpleado] = useState(leerEmpleado);

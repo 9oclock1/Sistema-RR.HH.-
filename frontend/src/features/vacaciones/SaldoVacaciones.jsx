@@ -87,6 +87,12 @@ export default function SaldoVacaciones({ saldo, cargando, error, onReintentar, 
           ))}
         </dl>
 
+        {dias.disponibles < 0 && (
+          <Alerta tono="aviso" titulo="El saldo es negativo">
+            Los días gozados y en proceso superan los acumulados. Revise los movimientos con RRHH.
+          </Alerta>
+        )}
+
         <p className="vacaciones-nota">
           {anios_servicio === 0
             ? `Aún no cumple el primer año de servicio. Ganará ${proximo}.`

@@ -1,7 +1,7 @@
 const servicio = require("../services/vacaciones.service");
 
 async function miSaldo(req, res) {
-  res.json(await servicio.consultarSaldo(req.idEmpleado));
+  res.json(await servicio.consultarMiSaldo(req.idEmpleado));
 }
 
 async function saldoDeEmpleado(req, res) {
