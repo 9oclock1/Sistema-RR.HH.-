@@ -15,6 +15,8 @@ export const DESCRIPCION_MODIFICACION = {
   AJUSTE_CONDICIONES: 'Adenda que formaliza otras condiciones de trabajo; descríbelas en la justificación.',
 };
 
+export const TIPO_INDEFINIDO = 'INDEFINIDO';
+
 export const MODIFICACIONES = ['RENOVACION', 'CAMBIO_JORNADA', 'AJUSTE_SALARIAL', 'AJUSTE_CONDICIONES'];
 
 export const esAdenda = (tipo) => tipo !== 'CONTRATO_INICIAL' && tipo !== 'RENOVACION';

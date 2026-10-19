@@ -13,6 +13,7 @@ import {
   MODIFICACIONES,
   MONTO_REGEX,
   NUMERO_MAX,
+  TIPO_INDEFINIDO,
   TIPOS_MODIFICACION,
 } from '../utils/opciones';
 import { diaSiguiente, mismoMonto, normalizarMonto } from '../utils/versiones';
@@ -64,7 +65,13 @@ const validarVigencia = (tipo, fecha, actual) => {
   return undefined;
 };
 
-const validar = (valores, actual, documento) => {
+const esIndefinido = (catalogos, idTipoContrato) =>
+  catalogos.tipos_contrato.find((t) => String(t.id_tipo_contrato) === String(idTipoContrato))?.codigo === TIPO_INDEFINIDO;
+
+const pideFechaFin = (valores, catalogos) =>
+  Boolean(CAMPOS_POR_TIPO[valores.tipo_modificacion]?.fechaFin) && !esIndefinido(catalogos, valores.id_tipo_contrato);
+
+const validar = (valores, actual, documento, catalogos) => {
   const errores = {};
   const tipo = valores.tipo_modificacion;
   const campos = CAMPOS_POR_TIPO[tipo] ?? {};
@@ -77,8 +84,11 @@ const validar = (valores, actual, documento) => {
 
   const errorVigencia = tipo ? validarVigencia(tipo, valores.fecha_vigencia, actual) : undefined;
   if (errorVigencia) errores.fecha_vigencia = errorVigencia;
-  if (campos.fechaFin && valores.fecha_fin && valores.fecha_vigencia && valores.fecha_fin < valores.fecha_vigencia) {
-    errores.fecha_fin = 'La fecha de fin no puede ser anterior a la de vigencia.';
+  if (pideFechaFin(valores, catalogos)) {
+    if (!valores.fecha_fin) errores.fecha_fin = 'Indica hasta cuándo rige: solo un contrato indefinido puede no tener fecha de fin.';
+    else if (valores.fecha_vigencia && valores.fecha_fin < valores.fecha_vigencia) {
+      errores.fecha_fin = 'La fecha de fin no puede ser anterior a la de vigencia.';
+    }
   }
 
   if (tipo === 'CAMBIO_JORNADA' && valores.id_tipo_jornada === String(actual.id_tipo_jornada)) {
@@ -141,7 +151,7 @@ const textoVigencia = (valores, actual) => {
     : `Desde ${desde}, hasta el fin del contrato indefinido`;
 };
 
-export default function ModificacionContratoForm({ idEmpleado, actual, catalogos, onRegistrar }) {
+export default function ModificacionContratoForm({ idEmpleado, actual, catalogos, autor, onRegistrar }) {
   const uid = useId();
   const idCampo = (campo) => `${uid}-${campo}`;
 
@@ -163,6 +173,7 @@ export default function ModificacionContratoForm({ idEmpleado, actual, catalogos
   const campos = CAMPOS_POR_TIPO[tipo] ?? {};
   const limites = limitesVigencia(tipo, actual);
   const renovable = Boolean(actual.fecha_fin_contrato);
+  const conFechaFin = pideFechaFin(valores, catalogos);
 
   const quitarError = (...lista) =>
     setErrores((previos) => {
@@ -173,8 +184,9 @@ export default function ModificacionContratoForm({ idEmpleado, actual, catalogos
     });
 
   const actualizarCampo = (campo, valor) => {
-    setValores((previos) => ({ ...previos, [campo]: valor }));
-    quitarError(campo, ...(campo === 'fecha_vigencia' ? ['fecha_fin'] : []));
+    const limpiaFin = campo === 'id_tipo_contrato' && esIndefinido(catalogos, valor);
+    setValores((previos) => ({ ...previos, [campo]: valor, ...(limpiaFin && { fecha_fin: '' }) }));
+    quitarError(campo, ...(campo === 'fecha_vigencia' || campo === 'id_tipo_contrato' ? ['fecha_fin'] : []));
   };
 
   const seleccionarTipo = (nuevo) => {
@@ -194,7 +206,7 @@ export default function ModificacionContratoForm({ idEmpleado, actual, catalogos
     evento.preventDefault();
     setRechazo(null);
 
-    const erroresCliente = validar(valores, actual, documento);
+    const erroresCliente = validar(valores, actual, documento, catalogos);
     setErrores(erroresCliente);
     const primero = CAMPOS.find((campo) => erroresCliente[campo]);
     if (primero) return enfocar(primero);
@@ -209,7 +221,7 @@ export default function ModificacionContratoForm({ idEmpleado, actual, catalogos
     datos.append('numero_contrato', valores.numero_contrato.trim());
     datos.append('fecha_vigencia', valores.fecha_vigencia);
     datos.append('justificacion', valores.justificacion.trim());
-    if (campos.fechaFin && valores.fecha_fin) datos.append('fecha_fin', valores.fecha_fin);
+    if (conFechaFin) datos.append('fecha_fin', valores.fecha_fin);
     if (campos.tipoContrato) datos.append('id_tipo_contrato', valores.id_tipo_contrato);
     if (campos.jornada) datos.append('id_tipo_jornada', valores.id_tipo_jornada);
     if (campos.haber) datos.append('haber_mensual_pactado', normalizarMonto(valores.haber_mensual_pactado));
@@ -304,16 +316,17 @@ export default function ModificacionContratoForm({ idEmpleado, actual, catalogos
               error={errores.fecha_vigencia}
               ayuda={errores.fecha_vigencia ? undefined : ayudaVigencia()}
             />
-            {campos.fechaFin && (
+            {conFechaFin && (
               <CampoTexto
                 id={idCampo('fecha_fin')}
                 type="date"
                 etiqueta="Fecha de fin"
+                requerido
                 value={valores.fecha_fin}
                 min={valores.fecha_vigencia || limites.min}
                 onChange={(e) => actualizarCampo('fecha_fin', e.target.value)}
                 error={errores.fecha_fin}
-                ayuda={errores.fecha_fin ? undefined : 'Déjala vacía si el nuevo contrato es por plazo indefinido.'}
+                ayuda={errores.fecha_fin ? undefined : 'Último día del nuevo contrato.'}
               />
             )}
           </div>
@@ -329,7 +342,11 @@ export default function ModificacionContratoForm({ idEmpleado, actual, catalogos
                   onChange={(e) => actualizarCampo('id_tipo_contrato', e.target.value)}
                   opciones={catalogos.tipos_contrato.map((t) => ({ valor: String(t.id_tipo_contrato), etiqueta: t.nombre }))}
                   error={errores.id_tipo_contrato}
-                  ayuda={errores.id_tipo_contrato ? undefined : `Vigente: ${actual.tipo_contrato}`}
+                  ayuda={
+                    errores.id_tipo_contrato
+                      ? undefined
+                      : `Vigente: ${actual.tipo_contrato}.${conFechaFin ? '' : ' Un contrato indefinido no lleva fecha de fin.'}`
+                  }
                 />
               )}
               {campos.jornada && (
@@ -391,7 +408,7 @@ export default function ModificacionContratoForm({ idEmpleado, actual, catalogos
         </fieldset>
 
         <div className="contratos-form__pie">
-          <Boton type="submit" variante="primario" icono={FileSignature} disabled={enviando}>
+          <Boton type="submit" variante="primario" icono={FileSignature} disabled={enviando || !autor}>
             Revisar y registrar
           </Boton>
         </div>
@@ -420,6 +437,10 @@ export default function ModificacionContratoForm({ idEmpleado, actual, catalogos
             <div>
               <dt>Vigencia</dt>
               <dd>{revisando && textoVigencia(valores, actual)}</dd>
+            </div>
+            <div>
+              <dt>Registrado por</dt>
+              <dd>{autor}</dd>
             </div>
             <div>
               <dt>Documento</dt>

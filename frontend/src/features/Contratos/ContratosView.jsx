@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router';
 import { FileText, IdCard, UserSearch } from 'lucide-react';
 import { createModificacionContrato } from '../../api/contratosApi';
 import { Alerta, Boton, EncabezadoPagina, Esqueleto, EstadoVacio, Selector, Tarjeta } from '../../components/ui';
-import { useRol } from '../../context/sesion';
+import { useRol, useUsuario } from '../../context/sesion';
 import { useEmpleados } from '../Asignaciones/hooks/useEmpleados';
 import { RUTA_KARDEX } from '../Kardex/ruta';
 import { formatearFecha } from '../Vacantes/utils/formato';
@@ -27,6 +27,7 @@ function Cargando() {
 
 export default function ContratosView() {
   const rol = useRol();
+  const usuario = useUsuario();
   const [parametros, setParametros] = useSearchParams();
   const idEmpleado = parametros.get('empleado') ?? '';
   const empleados = useEmpleados();
@@ -38,6 +39,7 @@ export default function ContratosView() {
 
   const actual = versionActual(historial);
   const empleado = empleados.empleados.find((e) => e.id_empleado === idEmpleado);
+  const autor = empleados.empleados.find((e) => e.id_empleado === usuario)?.nombre_completo ?? null;
 
   useEffect(() => {
     if (registrada) refResultado.current?.focus();
@@ -49,7 +51,7 @@ export default function ContratosView() {
   };
 
   const registrar = async (datos) => {
-    const version = await createModificacionContrato(datos, { rol });
+    const version = await createModificacionContrato(datos, { rol, usuario });
     setRegistrada({ ...version, empleado: empleado?.nombre_completo ?? 'el colaborador' });
     setFormKey((k) => k + 1);
     recargar();
@@ -101,6 +103,7 @@ export default function ContratosView() {
         key={`${idEmpleado}#${formKey}`}
         idEmpleado={idEmpleado}
         actual={actual}
+        autor={autor}
         catalogos={catalogos}
         onRegistrar={registrar}
       />
@@ -153,6 +156,13 @@ export default function ContratosView() {
             {actual && !cargando && <ResumenVersionActual version={actual} />}
           </div>
         </Tarjeta>
+
+        {!autor && !empleados.cargando && (
+          <Alerta tono="aviso" titulo="Elige tu usuario de prueba para registrar">
+            Selecciona quién eres en «Usuario de prueba», al pie de la barra lateral. Quedará como autor de cada versión
+            del contrato.
+          </Alerta>
+        )}
 
         <Tarjeta titulo="Nueva modificación contractual">{formulario}</Tarjeta>
       </div>
