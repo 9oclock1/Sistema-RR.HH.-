@@ -1,4 +1,4 @@
-import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarRange, ClipboardCheck, FileCheck, FileText, FileUser, FileWarning, Fingerprint, IdCard, ListTree, Mail, Megaphone, Network, Send, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarDays, CalendarRange, ClipboardCheck, FileCheck, FileText, FileUser, FileWarning, Fingerprint, IdCard, ListTree, Mail, Megaphone, Network, Send, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
@@ -22,6 +22,7 @@ import RolTurnosPage from "../features/rol-turnos/RolTurnosPage";
 import SeguimientoAcusesPage from "../features/Memorandums/acuses/SeguimientoAcusesPage";
 import TurnosPage from "../features/turnos/TurnosPage";
 import SolicitudVacacionesPage from "../features/solicitud-vacaciones/SolicitudVacacionesPage";
+import VacacionesPage from "../features/vacaciones/VacacionesPage";
 import VacantesView from "../features/Vacantes/VacantesView";
 import { puedeAcceder } from "../utils/permisos";
 
@@ -122,6 +123,14 @@ export const SECCIONES = [
         icono: FileText,
         roles: ["empleado"],
         pagina: LicenciasPage,
+      },
+      {
+        ruta: "/asistencia/vacaciones",
+        etiqueta: "Vacaciones",
+        descripcion: "Saldo de días ganados, gozados y disponibles según su antigüedad.",
+        icono: CalendarDays,
+        roles: ["empleado"],
+        pagina: VacacionesPage,
       },
       {
         ruta: "/asistencia/turnos",

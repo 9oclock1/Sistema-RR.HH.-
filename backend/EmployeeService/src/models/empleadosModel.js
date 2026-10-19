@@ -83,6 +83,7 @@ const obtenerResumen = async (db, idEmpleado) => {
     `SELECT e.id_empleado,
             e.nombres,
             concat_ws(' ', e.primer_apellido, e.segundo_apellido) AS apellidos,
+            e.fecha_ingreso,
             ee.permite_acceso AS activo
        FROM empleados e
        JOIN estados_empleado ee ON ee.id_estado_empleado = e.id_estado_empleado
