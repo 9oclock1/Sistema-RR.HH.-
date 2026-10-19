@@ -1,0 +1,103 @@
+.affinity-filtro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-bg-page);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  margin-bottom: var(--space-3);
+}
+
+.affinity-filtro__presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.affinity-filtro__etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
+
+.affinity-filtro__botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.affinity-filtro__chip {
+  padding: 2px var(--space-2);
+  min-height: 24px;
+  font-family: var(--font-family);
+  font-size: var(--font-size-small);
+  border-radius: var(--radius-control);
+  border: var(--border-width) solid var(--color-border);
+  background-color: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+  outline: none;
+}
+
+.affinity-filtro__chip:hover:not(:disabled) {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text);
+  border-color: var(--color-border-hover);
+}
+
+.affinity-filtro__chip:focus-visible {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 var(--focus-ring-width) var(--color-border-focus);
+}
+
+.affinity-filtro__chip--activo {
+  background-color: var(--color-bg-selected);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.affinity-filtro__manual {
+  display: flex;
+  align-items: center;
+}
+
+.affinity-filtro__inputs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.affinity-filtro__inputs .ds-campo {
+  margin: 0;
+  width: 80px;
+}
+
+.affinity-filtro__separador {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+}
+
+@media (max-width: 640px) {
+  .affinity-filtro {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .affinity-filtro__manual {
+    width: 100%;
+  }
+
+  .affinity-filtro__inputs {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

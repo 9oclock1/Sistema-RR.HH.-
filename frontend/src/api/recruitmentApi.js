@@ -46,13 +46,29 @@ export async function registerApplicant(applicantData) {
 }
 
 /**
- * Obtiene la lista de postulantes de una convocatoria específica.
+ * Obtiene la lista de postulantes de una convocatoria específica,
+ * admitiendo filtros opcionales de rango de afinidad.
  * @param {string} id_convocatoria - UUID de la convocatoria
+ * @param {Object} [filtros={}] - { minAfinidad, maxAfinidad }
  * @returns {Promise<Object>} { convocatoria, total_postulantes, postulantes }
  */
-export async function fetchApplicantsByJobOpening(id_convocatoria) {
+export async function fetchApplicantsByJobOpening(
+  id_convocatoria,
+  { minAfinidad = null, maxAfinidad = null } = {},
+) {
   try {
-    const respuesta = await solicitar(`${RUTA_BASE}/by-opening/${id_convocatoria}`);
+    const params = new URLSearchParams();
+    if (minAfinidad !== null && minAfinidad !== "") {
+      params.append("minAfinidad", minAfinidad);
+    }
+    if (maxAfinidad !== null && maxAfinidad !== "") {
+      params.append("maxAfinidad", maxAfinidad);
+    }
+
+    const queryStr = params.toString() ? `?${params.toString()}` : "";
+    const respuesta = await solicitar(
+      `${RUTA_BASE}/by-opening/${id_convocatoria}${queryStr}`,
+    );
     return respuesta?.data ?? respuesta ?? { postulantes: [] };
   } catch (error) {
     throw adaptarError(error);
