@@ -43,11 +43,11 @@ async function registrarPublicacion(cliente, detalle) {
   }
 }
 
-// Se llama dentro de la transacción que marca la jornada como consolidada.
+// Se llama dentro de la transacción que consolida la jornada o la recalcula al aprobar un justificativo.
 async function registrarConsolidacion(cliente, carga) {
   await modelo.registrar(cliente, {
     topico: TOPICO.COMPENSACIONES,
-    tipoEvento: TIPO_EVENTO.JORNADA_CONSOLIDADA,
+    tipoEvento: carga.evento ?? TIPO_EVENTO.JORNADA_CONSOLIDADA,
     idRol: null,
     carga: { ...carga, topico: TOPICO.COMPENSACIONES },
   });

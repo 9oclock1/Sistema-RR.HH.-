@@ -1,14 +1,14 @@
 {
-    "sqltools.connections": [
-        {
-            "ssh": "Disabled",
-            "previewLimit": 50,
-            "server": "localhost",
-            "port": 5432,
-            "driver": "PostgreSQL",
-            "username": "adminRRHH",
-            "name": "RRHH",
-            "database": "postgres"
-        }
-    ]
+  "sqltools.connections": [
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "localhost",
+      "port": 5432,
+      "driver": "PostgreSQL",
+      "name": "employeeDB",
+      "database": "EmployeeDB",
+      "username": "adminRRHH"
+    }
+  ]
 }

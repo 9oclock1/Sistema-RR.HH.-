@@ -44,6 +44,7 @@ beforeEach(() => {
   mock.method(modelo, "listarProgramacion", async () => [turno(ANA, { id_rol: ROL }), turno(LUIS)]);
   mock.method(modelo, "listarMarcajes", async () => [entrada(ANA, "08:20")]);
   mock.method(modelo, "sumarAtrasosDelMes", async () => [{ id_empleado: ANA, minutos: 45, cantidad: 2 }]);
+  mock.method(modelo, "listarJustificadas", async () => []);
   registrar = mock.method(modelo, "registrar", async (filas) => filas.length);
 });
 
@@ -221,6 +222,32 @@ test("panel: solo personal activo, estados ordenados por urgencia y resumen", as
   assert.equal(panel.resumen.inasistencias, 1);
   assert.equal(panel.resumen.atrasos, 1);
   assert.equal(panel.resumen.con_turno, 2);
+});
+
+test("panel: la falta y el atraso con justificación aprobada no quedan como alerta ni descuentan", async () => {
+  mock.method(empleados, "listarPorArea", async () => [
+    { id_empleado: ANA, nombre_completo: "Ana Quispe", activo: true },
+    { id_empleado: LUIS, nombre_completo: "Luis Rojas", activo: true },
+  ]);
+  mock.method(modelo, "listarJustificadas", async () => [
+    { id_empleado: LUIS, tipo_codigo: "INASISTENCIA" },
+    { id_empleado: ANA, tipo_codigo: "ATRASO" },
+  ]);
+  const panel = await servicio.panel({ id_sucursal: SUCURSAL });
+  assert.deepEqual(modelo.listarJustificadas.mock.calls[0].arguments, [[ANA, LUIS], HOY]);
+  assert.deepEqual(
+    panel.colaboradores.map((c) => [c.nombre_completo, c.estado.codigo, c.estado.nombre, c.justificadas]),
+    [
+      ["Luis Rojas", "INASISTENCIA_JUSTIFICADA", "Falta justificada", ["INASISTENCIA"]],
+      ["Ana Quispe", "ATRASO_JUSTIFICADO", "Atraso justificado", ["ATRASO"]],
+    ]
+  );
+  assert.equal(panel.colaboradores[0].minutos_inasistencia, 420);
+  assert.equal(panel.colaboradores[0].minutos_penalizacion, 0);
+  assert.equal(panel.colaboradores[1].minutos_penalizacion, 0);
+  assert.equal(panel.resumen.inasistencias, 0);
+  assert.equal(panel.resumen.atrasos, 0);
+  assert.equal(panel.resumen.justificadas, 2);
 });
 
 test("panel: una sucursal sin personal no consulta turnos", async () => {

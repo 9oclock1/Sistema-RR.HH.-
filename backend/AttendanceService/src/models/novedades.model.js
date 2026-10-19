@@ -58,9 +58,10 @@ async function registrar(novedades) {
   const { rowCount } = await pool.query(
     `INSERT INTO novedades_asistencia (id_empleado, fecha_jornada, id_tipo_novedad, id_turno, id_rol, nombre_turno,
                                        inicio_programado, fin_programado, minutos_tolerancia, id_marcaje,
-                                       minutos, minutos_penalizacion)
+                                       minutos, minutos_penalizacion, minutos_programados)
      SELECT * FROM unnest($1::uuid[], $2::date[], $3::smallint[], $4::uuid[], $5::uuid[], $6::varchar[],
-                          $7::timestamptz[], $8::timestamptz[], $9::smallint[], $10::uuid[], $11::int[], $12::int[])
+                          $7::timestamptz[], $8::timestamptz[], $9::smallint[], $10::uuid[], $11::int[], $12::int[],
+                          $13::int[])
      ON CONFLICT (id_empleado, fecha_jornada, id_tipo_novedad) DO NOTHING`,
     [
       columna("id_empleado"),
@@ -75,6 +76,7 @@ async function registrar(novedades) {
       columna("id_marcaje"),
       columna("minutos"),
       columna("minutos_penalizacion"),
+      columna("minutos_programados"),
     ]
   );
   return rowCount;
@@ -83,7 +85,7 @@ async function registrar(novedades) {
 const conCatalogos = `
   SELECT n.id_novedad, n.id_empleado, n.fecha_jornada, n.id_turno, n.id_rol, n.nombre_turno,
          n.inicio_programado, n.fin_programado, n.minutos_tolerancia, n.id_marcaje,
-         n.minutos, n.minutos_penalizacion, n.detectada_en, n.consolidada_en,
+         n.minutos, n.minutos_penalizacion, n.minutos_programados, n.detectada_en, n.consolidada_en,
          t.codigo AS tipo_codigo, t.nombre AS tipo_nombre, e.codigo AS estado_codigo, e.nombre AS estado_nombre
   FROM novedades_asistencia n
   JOIN catalogos_tipo_novedad t USING (id_tipo_novedad)
@@ -134,6 +136,19 @@ async function sumarAtrasosDelMes(ids, fecha) {
   return rows;
 }
 
+// Tipos de novedad ya justificados de cada empleado en una jornada.
+async function listarJustificadas(ids, fecha) {
+  if (ids.length === 0) return [];
+  const { rows } = await pool.query(
+    `SELECT n.id_empleado, t.codigo AS tipo_codigo
+     FROM novedades_asistencia n
+     JOIN catalogos_tipo_novedad t USING (id_tipo_novedad)
+     WHERE n.id_empleado = ANY($1::uuid[]) AND n.fecha_jornada = $2::date AND n.id_estado_novedad = 2`,
+    [ids, fecha]
+  );
+  return rows;
+}
+
 async function momentoActual() {
   const { rows } = await pool.query(`SELECT CURRENT_TIMESTAMP AS ahora, ${HOY_BOLIVIA} AS hoy`);
   return rows[0];
@@ -147,5 +162,6 @@ module.exports = {
   reservarPorConsolidar,
   marcarConsolidadas,
   sumarAtrasosDelMes,
+  listarJustificadas,
   momentoActual,
 };

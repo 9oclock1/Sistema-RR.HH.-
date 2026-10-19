@@ -44,7 +44,7 @@
 - `fecha_jornada` es el día en que empieza el turno. Cada tipo se registra una sola vez por empleado y jornada (`uq_novedad_empleado_jornada_tipo`).
 - La novedad copia el turno de ese día (`nombre_turno`, `inicio_programado`, `fin_programado`, `minutos_tolerancia`) para que no cambie si después se edita el turno o el rol; si el turno se elimina, `id_turno` queda en NULL y la copia se conserva. `id_rol` se llena si el turno vino de un rol publicado.
 - `id_marcaje` apunta a la entrada del atraso o a la salida anticipada; la omisión apunta a la entrada que quedó sin salida y la inasistencia no tiene marcaje.
-- `minutos` son los minutos de atraso, los que faltaron por la salida anticipada o los de la jornada no trabajada. `minutos_penalizacion` es el tiempo que se descuenta en compensaciones.
+- `minutos` son los minutos de atraso, los que faltaron por la salida anticipada o los de la jornada no trabajada. `minutos_penalizacion` es el tiempo que se descuenta en compensaciones. `minutos_programados` son las horas efectivas del turno (duración - refrigerio).
 - Estado (`CATALOGOS_ESTADO_NOVEDAD`): `REGISTRADA` o `JUSTIFICADA`. Una novedad justificada no suma penalización.
 - `consolidada_en` se llena cuando la jornada se cierra y se avisa a compensaciones.
 - `id_empleado` debería hacer referencia a `id_empleado` de EmployeeDB.
@@ -63,9 +63,25 @@
 
 ### Aviso a compensaciones
 
-- Al cerrar la jornada, sus novedades se consolidan y se registra un evento `JORNADA_CONSOLIDADA` con tópico `compensaciones` en `EVENTOS_SALIENTES`: empleado, fecha, turno, minutos de penalización (de las novedades registradas, no justificadas) y el detalle de cada novedad.
+- Al cerrar la jornada, sus novedades se consolidan y se registra un evento `JORNADA_CONSOLIDADA` con tópico `compensaciones` en `EVENTOS_SALIENTES`: empleado, fecha, turno, horas efectivas del turno (`minutos_programados`), minutos de penalización (de las novedades registradas, no justificadas), minutos justificados, horas efectivas reconocidas (`minutos_efectivos`) y el detalle de cada novedad.
 - Se envía igual que los demás eventos: con `URL_COMPENSACIONES` el despachador hace `POST`; sin URL, CompensationService lo lee con `GET /eventos?topico=compensaciones`.
 - Cada novedad se consolida una sola vez. Si una novedad aparece después del cierre, llega en otro evento de la misma jornada: el consumidor debe sumar por `id_novedad`.
+
+## Justificaciones
+
+- `SOLICITUDES_JUSTIFICACION` guarda el justificativo que el colaborador presenta para una novedad: motivo (`CATALOGOS_MOTIVO_JUSTIFICACION`), descripción opcional y estado (`CATALOGOS_ESTADO_JUSTIFICACION`): `PENDIENTE`, `APROBADA` o `RECHAZADA`.
+- Solo se justifican los tipos con `es_justificable` en `CATALOGOS_TIPO_NOVEDAD`: atraso, inasistencia y salida anticipada. La omisión de salida no descuenta tiempo.
+- Una novedad tiene a lo sumo una solicitud pendiente o aprobada (`uq_justificacion_novedad_vigente`). Las rechazadas quedan como historial y se puede presentar otra dentro del plazo.
+- La revisión guarda `id_revisor` (y su nombre en ese momento), `revisada_en` y `comentario_revision` (obligatorio al rechazar).
+- `ADJUNTOS_JUSTIFICACION` registra cada comprobante (PDF, JPG o PNG). El archivo se guarda en disco (`uploads/justificaciones`) con `clave_almacenamiento`; el nombre original solo se muestra.
+- `id_empleado` e `id_revisor` deberían hacer referencia a `id_empleado` de EmployeeDB.
+
+### Presentación y revisión
+
+- El colaborador ve sus novedades justificables en `GET /mis-novedades` (últimos 30 días) con el plazo y su última solicitud, y presenta el justificativo con `POST /justificaciones` (multipart: `id_novedad`, `id_motivo`, `descripcion` y de 1 a 3 `archivos` de hasta 5 MB). El contenido de cada archivo debe coincidir con su tipo.
+- El plazo es `HORAS_PLAZO_JUSTIFICACION` (por defecto 48) desde la incidencia: la marca del atraso o de la salida anticipada; en una inasistencia, el fin del turno. Vencido, el envío se rechaza con la fecha de vencimiento.
+- La jefatura o RRHH revisa en `GET /justificaciones?id_sucursal=&id_departamento=&estado=` y decide con `PATCH /justificaciones/:id` (`decision`: `APROBADA` o `RECHAZADA`, `comentario`). Nadie revisa su propia solicitud.
+- Al aprobar, la novedad pasa a `JUSTIFICADA` y deja de sumar penalización. Si la jornada ya se había consolidado, se registra un evento `JORNADA_RECALCULADA` para `compensaciones` con todas las novedades de la jornada.
 
 ## Eventos salientes
 

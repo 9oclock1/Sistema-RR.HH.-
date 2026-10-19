@@ -192,6 +192,8 @@ CREATE TABLE CATALOGOS_TIPO_NOVEDAD (
     id_tipo_novedad SMALLINT NOT NULL,
     codigo varchar(30) NOT NULL,
     nombre varchar(60) NOT NULL,
+    -- El colaborador puede presentar un justificativo para subsanarla.
+    es_justificable BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT CATALOGOS_TIPO_NOVEDAD_pk PRIMARY KEY (id_tipo_novedad),
     CONSTRAINT uq_tipo_novedad_codigo UNIQUE (codigo)
 );
@@ -220,17 +222,80 @@ CREATE TABLE NOVEDADES_ASISTENCIA (
     id_marcaje UUID NULL,
     minutos int NOT NULL DEFAULT 0,
     minutos_penalizacion int NOT NULL DEFAULT 0,
+    -- Minutos efectivos del turno (duración menos refrigerio).
+    minutos_programados int NOT NULL DEFAULT 0,
     detectada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     consolidada_en TIMESTAMPTZ NULL,
     CONSTRAINT NOVEDADES_ASISTENCIA_pk PRIMARY KEY (id_novedad),
     -- Cada tipo de novedad se registra una sola vez por jornada.
     CONSTRAINT uq_novedad_empleado_jornada_tipo UNIQUE (id_empleado, fecha_jornada, id_tipo_novedad),
-    CONSTRAINT chk_novedad_minutos CHECK (minutos >= 0 AND minutos_penalizacion >= 0),
+    CONSTRAINT chk_novedad_minutos CHECK (minutos >= 0 AND minutos_penalizacion >= 0 AND minutos_programados >= 0),
     CONSTRAINT chk_novedad_horario CHECK (fin_programado > inicio_programado)
 );
 CREATE INDEX idx_novedades_asistencia_fecha ON NOVEDADES_ASISTENCIA (fecha_jornada);
 CREATE INDEX idx_novedades_asistencia_id_marcaje ON NOVEDADES_ASISTENCIA (id_marcaje);
 CREATE INDEX idx_novedades_asistencia_sin_consolidar ON NOVEDADES_ASISTENCIA (fin_programado) WHERE consolidada_en IS NULL;
+-- Tabla: CATALOGOS_MOTIVO_JUSTIFICACION
+CREATE TABLE CATALOGOS_MOTIVO_JUSTIFICACION (
+    id_motivo_justificacion SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_MOTIVO_JUSTIFICACION_pk PRIMARY KEY (id_motivo_justificacion),
+    CONSTRAINT uq_motivo_justificacion_codigo UNIQUE (codigo)
+);
+-- Tabla: CATALOGOS_ESTADO_JUSTIFICACION
+CREATE TABLE CATALOGOS_ESTADO_JUSTIFICACION (
+    id_estado_justificacion SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_ESTADO_JUSTIFICACION_pk PRIMARY KEY (id_estado_justificacion),
+    CONSTRAINT uq_estado_justificacion_codigo UNIQUE (codigo)
+);
+-- Tabla: SOLICITUDES_JUSTIFICACION
+-- Justificativo de una novedad presentado por el colaborador y revisado por su jefatura o RRHH.
+CREATE TABLE SOLICITUDES_JUSTIFICACION (
+    id_solicitud UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_novedad UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    id_motivo_justificacion SMALLINT NOT NULL,
+    descripcion varchar(500) NULL,
+    id_estado_justificacion SMALLINT NOT NULL DEFAULT 1,
+    id_revisor UUID NULL,
+    nombre_revisor varchar(150) NULL,
+    comentario_revision varchar(500) NULL,
+    revisada_en TIMESTAMPTZ NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT SOLICITUDES_JUSTIFICACION_pk PRIMARY KEY (id_solicitud),
+    -- Pendiente sin revisión; aprobada o rechazada con revisor y fecha.
+    CONSTRAINT chk_justificacion_revision CHECK (
+        (id_estado_justificacion = 1) = (revisada_en IS NULL AND id_revisor IS NULL)
+    ),
+    -- El rechazo exige un comentario.
+    CONSTRAINT chk_justificacion_rechazo CHECK (
+        id_estado_justificacion <> 3 OR length(btrim(coalesce(comentario_revision, ''))) > 0
+    )
+);
+-- Una novedad tiene a lo sumo una solicitud pendiente o aprobada; las rechazadas quedan como historial.
+CREATE UNIQUE INDEX uq_justificacion_novedad_vigente ON SOLICITUDES_JUSTIFICACION (id_novedad)
+    WHERE id_estado_justificacion IN (1, 2);
+CREATE INDEX idx_justificaciones_empleado ON SOLICITUDES_JUSTIFICACION (id_empleado);
+CREATE INDEX idx_justificaciones_estado ON SOLICITUDES_JUSTIFICACION (id_estado_justificacion, creado_en);
+-- Tabla: ADJUNTOS_JUSTIFICACION
+-- Comprobantes digitales; el archivo se guarda fuera de la BD con la clave indicada.
+CREATE TABLE ADJUNTOS_JUSTIFICACION (
+    id_adjunto UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_solicitud UUID NOT NULL,
+    nombre_original varchar(255) NOT NULL,
+    tipo_mime varchar(100) NOT NULL,
+    tamano_bytes int NOT NULL,
+    clave_almacenamiento varchar(255) NOT NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ADJUNTOS_JUSTIFICACION_pk PRIMARY KEY (id_adjunto),
+    CONSTRAINT uq_adjunto_clave UNIQUE (clave_almacenamiento),
+    CONSTRAINT chk_adjunto_tamano CHECK (tamano_bytes > 0),
+    CONSTRAINT chk_adjunto_tipo CHECK (tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png'))
+);
+CREATE INDEX idx_adjuntos_justificacion_solicitud ON ADJUNTOS_JUSTIFICACION (id_solicitud);
 -- llaves foráneas
 -- Referencia: TURNOS_CATALOGOS_TIPO_JORNADA (tabla: TURNOS)
 ALTER TABLE TURNOS
@@ -283,6 +348,18 @@ ADD CONSTRAINT NOVEDADES_ASISTENCIA_ROLES_TURNO FOREIGN KEY (id_rol) REFERENCES 
 -- Referencia: NOVEDADES_ASISTENCIA_MARCAJES (tabla: NOVEDADES_ASISTENCIA)
 ALTER TABLE NOVEDADES_ASISTENCIA
 ADD CONSTRAINT NOVEDADES_ASISTENCIA_MARCAJES FOREIGN KEY (id_marcaje) REFERENCES MARCAJES (id_marcaje) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: SOLICITUDES_JUSTIFICACION_NOVEDADES_ASISTENCIA (tabla: SOLICITUDES_JUSTIFICACION)
+ALTER TABLE SOLICITUDES_JUSTIFICACION
+ADD CONSTRAINT SOLICITUDES_JUSTIFICACION_NOVEDADES_ASISTENCIA FOREIGN KEY (id_novedad) REFERENCES NOVEDADES_ASISTENCIA (id_novedad) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: SOLICITUDES_JUSTIFICACION_CATALOGOS_MOTIVO_JUSTIFICACION (tabla: SOLICITUDES_JUSTIFICACION)
+ALTER TABLE SOLICITUDES_JUSTIFICACION
+ADD CONSTRAINT SOLICITUDES_JUSTIFICACION_CATALOGOS_MOTIVO_JUSTIFICACION FOREIGN KEY (id_motivo_justificacion) REFERENCES CATALOGOS_MOTIVO_JUSTIFICACION (id_motivo_justificacion) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: SOLICITUDES_JUSTIFICACION_CATALOGOS_ESTADO_JUSTIFICACION (tabla: SOLICITUDES_JUSTIFICACION)
+ALTER TABLE SOLICITUDES_JUSTIFICACION
+ADD CONSTRAINT SOLICITUDES_JUSTIFICACION_CATALOGOS_ESTADO_JUSTIFICACION FOREIGN KEY (id_estado_justificacion) REFERENCES CATALOGOS_ESTADO_JUSTIFICACION (id_estado_justificacion) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: ADJUNTOS_JUSTIFICACION_SOLICITUDES_JUSTIFICACION (tabla: ADJUNTOS_JUSTIFICACION)
+ALTER TABLE ADJUNTOS_JUSTIFICACION
+ADD CONSTRAINT ADJUNTOS_JUSTIFICACION_SOLICITUDES_JUSTIFICACION FOREIGN KEY (id_solicitud) REFERENCES SOLICITUDES_JUSTIFICACION (id_solicitud) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- datos iniciales
 INSERT INTO CATALOGOS_TIPO_JORNADA (id_tipo_jornada, codigo, nombre) VALUES
     (1, 'DIURNO', 'Diurno'),
@@ -415,12 +492,22 @@ INSERT INTO CATALOGOS_ESTADO_EVENTO (id_estado_evento, codigo, nombre) VALUES
     (1, 'PENDIENTE', 'Pendiente'),
     (2, 'ENTREGADO', 'Entregado'),
     (3, 'FALLIDO', 'Fallido');
-INSERT INTO CATALOGOS_TIPO_NOVEDAD (id_tipo_novedad, codigo, nombre) VALUES
-    (1, 'ATRASO', 'Atraso'),
-    (2, 'INASISTENCIA', 'Falta injustificada'),
-    (3, 'SALIDA_ANTICIPADA', 'Salida anticipada'),
-    (4, 'OMISION_SALIDA', 'Omisión de marcaje de salida');
+INSERT INTO CATALOGOS_TIPO_NOVEDAD (id_tipo_novedad, codigo, nombre, es_justificable) VALUES
+    (1, 'ATRASO', 'Atraso', TRUE),
+    (2, 'INASISTENCIA', 'Falta injustificada', TRUE),
+    (3, 'SALIDA_ANTICIPADA', 'Salida anticipada', TRUE),
+    (4, 'OMISION_SALIDA', 'Omisión de marcaje de salida', FALSE);
 INSERT INTO CATALOGOS_ESTADO_NOVEDAD (id_estado_novedad, codigo, nombre) VALUES
     (1, 'REGISTRADA', 'Registrada'),
     (2, 'JUSTIFICADA', 'Justificada');
+INSERT INTO CATALOGOS_MOTIVO_JUSTIFICACION (id_motivo_justificacion, codigo, nombre) VALUES
+    (1, 'SALUD', 'Salud o atención médica'),
+    (2, 'EMERGENCIA_FAMILIAR', 'Emergencia familiar'),
+    (3, 'TRAMITE', 'Trámite personal o legal'),
+    (4, 'TRANSPORTE', 'Problema de transporte'),
+    (5, 'OTRO', 'Otro motivo');
+INSERT INTO CATALOGOS_ESTADO_JUSTIFICACION (id_estado_justificacion, codigo, nombre) VALUES
+    (1, 'PENDIENTE', 'Pendiente de revisión'),
+    (2, 'APROBADA', 'Aprobada'),
+    (3, 'RECHAZADA', 'Rechazada');
 -- Fin del archivo.
