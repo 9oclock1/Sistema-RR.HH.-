@@ -690,4 +690,26 @@ INSERT INTO FERIADOS (fecha, nombre) VALUES
     ('2027-08-06', 'Día de la Independencia'),
     ('2027-11-02', 'Todos Santos'),
     ('2027-12-25', 'Navidad');
+-- Solicitudes de vacaciones (RF-30). Bloque idempotente, al final porque usa tablas definidas antes:
+-- CATALOGOS_ESTADO_SOLICITUD (estados de solicitud, compartidos con licencias), FERIADOS (días no hábiles)
+-- y TURNOS_PUBLICADOS (días de trabajo y descanso del rol). Al registrar una solicitud también se crea su
+-- movimiento «en proceso» en MOVIMIENTOS_VACACION (KAN-52), que es lo que descuenta el saldo.
+-- Tabla: SOLICITUDES_VACACION
+CREATE TABLE IF NOT EXISTS SOLICITUDES_VACACION (
+    id_solicitud UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    id_estado_solicitud SMALLINT NOT NULL DEFAULT 1,
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    dias_habiles SMALLINT NOT NULL,
+    id_supervisor UUID NULL,
+    supervisor_notificado boolean NOT NULL DEFAULT FALSE,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT SOLICITUDES_VACACION_pk PRIMARY KEY (id_solicitud),
+    CONSTRAINT chk_solicitud_vacacion_fechas CHECK (fecha_fin >= fecha_inicio),
+    CONSTRAINT chk_solicitud_vacacion_dias CHECK (dias_habiles > 0),
+    CONSTRAINT SOLICITUDES_VACACION_CATALOGOS_ESTADO_SOLICITUD FOREIGN KEY (id_estado_solicitud) REFERENCES CATALOGOS_ESTADO_SOLICITUD (id_estado_solicitud) NOT DEFERRABLE INITIALLY IMMEDIATE
+);
+CREATE INDEX IF NOT EXISTS idx_solicitudes_vacacion_empleado ON SOLICITUDES_VACACION (id_empleado, fecha_inicio);
 -- Fin del archivo.

@@ -103,4 +103,33 @@ const actualizarAsignacionActual = async (db, idEmpleado, { id_cargo, id_sucursa
   );
 };
 
-module.exports = { listar, bloquearPorId, obtenerFicha, obtenerResumen, actualizarAsignacionActual };
+// Supervisor directo (p. ej. para que AttendanceService avise una solicitud de vacaciones):
+// quien ocupa el cargo jefe directo del cargo del empleado; si hay varios, el de mayor antigüedad.
+// Devuelve undefined si el empleado no existe y supervisor null si no hay quien lo supervise.
+const obtenerSupervisor = async (db, idEmpleado) => {
+  const { rows } = await db.query(
+    `SELECT e.id_empleado,
+            sup.supervisor
+       FROM empleados e
+       JOIN cargos c ON c.id_cargo = e.id_cargo_actual
+       LEFT JOIN LATERAL (
+         SELECT json_build_object(
+                  'id_empleado', j.id_empleado,
+                  'nombres', j.nombres,
+                  'apellidos', concat_ws(' ', j.primer_apellido, j.segundo_apellido)
+                ) AS supervisor
+           FROM empleados j
+           JOIN estados_empleado ej ON ej.id_estado_empleado = j.id_estado_empleado
+          WHERE j.id_cargo_actual = c.id_cargo_jefe_directo
+            AND ej.permite_acceso = TRUE
+            AND j.id_empleado <> e.id_empleado
+          ORDER BY j.fecha_ingreso, j.id_empleado
+          LIMIT 1
+       ) sup ON TRUE
+      WHERE e.id_empleado = $1`,
+    [idEmpleado]
+  );
+  return rows[0];
+};
+
+module.exports = { listar, bloquearPorId, obtenerFicha, obtenerResumen, obtenerSupervisor, actualizarAsignacionActual };

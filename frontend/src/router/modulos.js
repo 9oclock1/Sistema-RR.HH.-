@@ -1,4 +1,4 @@
-import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarRange, ClipboardCheck, FileCheck, FileText, FileUser, FileWarning, Fingerprint, IdCard, ListTree, Mail, Megaphone, Network, Send, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarRange, ClipboardCheck, FileCheck, FileText, FileUser, FileWarning, Fingerprint, IdCard, ListTree, Mail, Megaphone, Network, Send, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
@@ -21,6 +21,7 @@ import ReconocimientosView from "../features/Reconocimientos/ReconocimientosView
 import RolTurnosPage from "../features/rol-turnos/RolTurnosPage";
 import SeguimientoAcusesPage from "../features/Memorandums/acuses/SeguimientoAcusesPage";
 import TurnosPage from "../features/turnos/TurnosPage";
+import SolicitudVacacionesPage from "../features/solicitud-vacaciones/SolicitudVacacionesPage";
 import VacantesView from "../features/Vacantes/VacantesView";
 import { puedeAcceder } from "../utils/permisos";
 
@@ -129,6 +130,14 @@ export const SECCIONES = [
         icono: CalendarClock,
         roles: ["admin"],
         pagina: TurnosPage,
+      },
+      {
+        ruta: "/asistencia/solicitud-vacaciones",
+        etiqueta: "Solicitud de vacaciones",
+        descripcion: "Envío de solicitudes de vacaciones al supervisor, con el cálculo de días hábiles.",
+        icono: TreePalm,
+        roles: ["empleado"],
+        pagina: SolicitudVacacionesPage,
       },
       {
         ruta: "/asistencia/rol-turnos",
