@@ -35,6 +35,8 @@ CREATE TABLE comunicaciones (
     asunto varchar(150) NOT NULL,
     contenido text NOT NULL,
     requiere_confirmacion boolean NOT NULL DEFAULT false,
+    prioridad varchar(10) NOT NULL DEFAULT 'NORMAL',
+    enlace varchar(255) NULL,
     id_departamento_destino uuid NULL,
     id_sucursal_destino uuid NULL,
     cantidad_destinatarios integer NOT NULL DEFAULT 0,
@@ -43,6 +45,7 @@ CREATE TABLE comunicaciones (
     actualizado_en timestamptz NOT NULL DEFAULT current_timestamp,
     CONSTRAINT chk_asunto_no_vacio CHECK ((length (trim (asunto)) > 0)) NOT DEFERRABLE INITIALLY IMMEDIATE,
     CONSTRAINT chk_contenido_no_vacio CHECK ((length (trim (contenido)) > 0)) NOT DEFERRABLE INITIALLY IMMEDIATE,
+    CONSTRAINT chk_prioridad CHECK (prioridad IN ('NORMAL', 'ALTA')) NOT DEFERRABLE INITIALLY IMMEDIATE,
     CONSTRAINT pk_comunicaciones PRIMARY KEY (id_comunicacion)
 );
 CREATE INDEX idx_comunicaciones_remitente on comunicaciones (id_usuario_remitente ASC);

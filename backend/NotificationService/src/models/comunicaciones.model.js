@@ -37,6 +37,8 @@ async function autoInicializarTablas() {
         asunto varchar(150) NOT NULL,
         contenido text NOT NULL,
         requiere_confirmacion boolean NOT NULL DEFAULT false,
+        prioridad varchar(10) NOT NULL DEFAULT 'NORMAL',
+        enlace varchar(255) NULL,
         id_departamento_destino uuid NULL,
         id_sucursal_destino uuid NULL,
         cantidad_destinatarios integer NOT NULL DEFAULT 0,
@@ -45,6 +47,7 @@ async function autoInicializarTablas() {
         actualizado_en timestamptz NOT NULL DEFAULT current_timestamp,
         CONSTRAINT chk_asunto_no_vacio CHECK ((length(trim(asunto)) > 0)),
         CONSTRAINT chk_contenido_no_vacio CHECK ((length(trim(contenido)) > 0)),
+        CONSTRAINT chk_prioridad CHECK (prioridad IN ('NORMAL', 'ALTA')),
         CONSTRAINT pk_comunicaciones PRIMARY KEY (id_comunicacion)
     );
     ALTER TABLE comunicaciones ADD COLUMN IF NOT EXISTS remitente_nombre varchar(150) NULL;
@@ -89,6 +92,18 @@ async function autoInicializarTablas() {
   await pool.query(ddl);
 }
 
+// RF-39: columnas agregadas después de la creación inicial; se aplican también a bases ya existentes.
+async function migrarTablas() {
+  await pool.query(`
+    ALTER TABLE comunicaciones ADD COLUMN IF NOT EXISTS prioridad varchar(10) NOT NULL DEFAULT 'NORMAL';
+    ALTER TABLE comunicaciones ADD COLUMN IF NOT EXISTS enlace varchar(255) NULL;
+    DO $$ BEGIN
+      ALTER TABLE comunicaciones ADD CONSTRAINT chk_prioridad CHECK (prioridad IN ('NORMAL', 'ALTA'));
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+  `);
+}
+
 async function asegurarBaseDatos() {
   if (baseDatosInicializada) return;
   try {
@@ -96,6 +111,7 @@ async function asegurarBaseDatos() {
     if (!res.rows[0].tabla) {
       await autoInicializarTablas();
     }
+    await migrarTablas();
     baseDatosInicializada = true;
   } catch (error) {
     console.error("Error al conectar con PostgreSQL en NotificationService:", error.message);
@@ -115,6 +131,8 @@ async function crearComunicacion({
   asunto,
   contenido,
   requiereConfirmacion = false,
+  prioridad = "NORMAL",
+  enlace = null,
   idDepartamentoDestino = null,
   idSucursalDestino = null,
   idsEmpleadosDestinatarios = [],
@@ -130,9 +148,9 @@ async function crearComunicacion({
       INSERT INTO comunicaciones (
         id_tipo, id_alcance, id_usuario_remitente, remitente_nombre, asunto, contenido,
         requiere_confirmacion, id_departamento_destino, id_sucursal_destino,
-        cantidad_destinatarios, fecha_envio
+        cantidad_destinatarios, prioridad, enlace, fecha_envio
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
       RETURNING *;
     `;
     const resCom = await client.query(queryCom, [
@@ -146,6 +164,8 @@ async function crearComunicacion({
       idDepartamentoDestino,
       idSucursalDestino,
       idsEmpleadosDestinatarios.length,
+      prioridad,
+      enlace,
     ]);
     const comunicacion = resCom.rows[0];
 
@@ -193,7 +213,7 @@ async function listarBandejaEmpleado(idEmpleado, { estado, busqueda } = {}) {
     SELECT d.id_destinatario, d.id_comunicacion, d.id_empleado, d.id_estado,
            d.fecha_entrega, d.fecha_lectura, d.fecha_confirmacion,
            c.asunto, c.contenido, c.requiere_confirmacion, c.fecha_envio,
-           c.id_usuario_remitente, c.remitente_nombre,
+           c.id_usuario_remitente, c.remitente_nombre, c.prioridad, c.enlace,
            t.codigo AS tipo_codigo, t.nombre AS tipo_nombre,
            a.codigo AS alcance_codigo, a.nombre AS alcance_nombre,
            e.codigo AS estado_codigo, e.nombre AS estado_nombre
@@ -241,7 +261,7 @@ async function abrirMensaje(idDestinatario, idEmpleado) {
 
     const queryBuscar = `
       SELECT d.*, c.asunto, c.contenido, c.requiere_confirmacion, c.fecha_envio,
-             c.id_usuario_remitente, c.remitente_nombre,
+             c.id_usuario_remitente, c.remitente_nombre, c.prioridad, c.enlace,
              t.codigo AS tipo_codigo, t.nombre AS tipo_nombre,
              a.codigo AS alcance_codigo, a.nombre AS alcance_nombre,
              e.codigo AS estado_codigo, e.nombre AS estado_nombre

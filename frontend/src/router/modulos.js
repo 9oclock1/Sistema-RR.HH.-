@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Briefcase, Building2, CalendarClock, CalendarRange, FileCheck, FileText, FileUser, FileWarning, Fingerprint, ListTree, Mail, Megaphone, Network, Send, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarRange, ClipboardCheck, FileCheck, FileText, FileUser, FileWarning, Fingerprint, ListTree, Mail, Megaphone, Network, Send, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
@@ -11,11 +11,13 @@ import LicenciasPage from "../features/licencias/LicenciasPage";
 import JerarquiaView from "../features/Jerarquia/JerarquiaView";
 import MarcajePage from "../features/marcaje/MarcajePage";
 import MemorandumsView from "../features/Memorandums/MemorandumsView";
+import MisMemorandumsPage from "../features/Memorandums/acuses/MisMemorandumsPage";
 import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import ReconocimientosView from "../features/Reconocimientos/ReconocimientosView";
 import RolTurnosPage from "../features/rol-turnos/RolTurnosPage";
+import SeguimientoAcusesPage from "../features/Memorandums/acuses/SeguimientoAcusesPage";
 import TurnosPage from "../features/turnos/TurnosPage";
 import VacantesView from "../features/Vacantes/VacantesView";
 import { puedeAcceder } from "../utils/permisos";
@@ -171,6 +173,14 @@ export const SECCIONES = [
         roles: ["supervisor"],
         pagina: MemorandumsView,
       },
+      {
+        ruta: "/disciplina/acuses",
+        etiqueta: "Acuses de memorándums",
+        descripcion: "Estado del acuse de recibo de cada memorándum y casos sin acuse para seguimiento presencial.",
+        icono: ClipboardCheck,
+        roles: ["supervisor"],
+        pagina: SeguimientoAcusesPage,
+      },
     ],
   },
   {
@@ -196,6 +206,14 @@ export const SECCIONES = [
         icono: Mail,
         roles: ["empleado"],
         pagina: BandejaMensajesPage,
+      },
+      {
+        ruta: "/comunicaciones/memorandums",
+        etiqueta: "Mis memorándums",
+        descripcion: "Felicitaciones y llamadas de atención emitidas a su nombre, con su acuse de recibo.",
+        icono: BookOpenCheck,
+        roles: ["empleado"],
+        pagina: MisMemorandumsPage,
       },
       {
         ruta: "/comunicaciones/gestion",

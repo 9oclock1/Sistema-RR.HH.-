@@ -61,6 +61,7 @@ const EMPLEADOS = [
   {
     id_empleado: "4192f252-acf0-4522-a109-e051cad9a50b",
     nombres: "Ana",
+    correo: "ana.quispe@ejemplo.com",
     apellidos: "Quispe Mamani",
     cargo: "Analista de Personal",
     id_departamento: "11111111-1111-4111-a111-111111111111", // RRHH
@@ -70,6 +71,7 @@ const EMPLEADOS = [
   {
     id_empleado: "cb7995a6-4b23-4738-ab8b-37d0b203d73b",
     nombres: "Luis",
+    correo: "luis.rojas@ejemplo.com",
     apellidos: "Rojas Vargas",
     cargo: "Supervisor de Logística",
     id_departamento: "22222222-2222-4222-a222-222222222222", // Operaciones
@@ -79,6 +81,7 @@ const EMPLEADOS = [
   {
     id_empleado: "e1a2b3c4-d5e6-4789-a012-3456789abcde",
     nombres: "Carlos",
+    correo: "carlos.mendoza@ejemplo.com",
     apellidos: "Mendoza Calle",
     cargo: "Desarrollador de Sistemas",
     id_departamento: "33333333-3333-4333-a333-333333333333", // TI
@@ -88,6 +91,7 @@ const EMPLEADOS = [
   {
     id_empleado: "f2b3c4d5-e6f7-4890-b123-456789abcdef",
     nombres: "Elena",
+    correo: "elena.gomez@ejemplo.com",
     apellidos: "Gómez Prado",
     cargo: "Cajera Principal",
     id_departamento: "44444444-4444-4444-a444-444444444444", // Ventas
@@ -98,6 +102,7 @@ const EMPLEADOS = [
     // Empleado inactivo para probar RF-64 criterio 4
     id_empleado: "d97320a7-c29b-4405-a33b-a48dc65c6090",
     nombres: "Carla",
+    correo: "carla.flores@ejemplo.com",
     apellidos: "Flores Choque",
     cargo: "Ex Asistente Comercial",
     id_departamento: "44444444-4444-4444-a444-444444444444",

@@ -350,4 +350,37 @@ VALUES (
         'RECONOCIMIENTO',
         'Rendimiento operativo',
         'Reconocimiento por rendimiento operativo destacado'
-    )
+    );
+-- KAN-278 (RF-39): notificación y acuse de recibo digital de memorándums.
+-- fue_notificado / fecha_hora_notificacion: el aviso llegó al portal del colaborador; el plazo de acuse corre desde ahí.
+-- acuse_recibo_firmado / fecha_hora_acuse: acuse del colaborador, con la IP y el usuario que lo registraron.
+-- estado_acuse: PENDIENTE (esperando acuse), RECIBIDO ('Notificado y Recibido') o VENCIDO (plazo cumplido sin acuse; RRHH ya fue alertado).
+ALTER TABLE MEMORANDUMS
+ADD COLUMN estado_acuse varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    ADD COLUMN fecha_limite_acuse TIMESTAMPTZ NULL,
+    ADD COLUMN fecha_hora_apertura TIMESTAMPTZ NULL,
+    ADD COLUMN ip_acuse varchar(45) NULL,
+    ADD COLUMN id_usuario_acuse UUID NULL,
+    ADD COLUMN comentario_descargo text NULL,
+    ADD COLUMN fecha_hora_alerta_rrhh TIMESTAMPTZ NULL;
+ALTER TABLE MEMORANDUMS
+ADD CONSTRAINT ck_memorandum_estado_acuse CHECK (estado_acuse IN ('PENDIENTE', 'RECIBIDO', 'VENCIDO')),
+    ADD CONSTRAINT ck_memorandum_notificacion CHECK (
+        fue_notificado = (fecha_hora_notificacion IS NOT NULL)
+        AND fue_notificado = (fecha_limite_acuse IS NOT NULL)
+    ),
+    ADD CONSTRAINT ck_memorandum_acuse CHECK (
+        acuse_recibo_firmado = (estado_acuse = 'RECIBIDO')
+        AND acuse_recibo_firmado = (
+            fecha_hora_acuse IS NOT NULL
+            AND ip_acuse IS NOT NULL
+            AND id_usuario_acuse IS NOT NULL
+        )
+    ),
+    ADD CONSTRAINT ck_memorandum_acuse_vencido CHECK (
+        estado_acuse <> 'VENCIDO'
+        OR fecha_hora_alerta_rrhh IS NOT NULL
+    );
+-- Memorándums emitidos que esperan acuse: los recorre el job de vencimientos.
+CREATE INDEX ix_memorandum_acuse_pendiente ON MEMORANDUMS (fecha_limite_acuse)
+WHERE estado_acuse = 'PENDIENTE';

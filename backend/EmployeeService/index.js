@@ -11,9 +11,13 @@ const jerarquiaRoutes = require("./src/routes/jerarquia.routes"); // RF-18
 const memorandumsRoutes = require("./src/routes/memorandums"); // RF-37
 const reconocimientosRoutes = require("./src/routes/reconocimientos"); // RF-38
 const errorHandler = require("./src/middlewares/errorHandler");
+const acusesMemorandumJob = require("./src/jobs/acusesMemorandumJob"); // RF-39
 
 const app = express();
 const PORT = process.env.PORT || 3002;
+
+// Detrás del gateway (NGINX en la red interna) req.ip toma la IP real de X-Forwarded-For; RF-39 la registra en el acuse.
+app.set("trust proxy", "loopback, uniquelocal");
 
 app.use(cors());
 app.use(express.json());
@@ -59,6 +63,7 @@ if (require.main === module) {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`EmployeeService corriendo en http://0.0.0.0:${PORT}`);
   });
+  acusesMemorandumJob.iniciar(); // RF-39
 }
 
 module.exports = app;

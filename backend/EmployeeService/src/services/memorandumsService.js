@@ -4,6 +4,7 @@ const pool = require("../../db/pool");
 const memorandumsModel = require("../models/memorandumsModel");
 const asignacionesModel = require("../models/asignacionesModel");
 const pdfGeneratorService = require("./pdfGeneratorService");
+const acusesMemorandumService = require("./acusesMemorandumService");
 const HttpError = require("../utils/HttpError");
 const { withTransaction } = require("../utils/transaction");
 
@@ -86,6 +87,8 @@ const crearMemorandum = async (datos) => {
   return {
     memorandum,
     alerta_roja: amonestacionesPrevias >= UMBRAL_ALERTA_ROJA,
+    // RF-39: el aviso al colaborador sale recién con el memorándum confirmado.
+    notificado: await acusesMemorandumService.notificarEmision(memorandum.id_memorandum),
   };
 };
 
