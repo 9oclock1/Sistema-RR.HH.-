@@ -12,6 +12,7 @@ const horasExtraRoutes = require("./src/routes/horasExtra.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 const { iniciarDespachador } = require("./src/services/eventos.service");
 const { iniciarContraste } = require("./src/services/novedades.service");
+const { iniciarReintentoDeAvisos } = require("./src/services/licencias.service");
 
 const app = express();
 const PORT = process.env.PORT || 3004;
@@ -57,4 +58,5 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`AttendanceService corriendo en http://0.0.0.0:${PORT}`);
   iniciarDespachador();
   iniciarContraste();
+  iniciarReintentoDeAvisos();
 });

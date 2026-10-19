@@ -5,6 +5,7 @@ const COLUMNAS_TIPO = `id_tipo_licencia, codigo, nombre, es_con_goce_haberes, di
 const SOLICITUD_CON_CATALOGOS = `
   SELECT s.id_solicitud, s.id_empleado, s.fecha_inicio, s.fecha_fin, s.dias_solicitados,
          s.es_con_goce_haberes, s.excede_limite_dias, s.motivo, s.creado_en,
+         s.id_empleado_resolutor, s.resuelto_en, s.motivo_resolucion,
          t.id_tipo_licencia, t.codigo AS tipo_codigo, t.nombre AS tipo_nombre,
          e.codigo AS estado_codigo, e.nombre AS estado_nombre,
          COALESCE((SELECT json_agg(json_build_object(
@@ -92,4 +93,45 @@ async function obtenerAdjunto(idSolicitud, idAdjunto) {
   return rows[0];
 }
 
-module.exports = { listarTipos, obtenerTipo, crear, obtener, listarPorEmpleado, obtenerAdjunto };
+// KAN-54: solo resuelve una solicitud que sigue pendiente, así dos supervisores no se pisan.
+async function resolver({ idSolicitud, idEstado, idResolutor, motivo }) {
+  const { rowCount } = await pool.query(
+    `UPDATE solicitudes_licencia
+        SET id_estado_solicitud = $2, id_empleado_resolutor = $3, resuelto_en = CURRENT_TIMESTAMP,
+            motivo_resolucion = $4, actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_solicitud = $1 AND id_estado_solicitud = 1`,
+    [idSolicitud, idEstado, idResolutor, motivo]
+  );
+  return rowCount === 1;
+}
+
+async function marcarResolucionNotificada(idSolicitud) {
+  await pool.query(
+    `UPDATE solicitudes_licencia SET resolucion_notificada_en = CURRENT_TIMESTAMP WHERE id_solicitud = $1`,
+    [idSolicitud]
+  );
+}
+
+// Resoluciones sin aviso confirmado; se espera unos segundos para no competir con el envío en línea.
+async function listarResolucionesSinNotificar(limite) {
+  const { rows } = await pool.query(
+    `${SOLICITUD_CON_CATALOGOS}
+     WHERE s.resuelto_en IS NOT NULL AND s.resolucion_notificada_en IS NULL
+       AND s.resuelto_en < CURRENT_TIMESTAMP - INTERVAL '30 seconds'
+     ORDER BY s.resuelto_en LIMIT $1`,
+    [limite]
+  );
+  return rows;
+}
+
+module.exports = {
+  listarTipos,
+  obtenerTipo,
+  crear,
+  obtener,
+  listarPorEmpleado,
+  obtenerAdjunto,
+  resolver,
+  marcarResolucionNotificada,
+  listarResolucionesSinNotificar,
+};
