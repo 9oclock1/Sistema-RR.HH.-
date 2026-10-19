@@ -13,3 +13,6 @@ npm-debug.log*
 
 # uploads
 uploads/
+
+# llave de la cuenta de servicio de Pub/Sub
+credenciales/

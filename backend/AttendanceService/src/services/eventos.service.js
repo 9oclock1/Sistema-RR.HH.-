@@ -1,12 +1,20 @@
+const { randomUUID } = require("node:crypto");
 const modelo = require("../models/eventos.model");
+const pubsub = require("../config/pubsub");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const {
   TIPO_EVENTO,
   TOPICO,
+  ORIGEN,
+  DESTINOS,
   MAXIMO_INTENTOS,
   topicosDelArea,
   esperaReintento,
+  topicoDelGrupo,
+  armarMensaje,
+  atributosDe,
+  errorDePublicacion,
   armarCargaPublicacion,
 } = require("../utils/eventos");
 
@@ -15,10 +23,10 @@ const LOTE = 10;
 const SEGUNDOS_RESERVA = 60;
 const LIMITE_CONSULTA = 100;
 
-// Destino de cada tópico; sin URL, el evento queda pendiente para que el módulo lo consulte.
-const destinos = () => ({
-  [TOPICO.PRODUCCION_LOGISTICA]: process.env.URL_PRODUCCION_LOGISTICA || null,
-  [TOPICO.ENTREGAS_DESPACHOS]: process.env.URL_ENTREGAS_DESPACHOS || null,
+const prefijoTopico = () => process.env.PUBSUB_PREFIJO_TOPICO || "ucb-sis323-sub-";
+
+// Compensaciones es del mismo proyecto: va por REST. Sin URL, el evento queda pendiente para que el módulo lo consulte.
+const destinosHttp = () => ({
   [TOPICO.COMPENSACIONES]: process.env.URL_COMPENSACIONES || null,
 });
 
@@ -32,13 +40,22 @@ const topicosDe = (codigoArea) =>
 async function registrarPublicacion(cliente, detalle) {
   const topicos = topicosDe(detalle.area.codigo);
   if (topicos.length === 0) return;
-  const carga = armarCargaPublicacion(detalle);
+  const datos = armarCargaPublicacion(detalle);
+  const fecha = new Date().toISOString();
   for (const topico of topicos) {
+    const idEvento = randomUUID();
     await modelo.registrar(cliente, {
+      idEvento,
       topico,
       tipoEvento: TIPO_EVENTO.ROL_TURNOS_PUBLICADO,
       idRol: detalle.id_rol,
-      carga: { ...carga, topico },
+      carga: armarMensaje({
+        idMensaje: idEvento,
+        destino: DESTINOS[topico],
+        tipo: TIPO_EVENTO.ROL_TURNOS_PUBLICADO,
+        fecha,
+        datos,
+      }),
     });
   }
 }
@@ -53,7 +70,24 @@ async function registrarConsolidacion(cliente, carga) {
   });
 }
 
-async function enviar(evento, url) {
+// Todo lo que sale de RRHH va al tópico de RRHH (<prefijo><letra del grupo origen>); el destino viaja en el encabezado.
+async function publicar(clientePubSub, evento) {
+  const topico = topicoDelGrupo(prefijoTopico(), ORIGEN.grupo);
+  try {
+    await clientePubSub.topic(topico).publishMessage({ json: evento.carga, attributes: atributosDe(evento.carga) });
+    await modelo.marcarEntregado(evento.id_evento);
+  } catch (error) {
+    console.error(`Error al publicar el evento ${evento.id_evento} en ${topico}:`, error.message);
+    const { mensaje, permanente } = errorDePublicacion(error, topico);
+    await modelo.marcarError(evento.id_evento, {
+      error: mensaje,
+      esperaMs: esperaReintento(evento.intentos + 1),
+      fallido: permanente,
+    });
+  }
+}
+
+async function enviarHttp(evento, url) {
   try {
     const respuesta = await fetch(url, {
       method: "POST",
@@ -76,12 +110,20 @@ async function enviar(evento, url) {
   }
 }
 
+// Producción y Entregas salen por Pub/Sub (sin configurar, quedan en la base hasta que lo esté);
+// Compensaciones sale por HTTP si hay URL.
 async function despachar() {
-  const urls = destinos();
-  const topicos = Object.keys(urls).filter((topico) => urls[topico]);
+  const clientePubSub = pubsub.obtenerCliente();
+  const urls = destinosHttp();
+  const topicos = [
+    ...(clientePubSub ? Object.keys(DESTINOS) : []),
+    ...Object.keys(urls).filter((topico) => urls[topico]),
+  ];
   if (topicos.length === 0) return 0;
   const eventos = await modelo.reservarPendientes(topicos, LOTE, SEGUNDOS_RESERVA);
-  await Promise.all(eventos.map((evento) => enviar(evento, urls[evento.topico])));
+  await Promise.all(
+    eventos.map((evento) => (DESTINOS[evento.topico] ? publicar(clientePubSub, evento) : enviarHttp(evento, urls[evento.topico])))
+  );
   return eventos.length;
 }
 
