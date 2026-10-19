@@ -16,6 +16,7 @@ CREATE TABLE CAPACITACIONES_CERTIFICACION (
     certificado_tipo_mime varchar(50) NULL,
     certificado_tamano_bytes int NULL,
     id_solicitud_servicio UUID NULL,
+    alerta_vencimiento_enviada_en TIMESTAMPTZ NULL,
     registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT CAPACITACIONES_CERTIFICACION_pk PRIMARY KEY (id_capacitacion),
@@ -195,6 +196,7 @@ CREATE TABLE REQUISITOS_CAPACITACION_CARGO (
 );
 CREATE TABLE SOLICITUDES_SERVICIO_CAPACITACION (
     id_solicitud_servicio UUID NOT NULL,
+    id_mensaje UUID NOT NULL,
     id_curso UUID NOT NULL,
     id_empleado_solicitante UUID NOT NULL,
     descripcion_requerimiento text NOT NULL,
@@ -213,6 +215,7 @@ CREATE TABLE SOLICITUDES_SERVICIO_CAPACITACION (
     registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT SOLICITUDES_SERVICIO_CAPACITACION_pk PRIMARY KEY (id_solicitud_servicio),
+    CONSTRAINT uq_solicitud_servicio_id_mensaje UNIQUE (id_mensaje),
     CONSTRAINT uq_solicitud_servicio_numero_orden UNIQUE (numero_orden_servicio),
     CONSTRAINT ck_solicitud_servicio_estado CHECK (
         estado IN ('PENDIENTE_ENVIO', 'ENVIADA', 'EN_PROCESO', 'ORDEN_EMITIDA', 'RECHAZADA', 'CANCELADA')
@@ -518,6 +521,9 @@ SELECT e.id_empleado,
 CREATE INDEX IF NOT EXISTS ix_capacitacion_vencimiento
     ON CAPACITACIONES_CERTIFICACION (fecha_vencimiento)
     WHERE fecha_vencimiento IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_capacitacion_alerta_pendiente
+    ON CAPACITACIONES_CERTIFICACION (fecha_vencimiento)
+    WHERE fecha_vencimiento IS NOT NULL AND alerta_vencimiento_enviada_en IS NULL;
 
 CREATE INDEX IF NOT EXISTS ix_capacitacion_solicitud_servicio
     ON CAPACITACIONES_CERTIFICACION (id_solicitud_servicio)
@@ -525,6 +531,9 @@ CREATE INDEX IF NOT EXISTS ix_capacitacion_solicitud_servicio
 CREATE INDEX IF NOT EXISTS ix_solicitud_servicio_pendiente_envio
     ON SOLICITUDES_SERVICIO_CAPACITACION (proximo_intento_en)
     WHERE estado = 'PENDIENTE_ENVIO';
+CREATE INDEX IF NOT EXISTS ix_solicitud_servicio_respuesta_simulada
+    ON SOLICITUDES_SERVICIO_CAPACITACION (actualizado_en)
+    WHERE estado IN ('ENVIADA', 'EN_PROCESO');
 CREATE INDEX IF NOT EXISTS ix_solicitud_servicio_curso_estado
     ON SOLICITUDES_SERVICIO_CAPACITACION (id_curso, estado);
 CREATE INDEX IF NOT EXISTS ix_historial_solicitud_servicio_fecha
