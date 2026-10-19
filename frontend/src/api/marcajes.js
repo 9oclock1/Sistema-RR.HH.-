@@ -12,3 +12,7 @@ export const registrarEntrada = (idEmpleado) =>
 
 export const registrarSalida = (idEmpleado) =>
   solicitar(`${RUTA}/salida`, { metodo: "POST", cabeceras: comoEmpleado(idEmpleado) });
+
+// Turnos publicados del empleado para los próximos 7 días (desde hoy).
+export const consultarMisTurnos = (idEmpleado) =>
+  solicitar("/att/mis-turnos", { cabeceras: comoEmpleado(idEmpleado) });

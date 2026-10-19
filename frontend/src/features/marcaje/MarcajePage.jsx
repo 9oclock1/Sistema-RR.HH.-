@@ -11,10 +11,12 @@ import {
   ModalConfirmacion,
   Tarjeta,
 } from "../../components/ui";
+import MisNovedades from "../justificaciones/MisNovedades";
 import IdentificacionEmpleado from "./IdentificacionEmpleado";
+import MisTurnos from "./MisTurnos";
 import Reloj from "./Reloj";
 import ResumenJornada from "./ResumenJornada";
-import { describirOrigen, formatearFechaJornada, formatearHora } from "./formato";
+import { describirAtraso, describirOrigen, formatearFechaJornada, formatearHora } from "./formato";
 import { guardarEmpleado, leerEmpleado, olvidarEmpleado } from "./sesionEmpleado";
 import "./marcaje.css";
 
@@ -111,7 +113,7 @@ export default function MarcajePage() {
     try {
       if (tipo === "entrada") {
         const entrada = await registrarEntrada(idEmpleado);
-        setJornada((actual) => ({ ...actual, fecha_jornada: entrada.fecha_jornada, entrada }));
+        setJornada((actual) => ({ ...actual, fecha_jornada: entrada.fecha_jornada, entrada, atraso: entrada.atraso }));
       } else {
         const resumen = await registrarSalida(idEmpleado);
         setJornada((actual) => ({ ...actual, ...resumen }));
@@ -133,6 +135,7 @@ export default function MarcajePage() {
 
   const entrada = jornada?.entrada;
   const salida = jornada?.salida;
+  const atraso = jornada?.atraso;
   const nombre = jornada ? `${jornada.empleado.nombres} ${jornada.empleado.apellidos}` : "";
 
   return (
@@ -206,12 +209,18 @@ export default function MarcajePage() {
               <ResumenJornada jornada={jornada} ref={refConfirmacion} />
             ) : entrada ? (
               <>
-                <Alerta ref={refConfirmacion} tabIndex={-1} tono="exito" titulo="Entrada registrada">
+                <Alerta
+                  ref={refConfirmacion}
+                  tabIndex={-1}
+                  tono={atraso ? "aviso" : "exito"}
+                  titulo={atraso ? "Entrada registrada con atraso" : "Entrada registrada"}
+                >
                   <p>
                     <time className="marcaje-hora" dateTime={entrada.fecha_hora_marcaje}>
                       {formatearHora(entrada.fecha_hora_marcaje)}
                     </time>
                   </p>
+                  {atraso && <p>{describirAtraso(atraso)}</p>}
                   <p>Origen: {describirOrigen(entrada)}</p>
                 </Alerta>
                 <div className="marcaje-accion">
@@ -261,6 +270,9 @@ export default function MarcajePage() {
             )}
           </Tarjeta>
         )}
+
+        {jornada && <MisTurnos key={idEmpleado} idEmpleado={idEmpleado} />}
+        {jornada && <MisNovedades key={`novedades-${idEmpleado}`} idEmpleado={idEmpleado} />}
       </div>
 
       <ModalConfirmacion

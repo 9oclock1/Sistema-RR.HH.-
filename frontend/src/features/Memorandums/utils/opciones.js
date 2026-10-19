@@ -1,9 +1,14 @@
-// Temporal hasta contar con inicio de sesión: quien emite el memorándum.
-export const ID_EMPLEADO_EMISOR = 'e0000000-0000-4000-8000-000000000002';
+export const CLASIFICACION_AMONESTACION = 'AMONESTACION';
 
-// Datos de prueba hasta conectar los catálogos reales de empleados y tipos de memorándum.
-export const EMPLEADOS_PRUEBA = [{ valor: 'e0000000-0000-4000-8000-000000000001', etiqueta: 'Empleado de prueba' }];
-export const TIPOS_MEMO_PRUEBA = [{ valor: '1', etiqueta: 'Llamada de atención' }];
+// Opciones de un <Selector> a partir de la lista de empleados de la API.
+export const opcionesEmpleados = (empleados) =>
+  empleados.map((empleado) => ({
+    valor: empleado.id_empleado,
+    etiqueta: `${empleado.nombre_completo} · ${empleado.cargo}`,
+  }));
+
+export const opcionesTipos = (tipos) =>
+  tipos.map((tipo) => ({ valor: String(tipo.id_tipo_memo), etiqueta: tipo.nombre }));
 
 export const NATURALEZAS_FALTA = [
   { valor: 'OPERATIVA', etiqueta: 'Operativa' },

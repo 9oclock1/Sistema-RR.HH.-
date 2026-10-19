@@ -1,0 +1,158 @@
+.aa-pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.aa-pagina .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+.aa-sutil {
+  color: var(--color-text-subtle);
+}
+
+/* Filtros */
+.aa-filtros__campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--size-sidebar) * 0.75), 1fr));
+  gap: var(--space-3) var(--space-4);
+  align-items: end;
+  margin-top: var(--space-2);
+}
+
+.aa-filtros__pie {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+  margin-top: var(--space-3);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+/* Resumen */
+.aa-resumen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.aa-resumen__titulo {
+  margin: 0;
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.aa-indicadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--size-sidebar) * 0.6), 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aa-indicador {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-1);
+  width: 100%;
+  height: 100%;
+  min-height: var(--size-touch);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-card);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition), background-color var(--transition);
+}
+
+.aa-indicador:hover {
+  border-color: var(--color-border-hover);
+}
+
+.aa-indicador[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-primary);
+  background: var(--color-bg-selected);
+}
+
+.aa-indicador__etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.aa-indicador__valor {
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* El color del ícono acompaña a la etiqueta; el número va siempre en el color de texto. */
+.aa-indicador--peligro .aa-indicador__icono {
+  color: var(--color-danger);
+}
+
+.aa-indicador--aviso .aa-indicador__icono {
+  color: var(--color-warning-text);
+}
+
+.aa-indicador--exito .aa-indicador__icono {
+  color: var(--color-success);
+}
+
+.aa-indicador--info .aa-indicador__icono {
+  color: var(--color-info);
+}
+
+/* Tabla */
+.aa-tabla {
+  min-width: 0;
+}
+
+.aa-tabla .ds-tarjeta__acciones {
+  flex-wrap: wrap;
+}
+
+.aa-tabla .ds-tabla {
+  min-width: calc(var(--size-sidebar) * 3.6);
+}
+
+.aa-celda {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.aa-celda__principal {
+  overflow-wrap: anywhere;
+}
+
+.aa-celda__secundario {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  overflow-wrap: anywhere;
+}
+
+.aa-detalles {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}

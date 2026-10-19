@@ -1,5 +1,7 @@
 const { ErrorApp } = require("./errores");
 const { horaBolivia } = require("./jornada");
+const { horarioProgramado, ventanaEntrada } = require("./novedades");
+const { sumarDias } = require("./periodos");
 
 const TIPO_MARCAJE = { ENTRADA: 1, SALIDA: 2 };
 const ORIGEN_MARCAJE = { PORTAL: 1, BIOMETRICO: 2 };
@@ -14,12 +16,6 @@ const HORAS_SALIDA_RECIENTE = 8;
 const esEntrada = (marcaje) => marcaje.tipo_codigo === "ENTRADA";
 const esSalida = (marcaje) => marcaje.tipo_codigo === "SALIDA";
 
-function diaAnterior(fecha) {
-  const dia = new Date(`${fecha}T00:00:00Z`);
-  dia.setUTCDate(dia.getUTCDate() - 1);
-  return dia.toISOString().slice(0, 10);
-}
-
 function jornadaDe(marcajes, fecha) {
   const propios = marcajes.filter((marcaje) => marcaje.fecha_jornada === fecha);
   return {
@@ -29,15 +25,35 @@ function jornadaDe(marcajes, fecha) {
   };
 }
 
-// La jornada de hoy, salvo que la del día anterior siga abierta.
+// La jornada de la última entrada si sigue abierta (turnos que cruzan la medianoche); si no, la de hoy.
 function jornadaEnCurso(marcajes, { hoy, ahora }) {
-  const actual = jornadaDe(marcajes, hoy);
-  if (actual.entrada || actual.salida) return actual;
+  const ultima = marcajes.findLast(esEntrada);
+  if (ultima && ahora - ultima.fecha_hora_marcaje < HORAS_JORNADA_ABIERTA * HORA_MS) {
+    const jornada = jornadaDe(marcajes, ultima.fecha_jornada);
+    if (!jornada.salida) return jornada;
+  }
+  return jornadaDe(marcajes, hoy);
+}
 
-  const anterior = jornadaDe(marcajes, diaAnterior(hoy));
-  const sigueAbierta =
-    anterior.entrada && !anterior.salida && ahora - anterior.entrada.fecha_hora_marcaje < HORAS_JORNADA_ABIERTA * HORA_MS;
-  return sigueAbierta ? anterior : actual;
+// Jornada a la que corresponde una entrada: la del turno programado (de ayer, hoy o mañana) cuya ventana
+// de entrada incluye el instante. Así, quien llega pasada la medianoche a un turno nocturno marca en la jornada
+// del turno y no ocupa la del día siguiente. Sin turno en la ventana devuelve null.
+function fechaJornadaEntrada(programacion, marcajes, { hoy, ahoraMs }) {
+  const fechas = new Set([sumarDias(hoy, -1), hoy, sumarDias(hoy, 1)]);
+  const candidatos = programacion
+    .filter((turno) => !turno.descanso && fechas.has(turno.fecha))
+    .map((turno) => ({ fecha: turno.fecha, horario: horarioProgramado(turno, turno.fecha) }))
+    .filter(({ horario }) => {
+      const { desdeMs, hastaMs } = ventanaEntrada(horario);
+      return ahoraMs >= desdeMs && ahoraMs < hastaMs;
+    })
+    .map((c) => ({ ...c, jornada: jornadaDe(marcajes, c.fecha), distancia: Math.abs(ahoraMs - c.horario.inicioMs) }))
+    .sort((a, b) => a.distancia - b.distancia);
+  if (candidatos.length === 0) return null;
+  // Un turno con la entrada abierta todavía está en curso: una segunda entrada es un duplicado.
+  const abierto = candidatos.find((c) => c.jornada.entrada && !c.jornada.salida);
+  const libre = candidatos.find((c) => !c.jornada.entrada && !c.jornada.salida);
+  return (abierto ?? libre ?? candidatos[0]).fecha;
 }
 
 // Salida que impide marcar otra: la de la jornada en curso o, sin entrada abierta, una reciente.
@@ -78,7 +94,9 @@ module.exports = {
   ESTADO_MARCAJE,
   esEntrada,
   esSalida,
+  jornadaDe,
   jornadaEnCurso,
+  fechaJornadaEntrada,
   salidaRegistrada,
   verificarEmpleadoActivo,
   entradaDuplicada,

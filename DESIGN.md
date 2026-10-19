@@ -77,7 +77,7 @@ Están en `frontend/src/styles/tokens.css` y se cargan en `main.jsx`. En CSS se 
 | Texto | `--color-text`, `--color-text-secondary`, `--color-text-subtle`, `--color-text-inverse`, `--color-text-selected` |
 | Fondos | `--color-bg-surface`, `--color-bg-page`, `--color-bg-hover`, `--color-bg-pressed`, `--color-bg-neutral`, `--color-bg-selected`, `--color-bg-overlay` |
 | Bordes | `--color-border`, `--color-border-hover`, `--color-border-input`, `--color-border-focus` |
-| Estados | `--color-success`, `--color-warning`, `--color-danger`, `--color-info`, `--color-purple` y sus variantes `-text` y `-bg` (`--color-info-bg`, `--color-success-bg`, `--color-warning-bg`, `--color-danger-bg`); `--color-danger-hover`, `--color-danger-pressed`, `--color-on-danger` |
+| Estados | `--color-success`, `--color-warning`, `--color-danger`, `--color-info`, `--color-purple` y sus variantes `-text` y `-bg` (`--color-info-bg`, `--color-success-bg`, `--color-warning-bg`, `--color-danger-bg`, `--color-purple-bg`); `--color-danger-hover`, `--color-danger-pressed`, `--color-on-danger` |
 | Avatares y carga | `--color-avatar-1` … `--color-avatar-6`, `--color-on-avatar`, `--color-skeleton`, `--color-skeleton-shine` |
 | Tipografía | `--font-family`, `--font-family-mono`, `--font-size-body`, `--line-height-body`, `--font-size-small`, `--line-height-small`, `--font-size-title`, `--line-height-title`, `--font-size-section`, `--line-height-section`, `--font-size-input-touch`, `--font-weight-regular`, `--font-weight-medium`, `--font-weight-semibold` |
 | Espaciado | `--space-1` (4), `--space-2` (8), `--space-3` (12), `--space-4` (16), `--space-6` (24), `--space-8` (32), `--space-content` |

@@ -1,7 +1,9 @@
 const { test, beforeEach, mock } = require("node:test");
 const assert = require("node:assert/strict");
 const modelo = require("../src/models/marcajes.model");
+const programacion = require("../src/models/novedades.model");
 const empleados = require("../src/services/empleados.service");
+const novedades = require("../src/services/novedades.service");
 const servicio = require("../src/services/marcajes.service");
 const { ORIGEN_MARCAJE, TIPO_MARCAJE, ESTADO_MARCAJE } = require("../src/utils/marcajes");
 
@@ -19,6 +21,8 @@ beforeEach(() => {
   mock.restoreAll();
   mock.method(empleados, "obtener", async (id) => (id === ANA ? { nombres: "Ana", apellidos: "Quispe", activo: true } : null));
   mock.method(modelo, "listarRecientes", async () => []);
+  mock.method(programacion, "listarProgramacion", async () => []);
+  mock.method(novedades, "alMarcar", async () => []);
   mock.method(modelo, "momentoActual", async () => ({ ahora: new Date("2026-09-24T21:10:00Z"), hoy: "2026-09-24" }));
   registrar = mock.method(modelo, "registrar", async (datos) => ({ ...entradaDeAna, ...datos }));
 });
@@ -31,6 +35,7 @@ test("registra la entrada del portal con el tipo y origen correctos", async () =
     idOrigen: ORIGEN_MARCAJE.PORTAL,
     idEstado: ESTADO_MARCAJE.REGISTRADO,
     codigoDispositivo: undefined,
+    fechaJornada: "2026-09-24",
   });
 });
 
@@ -94,6 +99,7 @@ test("el marcaje biométrico usa el mismo registro con origen y dispositivo", as
     idOrigen: ORIGEN_MARCAJE.BIOMETRICO,
     idEstado: ESTADO_MARCAJE.REGISTRADO,
     codigoDispositivo: "BIO-01",
+    fechaJornada: "2026-09-24",
   });
 });
 
@@ -239,4 +245,103 @@ test("la consulta de jornada muestra entrada, salida y horas trabajadas", async 
   assert.equal(jornada.salida, salidaDeAna);
   assert.equal(jornada.minutos_trabajados, 547);
   assert.equal(jornada.inconsistencia, null);
+});
+
+const atrasoDeAna = { tipo: { codigo: "ATRASO", nombre: "Atraso" }, minutos: 12, turno: { nombre: "Mañana" } };
+
+test("la entrada tardía devuelve el atraso calculado", async () => {
+  novedades.alMarcar.mock.mockImplementation(async () => [atrasoDeAna]);
+  const entrada = await servicio.registrarEntrada(ANA);
+  assert.equal(entrada.atraso, atrasoDeAna);
+  assert.equal(novedades.alMarcar.mock.calls[0].arguments[0], ANA);
+});
+
+test("si falla el cálculo de novedades, el marcaje se guarda igual y sin atraso", async () => {
+  novedades.alMarcar.mock.mockImplementation(async () => {
+    throw new Error("fallo");
+  });
+  mock.method(console, "error", () => {});
+  const entrada = await servicio.registrarEntrada(ANA);
+  assert.equal(registrar.mock.callCount(), 1);
+  assert.equal(entrada.atraso, null);
+});
+
+test("la salida antes del fin devuelve la salida anticipada y la consulta de jornada las novedades", async () => {
+  const anticipada = { tipo: { codigo: "SALIDA_ANTICIPADA", nombre: "Salida anticipada" }, minutos: 45 };
+  novedades.alMarcar.mock.mockImplementation(async () => [atrasoDeAna, anticipada]);
+  conMarcajes(entradaDeAna);
+  devolver(salidaDeAna);
+  const resumen = await servicio.registrarSalida(ANA);
+  assert.equal(resumen.salida_anticipada, anticipada);
+  assert.equal(resumen.atraso, atrasoDeAna);
+  const jornada = await servicio.consultarJornada(ANA);
+  assert.equal(jornada.salida_anticipada, anticipada);
+});
+
+const turnoNocturno = (fecha) => ({
+  id_empleado: ANA,
+  fecha,
+  descanso: false,
+  hora_inicio: "22:00:00",
+  hora_fin: "06:00:00",
+  minutos_refrigerio: 30,
+  minutos_tolerancia: 5,
+});
+const enElMomento = (ahora, hoy) => modelo.momentoActual.mock.mockImplementation(async () => ({ ahora: new Date(ahora), hoy }));
+
+test("entrada tardía pasada la medianoche: se guarda en la jornada del turno nocturno", async () => {
+  enElMomento("2026-09-25T00:30:00-04:00", "2026-09-25");
+  programacion.listarProgramacion.mock.mockImplementation(async () => [turnoNocturno("2026-09-24"), turnoNocturno("2026-09-25")]);
+  await servicio.registrarEntrada(ANA);
+  assert.equal(registrar.mock.calls[0].arguments[0].fechaJornada, "2026-09-24");
+  const [desde, hasta, ids] = programacion.listarProgramacion.mock.calls[0].arguments;
+  assert.deepEqual([desde, hasta, ids], ["2026-09-24", "2026-09-26", [ANA]]);
+});
+
+test("tras entrar pasada la medianoche, la noche siguiente puede marcar la entrada de su turno", async () => {
+  const entradaTardia = {
+    ...entradaDeAna,
+    fecha_jornada: "2026-09-24",
+    fecha_hora_marcaje: new Date("2026-09-25T00:30:00-04:00"),
+  };
+  const salidaManana = {
+    ...entradaTardia,
+    tipo_codigo: "SALIDA",
+    fecha_hora_marcaje: new Date("2026-09-25T06:00:00-04:00"),
+  };
+  conMarcajes(entradaTardia, salidaManana);
+  enElMomento("2026-09-25T21:55:00-04:00", "2026-09-25");
+  programacion.listarProgramacion.mock.mockImplementation(async () => [turnoNocturno("2026-09-24"), turnoNocturno("2026-09-25")]);
+  await servicio.registrarEntrada(ANA);
+  assert.equal(registrar.mock.calls[0].arguments[0].fechaJornada, "2026-09-25");
+});
+
+test("turno que empieza a medianoche: la entrada de las 23:50 se guarda en la jornada siguiente", async () => {
+  enElMomento("2026-09-24T23:50:00-04:00", "2026-09-24");
+  programacion.listarProgramacion.mock.mockImplementation(async () => [
+    { ...turnoNocturno("2026-09-25"), hora_inicio: "00:00:00", hora_fin: "08:00:00" },
+  ]);
+  await servicio.registrarEntrada(ANA);
+  assert.equal(registrar.mock.calls[0].arguments[0].fechaJornada, "2026-09-25");
+});
+
+test("con el turno nocturno en curso, una segunda entrada es duplicada aunque ya abra la ventana del siguiente", async () => {
+  const entradaNoche = { ...entradaDeAna, fecha_jornada: "2026-09-24", fecha_hora_marcaje: new Date("2026-09-24T21:58:00-04:00") };
+  conMarcajes(entradaNoche);
+  enElMomento("2026-09-25T05:00:00-04:00", "2026-09-25");
+  programacion.listarProgramacion.mock.mockImplementation(async () => [
+    turnoNocturno("2026-09-24"),
+    { ...turnoNocturno("2026-09-25"), hora_inicio: "08:00:00", hora_fin: "16:00:00" },
+  ]);
+  await assert.rejects(servicio.registrarEntrada(ANA), { estado: 409, message: "Ya registró su entrada de hoy a las 21:58." });
+  assert.equal(registrar.mock.callCount(), 0);
+});
+
+test("la salida de la mañana cierra la jornada del turno al que entró pasada la medianoche", async () => {
+  const entradaTardia = { ...entradaDeAna, fecha_jornada: "2026-09-24", fecha_hora_marcaje: new Date("2026-09-25T00:30:00-04:00") };
+  conMarcajes(entradaTardia);
+  enElMomento("2026-09-25T06:02:00-04:00", "2026-09-25");
+  devolver({ ...salidaDeAna, fecha_jornada: "2026-09-24", fecha_hora_marcaje: new Date("2026-09-25T06:02:00-04:00") });
+  await servicio.registrarSalida(ANA);
+  assert.equal(registrar.mock.calls[0].arguments[0].fechaJornada, "2026-09-24");
 });

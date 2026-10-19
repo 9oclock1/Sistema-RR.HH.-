@@ -33,3 +33,12 @@ export const duracionISO = (minutos) => `PT${Math.floor(minutos / 60)}H${minutos
 
 export const describirOrigen = ({ origen_codigo, codigo_dispositivo }) =>
   origen_codigo === "BIOMETRICO" ? `Lector biométrico ${codigo_dispositivo}` : "Portal";
+
+const minutos = (n) => (n === 1 ? "1 minuto" : `${n} minutos`);
+
+export const describirAtraso = ({ minutos: n, turno }) =>
+  `Llegó ${minutos(n)} tarde: su turno ${turno.nombre} empieza a las ${formatearHora(turno.inicio_programado)}` +
+  (turno.minutos_tolerancia ? ` (tolerancia de ${minutos(turno.minutos_tolerancia)}).` : ".");
+
+export const describirSalidaAnticipada = ({ minutos: n, turno }) =>
+  `Salió ${formatearDuracion(n)} antes del fin de su turno (${formatearHora(turno.fin_programado)}). Ese tiempo queda como no trabajado.`;

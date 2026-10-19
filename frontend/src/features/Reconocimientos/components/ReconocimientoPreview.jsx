@@ -1,6 +1,6 @@
 import { Star } from 'lucide-react';
 import { Tarjeta } from '../../../components/ui';
-import { DOCUMENTO, EMISOR_PRUEBA, EMPLEADOS_PRUEBA, TIPOS_RECONOCIMIENTO_PRUEBA } from '../utils/opciones';
+import { DOCUMENTO } from '../utils/opciones';
 
 const FORMATO_FECHA = new Intl.DateTimeFormat('es-BO', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -8,9 +8,12 @@ function Dato({ valor, pendiente, className }) {
   return <p className={valor ? className : `${className} reco-doc__pendiente`}>{valor || pendiente}</p>;
 }
 
-export default function ReconocimientoPreview({ valores }) {
-  const empleado = EMPLEADOS_PRUEBA.find((opcion) => opcion.valor === valores.id_empleado_receptor);
-  const tipo = TIPOS_RECONOCIMIENTO_PRUEBA.find((opcion) => opcion.valor === valores.id_tipo_memo);
+// Los datos del colaborador y de quien otorga salen de la misma lista que el formulario, que es la del Kardex.
+export default function ReconocimientoPreview({ valores, empleados, tipos }) {
+  const empleado = empleados.find((opcion) => opcion.id_empleado === valores.id_empleado_receptor);
+  const emisor = empleados.find((opcion) => opcion.id_empleado === valores.id_empleado_emisor);
+  const idTipo = valores.id_tipo_memo || (tipos.length === 1 ? String(tipos[0].id_tipo_memo) : '');
+  const tipo = tipos.find((opcion) => String(opcion.id_tipo_memo) === idTipo);
 
   return (
     <Tarjeta titulo="Previsualización" className="reco-preview">
@@ -36,18 +39,18 @@ export default function ReconocimientoPreview({ valores }) {
 
           <div className="reco-doc__homenajeado">
             <p className="reco-doc__meta reco-doc__mayusculas">Se otorga a</p>
-            <Dato className="reco-doc__colaborador" valor={empleado?.etiqueta} pendiente="Nombre del colaborador" />
+            <Dato className="reco-doc__colaborador" valor={empleado?.nombre_completo} pendiente="Nombre del colaborador" />
             <Dato
               className="reco-doc__meta"
-              valor={empleado && `${empleado.cargo} · ${empleado.sucursal}`}
-              pendiente="Cargo · Sucursal"
+              valor={empleado && `${empleado.cargo} · ${empleado.sucursal} · C.I. ${empleado.numero_documento}`}
+              pendiente="Cargo · Sucursal · C.I."
             />
           </div>
 
           <div className="reco-doc__motivo">
             <p className="reco-doc__meta reco-doc__mayusculas">Motivo del reconocimiento</p>
             <Dato className="reco-doc__asunto" valor={valores.asunto.trim()} pendiente="Asunto del reconocimiento" />
-            <Dato className="reco-doc__meta" valor={tipo?.etiqueta} pendiente="Tipo de reconocimiento" />
+            <Dato className="reco-doc__meta" valor={tipo?.nombre} pendiente="Tipo de reconocimiento" />
           </div>
 
           <Dato
@@ -60,8 +63,8 @@ export default function ReconocimientoPreview({ valores }) {
           <p className="reco-doc__felicitacion">¡Felicitaciones!</p>
 
           <div className="reco-doc__firma">
-            <p className="reco-doc__firmante">{EMISOR_PRUEBA.nombre}</p>
-            <p className="reco-doc__meta">{EMISOR_PRUEBA.cargo}</p>
+            <Dato className="reco-doc__firmante" valor={emisor?.nombre_completo} pendiente="Quien otorga" />
+            <Dato className="reco-doc__meta" valor={emisor?.cargo} pendiente="Cargo" />
             <p className="reco-doc__meta">Otorgado por</p>
           </div>
         </div>

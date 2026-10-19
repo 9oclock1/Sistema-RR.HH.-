@@ -1,0 +1,96 @@
+.licencias-columna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 72rem;
+}
+
+.licencias-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.licencias-formulario {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  max-width: var(--size-modal-lg);
+}
+
+.licencias-formulario > * {
+  align-self: stretch;
+}
+
+.licencias-formulario > button[type="submit"] {
+  align-self: flex-start;
+}
+
+.licencias-reglas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.licencias-fechas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-4);
+}
+
+.licencias-dias {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.licencias-respaldo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.licencias-archivos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.licencias-archivo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.licencias-archivo__nombre {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.licencias-archivo__tamano {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+}
+
+.licencias-tipo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.licencias-adjuntos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}

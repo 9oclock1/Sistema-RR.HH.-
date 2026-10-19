@@ -32,7 +32,9 @@ const siguienteCorrelativo = async (db, gestion) => {
   return rows[0].ultimo_numero;
 };
 
-const insertarBorrador = async (db, memorandum) => {
+// La amonestación queda EMITIDA desde el INSERT: el CITE y el correlativo ya están asignados y el PDF se genera
+// en la misma transacción, así que un ROLLBACK la descarta por completo.
+const insertarAmonestacion = async (db, memorandum) => {
   const { rows } = await db.query(
     `INSERT INTO memorandums (
         id_memorandum, id_empleado_receptor, id_tipo_memo, id_empleado_emisor,
@@ -40,7 +42,7 @@ const insertarBorrador = async (db, memorandum) => {
         gestion, numero_correlativo, naturaleza_falta, gravedad_falta,
         estado_sancion, evidencia_adjunto_url
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'BORRADOR', $13)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'EMITIDO', $13)
      RETURNING ${COLUMNAS}`,
     [
       randomUUID(),
@@ -67,6 +69,18 @@ const obtenerTipo = async (db, idTipoMemo) => {
     [idTipoMemo]
   );
   return rows[0] || null;
+};
+
+// Catálogo de tipos para los formularios; `clasificacion` es opcional.
+const listarTipos = async (db, clasificacion) => {
+  const { rows } = await db.query(
+    `SELECT id_tipo_memo, clasificacion, nombre, descripcion
+       FROM tipos_memorandum
+      WHERE ($1::text IS NULL OR upper(trim(clasificacion)) = $1)
+      ORDER BY id_tipo_memo`,
+    [clasificacion]
+  );
+  return rows;
 };
 
 // RF-38: un reconocimiento no lleva datos de falta ni evidencia y queda emitido al registrarse.
@@ -136,7 +150,7 @@ const listarPorEmpleado = async (db, idEmpleado) => {
             m.gravedad_falta,
             m.documento_pdf_url,
             t.nombre AS tipo_nombre,
-            (m.naturaleza_falta IS NULL) AS es_reconocimiento
+            (upper(trim(t.clasificacion)) = 'RECONOCIMIENTO') AS es_reconocimiento
        FROM memorandums m
        JOIN tipos_memorandum t ON t.id_tipo_memo = m.id_tipo_memo
       WHERE m.id_empleado_receptor = $1
@@ -155,13 +169,24 @@ const guardarRutaPdf = async (db, idMemorandum, rutaPdf) => {
   return rows[0];
 };
 
+// Ruta del PDF ya generado; null si el memorándum no existe.
+const obtenerDocumento = async (db, idMemorandum) => {
+  const { rows } = await db.query(
+    'SELECT codigo_cite, documento_pdf_url FROM memorandums WHERE id_memorandum = $1',
+    [idMemorandum]
+  );
+  return rows[0] || null;
+};
+
 module.exports = {
   contarRecientes,
   siguienteCorrelativo,
-  insertarBorrador,
+  insertarAmonestacion,
   obtenerTipo,
+  listarTipos,
   insertarReconocimiento,
   obtenerParaDocumento,
   listarPorEmpleado,
   guardarRutaPdf,
+  obtenerDocumento,
 };

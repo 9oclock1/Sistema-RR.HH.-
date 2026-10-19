@@ -1,9 +1,13 @@
-import { Award, Briefcase, Building2, CalendarClock, FileUser, FileWarning, Fingerprint, IdCard, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Briefcase, Building2, CalendarClock, CalendarRange, FileCheck, FileText, FileUser, FileWarning, Fingerprint, IdCard, ListTree, Mail, Megaphone, Network, Send, Timer, UserCheck, UserPlus } from "lucide-react";
+import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
+import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
 import CargosList from "../features/Cargos/CargosList";
+import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import GestionComunicacionesPage from "../features/comunicaciones/GestionComunicacionesPage";
+import LicenciasPage from "../features/licencias/LicenciasPage";
 import JerarquiaView from "../features/Jerarquia/JerarquiaView";
 import KardexView from "../features/Kardex/KardexView";
 import { RUTA_KARDEX } from "../features/Kardex/ruta";
@@ -13,6 +17,7 @@ import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import ReconocimientosView from "../features/Reconocimientos/ReconocimientosView";
+import RolTurnosPage from "../features/rol-turnos/RolTurnosPage";
 import TurnosPage from "../features/turnos/TurnosPage";
 import VacantesView from "../features/Vacantes/VacantesView";
 import { puedeAcceder } from "../utils/permisos";
@@ -108,12 +113,52 @@ export const SECCIONES = [
         pagina: MarcajePage,
       },
       {
+        ruta: "/asistencia/licencias",
+        etiqueta: "Licencias",
+        descripcion: "Solicitud de licencias y permisos con respaldo digital.",
+        icono: FileText,
+        roles: ["empleado"],
+        pagina: LicenciasPage,
+      },
+      {
         ruta: "/asistencia/turnos",
         etiqueta: "Turnos",
         descripcion: "Horarios de trabajo, refrigerios y márgenes de tolerancia.",
         icono: CalendarClock,
         roles: ["admin"],
         pagina: TurnosPage,
+      },
+      {
+        ruta: "/asistencia/rol-turnos",
+        etiqueta: "Rol de turnos",
+        descripcion: "Turnos rotativos semanales o mensuales por sucursal y área.",
+        icono: CalendarRange,
+        roles: ["supervisor"],
+        pagina: RolTurnosPage,
+      },
+      {
+        ruta: "/asistencia/alertas",
+        etiqueta: "Alertas de asistencia",
+        descripcion: "Atrasos, faltas y salidas anticipadas del día por sucursal.",
+        icono: AlarmClock,
+        roles: ["supervisor"],
+        pagina: AlertasAsistenciaPage,
+      },
+      {
+        ruta: "/asistencia/justificaciones",
+        etiqueta: "Justificaciones",
+        descripcion: "Revisión de justificativos de atrasos y faltas con su respaldo.",
+        icono: FileCheck,
+        roles: ["supervisor"],
+        pagina: BandejaJustificacionesPage,
+      },
+      {
+        ruta: "/asistencia/horas-extra",
+        etiqueta: "Horas extra",
+        descripcion: "Horas ordinarias, nocturnas y extra de cada jornada, conciliadas para planillas.",
+        icono: Timer,
+        roles: ["supervisor"],
+        pagina: HorasExtraPage,
       },
     ],
   },

@@ -1,2 +1,4 @@
 # Configuracion de VSCode
 .vscode/*
+# archivos subidos (comprobantes de licencias)
+backend/AttendanceService/uploads/
