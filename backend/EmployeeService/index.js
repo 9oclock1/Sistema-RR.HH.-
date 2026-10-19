@@ -14,6 +14,7 @@ const reconocimientosRoutes = require("./src/routes/reconocimientos"); // RF-38
 const cursosCapacitacionRoutes = require("./src/routes/cursosCapacitacion");
 const capacitacionesRoutes = require("./src/routes/capacitaciones");
 const solicitudesServicioRoutes = require("./src/routes/solicitudesServicio");
+const contratosRoutes = require("./src/routes/contratos");
 const errorHandler = require("./src/middlewares/errorHandler");
 const { iniciarCronCertificaciones } = require("./src/jobs/certificacionesCron");
 const { iniciarCronReintentosCompras } = require("./src/jobs/solicitudesCompraCron");
@@ -58,6 +59,7 @@ app.use("/reconocimientos", reconocimientosRoutes); // RF-38
 app.use("/cursos-capacitacion", cursosCapacitacionRoutes);
 app.use("/capacitaciones", capacitacionesRoutes);
 app.use("/solicitudes-servicio", solicitudesServicioRoutes);
+app.use("/contratos", contratosRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: `Ruta no encontrada: ${req.method} ${req.originalUrl}` });
