@@ -447,7 +447,7 @@ SELECT e.id_empleado,
               MAX(m.fecha_emision) FILTER (WHERE m.naturaleza_falta IS NOT NULL) AS fecha_ultima_sancion
          FROM MEMORANDUMS m
         WHERE m.id_empleado_receptor = e.id_empleado
-          AND m.estado_sancion <> 'ANULADO'
+          AND m.estado_sancion = 'EMITIDO'
   ) mm ON TRUE
   LEFT JOIN LATERAL (
        SELECT COUNT(*)::int AS total_capacitaciones,

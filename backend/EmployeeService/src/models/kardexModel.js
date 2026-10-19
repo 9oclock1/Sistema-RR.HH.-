@@ -89,7 +89,7 @@ const listarMemorandums = async (db, idEmpleado) => {
        JOIN tipos_memorandum t ON t.id_tipo_memo = m.id_tipo_memo
        JOIN empleados em       ON em.id_empleado = m.id_empleado_emisor
       WHERE m.id_empleado_receptor = $1
-        AND m.estado_sancion <> 'ANULADO'
+        AND m.estado_sancion = 'EMITIDO'
       ORDER BY m.fecha_emision DESC, m.numero_correlativo DESC`,
     [idEmpleado]
   );
