@@ -1,6 +1,7 @@
 const modelo = require("../models/novedades.model");
 const empleados = require("./empleados.service");
 const eventos = require("./eventos.service");
+const horasExtra = require("./horasExtra.service");
 const { enTransaccion } = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
@@ -95,7 +96,13 @@ async function ejecutarContraste() {
     lote = await consolidar();
     consolidadas += lote;
   } while (lote === LOTE_CONSOLIDACION);
-  return { nuevas, consolidadas };
+
+  // Horas ordinarias, nocturnas y extra de las jornadas ya cerradas con su salida.
+  const horas = await horasExtra.calcular({ desde: sumarDias(hoy, -DIAS_REVISION), hasta: hoy }).catch((error) => {
+    console.error("No se pudieron calcular las horas extra:", error.message);
+    return 0;
+  });
+  return { nuevas, consolidadas, horas };
 }
 
 function iniciarContraste() {
@@ -132,10 +139,11 @@ const resumirNovedad = (n) => ({
   },
 });
 
-// Contrasta las jornadas de ayer y hoy del empleado que acaba de marcar y devuelve las novedades de sus marcajes.
+// Contrasta las jornadas de ayer, hoy y mañana (turno que empieza a medianoche) del empleado que acaba de marcar
+// y devuelve las novedades de sus marcajes.
 async function alMarcar(idEmpleado, idsMarcajes) {
   const { ahora, hoy } = await modelo.momentoActual();
-  await contrastar({ desde: sumarDias(hoy, -1), hasta: hoy, ids: [idEmpleado], ahora });
+  await contrastar({ desde: sumarDias(hoy, -1), hasta: sumarDias(hoy, 1), ids: [idEmpleado], ahora });
   return (await modelo.listarPorMarcajes(idsMarcajes)).map(resumirNovedad);
 }
 

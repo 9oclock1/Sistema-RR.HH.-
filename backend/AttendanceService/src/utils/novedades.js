@@ -17,7 +17,6 @@ const ESTADO_JORNADA = {
 };
 
 const MINUTO_MS = 60 * 1000;
-// Una entrada cuenta para el turno si se marca desde 4 horas antes de su inicio.
 const ANTICIPACION_ENTRADA_MS = 4 * 60 * MINUTO_MS;
 
 const instante = (marcaje) => new Date(marcaje.fecha_hora_marcaje).getTime();
@@ -34,15 +33,14 @@ function horarioProgramado(turno, fecha) {
   };
 }
 
+// Una entrada cuenta para el turno desde 4 horas antes de su inicio hasta su fin.
+const ventanaEntrada = (horario) => ({ desdeMs: horario.inicioMs - ANTICIPACION_ENTRADA_MS, hastaMs: horario.finMs });
+
 // La entrada del turno es la primera marcada en su ventana; la salida, la de la misma jornada de marcaje.
 function marcajesDelTurno(horario, marcajes) {
+  const { desdeMs, hastaMs } = ventanaEntrada(horario);
   const entrada =
-    marcajes.find(
-      (m) =>
-        m.tipo_codigo === "ENTRADA" &&
-        instante(m) >= horario.inicioMs - ANTICIPACION_ENTRADA_MS &&
-        instante(m) < horario.finMs
-    ) ?? null;
+    marcajes.find((m) => m.tipo_codigo === "ENTRADA" && instante(m) >= desdeMs && instante(m) < hastaMs) ?? null;
   const salida = entrada
     ? (marcajes.find(
         (m) => m.tipo_codigo === "SALIDA" && m.fecha_jornada === entrada.fecha_jornada && instante(m) >= instante(entrada)
@@ -171,6 +169,8 @@ module.exports = {
   ESTADO_NOVEDAD,
   ESTADO_JORNADA,
   horarioProgramado,
+  ventanaEntrada,
+  marcajesDelTurno,
   contrastarJornada,
   estadoJornada,
   filasNovedades,

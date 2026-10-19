@@ -16,10 +16,10 @@
 
 - El campo id_empleado debería hacer referencia a id_empleado de EmployeeDB.
 - `fecha_hora_marcaje` la pone el servidor de base de datos, nunca el cliente.
-- `fecha_jornada` es la fecha en hora de Bolivia al momento del marcaje; la salida toma la de su entrada.
+- `fecha_jornada` de una entrada es la del turno programado (de ayer, hoy o mañana) cuya ventana de entrada la contiene: desde 4 horas antes del inicio hasta el fin. Quien llega pasada la medianoche a un turno nocturno marca en la jornada del día en que empezó el turno. Sin turno en la ventana, es la fecha en hora de Bolivia al momento del marcaje. La salida toma la de su entrada.
 - Un empleado tiene como máximo un marcaje por tipo (entrada o salida) en cada jornada (`uq_marcaje_empleado_tipo_jornada`).
 - El origen indica cómo se tomó la marca: portal o biométrico. `codigo_dispositivo` solo se llena en marcajes biométricos.
-- La salida cierra la entrada de la jornada en curso: la de hoy o, si la del día anterior sigue abierta y tiene menos de 16 horas, esa (turnos que cruzan la medianoche).
+- La salida cierra la entrada de la jornada en curso: la de la última entrada si sigue abierta y tiene menos de 16 horas (turnos que cruzan la medianoche) o, si no, la de hoy.
 - Sin entrada abierta, una salida marcada hace menos de 8 horas cuenta como ya registrada y no se guarda otra.
 - Horas trabajadas = salida - entrada en minutos completos, sin descontar el refrigerio.
 - Estado del marcaje (`CATALOGOS_ESTADO_MARCAJE`): `REGISTRADO` o `PENDIENTE_JUSTIFICACION`. Una salida sin entrada en la jornada se guarda como pendiente de justificación, no tiene horas trabajadas y cierra la jornada: no se acepta una entrada posterior.
@@ -82,6 +82,41 @@
 - El plazo es `HORAS_PLAZO_JUSTIFICACION` (por defecto 48) desde la incidencia: la marca del atraso o de la salida anticipada; en una inasistencia, el fin del turno. Vencido, el envío se rechaza con la fecha de vencimiento.
 - La jefatura o RRHH revisa en `GET /justificaciones?id_sucursal=&id_departamento=&estado=` y decide con `PATCH /justificaciones/:id` (`decision`: `APROBADA` o `RECHAZADA`, `comentario`). Nadie revisa su propia solicitud.
 - Al aprobar, la novedad pasa a `JUSTIFICADA` y deja de sumar penalización. Si la jornada ya se había consolidado, se registra un evento `JORNADA_RECALCULADA` para `compensaciones` con todas las novedades de la jornada.
+
+## Horas extra y recargo nocturno
+
+- `HORAS_JORNADA` guarda una fila por empleado y jornada con entrada y salida: la copia del turno programado (NULL si se trabajó en descanso o sin turno), las horas marcadas y su separación, en minutos completos.
+  - **Ordinarias:** tiempo dentro del turno menos el refrigerio.
+  - **Nocturnas:** las que caen entre las 20:00 y las 06:00 (hora de Bolivia). El refrigerio se descuenta primero del tiempo diurno.
+  - **Extra:** tiempo después del fin del turno. Sin turno, todo lo trabajado queda por aprobar.
+  - **Anticipadas:** tiempo antes del inicio del turno. No se paga salvo que el supervisor lo apruebe.
+  - Un tramo fuera del turno menor a `MINUTOS_MINIMOS_EXTRA` (por defecto 15) no cuenta.
+- Estado (`CATALOGOS_ESTADO_HORAS_EXTRA`): `SIN_EXTRA`, `PENDIENTE` (hay tiempo fuera del turno por revisar), `APROBADA`, `AJUSTADA` (aprobada con otros minutos) o `RECHAZADA`. Solo se pagan las extra aprobadas (`minutos_extra_aprobados`).
+- **Tope legal** (Ley General del Trabajo, art. 50): hasta 2 horas extra por día. Con turno se aprueban como máximo 120 minutos; lo marcado de más queda registrado pero no se paga. Sin turno (descanso), como máximo la jornada de 8 horas (art. 46) y 2 horas extra.
+- **Tipo de día** (`tipo_dia`): `HABIL`, `DOMINGO` o `FERIADO` (`FERIADOS`, nacionales de Bolivia 2026 y 2027). Un feriado que cae en domingo cuenta como domingo.
+- Pago de la jornada, separado para planillas (columnas `minutos_extra_*`, `minutos_domingo`, `minutos_feriado`, `minutos_descanso`, `minutos_nocturnos`):
+
+  | Columna | Qué guarda | Recargo |
+  |---|---|---|
+  | `minutos_extra_habil` | Extra aprobadas en día hábil | 100% (art. 55) |
+  | `minutos_domingo` | Tiempo ordinario trabajado en domingo | 200% |
+  | `minutos_extra_domingo` | Extra aprobadas en domingo | lo define planillas |
+  | `minutos_feriado` | Tiempo ordinario trabajado en feriado | 100% (art. 55) |
+  | `minutos_extra_feriado` | Extra aprobadas en feriado | lo define planillas |
+  | `minutos_descanso` | Sin turno en día hábil: las primeras 8 horas aprobadas | lo define planillas |
+  | `minutos_nocturnos` | Ordinarios nocturnos más los aprobados que caen en la franja (`minutos_extra_nocturnos`, las extra) | recargo nocturno |
+
+  - Sin turno, las primeras 8 horas aprobadas son la jornada del día (`minutos_descanso`, `minutos_domingo` o `minutos_feriado`) y lo que sigue, hasta 2 horas, es extra.
+  - Los minutos aprobados se toman primero después del turno y luego del tiempo anticipado.
+  - Las tasas las aplica planillas (CompensationService); aquí solo se entregan los minutos.
+- El cálculo corre en el mismo proceso del contraste (últimos 7 días) y antes de cada consulta. Repetirlo no duplica filas; una jornada ya consolidada no cambia.
+- `GET /horas-extra?id_sucursal=&id_departamento=&desde=&hasta=&estado=` devuelve el desglose por jornada del personal (por defecto, desde el primer día del mes hasta hoy; máximo 92 días).
+- `GET /horas-extra/resumen?desde=&hasta=&id_sucursal=` totaliza por empleado (sin sucursal, toda la empresa); con `formato=csv` se descarga para hojas de cálculo (separador `;`, decimales con coma).
+- **Autorización previa** (`AUTORIZACIONES_HORAS_EXTRA`): el supervisor autoriza con `POST /horas-extra/autorizaciones` (`id_empleado`, `fecha_jornada` de hoy en adelante, `minutos_autorizados`, `motivo`) cuántos minutos extra puede quedarse un colaborador un día: hasta 120 si ese día tiene turno, hasta 600 si no; una por colaborador y día (autorizar de nuevo la reemplaza). Al calcular la jornada se aprueba sola hasta lo autorizado y el tope legal (`APROBADA` si coincide con lo marcado después del turno dentro del tope, `AJUSTADA` si no) y queda enlazada en `id_autorizacion`. Se consulta con `GET /horas-extra/autorizaciones?id_sucursal=&desde=&hasta=` y se anula con `DELETE /horas-extra/autorizaciones/:id` mientras el día no haya pasado.
+- **Conciliación** (`PATCH /horas-extra/:id`, `decision`: `APROBADA` o `RECHAZADA`, `minutos_aprobados`, `comentario`): el supervisor compara lo marcado en reloj con lo autorizado y aprueba lo marcado después del turno, ajusta los minutos (hasta lo marcado fuera del turno, anticipado incluido, y el tope legal) o rechaza. La respuesta trae `maximo_aprobable`. Ajustar o rechazar exige comentario. Se guarda `id_revisor`, su nombre, `comentario_revision` y `revisada_en`; nadie revisa sus propias horas. Se puede corregir hasta que el periodo se consolide, y una jornada revisada ya no cambia al recalcular.
+- `id_autorizador` e `id_revisor` deberían hacer referencia a `id_empleado` de EmployeeDB.
+- `PERIODOS_HORAS_EXTRA`: `POST /horas-extra/periodos` (`desde`, `hasta`, hasta 62 días ya terminados) cierra el periodo para planillas. Se rechaza si quedan jornadas pendientes de revisión o si se superpone con otro periodo. Al cerrar se registra un evento `HORAS_EXTRA_CONSOLIDADAS` con tópico `compensaciones` y los totales por empleado.
+- `id_empleado` e `id_responsable` deberían hacer referencia a `id_empleado` de EmployeeDB.
 
 ## Eventos salientes
 

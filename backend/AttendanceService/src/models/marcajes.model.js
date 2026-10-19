@@ -23,7 +23,7 @@ async function registrar({ idEmpleado, idTipo, idOrigen, idEstado, codigoDisposi
   return rows[0];
 }
 
-// Marcajes de la jornada de hoy y de la anterior.
+// Marcajes desde la jornada de ayer; incluye la de mañana si un turno empieza a medianoche.
 async function listarRecientes(idEmpleado, hoy) {
   const { rows } = await pool.query(
     `${conCatalogos("marcajes")}

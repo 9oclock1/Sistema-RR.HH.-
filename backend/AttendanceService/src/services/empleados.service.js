@@ -65,6 +65,20 @@ async function listarIdsActivos() {
   return new Set(lista.filter((e) => e.activo === true).map((e) => e.id_empleado));
 }
 
+// Todo el personal, de todas las sucursales: [{ id_empleado, nombre_completo, cargo, area, activo }].
+async function listarPersonal() {
+  if (usarSimulados()) return listarPorArea(null);
+  const lista = await consultar("/empleados", sinDatosDePersonal);
+  if (!Array.isArray(lista)) throw sinDatosDePersonal();
+  return lista.map(({ id_empleado, nombre_completo, cargo, area, activo }) => ({
+    id_empleado,
+    nombre_completo,
+    cargo,
+    area,
+    activo: activo === true,
+  }));
+}
+
 // Nombre de un empleado que ya no está en el área (para mostrar sus celdas).
 async function obtenerNombre(idEmpleado) {
   const empleado = await obtener(idEmpleado).catch(() => null);
@@ -86,4 +100,4 @@ async function obtenerArea(idDepartamento) {
   return area ? { id_departamento: area.id_departamento, codigo: area.codigo, nombre: area.nombre } : null;
 }
 
-module.exports = { obtener, listarPorArea, listarIdsActivos, obtenerNombre, obtenerSucursal, obtenerArea };
+module.exports = { obtener, listarPorArea, listarPersonal, listarIdsActivos, obtenerNombre, obtenerSucursal, obtenerArea };

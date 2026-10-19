@@ -1,14 +1,18 @@
 const modelo = require("../models/marcajes.model");
+const programacion = require("../models/novedades.model");
 const empleados = require("./empleados.service");
 const novedades = require("./novedades.service");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const { minutosTrabajados } = require("../utils/jornada");
+const { sumarDias } = require("../utils/periodos");
 const {
   TIPO_MARCAJE,
   ORIGEN_MARCAJE,
   ESTADO_MARCAJE,
+  jornadaDe,
   jornadaEnCurso,
+  fechaJornadaEntrada,
   salidaRegistrada,
   verificarEmpleadoActivo,
   entradaDuplicada,
@@ -25,7 +29,14 @@ async function verificarEmpleado(idEmpleado) {
 async function leerJornada(idEmpleado) {
   const { ahora, hoy } = await modelo.momentoActual();
   const marcajes = await modelo.listarRecientes(idEmpleado, hoy);
-  return { ahora, marcajes, jornada: jornadaEnCurso(marcajes, { hoy, ahora }) };
+  return { ahora, hoy, marcajes, jornada: jornadaEnCurso(marcajes, { hoy, ahora }) };
+}
+
+// Jornada en la que se guarda una entrada: la del turno programado que la contiene o, sin turno, la jornada en curso.
+async function jornadaParaEntrada(idEmpleado, { ahora, hoy, marcajes, jornada }) {
+  const turnos = await programacion.listarProgramacion(sumarDias(hoy, -1), sumarDias(hoy, 1), [idEmpleado]);
+  const fecha = fechaJornadaEntrada(turnos, marcajes, { hoy, ahoraMs: ahora.getTime() });
+  return fecha ? jornadaDe(marcajes, fecha) : jornada;
 }
 
 const resumir = ({ fecha_jornada, entrada, salida }) => ({
@@ -61,7 +72,7 @@ async function consultarJornada(idEmpleado) {
 
 async function registrarEntrada(idEmpleado, { idOrigen = ORIGEN_MARCAJE.PORTAL, codigoDispositivo } = {}) {
   await verificarEmpleado(idEmpleado);
-  const { jornada } = await leerJornada(idEmpleado);
+  const jornada = await jornadaParaEntrada(idEmpleado, await leerJornada(idEmpleado));
   if (jornada.entrada) throw entradaDuplicada(jornada.entrada);
   if (jornada.salida) throw jornadaCerrada(jornada.salida);
 
@@ -73,10 +84,11 @@ async function registrarEntrada(idEmpleado, { idOrigen = ORIGEN_MARCAJE.PORTAL, 
       idOrigen,
       idEstado: ESTADO_MARCAJE.REGISTRADO,
       codigoDispositivo,
+      fechaJornada: jornada.fecha_jornada,
     });
   } catch (error) {
     if (error.code !== "23505") throw error;
-    throw entradaDuplicada((await leerJornada(idEmpleado)).jornada.entrada);
+    throw entradaDuplicada(jornadaDe((await leerJornada(idEmpleado)).marcajes, jornada.fecha_jornada).entrada);
   }
   const { atraso } = await novedadesDeLaJornada(idEmpleado, { entrada });
   return { ...entrada, atraso };

@@ -296,6 +296,135 @@ CREATE TABLE ADJUNTOS_JUSTIFICACION (
     CONSTRAINT chk_adjunto_tipo CHECK (tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png'))
 );
 CREATE INDEX idx_adjuntos_justificacion_solicitud ON ADJUNTOS_JUSTIFICACION (id_solicitud);
+-- Tabla: CATALOGOS_ESTADO_HORAS_EXTRA
+CREATE TABLE CATALOGOS_ESTADO_HORAS_EXTRA (
+    id_estado_horas_extra SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_ESTADO_HORAS_EXTRA_pk PRIMARY KEY (id_estado_horas_extra),
+    CONSTRAINT uq_estado_horas_extra_codigo UNIQUE (codigo)
+);
+-- Tabla: FERIADOS
+-- Feriados nacionales: lo trabajado en ellos se paga con recargo del 100%.
+CREATE TABLE FERIADOS (
+    id_feriado UUID NOT NULL DEFAULT gen_random_uuid(),
+    fecha date NOT NULL,
+    nombre varchar(80) NOT NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT FERIADOS_pk PRIMARY KEY (id_feriado),
+    CONSTRAINT uq_feriado_fecha UNIQUE (fecha)
+);
+-- Tabla: PERIODOS_HORAS_EXTRA
+-- Cierre de un periodo para planillas: sus jornadas ya no se modifican.
+CREATE TABLE PERIODOS_HORAS_EXTRA (
+    id_periodo UUID NOT NULL DEFAULT gen_random_uuid(),
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    id_responsable UUID NOT NULL,
+    nombre_responsable varchar(150) NOT NULL,
+    cantidad_jornadas int NOT NULL DEFAULT 0,
+    consolidado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PERIODOS_HORAS_EXTRA_pk PRIMARY KEY (id_periodo),
+    CONSTRAINT chk_periodo_horas_fechas CHECK (fecha_fin >= fecha_inicio),
+    -- Un día se consolida una sola vez.
+    CONSTRAINT ex_periodo_horas_sin_solapamiento EXCLUDE USING gist (daterange(fecha_inicio, fecha_fin, '[]') WITH &&)
+);
+-- Tabla: AUTORIZACIONES_HORAS_EXTRA
+-- Autorización previa del supervisor: cuántos minutos extra puede quedarse un colaborador un día.
+CREATE TABLE AUTORIZACIONES_HORAS_EXTRA (
+    id_autorizacion UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    fecha_jornada date NOT NULL,
+    minutos_autorizados int NOT NULL,
+    motivo varchar(500) NOT NULL,
+    id_autorizador UUID NOT NULL,
+    nombre_autorizador varchar(150) NOT NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT AUTORIZACIONES_HORAS_EXTRA_pk PRIMARY KEY (id_autorizacion),
+    CONSTRAINT uq_autorizacion_empleado_fecha UNIQUE (id_empleado, fecha_jornada),
+    -- Con turno, hasta 2 horas extra; sin turno, la jornada de 8 horas y 2 extra.
+    CONSTRAINT chk_autorizacion_minutos CHECK (minutos_autorizados BETWEEN 1 AND 600)
+);
+CREATE INDEX idx_autorizaciones_horas_extra_fecha ON AUTORIZACIONES_HORAS_EXTRA (fecha_jornada);
+-- Tabla: HORAS_JORNADA
+-- Jornada marcada separada en horas ordinarias, nocturnas y extra, con la revisión del supervisor.
+CREATE TABLE HORAS_JORNADA (
+    id_horas_jornada UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    fecha_jornada date NOT NULL,
+    id_turno UUID NULL,
+    id_rol UUID NULL,
+    -- Copia del turno programado; NULL si se trabajó sin turno (descanso o día libre).
+    nombre_turno varchar(60) NULL,
+    inicio_programado TIMESTAMPTZ NULL,
+    fin_programado TIMESTAMPTZ NULL,
+    minutos_refrigerio SMALLINT NOT NULL DEFAULT 0,
+    id_marcaje_entrada UUID NOT NULL,
+    id_marcaje_salida UUID NOT NULL,
+    entrada_en TIMESTAMPTZ NOT NULL,
+    salida_en TIMESTAMPTZ NOT NULL,
+    -- HABIL, DOMINGO o FERIADO (un feriado en domingo cuenta como domingo).
+    tipo_dia varchar(10) NOT NULL DEFAULT 'HABIL',
+    minutos_trabajados int NOT NULL DEFAULT 0,
+    minutos_ordinarios int NOT NULL DEFAULT 0,
+    minutos_ordinarios_nocturnos int NOT NULL DEFAULT 0,
+    -- Después del fin del turno (o todo, sin turno): horas extra marcadas en reloj.
+    minutos_extra int NOT NULL DEFAULT 0,
+    -- Antes del inicio del turno: solo se paga si se aprueba.
+    minutos_anticipados int NOT NULL DEFAULT 0,
+    id_estado_horas_extra SMALLINT NOT NULL DEFAULT 1,
+    minutos_extra_aprobados int NULL,
+    -- Lo que se paga según lo aprobado, separado por tipo de día. Las extra no pasan de 2 horas por día.
+    minutos_extra_habil int NOT NULL DEFAULT 0,
+    minutos_extra_domingo int NOT NULL DEFAULT 0,
+    minutos_extra_feriado int NOT NULL DEFAULT 0,
+    -- Tiempo ordinario trabajado en domingo o feriado.
+    minutos_domingo int NOT NULL DEFAULT 0,
+    minutos_feriado int NOT NULL DEFAULT 0,
+    -- Sin turno en día hábil: las primeras 8 horas aprobadas.
+    minutos_descanso int NOT NULL DEFAULT 0,
+    minutos_extra_nocturnos int NOT NULL DEFAULT 0,
+    minutos_nocturnos int NOT NULL DEFAULT 0,
+    -- Autorización previa aplicada al calcular (aprobación automática hasta lo autorizado).
+    id_autorizacion UUID NULL,
+    id_revisor UUID NULL,
+    nombre_revisor varchar(150) NULL,
+    comentario_revision varchar(500) NULL,
+    revisada_en TIMESTAMPTZ NULL,
+    id_periodo UUID NULL,
+    calculada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT HORAS_JORNADA_pk PRIMARY KEY (id_horas_jornada),
+    CONSTRAINT uq_horas_jornada_empleado_fecha UNIQUE (id_empleado, fecha_jornada),
+    CONSTRAINT chk_horas_jornada_marcajes CHECK (salida_en >= entrada_en),
+    CONSTRAINT chk_horas_jornada_turno CHECK ((inicio_programado IS NULL) = (fin_programado IS NULL)),
+    CONSTRAINT chk_horas_jornada_tipo_dia CHECK (tipo_dia IN ('HABIL', 'DOMINGO', 'FERIADO')),
+    CONSTRAINT chk_horas_jornada_minutos CHECK (
+        minutos_trabajados >= 0 AND minutos_ordinarios >= 0 AND minutos_ordinarios_nocturnos >= 0
+        AND minutos_extra >= 0 AND minutos_anticipados >= 0 AND minutos_domingo >= 0 AND minutos_feriado >= 0
+        AND minutos_descanso >= 0 AND minutos_extra_nocturnos >= 0 AND minutos_nocturnos >= 0
+    ),
+    -- Ley General del Trabajo, art. 50: hasta 2 horas extra por día.
+    CONSTRAINT chk_horas_jornada_extra_dia CHECK (
+        minutos_extra_habil >= 0 AND minutos_extra_domingo >= 0 AND minutos_extra_feriado >= 0
+        AND minutos_extra_habil + minutos_extra_domingo + minutos_extra_feriado <= 120
+    ),
+    CONSTRAINT chk_horas_jornada_aprobados CHECK (
+        minutos_extra_aprobados IS NULL OR minutos_extra_aprobados BETWEEN 0 AND minutos_extra + minutos_anticipados
+    ),
+    -- Revisada a mano: con revisor y fecha.
+    CONSTRAINT chk_horas_jornada_revision CHECK ((revisada_en IS NULL) = (id_revisor IS NULL)),
+    -- El rechazo exige un comentario.
+    CONSTRAINT chk_horas_jornada_rechazo CHECK (
+        id_estado_horas_extra <> 5 OR length(btrim(coalesce(comentario_revision, ''))) > 0
+    )
+);
+CREATE INDEX idx_horas_jornada_fecha ON HORAS_JORNADA (fecha_jornada);
+CREATE INDEX idx_horas_jornada_estado ON HORAS_JORNADA (id_estado_horas_extra, fecha_jornada);
+CREATE INDEX idx_horas_jornada_id_periodo ON HORAS_JORNADA (id_periodo);
+CREATE INDEX idx_horas_jornada_id_turno ON HORAS_JORNADA (id_turno);
+CREATE INDEX idx_horas_jornada_id_rol ON HORAS_JORNADA (id_rol);
+CREATE INDEX idx_horas_jornada_id_autorizacion ON HORAS_JORNADA (id_autorizacion);
 -- llaves foráneas
 -- Referencia: TURNOS_CATALOGOS_TIPO_JORNADA (tabla: TURNOS)
 ALTER TABLE TURNOS
@@ -360,6 +489,27 @@ ADD CONSTRAINT SOLICITUDES_JUSTIFICACION_CATALOGOS_ESTADO_JUSTIFICACION FOREIGN 
 -- Referencia: ADJUNTOS_JUSTIFICACION_SOLICITUDES_JUSTIFICACION (tabla: ADJUNTOS_JUSTIFICACION)
 ALTER TABLE ADJUNTOS_JUSTIFICACION
 ADD CONSTRAINT ADJUNTOS_JUSTIFICACION_SOLICITUDES_JUSTIFICACION FOREIGN KEY (id_solicitud) REFERENCES SOLICITUDES_JUSTIFICACION (id_solicitud) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: HORAS_JORNADA_CATALOGOS_ESTADO_HORAS_EXTRA (tabla: HORAS_JORNADA)
+ALTER TABLE HORAS_JORNADA
+ADD CONSTRAINT HORAS_JORNADA_CATALOGOS_ESTADO_HORAS_EXTRA FOREIGN KEY (id_estado_horas_extra) REFERENCES CATALOGOS_ESTADO_HORAS_EXTRA (id_estado_horas_extra) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: HORAS_JORNADA_TURNOS (tabla: HORAS_JORNADA)
+ALTER TABLE HORAS_JORNADA
+ADD CONSTRAINT HORAS_JORNADA_TURNOS FOREIGN KEY (id_turno) REFERENCES TURNOS (id_turno) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: HORAS_JORNADA_ROLES_TURNO (tabla: HORAS_JORNADA)
+ALTER TABLE HORAS_JORNADA
+ADD CONSTRAINT HORAS_JORNADA_ROLES_TURNO FOREIGN KEY (id_rol) REFERENCES ROLES_TURNO (id_rol) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: HORAS_JORNADA_MARCAJES_ENTRADA (tabla: HORAS_JORNADA)
+ALTER TABLE HORAS_JORNADA
+ADD CONSTRAINT HORAS_JORNADA_MARCAJES_ENTRADA FOREIGN KEY (id_marcaje_entrada) REFERENCES MARCAJES (id_marcaje) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: HORAS_JORNADA_MARCAJES_SALIDA (tabla: HORAS_JORNADA)
+ALTER TABLE HORAS_JORNADA
+ADD CONSTRAINT HORAS_JORNADA_MARCAJES_SALIDA FOREIGN KEY (id_marcaje_salida) REFERENCES MARCAJES (id_marcaje) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: HORAS_JORNADA_AUTORIZACIONES_HORAS_EXTRA (tabla: HORAS_JORNADA)
+ALTER TABLE HORAS_JORNADA
+ADD CONSTRAINT HORAS_JORNADA_AUTORIZACIONES_HORAS_EXTRA FOREIGN KEY (id_autorizacion) REFERENCES AUTORIZACIONES_HORAS_EXTRA (id_autorizacion) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: HORAS_JORNADA_PERIODOS_HORAS_EXTRA (tabla: HORAS_JORNADA)
+ALTER TABLE HORAS_JORNADA
+ADD CONSTRAINT HORAS_JORNADA_PERIODOS_HORAS_EXTRA FOREIGN KEY (id_periodo) REFERENCES PERIODOS_HORAS_EXTRA (id_periodo) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- datos iniciales
 INSERT INTO CATALOGOS_TIPO_JORNADA (id_tipo_jornada, codigo, nombre) VALUES
     (1, 'DIURNO', 'Diurno'),
@@ -510,4 +660,34 @@ INSERT INTO CATALOGOS_ESTADO_JUSTIFICACION (id_estado_justificacion, codigo, nom
     (1, 'PENDIENTE', 'Pendiente de revisión'),
     (2, 'APROBADA', 'Aprobada'),
     (3, 'RECHAZADA', 'Rechazada');
+INSERT INTO CATALOGOS_ESTADO_HORAS_EXTRA (id_estado_horas_extra, codigo, nombre) VALUES
+    (1, 'SIN_EXTRA', 'Sin horas extra'),
+    (2, 'PENDIENTE', 'Pendiente de revisión'),
+    (3, 'APROBADA', 'Aprobada'),
+    (4, 'AJUSTADA', 'Aprobada con ajuste'),
+    (5, 'RECHAZADA', 'Rechazada');
+-- Feriados nacionales de Bolivia 2026 y 2027.
+INSERT INTO FERIADOS (fecha, nombre) VALUES
+    ('2026-01-01', 'Año Nuevo'),
+    ('2026-01-22', 'Día del Estado Plurinacional'),
+    ('2026-02-16', 'Carnaval'),
+    ('2026-02-17', 'Carnaval'),
+    ('2026-04-03', 'Viernes Santo'),
+    ('2026-05-01', 'Día del Trabajo'),
+    ('2026-06-04', 'Corpus Christi'),
+    ('2026-06-21', 'Año Nuevo Andino Amazónico'),
+    ('2026-08-06', 'Día de la Independencia'),
+    ('2026-11-02', 'Todos Santos'),
+    ('2026-12-25', 'Navidad'),
+    ('2027-01-01', 'Año Nuevo'),
+    ('2027-01-22', 'Día del Estado Plurinacional'),
+    ('2027-02-08', 'Carnaval'),
+    ('2027-02-09', 'Carnaval'),
+    ('2027-03-26', 'Viernes Santo'),
+    ('2027-05-01', 'Día del Trabajo'),
+    ('2027-05-27', 'Corpus Christi'),
+    ('2027-06-21', 'Año Nuevo Andino Amazónico'),
+    ('2027-08-06', 'Día de la Independencia'),
+    ('2027-11-02', 'Todos Santos'),
+    ('2027-12-25', 'Navidad');
 -- Fin del archivo.

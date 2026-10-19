@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
-import { FileCheck, Paperclip, RefreshCw, UserRoundCheck } from "lucide-react";
+import { FileCheck, Paperclip, RefreshCw } from "lucide-react";
 import { listarJustificaciones } from "../../api/justificaciones";
-import { consultarJornada } from "../../api/marcajes";
 import { listarAreas, listarSucursales } from "../../api/rolesTurno";
 import {
   Alerta,
@@ -17,8 +16,8 @@ import {
   Tarjeta,
   useAvisos,
 } from "../../components/ui";
-import IdentificacionEmpleado from "../marcaje/IdentificacionEmpleado";
-import { guardarEmpleado, leerEmpleado, olvidarEmpleado } from "../marcaje/sesionEmpleado";
+import Revisor from "../marcaje/Revisor";
+import useRevisor from "../marcaje/useRevisor";
 import DetalleJustificacion from "./DetalleJustificacion";
 import { ESTADOS_SOLICITUD, describirNovedad, formatearFechaHora, formatearJornada, formatearMinutos } from "./formato";
 import "../marcaje/marcaje.css";
@@ -121,39 +120,6 @@ const columnas = (onAbrir) => [
   },
 ];
 
-function Revisor({ revisor, onIdentificado, onCambiar }) {
-  const [error, setError] = useState(null);
-  const [procesando, setProcesando] = useState(false);
-
-  if (revisor) {
-    return (
-      <p className="jf-revisor">
-        <UserRoundCheck className="ds-icono" aria-hidden="true" />
-        <span>
-          Revisa: <strong>{revisor.nombre}</strong>
-        </span>
-        <Boton variante="sutil" tamano="sm" onClick={onCambiar}>
-          Cambiar
-        </Boton>
-      </p>
-    );
-  }
-
-  const identificar = (id) => {
-    setProcesando(true);
-    setError(null);
-    consultarJornada(id)
-      .then(({ empleado }) => {
-        guardarEmpleado(id);
-        onIdentificado({ id, nombre: `${empleado.nombres} ${empleado.apellidos}`.trim() });
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setProcesando(false));
-  };
-
-  return <IdentificacionEmpleado error={error} procesando={procesando} onIdentificar={identificar} onEditar={() => setError(null)} />;
-}
-
 // Bandeja de la jefatura o RRHH: justificativos del personal de una sucursal, para aprobar o rechazar.
 export default function BandejaJustificacionesPage() {
   const [catalogos, setCatalogos] = useState(null);
@@ -166,8 +132,7 @@ export default function BandejaJustificacionesPage() {
   const [abierta, setAbierta] = useState(null);
   // Contadores de las pestañas: se conservan mientras carga otra pestaña.
   const [resumen, setResumen] = useState(null);
-  const [revisor, setRevisor] = useState(null);
-  const [verificandoRevisor, setVerificandoRevisor] = useState(() => Boolean(leerEmpleado()));
+  const { revisor, verificando: verificandoRevisor, identificar: setRevisor, cambiar: cambiarRevisor } = useRevisor();
   const avisar = useAvisos();
   // Tras decidir, la fila puede salir de la pestaña: el foco vuelve a la pestaña activa cuando la lista se actualiza.
   const volverAPestana = useRef(false);
@@ -181,16 +146,6 @@ export default function BandejaJustificacionesPage() {
       vigente = false;
     };
   }, [intentoCatalogos]);
-
-  // El revisor que ya se identificó en este navegador se verifica de nuevo al entrar.
-  useEffect(() => {
-    const id = leerEmpleado();
-    if (!id) return;
-    consultarJornada(id)
-      .then(({ empleado }) => setRevisor({ id, nombre: `${empleado.nombres} ${empleado.apellidos}`.trim() }))
-      .catch(() => olvidarEmpleado())
-      .finally(() => setVerificandoRevisor(false));
-  }, []);
 
   const sucursalValida =
     filtros.id_sucursal && (!catalogos || catalogos.sucursales.some((s) => s.id_sucursal === filtros.id_sucursal));
@@ -227,11 +182,6 @@ export default function BandejaJustificacionesPage() {
   };
 
   const actualizar = () => setIntento((n) => n + 1);
-
-  const cambiarRevisor = () => {
-    olvidarEmpleado();
-    setRevisor(null);
-  };
 
   const alRevisar = (revisada) => {
     setAbierta(null);
