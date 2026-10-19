@@ -1,9 +1,10 @@
 const fs = require('node:fs');
-const { randomUUID } = require('node:crypto');
 
 const TIEMPO_ESPERA_MS = 10000;
-const ORIGEN = 'RRHH';
-const DESTINO = 'COMPRAS';
+const TIPO_SOLICITUD_COMPRA = 'SOLICITUD_COMPRA_CAPACITACION';
+const VERSION_ESQUEMA = 1;
+const ORIGEN = { grupo: 'F', modulo: 'RRHH' };
+const DESTINO = { grupo: 'C', modulo: 'Compras y Proveedores' };
 
 let topico = null;
 
@@ -13,11 +14,13 @@ const configuracion = () => ({
   credenciales: process.env.GOOGLE_APPLICATION_CREDENTIALS,
 });
 
-const modoSimulado = () => {
+const faltaConfiguracion = () => {
   const { projectId, topic, credenciales } = configuracion();
-  return (
-    process.env.PUBSUB_SIMULADO === 'true' || !projectId || !topic || !credenciales || !fs.existsSync(credenciales)
-  );
+  if (!projectId) return 'falta PUBSUB_PROJECT_ID';
+  if (!topic) return 'falta PUBSUB_TOPIC_COMPRAS';
+  if (!credenciales) return 'falta GOOGLE_APPLICATION_CREDENTIALS';
+  if (!fs.existsSync(credenciales)) return `no existe el archivo de credenciales ${credenciales}`;
+  return null;
 };
 
 const obtenerTopico = () => {
@@ -37,32 +40,31 @@ const conLimiteDeTiempo = (promesa) =>
     }),
   ]);
 
-const construirEvento = (tipo, datos) => ({
-  id_evento: randomUUID(),
-  tipo_evento: tipo,
-  version: 1,
-  origen: ORIGEN,
-  destino: DESTINO,
-  fecha_hora: new Date().toISOString(),
-  datos,
+const construirMensaje = (tipo, idMensaje, fecha, datos) => ({
+  atributos: {
+    id_mensaje: idMensaje,
+    origen: ORIGEN.grupo,
+    origen_modulo: ORIGEN.modulo,
+    destino: DESTINO.grupo,
+    destino_modulo: DESTINO.modulo,
+    tipo,
+    version_esquema: String(VERSION_ESQUEMA),
+  },
+  cuerpo: {
+    encabezado: {
+      id_mensaje: idMensaje,
+      origen: ORIGEN,
+      destino: DESTINO,
+      tipo,
+      fecha: new Date(fecha).toISOString(),
+      version_esquema: VERSION_ESQUEMA,
+    },
+    datos,
+  },
 });
 
-const publicarEvento = async (evento) => {
-  const atributos = { tipo_evento: evento.tipo_evento, origen: ORIGEN, destino: DESTINO };
-
-  if (modoSimulado()) {
-    console.log(`[pubsub simulado] ${evento.tipo_evento}\n${JSON.stringify(evento, null, 2)}`);
-    return { id_mensaje: `simulado-${evento.id_evento}`, simulado: true };
-  }
-
-  const idMensaje = await conLimiteDeTiempo(
-    obtenerTopico().publishMessage({ data: Buffer.from(JSON.stringify(evento)), attributes: atributos })
-  );
-  return { id_mensaje: idMensaje, simulado: false };
-};
-
-const publicarSolicitudCompraCapacitacion = (solicitud) => {
-  const evento = construirEvento('SOLICITUD_COMPRA_CAPACITACION', {
+const mensajeSolicitudCompra = (solicitud) =>
+  construirMensaje(TIPO_SOLICITUD_COMPRA, solicitud.id_mensaje, solicitud.registrado_en, {
     id_solicitud_servicio: solicitud.id_solicitud_servicio,
     curso: {
       id_curso: solicitud.id_curso,
@@ -80,7 +82,17 @@ const publicarSolicitudCompraCapacitacion = (solicitud) => {
       nombre: solicitud.solicitante,
     },
   });
-  return publicarEvento(evento).then((resultado) => ({ ...resultado, evento }));
+
+const publicarSolicitudCompraCapacitacion = async (solicitud) => {
+  const mensaje = mensajeSolicitudCompra(solicitud);
+
+  const motivo = faltaConfiguracion();
+  if (motivo) throw new Error(`Pub/Sub no está configurado: ${motivo}.`);
+
+  const idPubSub = await conLimiteDeTiempo(
+    obtenerTopico().publishMessage({ data: Buffer.from(JSON.stringify(mensaje.cuerpo)), attributes: mensaje.atributos })
+  );
+  return { id_pubsub: idPubSub, mensaje };
 };
 
-module.exports = { publicarSolicitudCompraCapacitacion };
+module.exports = { publicarSolicitudCompraCapacitacion, mensajeSolicitudCompra };

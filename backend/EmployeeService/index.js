@@ -16,7 +16,7 @@ const capacitacionesRoutes = require("./src/routes/capacitaciones");
 const solicitudesServicioRoutes = require("./src/routes/solicitudesServicio");
 const errorHandler = require("./src/middlewares/errorHandler");
 const { iniciarCronCertificaciones } = require("./src/jobs/certificacionesCron");
-const { iniciarCronReintentosCompras } = require("./src/jobs/solicitudesCompraCron");
+const { iniciarCronReintentosCompras, iniciarCronRespuestaCompras } = require("./src/jobs/solicitudesCompraCron");
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -71,6 +71,7 @@ if (require.main === module) {
   });
   iniciarCronCertificaciones();
   iniciarCronReintentosCompras();
+  iniciarCronRespuestaCompras();
 }
 
 module.exports = app;

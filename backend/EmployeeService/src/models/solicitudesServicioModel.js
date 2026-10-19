@@ -2,6 +2,7 @@ const { randomUUID } = require('node:crypto');
 
 const SELECT_SOLICITUD = `
   SELECT ss.id_solicitud_servicio,
+         ss.id_mensaje,
          ss.id_curso,
          cu.codigo AS curso_codigo,
          cu.nombre AS curso,
@@ -70,18 +71,30 @@ const listarHistorial = async (db, idSolicitud) => {
   return rows;
 };
 
-const listarPendientesDeEnvio = async (db, maxIntentos, limite) => {
+const listarPendientesDeEnvio = async (db, limite) => {
   const { rows } = await db.query(
     `SELECT id_solicitud_servicio
        FROM solicitudes_servicio_capacitacion
       WHERE estado = 'PENDIENTE_ENVIO'
-        AND intentos_envio < $1
         AND (proximo_intento_en IS NULL OR proximo_intento_en <= CURRENT_TIMESTAMP)
       ORDER BY proximo_intento_en NULLS FIRST
-      LIMIT $2`,
-    [maxIntentos, limite]
+      LIMIT $1`,
+    [limite]
   );
   return rows.map((fila) => fila.id_solicitud_servicio);
+};
+
+const listarParaRespuestaSimulada = async (db, minutosPorEtapa, limite) => {
+  const { rows } = await db.query(
+    `SELECT id_solicitud_servicio, id_mensaje, estado, cantidad_participantes, monto_estimado
+       FROM solicitudes_servicio_capacitacion
+      WHERE estado IN ('ENVIADA', 'EN_PROCESO')
+        AND actualizado_en <= CURRENT_TIMESTAMP - make_interval(mins => $1::int)
+      ORDER BY actualizado_en
+      LIMIT $2`,
+    [minutosPorEtapa, limite]
+  );
+  return rows;
 };
 
 const existeMensajeExterno = async (db, idMensajeExterno) => {
@@ -105,12 +118,13 @@ const existeNumeroOrden = async (db, numeroOrden, idSolicitudExcluida) => {
 const insertar = async (db, solicitud, minutosAntesDeReintentar) => {
   const { rows } = await db.query(
     `INSERT INTO solicitudes_servicio_capacitacion (
-       id_solicitud_servicio, id_curso, id_empleado_solicitante, descripcion_requerimiento,
+       id_solicitud_servicio, id_mensaje, id_curso, id_empleado_solicitante, descripcion_requerimiento,
        cantidad_participantes, fecha_requerida, monto_estimado, proximo_intento_en
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP + make_interval(mins => $8::int))
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP + make_interval(mins => $9::int))
      RETURNING id_solicitud_servicio`,
     [
+      randomUUID(),
       randomUUID(),
       solicitud.id_curso,
       solicitud.id_empleado_solicitante,
@@ -196,6 +210,7 @@ module.exports = {
   bloquearPorId,
   listarHistorial,
   listarPendientesDeEnvio,
+  listarParaRespuestaSimulada,
   existeMensajeExterno,
   existeNumeroOrden,
   insertar,

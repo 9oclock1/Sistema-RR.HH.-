@@ -5,9 +5,15 @@ const comprasPubSubService = require('./comprasPubSubService');
 const HttpError = require('../utils/HttpError');
 const { withTransaction } = require('../utils/transaction');
 
-const MAX_INTENTOS_ENVIO = 5;
 const MINUTOS_PRIMER_REINTENTO = 5;
 const MINUTOS_MAX_ESPERA = 60;
+const COSTO_SIMULADO_POR_PARTICIPANTE = 150;
+
+const PROVEEDORES_SIMULADOS = [
+  { nombre: 'Capacita SRL', nit: '1020304050' },
+  { nombre: 'Instituto de Formación Andina', nit: '2030405060' },
+  { nombre: 'Consultora Talento Bolivia', nit: '3040506070' },
+];
 
 const TRANSICIONES_COMPRAS = {
   ENVIADA: ['EN_PROCESO', 'ORDEN_EMITIDA', 'RECHAZADA'],
@@ -31,7 +37,7 @@ const enviarSolicitud = async (idSolicitud) => {
   if (!solicitud || solicitud.estado !== 'PENDIENTE_ENVIO') return solicitud;
 
   try {
-    const { id_mensaje, simulado, evento } = await comprasPubSubService.publicarSolicitudCompraCapacitacion(solicitud);
+    const { id_pubsub, mensaje } = await comprasPubSubService.publicarSolicitudCompraCapacitacion(solicitud);
     await withTransaction(async (client) => {
       const actual = await solicitudesModel.bloquearPorId(client, idSolicitud);
       if (actual?.estado !== 'PENDIENTE_ENVIO') return;
@@ -42,8 +48,8 @@ const enviarSolicitud = async (idSolicitud) => {
         estado_anterior: 'PENDIENTE_ENVIO',
         estado_nuevo: 'ENVIADA',
         origen: 'RRHH',
-        detalle: `Publicada en Pub/Sub${simulado ? ' (simulado)' : ''} con id de mensaje ${id_mensaje}.`,
-        carga_mensaje: evento,
+        detalle: `Publicada en Pub/Sub con id_mensaje ${solicitud.id_mensaje} (id de Pub/Sub ${id_pubsub}).`,
+        carga_mensaje: mensaje,
       });
     });
   } catch (error) {
@@ -75,7 +81,7 @@ const solicitarCompra = async (idCurso, datos) => {
 };
 
 const reintentarPendientes = async (limite = 20) => {
-  const pendientes = await solicitudesModel.listarPendientesDeEnvio(pool, MAX_INTENTOS_ENVIO, limite);
+  const pendientes = await solicitudesModel.listarPendientesDeEnvio(pool, limite);
   const resultado = { revisadas: pendientes.length, enviadas: 0 };
   for (const idSolicitud of pendientes) {
     const solicitud = await enviarSolicitud(idSolicitud);
@@ -134,9 +140,54 @@ const registrarRespuestaCompras = (idSolicitud, respuesta) =>
     return { ...(await conHistorial(client, idSolicitud)), mensaje_duplicado: false };
   });
 
+const respuestaSimulada = (solicitud) => {
+  const clave = solicitud.id_mensaje.replace(/-/g, '').toUpperCase();
+  if (solicitud.estado === 'ENVIADA') {
+    return {
+      id_mensaje_externo: `sim-${solicitud.id_mensaje}-EN_PROCESO`,
+      estado: 'EN_PROCESO',
+      numero_orden_servicio: null,
+      proveedor_nombre: null,
+      proveedor_nit: null,
+      monto_adjudicado: null,
+      detalle: 'Compras recibió la solicitud y está cotizando proveedores (respuesta simulada).',
+    };
+  }
+
+  const proveedor = PROVEEDORES_SIMULADOS[parseInt(clave.slice(0, 8), 16) % PROVEEDORES_SIMULADOS.length];
+  return {
+    id_mensaje_externo: `sim-${solicitud.id_mensaje}-ORDEN_EMITIDA`,
+    estado: 'ORDEN_EMITIDA',
+    numero_orden_servicio: `OS-${new Date().getFullYear()}-${clave.slice(0, 12)}`,
+    proveedor_nombre: proveedor.nombre,
+    proveedor_nit: proveedor.nit,
+    monto_adjudicado: solicitud.monto_estimado ?? (solicitud.cantidad_participantes * COSTO_SIMULADO_POR_PARTICIPANTE).toFixed(2),
+    detalle: 'Compras emitió la orden de servicio (respuesta simulada).',
+  };
+};
+
+const simularRespuestasCompras = async ({ minutosPorEtapa = 1, limite = 20 } = {}) => {
+  const solicitudes = await solicitudesModel.listarParaRespuestaSimulada(pool, minutosPorEtapa, limite);
+  const resultado = { revisadas: solicitudes.length, en_proceso: 0, ordenes_emitidas: 0, fallidas: 0 };
+
+  for (const solicitud of solicitudes) {
+    const respuesta = respuestaSimulada(solicitud);
+    try {
+      await registrarRespuestaCompras(solicitud.id_solicitud_servicio, respuesta);
+      if (respuesta.estado === 'EN_PROCESO') resultado.en_proceso += 1;
+      else resultado.ordenes_emitidas += 1;
+    } catch (error) {
+      resultado.fallidas += 1;
+      console.error(`[compras] No se pudo simular la respuesta de la solicitud ${solicitud.id_solicitud_servicio}`, error.message);
+    }
+  }
+  return resultado;
+};
+
 module.exports = {
   solicitarCompra,
   reintentarPendientes,
+  simularRespuestasCompras,
   listarSolicitudes,
   obtenerSolicitud,
   registrarRespuestaCompras,
