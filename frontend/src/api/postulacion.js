@@ -5,7 +5,9 @@ const BASE_RECRUITMENT = "/recr";
 export const postulacionApi = {
   // Listado de RF-08; los borradores todavía no reciben postulaciones.
   async obtenerConvocatorias() {
-    const convocatorias = await cliente.get(`${BASE_RECRUITMENT}/convocatorias`);
+    const convocatorias = await cliente.get(
+      `${BASE_RECRUITMENT}/convocatorias`,
+    );
     return convocatorias.filter((c) => c.estado !== "borrador");
   },
 
@@ -93,6 +95,28 @@ export const postulacionApi = {
   async analizarCv(idPostulacion) {
     const res = await cliente.post(
       `${BASE_RECRUITMENT}/postulaciones/${idPostulacion}/analizar-cv`,
+    );
+    return res.data?.data || res.data;
+  },
+  async obtenerAfinidadPostulacion(idPostulacion) {
+    const res = await cliente.get(
+      `${BASE_RECRUITMENT}/postulaciones/${idPostulacion}/afinidad`,
+    );
+    return res.data?.data || res.data;
+  },
+
+  async recalcularAfinidadPostulacion(idPostulacion, pesos = null) {
+    const res = await cliente.post(
+      `${BASE_RECRUITMENT}/postulaciones/${idPostulacion}/recalcular-afinidad`,
+      pesos || undefined,
+    );
+    return res.data?.data || res.data;
+  },
+
+  async recalcularAfinidadConvocatoria(idConvocatoria, pesos = null) {
+    const res = await cliente.post(
+      `${BASE_RECRUITMENT}/convocatorias/${idConvocatoria}/recalcular-afinidad`,
+      pesos || undefined,
     );
     return res.data?.data || res.data;
   },
