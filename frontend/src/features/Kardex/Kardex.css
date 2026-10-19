@@ -377,3 +377,43 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.kardex-asistencia {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.kardex-asistencia__resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--size-sidebar) * 0.6), 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.kardex-asistencia__indicador {
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-page);
+}
+
+.kardex-asistencia__indicador dt {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.kardex-asistencia__indicador dd {
+  margin: 0;
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.kardex-novedades {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding-block: var(--space-2);
+}

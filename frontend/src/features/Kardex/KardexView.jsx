@@ -17,6 +17,7 @@ import {
 import { useRol } from '../../context/sesion';
 import { useEmpleados } from '../Asignaciones/hooks/useEmpleados';
 import DatosPersonales from './components/DatosPersonales';
+import HistorialAsistencia from './components/HistorialAsistencia';
 import KardexResumen from './components/KardexResumen';
 import LineaTiempoTrayectoria from './components/LineaTiempoTrayectoria';
 import TablaCapacitaciones from './components/TablaCapacitaciones';
@@ -53,7 +54,7 @@ function Cargando() {
 
 function Expediente({ kardex }) {
   const [pestana, setPestana] = useState('datos');
-  const { datos_personales: datos, contratos, memorandums, capacitaciones, trayectoria } = kardex;
+  const { datos_personales: datos, contratos, memorandums, capacitaciones, trayectoria, asistencia } = kardex;
   const nombre = datos.nombre_completo;
 
   const pestanas = [
@@ -81,6 +82,12 @@ function Expediente({ kardex }) {
       etiqueta: 'Trayectoria',
       contador: trayectoria.length,
       contenido: <LineaTiempoTrayectoria trayectoria={trayectoria} nombre={nombre} />,
+    },
+    {
+      id: 'asistencia',
+      etiqueta: 'Asistencia histórica',
+      contador: asistencia.disponible ? asistencia.jornadas.length : undefined,
+      contenido: <HistorialAsistencia asistencia={asistencia} nombre={nombre} />,
     },
   ];
 

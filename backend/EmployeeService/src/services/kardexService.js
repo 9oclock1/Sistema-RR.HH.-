@@ -1,5 +1,6 @@
 const pool = require('../../db/pool');
 const kardexModel = require('../models/kardexModel');
+const asistenciaService = require('./asistenciaService');
 const { noEncontrado } = require('./empleadosService');
 
 const aContratoVigente = (fila) => {
@@ -15,7 +16,7 @@ const aContratoVigente = (fila) => {
   };
 };
 
-const aKardex = (fila, { contratos, trayectoria, memorandums, capacitaciones }) => ({
+const aKardex = (fila, { contratos, trayectoria, memorandums, capacitaciones, asistencia }) => ({
   id_empleado: fila.id_empleado,
   datos_personales: {
     numero_documento: fila.numero_documento,
@@ -65,18 +66,34 @@ const aKardex = (fila, { contratos, trayectoria, memorandums, capacitaciones }) 
   trayectoria,
   memorandums,
   capacitaciones,
+  asistencia,
 });
 
-const obtenerKardex = async (idEmpleado) => {
-  const [resumen, contratos, trayectoria, memorandums, capacitaciones] = await Promise.all([
+const ASISTENCIA_NO_DISPONIBLE = {
+  disponible: false,
+  mensaje: 'No se pudo consultar el historial de asistencia. Intente nuevamente más tarde.',
+};
+
+const obtenerAsistencia = async (idEmpleado, rol) => {
+  try {
+    return { disponible: true, ...(await asistenciaService.obtenerHistorial(idEmpleado, rol)) };
+  } catch (error) {
+    console.error('Historial de asistencia no disponible', error.message);
+    return ASISTENCIA_NO_DISPONIBLE;
+  }
+};
+
+const obtenerKardex = async (idEmpleado, rol) => {
+  const [resumen, contratos, trayectoria, memorandums, capacitaciones, asistencia] = await Promise.all([
     kardexModel.obtenerResumen(pool, idEmpleado),
     kardexModel.listarContratos(pool, idEmpleado),
     kardexModel.listarTrayectoria(pool, idEmpleado),
     kardexModel.listarMemorandums(pool, idEmpleado),
     kardexModel.listarCapacitaciones(pool, idEmpleado),
+    obtenerAsistencia(idEmpleado, rol),
   ]);
   if (!resumen) throw noEncontrado();
-  return aKardex(resumen, { contratos, trayectoria, memorandums, capacitaciones });
+  return aKardex(resumen, { contratos, trayectoria, memorandums, capacitaciones, asistencia });
 };
 
 module.exports = { obtenerKardex };
