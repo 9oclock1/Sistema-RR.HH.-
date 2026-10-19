@@ -2,8 +2,8 @@ const ESTADO_MOVIMIENTO = { EN_PROCESO: 1, GOZADO: 2, CANCELADO: 3 };
 
 // Escala legal (Ley General del Trabajo, art. 44): días hábiles por año según los años de servicio cumplidos.
 const ESCALA = [
-  { desdeAnios: 10, dias: 30 },
-  { desdeAnios: 5, dias: 20 },
+  { desdeAnios: 11, dias: 30 },
+  { desdeAnios: 6, dias: 20 },
   { desdeAnios: 1, dias: 15 },
 ];
 

@@ -6,7 +6,7 @@ const GOZADO = 2;
 const EN_PROCESO = 1;
 
 test("escala legal: 0, 15, 20 y 30 días según los años cumplidos", () => {
-  assert.deepEqual([0, 1, 4, 5, 9, 10, 25].map(diasPorAnio), [0, 15, 15, 20, 20, 30, 30]);
+  assert.deepEqual([0, 1, 5, 6, 10, 11, 25].map(diasPorAnio), [0, 15, 15, 20, 20, 30, 30]);
 });
 
 test("antigüedad menor a un año: no gana días", () => {
@@ -28,16 +28,25 @@ test("antigüedad intermedia: acumula 15 días por año", () => {
   assert.deepEqual(resultado.periodos.map((p) => p.fecha_acreditacion), ["2024-01-10", "2025-01-10", "2026-01-10"]);
 });
 
-test("escalamiento: al cumplir 5 años el período pasa a 20 días y al cumplir 10, a 30", () => {
+test("escalamiento: al cumplir 6 años el período pasa a 20 días y al cumplir 11, a 30", () => {
   const cinco = calcularSaldo("2021-06-01", "2026-06-01", []);
-  assert.deepEqual(cinco.periodos.map((p) => p.dias), [15, 15, 15, 15, 20]);
-  assert.equal(cinco.saldo.acumulados, 80);
-  assert.equal(cinco.dias_anuales, 20);
+  assert.deepEqual(cinco.periodos.map((p) => p.dias), [15, 15, 15, 15, 15]);
+  assert.equal(cinco.saldo.acumulados, 75);
+  assert.equal(cinco.dias_anuales, 15);
+
+  const seis = calcularSaldo("2020-06-01", "2026-06-01", []);
+  assert.equal(seis.periodos[5].dias, 20);
+  assert.equal(seis.saldo.acumulados, 5 * 15 + 20);
+  assert.equal(seis.dias_anuales, 20);
 
   const diez = calcularSaldo("2016-06-01", "2026-06-01", []);
-  assert.equal(diez.periodos[9].dias, 30);
-  assert.equal(diez.saldo.acumulados, 4 * 15 + 5 * 20 + 30);
-  assert.equal(diez.dias_anuales, 30);
+  assert.equal(diez.periodos[9].dias, 20);
+  assert.equal(diez.dias_anuales, 20);
+
+  const once = calcularSaldo("2015-06-01", "2026-06-01", []);
+  assert.equal(once.periodos[10].dias, 30);
+  assert.equal(once.saldo.acumulados, 5 * 15 + 5 * 20 + 30);
+  assert.equal(once.dias_anuales, 30);
 });
 
 test("el saldo descuenta días gozados y en proceso; los cancelados no cuentan", () => {

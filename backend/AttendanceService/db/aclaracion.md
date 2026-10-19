@@ -33,7 +33,7 @@
 ## Vacaciones (KAN-52)
 
 - Los días ganados no se guardan: se calculan en cada consulta con `fecha_ingreso` (EmployeeService, `GET /empleados/:id`) y la escala legal (Ley General del Trabajo, art. 44).
-- Cada aniversario cumplido acredita un período: años 1 a 4 = 15 días, 5 a 9 = 20 días, 10 o más = 30 días (hábiles). Antes del primer año no se gana ningún día. Un ingreso el 29 de febrero cumple el 28 en los años no bisiestos.
+- Cada aniversario cumplido acredita un período: años 1 a 5 = 15 días, 6 a 10 = 20 días, 11 o más = 30 días (hábiles). Antes del primer año no se gana ningún día. Un ingreso el 29 de febrero cumple el 28 en los años no bisiestos.
 - `MOVIMIENTOS_VACACION` guarda solo los días consumidos o reservados, en estado `EN_PROCESO`, `GOZADO` o `CANCELADO`. `id_empleado` e `id_solicitud_origen` no tienen FK (otro servicio / historia KAN-50). Una solicitud origina un solo movimiento.
 - Saldo disponible = acumulados − gozados − en proceso. Los cancelados no cuentan ni aparecen en el historial. Las historias KAN-50 y KAN-53 crean el movimiento al solicitar y lo pasan a `GOZADO` o `CANCELADO` al resolver; el saldo se actualiza solo porque se calcula al consultar.
 - La fecha de consulta es la de Bolivia (UTC-4). No se modela la caducidad de vacaciones no gozadas.
