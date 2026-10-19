@@ -5,6 +5,7 @@ const departamentosRoutes = require("./src/routes/departamentos.routes");
 const cargosRoutes = require("./src/routes/cargos");
 const sucursalesRoutes = require("./src/routes/sucursales");
 const empleadosRoutes = require("./src/routes/empleados");
+const kardexRoutes = require("./src/routes/kardex.routes");
 const asignacionesRoutes = require("./src/routes/asignaciones");
 const organigramaRoutes = require("./src/routes/organigrama.routes"); // RF-20
 const jerarquiaRoutes = require("./src/routes/jerarquia.routes"); // RF-18
@@ -47,6 +48,7 @@ app.use("/departamentos", departamentosRoutes);
 app.use("/cargos", cargosRoutes);
 app.use("/sucursales", sucursalesRoutes);
 app.use("/empleados", empleadosRoutes);
+app.use("/empleados", kardexRoutes);
 app.use("/asignaciones", asignacionesRoutes);
 app.use("/organigrama", organigramaRoutes); // RF-20
 app.use("/jerarquia", jerarquiaRoutes); // RF-18

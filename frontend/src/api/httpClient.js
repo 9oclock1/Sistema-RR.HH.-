@@ -14,7 +14,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function request(path, { method = 'GET', body, signal } = {}) {
+export async function request(path, { method = 'GET', body, signal, headers } = {}) {
   // Con FormData (archivos adjuntos) el navegador define el Content-Type con su boundary.
   const esFormData = body instanceof FormData;
   const enviaJson = body !== undefined && !esFormData;
@@ -24,7 +24,7 @@ export async function request(path, { method = 'GET', body, signal } = {}) {
     response = await fetch(`${API_URL}${path}`, {
       method,
       signal,
-      headers: enviaJson ? { 'Content-Type': 'application/json' } : undefined,
+      headers: { ...(enviaJson && { 'Content-Type': 'application/json' }), ...headers },
       body: enviaJson ? JSON.stringify(body) : body,
     });
   } catch (error) {
