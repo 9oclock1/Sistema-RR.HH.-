@@ -1,7 +1,9 @@
 jest.mock('../db/pool', () => require('./helpers/bdEnMemoria').crearBdEnMemoria());
+jest.mock('../src/services/asistenciaService');
 
 const request = require('supertest');
 const pool = require('../db/pool');
+const asistenciaService = require('../src/services/asistenciaService');
 const app = require('../index');
 
 const id = (n) => `e0000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -62,25 +64,29 @@ INSERT INTO contratos (id_contrato, id_empleado, id_tipo_contrato, id_tipo_jorna
   ('${id(205)}', '${LUIS}', 1, 1, 'CT-0003', daterange((CURRENT_DATE - INTERVAL '5 years')::date, NULL),
    3200, FALSE, NULL, now() - INTERVAL '5 years');
 
-INSERT INTO tipos_memorandum VALUES
-  (1, 'DISCIPLINARIO', 'Llamada de atención', 'Falta operativa o de conducta'),
-  (2, 'RECONOCIMIENTO', 'Felicitación', 'Mérito laboral');
 INSERT INTO memorandums (id_memorandum, id_empleado_receptor, id_tipo_memo, id_empleado_emisor, codigo_cite, asunto,
                          contenido_descripcion, fecha_emision, gestion, numero_correlativo, naturaleza_falta, gravedad_falta,
                          estado_sancion, evidencia_adjunto_url, documento_pdf_url, fue_notificado, fecha_hora_notificacion,
                          acuse_recibo_firmado, fecha_hora_acuse, motivo_anulacion, fecha_hora_anulacion) VALUES
   ('${id(301)}', '${ANA}', 1, '${LUIS}', 'MEM-2026-0001', 'Atrasos reiterados', 'Detalle', '2026-03-01', 2026, 1,
-   'CONDUCTA', 'GRAVE', 'BORRADOR', 'uploads/evidencia/marcajes.pdf', 'uploads/memorandums_pdf/MEM-2026-0001.pdf',
+   'CONDUCTA', 'GRAVE', 'EMITIDO', 'uploads/evidencia/marcajes.pdf', 'uploads/memorandums_pdf/MEM-2026-0001.pdf',
    FALSE, NULL, FALSE, NULL, NULL, NULL),
   ('${id(302)}', '${ANA}', 2, '${LUIS}', 'MEM-2026-0002', 'Puntualidad ejemplar', 'Detalle', '2026-05-01', 2026, 2,
    NULL, NULL, 'EMITIDO', NULL, 'uploads/reconocimientos_pdf/MEM-2026-0002.pdf',
    TRUE, '2026-05-02 10:00-04', TRUE, '2026-05-03 16:40-04', NULL, NULL),
   ('${id(303)}', '${ANA}', 1, '${LUIS}', 'MEM-2026-0003', 'Descuadre de caja', 'Detalle', '2026-08-11', 2026, 3,
-   'OPERATIVA', 'LEVE', 'BORRADOR', NULL, NULL, TRUE, '2026-08-12 09:15-04', FALSE, NULL, NULL, NULL),
+   'OPERATIVA', 'LEVE', 'EMITIDO', NULL, 'uploads/memorandums_pdf/MEM-2026-0003.pdf', TRUE, '2026-08-12 09:15-04',
+   FALSE, NULL, NULL, NULL),
   ('${id(304)}', '${ANA}', 1, '${LUIS}', 'MEM-2026-0004', 'Registro erróneo', 'Detalle', '2026-09-01', 2026, 4,
    'OPERATIVA', 'MODERADA', 'ANULADO', NULL, NULL, FALSE, NULL, FALSE, NULL, 'Se registró por error', now()),
+  ('${id(306)}', '${ANA}', 1, '${LUIS}', NULL, 'Borrador sin emitir', 'Detalle', '2026-10-01', NULL, NULL,
+   'CONDUCTA', 'GRAVE', 'BORRADOR', NULL, NULL, FALSE, NULL, FALSE, NULL, NULL, NULL),
   ('${id(305)}', '${LUIS}', 1, '${ANA}', 'MEM-2026-0005', 'Uso indebido de caja', 'Detalle', '2026-09-15', 2026, 5,
-   'CONDUCTA', 'GRAVE', 'BORRADOR', NULL, NULL, FALSE, NULL, FALSE, NULL, NULL, NULL);
+   'CONDUCTA', 'GRAVE', 'EMITIDO', NULL, 'uploads/memorandums_pdf/MEM-2026-0005.pdf', FALSE, NULL, FALSE, NULL, NULL, NULL),
+  ('${id(307)}', '${LUIS}', 1, '${ANA}', 'MEM-2026-0007', 'Amonestación sin naturaleza registrada', 'Detalle', '2026-09-20',
+   2026, 7, NULL, NULL, 'EMITIDO', NULL, 'uploads/memorandums_pdf/MEM-2026-0007.pdf', FALSE, NULL, FALSE, NULL, NULL, NULL),
+  ('${id(308)}', '${LUIS}', 3, '${ANA}', 'MEM-2026-0008', 'Rendimiento destacado', 'Detalle', '2026-09-25', 2026, 8,
+   NULL, NULL, 'EMITIDO', NULL, 'uploads/reconocimientos_pdf/MEM-2026-0008.pdf', FALSE, NULL, FALSE, NULL, NULL, NULL);
 
 INSERT INTO cursos_capacitacion (id_curso, codigo, nombre, horas_academicas) VALUES
   ('${id(401)}', 'BPM-01', 'Manipulación de alimentos', 20),
@@ -113,7 +119,39 @@ beforeAll(() => pool.preparar(SEMILLA), 30000);
 
 afterAll(() => pool.cerrar());
 
-beforeEach(() => pool.reiniciarRegistro());
+const HISTORIAL = {
+  id_empleado: ANA,
+  desde: '2025-10-20',
+  hasta: '2026-10-19',
+  resumen: {
+    jornadas_trabajadas: 1,
+    minutos_trabajados: 413,
+    minutos_extra: 5,
+    atrasos: 1,
+    minutos_atraso: 12,
+    inasistencias: 0,
+    salidas_anticipadas: 0,
+    omisiones_salida: 0,
+    novedades_justificadas: 0,
+  },
+  jornadas: [
+    {
+      fecha_jornada: '2026-10-18',
+      turno: 'Mañana',
+      entrada_en: '2026-10-18T12:12:00.000Z',
+      salida_en: '2026-10-18T20:05:00.000Z',
+      minutos_trabajados: 413,
+      minutos_extra: 5,
+      novedades: [{ tipo: 'ATRASO', nombre: 'Atraso', minutos: 12, estado: 'REGISTRADA' }],
+    },
+  ],
+};
+
+beforeEach(() => {
+  pool.reiniciarRegistro();
+  asistenciaService.obtenerHistorial.mockReset();
+  asistenciaService.obtenerHistorial.mockResolvedValue(HISTORIAL);
+});
 
 describe('GET /empleados/:id/kardex (KAN-267)', () => {
   describe('control de acceso por rol', () => {
@@ -129,6 +167,7 @@ describe('GET /empleados/:id/kardex (KAN-267)', () => {
         'trayectoria',
         'memorandums',
         'capacitaciones',
+        'asistencia',
       ]);
     });
 
@@ -139,22 +178,24 @@ describe('GET /empleados/:id/kardex (KAN-267)', () => {
     });
 
     test.each(['supervisor', 'reclutador', 'empleado', 'root'])(
-      'el rol %s recibe 403 y no se consulta la base de datos',
+      'el rol %s recibe 403 y no se consulta la base de datos ni la asistencia',
       async (rol) => {
         const { status, body } = await kardex(ANA, rol);
 
         expect(status).toBe(403);
         expect(body).toEqual({ error: 'Su rol no tiene permiso para consultar este recurso.' });
         expect(pool.consultas).toHaveLength(0);
+        expect(asistenciaService.obtenerHistorial).not.toHaveBeenCalled();
       }
     );
 
-    test('sin X-Rol responde 401 y no se consulta la base de datos', async () => {
+    test('sin X-Rol responde 401 y no se consulta la base de datos ni la asistencia', async () => {
       const { status, body } = await kardex(ANA, null);
 
       expect(status).toBe(401);
       expect(body).toEqual({ error: 'Identifíquese para continuar.' });
       expect(pool.consultas).toHaveLength(0);
+      expect(asistenciaService.obtenerHistorial).not.toHaveBeenCalled();
     });
 
     test('un rol no autorizado recibe 403 antes de que se valide el id', async () => {
@@ -279,7 +320,7 @@ describe('GET /empleados/:id/kardex (KAN-267)', () => {
       });
     });
 
-    test('los memorándums anulados no aparecen en la lista ni cuentan en el balance', async () => {
+    test('los memorándums anulados y los borradores no aparecen en la lista ni cuentan en el balance', async () => {
       const { memorandums } = await kardexDe(ANA);
 
       expect(memorandums.map((m) => m.codigo_cite)).toEqual(['MEM-2026-0003', 'MEM-2026-0002', 'MEM-2026-0001']);
@@ -290,8 +331,16 @@ describe('GET /empleados/:id/kardex (KAN-267)', () => {
       const luis = await kardexDe(LUIS);
 
       expect(ana.memorandums.map((m) => m.codigo_cite)).not.toContain('MEM-2026-0005');
-      expect(luis.memorandums.map((m) => m.codigo_cite)).toEqual(['MEM-2026-0005']);
-      expect(luis.resumen.balance_disciplinario).toMatchObject({ total_sanciones: 1, sanciones_graves: 1, total_reconocimientos: 0 });
+      expect(luis.memorandums.map((m) => m.codigo_cite)).toEqual(['MEM-2026-0008', 'MEM-2026-0007', 'MEM-2026-0005']);
+    });
+
+    test('la clasificación del tipo de memorándum decide si es reconocimiento, no la naturaleza de la falta', async () => {
+      const { resumen, memorandums } = await kardexDe(LUIS);
+      const porCite = Object.fromEntries(memorandums.map((m) => [m.codigo_cite, m]));
+
+      expect(porCite['MEM-2026-0007']).toMatchObject({ tipo_clasificacion: 'AMONESTACION', naturaleza_falta: null, es_reconocimiento: false });
+      expect(porCite['MEM-2026-0008']).toMatchObject({ tipo_clasificacion: 'RECONOCIMIENTO', es_reconocimiento: true });
+      expect(resumen.balance_disciplinario).toMatchObject({ total_sanciones: 2, sanciones_graves: 1, total_reconocimientos: 1 });
     });
 
     test('cada memorándum muestra sus respaldos y su estado de confirmación', async () => {
@@ -390,13 +439,41 @@ describe('GET /empleados/:id/kardex (KAN-267)', () => {
     });
   });
 
+  describe('historial de asistencia', () => {
+    test('incluye el historial de AttendanceService, consultado con el rol del usuario', async () => {
+      const { status, body } = await kardex(ANA, 'gerente');
+
+      expect(status).toBe(200);
+      expect(body.asistencia).toEqual({ disponible: true, ...HISTORIAL });
+      expect(asistenciaService.obtenerHistorial).toHaveBeenCalledTimes(1);
+      expect(asistenciaService.obtenerHistorial).toHaveBeenCalledWith(ANA, 'gerente');
+    });
+
+    test('si AttendanceService no responde, el Kardex se entrega igual y marca la asistencia como no disponible', async () => {
+      asistenciaService.obtenerHistorial.mockRejectedValueOnce(new Error('AttendanceService respondió 503'));
+      const consola = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      const { status, body } = await kardex(ANA);
+      consola.mockRestore();
+
+      expect(status).toBe(200);
+      expect(body.asistencia).toEqual({
+        disponible: false,
+        mensaje: 'No se pudo consultar el historial de asistencia. Intente nuevamente más tarde.',
+      });
+      expect(body.memorandums).toHaveLength(3);
+      expect(body.resumen.balance_disciplinario.total_sanciones).toBe(2);
+    });
+  });
+
   describe('armado del Kardex', () => {
-    test('lanza las cinco consultas a la vez y no consulta nada más', async () => {
+    test('lanza las cinco consultas y la de asistencia a la vez, y no consulta nada más', async () => {
       await kardexDe(ANA);
 
       expect(pool.consultas).toHaveLength(5);
       expect(pool.maximoEnCurso).toBe(5);
       expect(pool.consultas[0]).toMatch(/FROM vw_kardex_resumen WHERE id_empleado = \$1/);
+      expect(asistenciaService.obtenerHistorial).toHaveBeenCalledTimes(1);
     });
   });
 });
