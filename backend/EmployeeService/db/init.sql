@@ -331,3 +331,23 @@ CREATE TABLE CORRELATIVOS_MEMORANDUM (
     CONSTRAINT CORRELATIVOS_MEMORANDUM_pk PRIMARY KEY (gestion),
     CONSTRAINT ck_correlativo_memorandum_no_negativo CHECK (ultimo_numero >= 0)
 );
+-- Seed de tipos de memorándum.
+INSERT INTO TIPOS_MEMORANDUM (id_tipo_memo, clasificacion, nombre, descripcion)
+VALUES (
+        1,
+        'AMONESTACION',
+        'Llamada de atención',
+        'Llamada de atención por falta operativa o de conducta'
+    ),
+    (
+        2,
+        'RECONOCIMIENTO',
+        'Puntualidad',
+        'Reconocimiento por puntualidad'
+    ),
+    (
+        3,
+        'RECONOCIMIENTO',
+        'Rendimiento operativo',
+        'Reconocimiento por rendimiento operativo destacado'
+    )
