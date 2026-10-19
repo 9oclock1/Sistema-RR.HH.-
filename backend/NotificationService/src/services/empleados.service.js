@@ -121,11 +121,15 @@ function normalizarEmpleado(emp, ficha = null, resumen = null, deptos = [], sucs
     }
   }
 
+  // RF-39: correo al que se envían los avisos prioritarios (la ficha de EmployeeService lo expone como correo_personal).
+  const correo = ficha?.correo_personal || emp?.correo_personal || emp?.correo || resumen?.correo_personal || null;
+
   return {
     id_empleado,
     nombres,
     apellidos,
     nombre_completo,
+    correo,
     cargo,
     id_departamento,
     nombre_departamento,

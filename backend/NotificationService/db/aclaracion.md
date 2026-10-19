@@ -25,3 +25,8 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 
 - Los campos codigo de las tablas catalogos_tipo_comunicacion, catalogos_alcance_comunicacion y catalogos_estado_mensaje son únicos ya que no deben existir registros duplicados.
 - Los catálogos permiten controlar los tipos de comunicación, alcance de distribución y estados de lectura utilizados por el microservicio.
+
+## Prioridad y enlace (RF-39)
+
+- El campo prioridad (NORMAL o ALTA) marca los avisos urgentes, como la emisión de un memorándum o la falta de acuse de recibo; el portal los destaca en la bandeja.
+- El campo enlace guarda una ruta interna del portal (siempre empieza con «/») a la que lleva el aviso, por ejemplo «Mis memorándums».

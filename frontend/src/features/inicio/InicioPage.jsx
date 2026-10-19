@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { Contador, EncabezadoPagina, EstadoVacio, Tarjeta } from "../../components/ui";
 import { useRol } from "../../context/sesion";
+import AvisoMemorandumsPendientes from "../Memorandums/acuses/AvisoMemorandumsPendientes";
 import { seccionesPara } from "../../router/modulos";
 import { ROLES } from "../../utils/permisos";
 import "./inicio.css";
@@ -56,6 +57,8 @@ export default function InicioPage() {
         titulo={saludo(ahora)}
         descripcion={`${fechaHoy(ahora)}. Estos son los módulos disponibles para su rol, ${ROLES[rol].nombre}.`}
       />
+
+      <AvisoMemorandumsPendientes />
 
       {secciones.length === 0 && (
         <Tarjeta>

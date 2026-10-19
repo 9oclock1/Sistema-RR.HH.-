@@ -2,7 +2,16 @@ const servicio = require("../services/comunicaciones.service");
 
 async function enviarDirecta(req, res, next) {
   try {
-    const { id_empleado_destinatario, asunto, contenido, requiere_confirmacion, remitente_nombre } = req.body;
+    const {
+      id_empleado_destinatario,
+      asunto,
+      contenido,
+      requiere_confirmacion,
+      remitente_nombre,
+      prioridad,
+      enlace,
+      notificar_correo,
+    } = req.body;
     const resultado = await servicio.enviarComunicacionDirecta({
       idUsuarioRemitente: req.idUsuario,
       idEmpleadoDestinatario: id_empleado_destinatario,
@@ -10,6 +19,9 @@ async function enviarDirecta(req, res, next) {
       contenido,
       requiereConfirmacion: requiere_confirmacion,
       remitenteNombre: remitente_nombre || "Supervisor",
+      prioridad,
+      enlace,
+      notificarCorreo: notificar_correo === true,
     });
     res.status(201).json(resultado);
   } catch (error) {

@@ -11,6 +11,8 @@ process.env.EVIDENCIA_DIR = `${CARPETA_TEMPORAL}/evidencia`;
 process.env.INSTITUCION_NOMBRE = 'Supermercados Ejemplo S.A.';
 
 jest.mock('../db/pool', () => require('./helpers/poolFalso').crearPoolFalso());
+// El aviso al colaborador (RF-39) abre su propia transacción; se prueba aparte en acusesMemorandum.test.js.
+jest.mock('../src/services/acusesMemorandumService', () => ({ notificarEmision: async () => false }));
 
 const request = require('supertest');
 const pool = require('../db/pool');
