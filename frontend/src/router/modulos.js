@@ -1,6 +1,7 @@
-import { AlarmClock, Award, Briefcase, Building2, CalendarClock, CalendarRange, FileText, FileUser, FileWarning, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Briefcase, Building2, CalendarClock, CalendarRange, FileCheck, FileText, FileUser, FileWarning, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
+import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
 import CargosList from "../features/Cargos/CargosList";
@@ -139,6 +140,14 @@ export const SECCIONES = [
         icono: AlarmClock,
         roles: ["supervisor"],
         pagina: AlertasAsistenciaPage,
+      },
+      {
+        ruta: "/asistencia/justificaciones",
+        etiqueta: "Justificaciones",
+        descripcion: "Revisión de justificativos de atrasos y faltas con su respaldo.",
+        icono: FileCheck,
+        roles: ["supervisor"],
+        pagina: BandejaJustificacionesPage,
       },
     ],
   },

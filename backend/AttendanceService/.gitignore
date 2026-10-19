@@ -11,5 +11,5 @@ npm-debug.log*
 .env.local
 .env.*.local
 
-# uploads
+# uploads (comprobantes de licencias y de justificaciones)
 uploads/
