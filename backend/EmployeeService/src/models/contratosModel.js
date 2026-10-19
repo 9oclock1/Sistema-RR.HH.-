@@ -105,6 +105,11 @@ const existeNumero = async (db, numeroContrato) => {
   return rows.length > 0;
 };
 
+const obtenerTipoContrato = async (db, idTipoContrato) => {
+  const { rows } = await db.query('SELECT id_tipo_contrato, codigo, nombre FROM tipos_contrato WHERE id_tipo_contrato = $1', [idTipoContrato]);
+  return rows[0] || null;
+};
+
 const insertar = async (db, version) => {
   const { rows } = await db.query(
     `INSERT INTO contratos (
@@ -166,6 +171,7 @@ module.exports = {
   obtenerVersionActual,
   buscarSolapamiento,
   existeNumero,
+  obtenerTipoContrato,
   insertar,
   obtenerDocumento,
   listarCatalogos,

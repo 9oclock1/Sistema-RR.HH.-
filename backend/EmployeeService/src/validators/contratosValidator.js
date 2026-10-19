@@ -1,5 +1,6 @@
 const { esVacio, invalido, cuerpoComoObjeto, normalizarTexto, normalizarUuid, lanzarSiHayErrores, validarIdRuta } = require('./comunes');
 const { normalizarOpcion, normalizarEntero, normalizarFecha } = require('./capacitacionesValidator');
+const HttpError = require('../utils/HttpError');
 
 const TIPOS_MODIFICACION = ['RENOVACION', 'CAMBIO_JORNADA', 'AJUSTE_SALARIAL', 'AJUSTE_CONDICIONES'];
 const MONTO_REGEX = /^\d{1,10}(\.\d{1,2})?$/;
@@ -72,6 +73,10 @@ const validarFiltrosContratos = (query) => {
 };
 
 const validarRegistrador = (valor) => {
+  if (esVacio(valor)) {
+    const mensaje = 'Identifique al usuario que registra el cambio.';
+    throw new HttpError(401, mensaje, { campos_faltantes: ['X-Usuario-Id'], errores: [{ campo: 'X-Usuario-Id', mensaje }] });
+  }
   const errores = [];
   const id = normalizarUuid(valor, 'X-Usuario-Id', {}, errores);
   lanzarSiHayErrores(errores);

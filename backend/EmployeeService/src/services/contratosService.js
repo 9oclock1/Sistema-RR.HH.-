@@ -6,6 +6,8 @@ const { withTransaction } = require('../utils/transaction');
 const { TIPOS_MODIFICACION } = require('../validators/contratosValidator');
 const { rutaEnDisco } = require('../middlewares/documentoContratoUpload');
 
+const TIPO_INDEFINIDO = 'INDEFINIDO';
+
 const errorDeCampo = (status, campo, mensaje) =>
   new HttpError(status, mensaje, { campos_faltantes: [], errores: [{ campo, mensaje }] });
 
@@ -18,6 +20,19 @@ const prepararRenovacion = async (client, modificacion, actual) => {
     throw errorDeCampo(409, 'fecha_vigencia', `La renovación debe empezar después del ${actual.fecha_fin}, fecha de fin del contrato ${actual.numero_contrato}.`);
   }
 
+  const idTipoContrato = modificacion.id_tipo_contrato ?? actual.id_tipo_contrato;
+  const tipoContrato = await contratosModel.obtenerTipoContrato(client, idTipoContrato);
+  if (!tipoContrato) {
+    throw errorDeCampo(400, 'id_tipo_contrato', 'El tipo de contrato seleccionado no existe.');
+  }
+  const esIndefinido = tipoContrato.codigo === TIPO_INDEFINIDO;
+  if (esIndefinido && fecha_fin) {
+    throw errorDeCampo(400, 'fecha_fin', 'Un contrato indefinido no tiene fecha de fin.');
+  }
+  if (!esIndefinido && !fecha_fin) {
+    throw errorDeCampo(400, 'fecha_fin', `El contrato de tipo «${tipoContrato.nombre}» debe indicar su fecha de fin.`);
+  }
+
   const solapado = await contratosModel.buscarSolapamiento(client, modificacion.id_empleado, fecha_vigencia, fecha_fin);
   if (solapado) {
     const hasta = solapado.fecha_fin ?? 'sin fecha de fin';
@@ -26,7 +41,7 @@ const prepararRenovacion = async (client, modificacion, actual) => {
 
   return {
     es_adenda: false,
-    id_tipo_contrato: modificacion.id_tipo_contrato ?? actual.id_tipo_contrato,
+    id_tipo_contrato: idTipoContrato,
     fecha_fin,
   };
 };
