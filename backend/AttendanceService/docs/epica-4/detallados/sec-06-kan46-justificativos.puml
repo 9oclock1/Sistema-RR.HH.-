@@ -1,0 +1,92 @@
+@startuml sec-06-kan46-justificativos
+!include _estilo-secuencia.iuml
+title KAN-46 · Registro y validación de justificativos (RF-26)\n<size:12><color:#555555>El colaborador justifica con comprobantes dentro del plazo y la jefatura aprueba o rechaza; al aprobar se quita la penalización.</color></size>
+
+actor "Colaborador" as COL
+actor "Supervisor\no RRHH" as SUP
+boundary "MisNovedades\n(FormularioJustificacion)" as P #D5E8D4
+boundary "BandejaJustificacionesPage" as PB #D5E8D4
+participant "API Gateway\n(NGINX)" as GW #F5F5F5
+control "IdentificarEmpleado\n· SubirJustificativo (multer)" as MW #FFE6CC
+control "JustificacionesController" as C
+control "JustificacionesService" as S
+control "EventosService" as EV
+entity "JustificacionesModel" as M #E1D5E7
+database "AttendanceDB\n(PostgreSQL)\n+ uploads/justificaciones" as DB #FFF2CC
+participant "EmployeeService" as EMP #F8CECC
+
+== Novedades justificables ==
+COL -> P : abre «Mis novedades»
+P -> GW : GET /api/att/mis-novedades [X-Empleado-Id] (consultarMisNovedades)
+GW -> C : misNovedades (tras IdentificarEmpleado)
+C -> S : misNovedades(idEmpleado)
+S -> M : listarNovedadesDelEmpleado (30 días) · listarPorNovedades · listarAdjuntos
+S -> S : evaluarPlazo(): HORAS_PLAZO_JUSTIFICACION (48 h) desde la incidencia
+C --> P : 200 atrasos, faltas y salidas anticipadas con plazo y última solicitud
+
+== Presentar el justificativo ==
+COL -> P : motivo, descripción y de 1 a 3 comprobantes\n(arrastrar y soltar: PDF, JPG o PNG)
+P -> GW : POST /api/att/justificaciones (multipart) (enviarJustificacion)
+GW -> MW : IdentificarEmpleado · SubirJustificativo
+alt más de 3 archivos o más de 5 MB
+  $error(MW, P, "400 Datos inválidos (archivos)")
+end
+MW -> C : registrar(req, res)
+C -> S : registrar(idEmpleado, body, archivos)
+S -> S : validarSolicitud(): motivo, descripción y que el\ncontenido de cada archivo coincida con su tipo
+alt datos o archivos inválidos
+  $error(S, P, "400 Datos inválidos (detalle por campo)")
+else válidos
+  S -> M : BEGIN · bloquearNovedadDelEmpleado · obtenerVigente
+  alt la novedad no existe o no es suya
+    $error(S, P, "404 Novedad no encontrada")
+  else plazo vencido o ya hay una solicitud pendiente o aprobada
+    $error(S, P, "409 Plazo vencido el DD/MM a las HH:MM / solicitud vigente")
+  else dentro del plazo
+    S -> M : crear(solicitud PENDIENTE)
+    S -> DB : guardar(archivo) por cada comprobante (adjuntosJustificacion)
+    S -> M : agregarAdjuntos(...) · COMMIT
+    M -> DB : INSERT SOLICITUDES_JUSTIFICACION + ADJUNTOS_JUSTIFICACION
+    C --> P : 201 solicitud PENDIENTE
+    P --> COL : justificativo enviado
+  end
+end
+
+== Revisión de la jefatura ==
+SUP -> PB : sucursal, área y estado
+PB -> GW : GET /api/att/justificaciones?id_sucursal&id_departamento&estado (listarJustificaciones)
+GW -> C : bandeja(req, res)
+C -> S : bandeja(filtros)
+S -> EMP : GET /empleados?id_sucursal&id_departamento (listarPorArea)
+S -> M : listarBandeja · contarPorEstado · listarNovedades · listarAdjuntos
+C --> PB : 200 solicitudes con su novedad y comprobantes
+SUP -> PB : revisa los comprobantes y decide
+PB -> GW : PATCH /api/att/justificaciones/{id} [X-Empleado-Id]\n{ decision, comentario } (revisarJustificacion)
+GW -> C : revisar (tras IdentificarEmpleado)
+C -> S : revisar(id, idRevisor, body)
+S -> S : validarRevision(): comentario obligatorio al rechazar
+S -> EMP : GET /empleados/{idRevisor} (verificarRevisor)
+alt rechazo sin comentario
+  $error(S, PB, "400 Datos inválidos")
+else revisor inactivo o revisa su propia solicitud
+  $error(S, PB, "403 No puede revisar su propia justificación")
+else revisor válido
+  S -> M : BEGIN · bloquearSolicitud(id)
+  alt la solicitud ya fue revisada
+    $error(S, PB, "409 La solicitud ya fue aprobada / rechazada")
+  else pendiente
+    S -> M : registrarRevision(decision, revisor, comentario)
+    opt APROBADA
+      S -> M : marcarJustificada(novedad)
+      M -> DB : NOVEDADES_ASISTENCIA → JUSTIFICADA (sin penalización)
+      opt la jornada ya estaba consolidada
+        S -> M : listarNovedadesDeJornada
+        S -> EV : registrarConsolidacion(JORNADA_RECALCULADA)
+        EV -> DB : INSERT EVENTOS_SALIENTES (compensaciones)
+      end
+    end
+    S -> M : COMMIT
+    C --> PB : 200 solicitud revisada
+  end
+end
+@enduml

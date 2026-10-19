@@ -1,0 +1,41 @@
+@startuml sec-04-kan42-salida
+!include _estilo-secuencia.iuml
+title KAN-42 · Marcaje de salida (RF-22)\n<size:12><color:#555555>Cierra la jornada en curso, calcula las horas trabajadas y deja pendiente de justificación una salida sin entrada.</color></size>
+
+actor "Colaborador" as COL
+boundary "MarcajePage\n(ResumenJornada)" as P #D5E8D4
+participant "API Gateway\n(NGINX)" as GW #F5F5F5
+control "IdentificarEmpleado" as MW #FFE6CC
+control "MarcajesController" as C
+control "MarcajesService" as S
+control "NovedadesService" as NS
+entity "MarcajesModel" as M #E1D5E7
+database "AttendanceDB\n(PostgreSQL)" as DB #FFF2CC
+participant "EmployeeService" as EMP #F8CECC
+
+COL -> P : «Marcar salida»
+P -> GW : POST /api/att/marcajes/salida [X-Empleado-Id] (registrarSalida)
+GW -> MW : IdentificarEmpleado
+MW -> C : registrarSalida(req, res)
+C -> S : registrarSalida(idEmpleado)
+S -> EMP : GET /empleados/{id} (verificarEmpleado)
+S -> M : momentoActual() · listarRecientes(idEmpleado) (leerJornada)
+S -> S : jornadaEnCurso(): la última entrada abierta de menos\nde 16 h (turnos que cruzan la medianoche) o la de hoy
+alt ya registró su salida
+  $error(S, P, "409 Ya registró su salida de hoy a las HH:MM")
+else sin entrada en la jornada
+  S -> M : registrar(SALIDA, PENDIENTE_JUSTIFICACION)
+  M -> DB : INSERT MARCAJES
+  C --> P : 201 salida sin horas trabajadas
+  P --> COL : aviso: no hay entrada, queda pendiente de justificación
+else con entrada
+  S -> M : registrar(SALIDA, REGISTRADO)
+  M -> DB : INSERT MARCAJES (hora del servidor)
+  S -> S : resumir(jornada): horas trabajadas = salida − entrada
+  S -> NS : alMarcar(idEmpleado, [entrada, salida])
+  NS -> DB : contrastar → INSERT NOVEDADES_ASISTENCIA\n(SALIDA_ANTICIPADA si salió antes del fin del turno)
+  NS --> S : salida anticipada o nada
+  C --> P : 201 resumen de la jornada
+  P --> COL : entrada, salida y horas trabajadas
+end
+@enduml

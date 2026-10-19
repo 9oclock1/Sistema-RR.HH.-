@@ -1,0 +1,57 @@
+@startuml sec-01-kan43-turnos
+!include _estilo-secuencia.iuml
+title KAN-43 · Parametrizar turnos, refrigerios y tolerancias (RF-23)\n<size:12><color:#555555>Alta de un turno con sus horas efectivas y bloqueo de la eliminación de un turno en uso.</color></size>
+
+actor "Administrador\nde RRHH" as RRHH
+boundary "TurnosPage\n(TurnoFormulario)" as P #D5E8D4
+participant "API Gateway\n(NGINX)" as GW #F5F5F5
+control "TurnosController" as C
+control "TurnosService" as S
+entity "TurnosModel" as M #E1D5E7
+database "AttendanceDB\n(PostgreSQL)" as DB #FFF2CC
+
+== Registrar un turno ==
+RRHH -> P : nombre, tipo de jornada, hora de inicio y fin,\nrefrigerio y tolerancia en minutos
+P -> GW : POST /api/att/turnos (crearTurno)
+GW -> C : POST /turnos
+C -> S : crear(body)
+S -> S : validarTurno(datos)
+alt datos incompletos o fuera de rango
+  $error(S, P, "400 Datos del turno inválidos (detalle por campo)")
+else datos válidos
+  S -> M : crear(turno)
+  M -> DB : INSERT TURNOS
+  alt nombre repetido (23505)
+    $error(S, P, "409 Ya existe un turno con ese nombre")
+  else tipo de jornada inexistente (23503)
+    $error(S, P, "400 El tipo de jornada no existe")
+  else guardado
+    DB --> M : turno
+    M --> S : turno
+    S -> S : conCalculos(turno): horas efectivas =\nduración − refrigerio, cruza la medianoche
+    S --> C : turno
+    C --> P : 201 turno con horas efectivas
+  end
+end
+P --> RRHH : turno disponible para asignar
+
+== Eliminar un turno ==
+RRHH -> P : eliminar (DialogoConfirmacion)
+P -> GW : DELETE /api/att/turnos/{id} (eliminarTurno)
+GW -> C : DELETE /turnos/{id}
+C -> S : eliminar(id)
+S -> M : eliminar(id)
+M -> DB : DELETE TURNOS
+alt el turno tiene asignaciones (23503)
+  S -> M : contarEmpleadosAsignados(id)
+  M --> S : N empleados
+  $error(S, P, "409 El turno se encuentra en uso: está asignado a N empleado(s)")
+else sin asignaciones
+  C --> P : 204
+end
+
+note over S
+  POST /turnos/{id}/evaluar-marcaje aplica la tolerancia:
+  es puntual hasta hora_inicio + minutos_tolerancia (inclusive).
+end note
+@enduml
