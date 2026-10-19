@@ -1,0 +1,97 @@
+/* RF-29: reportes de asistencia. Valores solo desde styles/tokens.css (ver DESIGN.md). */
+
+.rep {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.rep-columna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.rep-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  min-width: 0;
+}
+
+.rep-formulario {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.rep-filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--size-sidebar) * 0.75), 1fr));
+  gap: var(--space-3) var(--space-4);
+  align-items: start;
+  align-self: stretch;
+}
+
+.rep-exportar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ---------- Indicadores ---------- */
+.rep-indicadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--size-sidebar) * 0.75)), 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.rep-indicador {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.rep-indicador__etiqueta {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.rep-indicador__valor {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- Tabla ---------- */
+.rep-tabla .ds-tabla {
+  min-width: calc(var(--size-sidebar) * 4);
+  font-variant-numeric: tabular-nums;
+}
+
+.rep-celda {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-block: var(--space-1);
+}
+
+.rep-celda__sub {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}

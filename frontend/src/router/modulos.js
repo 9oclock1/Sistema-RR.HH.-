@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Briefcase, Building2, CalendarClock, CalendarRange, FileCheck, FileText, FileUser, FileWarning, Fingerprint, ListTree, Mail, Megaphone, Network, Send, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Briefcase, Building2, CalendarClock, CalendarRange, FileChartColumn, FileCheck, FileText, FileUser, FileWarning, Fingerprint, ListTree, Mail, Megaphone, Network, Send, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
@@ -15,6 +15,7 @@ import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import ReconocimientosView from "../features/Reconocimientos/ReconocimientosView";
+import ReportesAsistenciaPage from "../features/reportes-asistencia/ReportesAsistenciaPage";
 import RolTurnosPage from "../features/rol-turnos/RolTurnosPage";
 import TurnosPage from "../features/turnos/TurnosPage";
 import VacantesView from "../features/Vacantes/VacantesView";
@@ -157,6 +158,14 @@ export const SECCIONES = [
         icono: Timer,
         roles: ["supervisor"],
         pagina: HorasExtraPage,
+      },
+      {
+        ruta: "/asistencia/reportes",
+        etiqueta: "Reportes de asistencia",
+        descripcion: "Consolidado de asistencia, ausentismo y puntualidad por sucursal y área, exportable a PDF y Excel.",
+        icono: FileChartColumn,
+        roles: ["supervisor"],
+        pagina: ReportesAsistenciaPage,
       },
     ],
   },
