@@ -74,7 +74,7 @@ const listarMemorandums = async (db, idEmpleado) => {
             m.fecha_emision,
             t.nombre AS tipo_nombre,
             t.clasificacion AS tipo_clasificacion,
-            (m.naturaleza_falta IS NULL) AS es_reconocimiento,
+            (upper(trim(t.clasificacion)) = 'RECONOCIMIENTO') AS es_reconocimiento,
             m.naturaleza_falta,
             m.gravedad_falta,
             m.estado_sancion,

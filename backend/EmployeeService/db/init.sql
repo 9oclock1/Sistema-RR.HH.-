@@ -438,16 +438,23 @@ SELECT e.id_empleado,
         WHERE k.id_empleado = e.id_empleado
   ) ct ON TRUE
   LEFT JOIN LATERAL (
-       SELECT COUNT(*) FILTER (WHERE m.naturaleza_falta IS NOT NULL)::int AS total_sanciones,
-              COUNT(*) FILTER (WHERE m.gravedad_falta = 'LEVE')::int AS sanciones_leves,
-              COUNT(*) FILTER (WHERE m.gravedad_falta = 'MODERADA')::int AS sanciones_moderadas,
-              COUNT(*) FILTER (WHERE m.gravedad_falta = 'GRAVE')::int AS sanciones_graves,
-              COUNT(*) FILTER (WHERE m.naturaleza_falta IS NULL)::int AS total_reconocimientos,
-              COUNT(*) FILTER (WHERE NOT m.acuse_recibo_firmado)::int AS memorandums_sin_acuse,
-              MAX(m.fecha_emision) FILTER (WHERE m.naturaleza_falta IS NOT NULL) AS fecha_ultima_sancion
-         FROM MEMORANDUMS m
-        WHERE m.id_empleado_receptor = e.id_empleado
-          AND m.estado_sancion = 'EMITIDO'
+       SELECT COUNT(*) FILTER (WHERE NOT mt.es_reconocimiento)::int AS total_sanciones,
+              COUNT(*) FILTER (WHERE NOT mt.es_reconocimiento AND mt.gravedad_falta = 'LEVE')::int AS sanciones_leves,
+              COUNT(*) FILTER (WHERE NOT mt.es_reconocimiento AND mt.gravedad_falta = 'MODERADA')::int AS sanciones_moderadas,
+              COUNT(*) FILTER (WHERE NOT mt.es_reconocimiento AND mt.gravedad_falta = 'GRAVE')::int AS sanciones_graves,
+              COUNT(*) FILTER (WHERE mt.es_reconocimiento)::int AS total_reconocimientos,
+              COUNT(*) FILTER (WHERE NOT mt.acuse_recibo_firmado)::int AS memorandums_sin_acuse,
+              MAX(mt.fecha_emision) FILTER (WHERE NOT mt.es_reconocimiento) AS fecha_ultima_sancion
+         FROM (
+              SELECT m.gravedad_falta,
+                     m.acuse_recibo_firmado,
+                     m.fecha_emision,
+                     upper(trim(t.clasificacion)) = 'RECONOCIMIENTO' AS es_reconocimiento
+                FROM MEMORANDUMS m
+                JOIN TIPOS_MEMORANDUM t ON t.id_tipo_memo = m.id_tipo_memo
+               WHERE m.id_empleado_receptor = e.id_empleado
+                 AND m.estado_sancion = 'EMITIDO'
+         ) mt
   ) mm ON TRUE
   LEFT JOIN LATERAL (
        SELECT COUNT(*)::int AS total_capacitaciones,
