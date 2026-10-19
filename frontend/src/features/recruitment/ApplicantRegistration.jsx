@@ -21,6 +21,7 @@ import {
 import ApplicantForm from "./ApplicantForm";
 import ApplicantList from "./ApplicantList";
 import "./ApplicantRegistration.css";
+import AffinityBreakdownModal from "./components/AffinityBreakdownModal";
 
 function formatearFechaLimite(fecha) {
   if (!fecha) return "Abierta";
@@ -58,7 +59,8 @@ export default function ApplicantRegistration() {
   const [applicants, setApplicants] = useState([]);
   const [loadingApplicants, setLoadingApplicants] = useState(false);
   const [errorApplicants, setErrorApplicants] = useState(null);
-
+  // Estado: modal de desglose comparativo de afinidad (RF-12)
+  const [postulanteAfinidad, setPostulanteAfinidad] = useState(null);
   // Estado: envío y notificaciones en página
   const [submitting, setSubmitting] = useState(false);
   const [alerta, setAlerta] = useState(null);
@@ -374,9 +376,18 @@ export default function ApplicantRegistration() {
             loading={loadingApplicants}
             openingTitle={selectedOpening.titulo_puesto}
             onRegistrarPrimerPostulante={handleToggleForm}
+            onVerAfinidad={(postulante) => setPostulanteAfinidad(postulante)}
           />
         </Tarjeta>
       )}
+      {/* Modal de desglose comparativo de afinidad (RF-12) */}
+      <AffinityBreakdownModal
+        abierto={Boolean(postulanteAfinidad)}
+        onCerrar={() => setPostulanteAfinidad(null)}
+        idPostulacion={postulanteAfinidad?.id_postulacion}
+        nombrePostulante={`${postulanteAfinidad?.nombres || ""} ${postulanteAfinidad?.apellidos || ""}`.trim()}
+        alRecalcular={() => cargarPostulantes(selectedOpening?.id_convocatoria)}
+      />
     </section>
   );
 }
