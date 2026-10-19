@@ -1,5 +1,6 @@
-import { Award, FileText, FileWarning } from 'lucide-react';
-import { EstadoVacio, Etiqueta, Tabla } from '../../../components/ui';
+import { Award, Download, FileText, FileWarning } from 'lucide-react';
+import { urlPdfMemorandum } from '../../../api/memorandumsApi';
+import { Boton, EstadoVacio, Etiqueta, Tabla } from '../../../components/ui';
 import { formatearFechaHora } from '../../Cargos/utils/formato';
 import { formatearFecha } from '../../Vacantes/utils/formato';
 import { Archivo, Celda, SinDato } from './comunes';
@@ -53,7 +54,18 @@ const COLUMNAS = [
     celda: (memo) =>
       memo.documento_pdf_url || memo.evidencia_adjunto_url ? (
         <div className="kardex-celda kardex-celda--inicio">
-          {memo.documento_pdf_url && <Archivo etiqueta="PDF" ruta={memo.documento_pdf_url} />}
+          {memo.documento_pdf_url && (
+            <Boton
+              variante="sutil"
+              tamano="sm"
+              icono={Download}
+              href={urlPdfMemorandum(memo.id_memorandum)}
+              download={`${memo.codigo_cite}.pdf`}
+              aria-label={`Descargar el PDF del memorándum ${memo.codigo_cite}`}
+            >
+              Descargar PDF
+            </Boton>
+          )}
           {memo.evidencia_adjunto_url && <Archivo etiqueta="Evidencia" ruta={memo.evidencia_adjunto_url} />}
         </div>
       ) : (
