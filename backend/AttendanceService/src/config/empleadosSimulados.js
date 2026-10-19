@@ -5,17 +5,23 @@ module.exports = [
     nombres: "Ana",
     apellidos: "Quispe Mamani",
     activo: true,
+    fecha_ingreso: "2019-03-11",
+    supervisor: { id_empleado: "cb7995a6-4b23-4738-ab8b-37d0b203d73b", nombres: "Luis", apellidos: "Rojas Vargas" },
   },
   {
     id_empleado: "cb7995a6-4b23-4738-ab8b-37d0b203d73b",
     nombres: "Luis",
     apellidos: "Rojas Vargas",
     activo: true,
+    fecha_ingreso: "2026-02-02",
+    supervisor: null,
   },
   {
     id_empleado: "d97320a7-c29b-4405-a33b-a48dc65c6090",
     nombres: "Carla",
     apellidos: "Flores Choque",
     activo: false,
+    fecha_ingreso: "2015-07-20",
+    supervisor: null,
   },
 ];

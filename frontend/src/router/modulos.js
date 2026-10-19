@@ -1,4 +1,4 @@
-import { Briefcase, Building2, CalendarClock, FileUser, Fingerprint, ListTree, Mail, Megaphone, Network, Send, UserCheck, UserPlus } from "lucide-react";
+import { Briefcase, Building2, CalendarClock, FileUser, Fingerprint, ListTree, Mail, Megaphone, Network, Send, TreePalm, UserCheck, UserPlus } from "lucide-react";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
@@ -10,6 +10,7 @@ import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import TurnosPage from "../features/turnos/TurnosPage";
+import VacacionesPage from "../features/vacaciones/VacacionesPage";
 import VacantesView from "../features/Vacantes/VacantesView";
 import { puedeAcceder } from "../utils/permisos";
 
@@ -110,6 +111,14 @@ export const SECCIONES = [
         icono: CalendarClock,
         roles: ["admin"],
         pagina: TurnosPage,
+      },
+      {
+        ruta: "/asistencia/vacaciones",
+        etiqueta: "Vacaciones",
+        descripcion: "Saldo de vacaciones y envío de solicitudes al supervisor.",
+        icono: TreePalm,
+        roles: ["empleado"],
+        pagina: VacacionesPage,
       },
     ],
   },

@@ -66,15 +66,33 @@ const obtenerFicha = async (db, idEmpleado) => {
   return rows[0] || null;
 };
 
-// Datos mínimos para otros servicios (p. ej. AttendanceService al registrar marcajes).
+// Datos mínimos para otros servicios (p. ej. AttendanceService al registrar marcajes y vacaciones).
+// El supervisor es quien ocupa el cargo jefe directo; si hay varios, el de mayor antigüedad.
 const obtenerResumen = async (db, idEmpleado) => {
   const { rows } = await db.query(
     `SELECT e.id_empleado,
             e.nombres,
             concat_ws(' ', e.primer_apellido, e.segundo_apellido) AS apellidos,
-            ee.permite_acceso AS activo
+            ee.permite_acceso AS activo,
+            e.fecha_ingreso,
+            sup.supervisor
        FROM empleados e
        JOIN estados_empleado ee ON ee.id_estado_empleado = e.id_estado_empleado
+       JOIN cargos c ON c.id_cargo = e.id_cargo_actual
+       LEFT JOIN LATERAL (
+         SELECT json_build_object(
+                  'id_empleado', j.id_empleado,
+                  'nombres', j.nombres,
+                  'apellidos', concat_ws(' ', j.primer_apellido, j.segundo_apellido)
+                ) AS supervisor
+           FROM empleados j
+           JOIN estados_empleado ej ON ej.id_estado_empleado = j.id_estado_empleado
+          WHERE j.id_cargo_actual = c.id_cargo_jefe_directo
+            AND ej.permite_acceso = TRUE
+            AND j.id_empleado <> e.id_empleado
+          ORDER BY j.fecha_ingreso, j.id_empleado
+          LIMIT 1
+       ) sup ON TRUE
       WHERE e.id_empleado = $1`,
     [idEmpleado]
   );

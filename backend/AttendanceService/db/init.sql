@@ -75,6 +75,37 @@ CREATE TABLE MARCAJES (
     CONSTRAINT MARCAJES_pk PRIMARY KEY (id_marcaje),
     CONSTRAINT uq_marcaje_empleado_tipo_jornada UNIQUE (id_empleado, id_tipo_marcaje, fecha_jornada)
 );
+-- Tabla: FERIADOS
+CREATE TABLE FERIADOS (
+    fecha date NOT NULL,
+    nombre varchar(80) NOT NULL,
+    CONSTRAINT FERIADOS_pk PRIMARY KEY (fecha)
+);
+-- Tabla: CATALOGOS_ESTADO_SOLICITUD_VACACION
+CREATE TABLE CATALOGOS_ESTADO_SOLICITUD_VACACION (
+    id_estado_solicitud SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_ESTADO_SOLICITUD_VACACION_pk PRIMARY KEY (id_estado_solicitud),
+    CONSTRAINT uq_estado_solicitud_vacacion_codigo UNIQUE (codigo)
+);
+-- Tabla: SOLICITUDES_VACACION
+CREATE TABLE SOLICITUDES_VACACION (
+    id_solicitud UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    id_estado_solicitud SMALLINT NOT NULL DEFAULT 1,
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    dias_habiles SMALLINT NOT NULL,
+    id_supervisor UUID NULL,
+    supervisor_notificado boolean NOT NULL DEFAULT FALSE,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT SOLICITUDES_VACACION_pk PRIMARY KEY (id_solicitud),
+    CONSTRAINT chk_solicitud_vacacion_fechas CHECK (fecha_fin >= fecha_inicio),
+    CONSTRAINT chk_solicitud_vacacion_dias CHECK (dias_habiles > 0)
+);
+CREATE INDEX idx_solicitudes_vacacion_empleado ON SOLICITUDES_VACACION (id_empleado, fecha_inicio);
 -- llaves foráneas
 -- Referencia: TURNOS_CATALOGOS_TIPO_JORNADA (tabla: TURNOS)
 ALTER TABLE TURNOS
@@ -91,6 +122,9 @@ ADD CONSTRAINT MARCAJES_CATALOGOS_ORIGEN_MARCAJE FOREIGN KEY (id_origen_marcaje)
 -- Referencia: MARCAJES_CATALOGOS_ESTADO_MARCAJE (tabla: MARCAJES)
 ALTER TABLE MARCAJES
 ADD CONSTRAINT MARCAJES_CATALOGOS_ESTADO_MARCAJE FOREIGN KEY (id_estado_marcaje) REFERENCES CATALOGOS_ESTADO_MARCAJE (id_estado_marcaje) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Referencia: SOLICITUDES_VACACION_CATALOGOS_ESTADO_SOLICITUD_VACACION (tabla: SOLICITUDES_VACACION)
+ALTER TABLE SOLICITUDES_VACACION
+ADD CONSTRAINT SOLICITUDES_VACACION_CATALOGOS_ESTADO_SOLICITUD_VACACION FOREIGN KEY (id_estado_solicitud) REFERENCES CATALOGOS_ESTADO_SOLICITUD_VACACION (id_estado_solicitud) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- datos iniciales
 INSERT INTO CATALOGOS_TIPO_JORNADA (id_tipo_jornada, codigo, nombre) VALUES
     (1, 'DIURNO', 'Diurno'),
@@ -105,4 +139,33 @@ INSERT INTO CATALOGOS_ORIGEN_MARCAJE (id_origen_marcaje, codigo, nombre) VALUES
 INSERT INTO CATALOGOS_ESTADO_MARCAJE (id_estado_marcaje, codigo, nombre) VALUES
     (1, 'REGISTRADO', 'Registrado'),
     (2, 'PENDIENTE_JUSTIFICACION', 'Pendiente de justificación');
+INSERT INTO CATALOGOS_ESTADO_SOLICITUD_VACACION (id_estado_solicitud, codigo, nombre) VALUES
+    (1, 'PENDIENTE', 'Pendiente'),
+    (2, 'APROBADA', 'Aprobada'),
+    (3, 'RECHAZADA', 'Rechazada'),
+    (4, 'CANCELADA', 'Cancelada');
+-- Feriados nacionales de Bolivia. Los que caen en domingo se trasladan al lunes.
+INSERT INTO FERIADOS (fecha, nombre) VALUES
+    ('2026-01-01', 'Año Nuevo'),
+    ('2026-01-22', 'Día del Estado Plurinacional'),
+    ('2026-02-16', 'Carnaval'),
+    ('2026-02-17', 'Carnaval'),
+    ('2026-04-03', 'Viernes Santo'),
+    ('2026-05-01', 'Día del Trabajo'),
+    ('2026-06-04', 'Corpus Christi'),
+    ('2026-06-22', 'Año Nuevo Andino Amazónico (trasladado del domingo 21)'),
+    ('2026-08-06', 'Día de la Independencia'),
+    ('2026-11-02', 'Día de Todos los Difuntos'),
+    ('2026-12-25', 'Navidad'),
+    ('2027-01-01', 'Año Nuevo'),
+    ('2027-01-22', 'Día del Estado Plurinacional'),
+    ('2027-02-08', 'Carnaval'),
+    ('2027-02-09', 'Carnaval'),
+    ('2027-03-26', 'Viernes Santo'),
+    ('2027-05-01', 'Día del Trabajo'),
+    ('2027-05-27', 'Corpus Christi'),
+    ('2027-06-21', 'Año Nuevo Andino Amazónico'),
+    ('2027-08-06', 'Día de la Independencia'),
+    ('2027-11-02', 'Día de Todos los Difuntos'),
+    ('2027-12-25', 'Navidad');
 -- Fin del archivo.
