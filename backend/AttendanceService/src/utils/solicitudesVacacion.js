@@ -1,4 +1,6 @@
 const { ErrorApp } = require("./errores");
+// Los días ganados y la escala legal viven en KAN-52: aquí solo se arma el saldo para la solicitud.
+const { aniversario, calcularSaldo: calcularSaldoLegal } = require("./vacaciones");
 
 const ESTADO_SOLICITUD = { PENDIENTE: 1, APROBADA: 2, RECHAZADA: 3, CANCELADA: 4 };
 // Estados que ocupan fechas y descuentan saldo.
@@ -28,15 +30,18 @@ const diasEntre = (desde, hasta) => Math.round((aFecha(hasta) - aFecha(desde)) /
 // Sábado y domingo son descansos obligatorios.
 const esFinDeSemana = (texto) => [0, 6].includes(aFecha(texto).getUTCDay());
 
-// Días hábiles del rango (inclusive), sin fines de semana ni feriados.
-function contarDiasHabiles(fechaInicio, fechaFin, feriados = []) {
+// Días hábiles del rango (inclusive), sin descansos ni feriados.
+// Un día con turno publicado es hábil si es de trabajo y descanso si es de descanso; sin turno publicado,
+// se descansan el sábado y el domingo.
+function contarDiasHabiles(fechaInicio, fechaFin, feriados = [], turnos = []) {
   const fechasFeriado = new Set(feriados.map((feriado) => feriado.fecha));
+  const descansoPublicado = new Map(turnos.map((turno) => [turno.fecha, turno.es_descanso]));
   const feriadosExcluidos = [];
   let diasHabiles = 0;
   let diasDescanso = 0;
 
   for (let dia = fechaInicio; dia <= fechaFin; dia = sumarDias(dia, 1)) {
-    if (esFinDeSemana(dia)) diasDescanso++;
+    if (descansoPublicado.has(dia) ? descansoPublicado.get(dia) : esFinDeSemana(dia)) diasDescanso++;
     else if (fechasFeriado.has(dia)) feriadosExcluidos.push(feriados.find((feriado) => feriado.fecha === dia));
     else diasHabiles++;
   }
@@ -49,40 +54,17 @@ function contarDiasHabiles(fechaInicio, fechaFin, feriados = []) {
   };
 }
 
-// Años de servicio cumplidos a la fecha.
-function aniosCumplidos(fechaIngreso, hoy) {
-  const [anioIngreso, mesIngreso, diaIngreso] = fechaIngreso.split("-").map(Number);
-  const [anioHoy, mesHoy, diaHoy] = hoy.split("-").map(Number);
-  const yaCumplioEsteAnio = mesHoy > mesIngreso || (mesHoy === mesIngreso && diaHoy >= diaIngreso);
-  return Math.max(0, anioHoy - anioIngreso - (yaCumplioEsteAnio ? 0 : 1));
-}
-
-// Ley General del Trabajo (DS 17288): 15 días hábiles del 1.º al 5.º año, 20 del 6.º al 10.º y 30 desde el 11.º.
-const diasPorAnio = (anio) => (anio <= 5 ? 15 : anio <= 10 ? 20 : 30);
-
-function diasGanados(anios) {
-  let total = 0;
-  for (let anio = 1; anio <= anios; anio++) total += diasPorAnio(anio);
-  return total;
-}
-
-// El 29 de febrero se toma como 1 de marzo en los años no bisiestos.
-function primerAniversario(fechaIngreso) {
-  const [anio, mes, dia] = fechaIngreso.split("-").map(Number);
-  return aTexto(new Date(Date.UTC(anio + 1, mes - 1, dia)));
-}
-
-function calcularSaldo({ fechaIngreso, hoy, diasComprometidos }) {
-  const anios = aniosCumplidos(fechaIngreso, hoy);
-  const ganados = diasGanados(anios);
+// Saldo para la solicitud: los días ganados, gozados y en proceso salen del cálculo de KAN-52.
+function calcularSaldo({ fechaIngreso, hoy, movimientos }) {
+  const { anios_servicio, saldo } = calcularSaldoLegal(fechaIngreso, hoy, movimientos);
   return {
     fecha_ingreso: fechaIngreso,
-    anios_servicio: anios,
-    dias_ganados: ganados,
-    dias_comprometidos: diasComprometidos,
-    dias_disponibles: Math.max(0, ganados - diasComprometidos),
-    habilitado: anios >= 1,
-    habilitado_desde: anios >= 1 ? null : primerAniversario(fechaIngreso),
+    anios_servicio,
+    dias_ganados: saldo.acumulados,
+    dias_comprometidos: saldo.gozados + saldo.en_proceso,
+    dias_disponibles: Math.max(0, saldo.disponibles),
+    habilitado: anios_servicio >= 1,
+    habilitado_desde: anios_servicio >= 1 ? null : aniversario(fechaIngreso, 1),
     fecha_minima_inicio: sumarDias(hoy, DIAS_ANTICIPACION_MINIMA),
   };
 }
@@ -151,8 +133,6 @@ module.exports = {
   DIAS_ANTICIPACION_MINIMA,
   DIAS_CALENDARIO_MAXIMOS,
   contarDiasHabiles,
-  aniosCumplidos,
-  diasGanados,
   calcularSaldo,
   validarFechas,
   verificarAntiguedad,

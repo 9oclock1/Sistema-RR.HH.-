@@ -1,17 +1,17 @@
 import { solicitar } from "./cliente";
 
-const RUTA = "/att/vacaciones";
+const RUTA = "/att/vacaciones/solicitudes";
 
 const comoEmpleado = (idEmpleado) => ({ "X-Empleado-Id": idEmpleado });
 
 export const consultarSaldo = (idEmpleado) =>
-  solicitar(`${RUTA}/saldo`, { cabeceras: comoEmpleado(idEmpleado) });
+  solicitar(`${RUTA}/resumen`, { cabeceras: comoEmpleado(idEmpleado) });
 
 export const calcularDias = (idEmpleado, fechas) =>
   solicitar(`${RUTA}/calculo?${new URLSearchParams(fechas)}`, { cabeceras: comoEmpleado(idEmpleado) });
 
 export const listarSolicitudes = (idEmpleado) =>
-  solicitar(`${RUTA}/solicitudes`, { cabeceras: comoEmpleado(idEmpleado) });
+  solicitar(`${RUTA}`, { cabeceras: comoEmpleado(idEmpleado) });
 
 export const registrarSolicitud = (idEmpleado, fechas) =>
-  solicitar(`${RUTA}/solicitudes`, { metodo: "POST", cuerpo: fechas, cabeceras: comoEmpleado(idEmpleado) });
+  solicitar(`${RUTA}`, { metodo: "POST", cuerpo: fechas, cabeceras: comoEmpleado(idEmpleado) });

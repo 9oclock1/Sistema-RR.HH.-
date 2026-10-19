@@ -1,5 +1,6 @@
-const modelo = require("../models/vacaciones.model");
+const modelo = require("../models/solicitudesVacacion.model");
 const empleados = require("./empleados.service");
+const supervisores = require("./supervisores.service");
 const notificaciones = require("./notificaciones.service");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
@@ -11,7 +12,7 @@ const {
   validarFechas,
   verificarAntiguedad,
   buscarProblemas,
-} = require("../utils/vacaciones");
+} = require("../utils/solicitudesVacacion");
 
 async function verificarEmpleado(idEmpleado) {
   const empleado = UUID_RE.test(idEmpleado) ? await empleados.obtener(idEmpleado) : null;
@@ -24,25 +25,23 @@ async function verificarEmpleado(idEmpleado) {
 }
 
 async function leerSaldo(empleado, db) {
-  const [hoy, diasComprometidos] = await Promise.all([
-    modelo.hoy(db),
-    modelo.sumarDiasEnCurso(empleado.id_empleado, ESTADOS_EN_CURSO, db),
-  ]);
-  return calcularSaldo({ fechaIngreso: empleado.fecha_ingreso, hoy, diasComprometidos });
+  const [hoy, movimientos] = await Promise.all([modelo.hoy(db), modelo.listarMovimientos(empleado.id_empleado, db)]);
+  return calcularSaldo({ fechaIngreso: empleado.fecha_ingreso, hoy, movimientos });
 }
 
 async function evaluar(empleado, { fechaInicio, fechaFin }, db) {
   const saldo = await leerSaldo(empleado, db);
   verificarAntiguedad(saldo);
-  const [feriados, solapadas] = await Promise.all([
+  const [feriados, turnos, solapadas] = await Promise.all([
     modelo.listarFeriados(fechaInicio, fechaFin, db),
+    modelo.listarTurnosPublicados(empleado.id_empleado, fechaInicio, fechaFin, db),
     modelo.listarSolapadas(empleado.id_empleado, fechaInicio, fechaFin, ESTADOS_EN_CURSO, db),
   ]);
-  const calculo = contarDiasHabiles(fechaInicio, fechaFin, feriados);
+  const calculo = contarDiasHabiles(fechaInicio, fechaFin, feriados, turnos);
   return { saldo, calculo, problemas: buscarProblemas({ fechaInicio, calculo, saldo, solapadas }) };
 }
 
-const describirEmpleado = ({ id_empleado, nombres, apellidos, supervisor }) => ({
+const describirEmpleado = ({ id_empleado, nombres, apellidos }, supervisor) => ({
   id_empleado,
   nombres,
   apellidos,
@@ -51,8 +50,12 @@ const describirEmpleado = ({ id_empleado, nombres, apellidos, supervisor }) => (
 
 async function consultarSaldo(idEmpleado) {
   const empleado = await verificarEmpleado(idEmpleado);
-  const saldo = await leerSaldo(empleado);
-  return { ...saldo, dias_anticipacion_minima: DIAS_ANTICIPACION_MINIMA, empleado: describirEmpleado(empleado) };
+  const [saldo, supervisor] = await Promise.all([leerSaldo(empleado), supervisores.obtenerSupervisor(idEmpleado)]);
+  return {
+    ...saldo,
+    dias_anticipacion_minima: DIAS_ANTICIPACION_MINIMA,
+    empleado: describirEmpleado(empleado, supervisor),
+  };
 }
 
 async function listarSolicitudes(idEmpleado) {
@@ -71,7 +74,7 @@ async function calcular(idEmpleado, datos) {
 async function registrarSolicitud(idEmpleado, datos) {
   const fechas = validarFechas(datos);
   const empleado = await verificarEmpleado(idEmpleado);
-  const supervisor = empleado.supervisor ?? null;
+  const supervisor = await supervisores.obtenerSupervisor(idEmpleado);
 
   const solicitud = await modelo.enTransaccionDeEmpleado(idEmpleado, async (db) => {
     const { calculo, problemas } = await evaluar(empleado, fechas, db);

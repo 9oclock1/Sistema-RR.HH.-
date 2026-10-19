@@ -1,22 +1,22 @@
-.vacaciones-columna {
+.solicitud-vacaciones-columna {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   max-width: var(--size-modal-lg);
 }
 
-.vacaciones-tarjeta {
+.solicitud-vacaciones-tarjeta {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   padding: var(--space-4);
 }
 
-.vacaciones-tarjeta > .ds-tarjeta__encabezado {
+.solicitud-vacaciones-tarjeta > .ds-tarjeta__encabezado {
   margin-bottom: 0;
 }
 
-.vacaciones-nota {
+.solicitud-vacaciones-nota {
   color: var(--color-text-subtle);
   font-size: var(--font-size-small);
   line-height: var(--line-height-small);
@@ -24,23 +24,23 @@
 }
 
 /* Saldo y cálculo comparten la misma rejilla de cifras */
-.vacaciones-saldo,
-.vacaciones-calculo__cifras {
+.solicitud-vacaciones-saldo,
+.solicitud-vacaciones-calculo__cifras {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-3);
   margin: 0;
 }
 
-.vacaciones-saldo dt,
-.vacaciones-calculo__cifras dt {
+.solicitud-vacaciones-saldo dt,
+.solicitud-vacaciones-calculo__cifras dt {
   color: var(--color-text-subtle);
   font-size: var(--font-size-small);
   line-height: var(--line-height-small);
 }
 
-.vacaciones-saldo dd,
-.vacaciones-calculo__cifras dd {
+.solicitud-vacaciones-saldo dd,
+.solicitud-vacaciones-calculo__cifras dd {
   display: flex;
   flex-direction: column;
   margin: 0;
@@ -49,32 +49,32 @@
   font-variant-numeric: tabular-nums;
 }
 
-.vacaciones-saldo__principal dd,
-.vacaciones-calculo__principal dd {
+.solicitud-vacaciones-saldo__principal dd,
+.solicitud-vacaciones-calculo__principal dd {
   color: var(--color-primary);
   font-size: var(--font-size-title);
   line-height: var(--line-height-title);
 }
 
 /* Formulario */
-.vacaciones-formulario {
+.solicitud-vacaciones-formulario {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 
-.vacaciones-formulario__campos {
+.solicitud-vacaciones-formulario__campos {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
   align-items: start;
 }
 
-.vacaciones-formulario__calculo:empty {
+.solicitud-vacaciones-formulario__calculo:empty {
   display: none;
 }
 
-.vacaciones-calculo {
+.solicitud-vacaciones-calculo {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -83,36 +83,36 @@
   background: var(--color-bg-page);
 }
 
-.vacaciones-problemas {
+.solicitud-vacaciones-problemas {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   outline: none;
 }
 
-.vacaciones-formulario__accion {
+.solicitud-vacaciones-formulario__accion {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
 }
 
-.vacaciones-formulario__accion .vacaciones-nota {
+.solicitud-vacaciones-formulario__accion .solicitud-vacaciones-nota {
   flex: 1;
   min-width: 0;
 }
 
-.vacaciones-tabla .ds-tabla {
+.solicitud-vacaciones-tabla .ds-tabla {
   min-width: calc(var(--size-sidebar) * 2.5);
 }
 
 @media (max-width: 640px) {
-  .vacaciones-saldo,
-  .vacaciones-calculo__cifras {
+  .solicitud-vacaciones-saldo,
+  .solicitud-vacaciones-calculo__cifras {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .vacaciones-formulario__campos {
+  .solicitud-vacaciones-formulario__campos {
     grid-template-columns: minmax(0, 1fr);
   }
 }

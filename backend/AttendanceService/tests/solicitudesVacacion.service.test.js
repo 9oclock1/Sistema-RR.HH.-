@@ -1,14 +1,14 @@
 const { test, beforeEach, mock } = require("node:test");
 const assert = require("node:assert/strict");
-const modelo = require("../src/models/vacaciones.model");
+const modelo = require("../src/models/solicitudesVacacion.model");
 const empleados = require("../src/services/empleados.service");
 const notificaciones = require("../src/services/notificaciones.service");
-const servicio = require("../src/services/vacaciones.service");
-const { ESTADOS_EN_CURSO } = require("../src/utils/vacaciones");
+const supervisores = require("../src/services/supervisores.service");
+const servicio = require("../src/services/solicitudesVacacion.service");
 
 const ANA = "4192f252-acf0-4522-a109-e051cad9a50b";
 const LUIS = { id_empleado: "cb7995a6-4b23-4738-ab8b-37d0b203d73b", nombres: "Luis", apellidos: "Rojas" };
-const ana = { id_empleado: ANA, nombres: "Ana", apellidos: "Quispe", activo: true, fecha_ingreso: "2024-01-15", supervisor: LUIS };
+const ana = { id_empleado: ANA, nombres: "Ana", apellidos: "Quispe", activo: true, fecha_ingreso: "2024-01-15" };
 const NOVIEMBRE = { fecha_inicio: "2026-11-09", fecha_fin: "2026-11-13" };
 const TRANSACCION = { transaccion: true };
 
@@ -19,7 +19,9 @@ beforeEach(() => {
   mock.restoreAll();
   mock.method(empleados, "obtener", async (id) => (id === ANA ? ana : null));
   mock.method(modelo, "hoy", async () => "2026-10-18");
-  mock.method(modelo, "sumarDiasEnCurso", async () => 0);
+  mock.method(supervisores, "obtenerSupervisor", async () => LUIS);
+  mock.method(modelo, "listarMovimientos", async () => []);
+  mock.method(modelo, "listarTurnosPublicados", async () => []);
   mock.method(modelo, "listarFeriados", async () => []);
   mock.method(modelo, "listarSolapadas", async () => []);
   mock.method(modelo, "marcarNotificada", async () => {});
@@ -35,13 +37,28 @@ beforeEach(() => {
 });
 
 test("el saldo informa días ganados, comprometidos y disponibles", async () => {
-  modelo.sumarDiasEnCurso.mock.mockImplementation(async () => 5);
+  modelo.listarMovimientos.mock.mockImplementation(async () => [
+    { id_estado_movimiento: 2, dias: 2 },
+    { id_estado_movimiento: 1, dias: 3 },
+    { id_estado_movimiento: 3, dias: 9 },
+  ]);
   const saldo = await servicio.consultarSaldo(ANA);
   assert.equal(saldo.dias_ganados, 30);
   assert.equal(saldo.dias_comprometidos, 5);
   assert.equal(saldo.dias_disponibles, 25);
   assert.equal(saldo.empleado.supervisor, LUIS);
-  assert.deepEqual(modelo.sumarDiasEnCurso.mock.calls[0].arguments.slice(0, 2), [ANA, ESTADOS_EN_CURSO]);
+  assert.equal(modelo.listarMovimientos.mock.calls[0].arguments[0], ANA);
+});
+
+test("el cálculo respeta los turnos publicados: descanso entre semana y trabajo en fin de semana", async () => {
+  modelo.listarTurnosPublicados.mock.mockImplementation(async () => [
+    { fecha: "2026-11-10", es_descanso: true },
+    { fecha: "2026-11-14", es_descanso: false },
+  ]);
+  const calculo = await servicio.calcular(ANA, { fecha_inicio: "2026-11-09", fecha_fin: "2026-11-15" });
+  assert.equal(calculo.dias_habiles, 5);
+  assert.equal(calculo.dias_descanso, 2);
+  assert.deepEqual(modelo.listarTurnosPublicados.mock.calls[0].arguments.slice(0, 3), [ANA, "2026-11-09", "2026-11-15"]);
 });
 
 test("el cálculo excluye feriados y devuelve los problemas sin guardar", async () => {
@@ -71,7 +88,8 @@ test("registra la solicitud pendiente con los días hábiles calculados por el s
 test("las validaciones se leen dentro de la transacción del empleado", async () => {
   await servicio.registrarSolicitud(ANA, NOVIEMBRE);
   assert.equal(modelo.enTransaccionDeEmpleado.mock.calls[0].arguments[0], ANA);
-  assert.equal(modelo.sumarDiasEnCurso.mock.calls[0].arguments[2], TRANSACCION);
+  assert.equal(modelo.listarMovimientos.mock.calls[0].arguments[1], TRANSACCION);
+  assert.equal(modelo.listarTurnosPublicados.mock.calls[0].arguments[3], TRANSACCION);
   assert.equal(modelo.listarSolapadas.mock.calls[0].arguments[4], TRANSACCION);
 });
 
@@ -94,7 +112,7 @@ test("si la notificación falla, la solicitud queda guardada y se avisa", async 
 });
 
 test("sin supervisor asignado no intenta notificar", async () => {
-  empleados.obtener.mock.mockImplementation(async () => ({ ...ana, supervisor: null }));
+  supervisores.obtenerSupervisor.mock.mockImplementation(async () => null);
   const solicitud = await servicio.registrarSolicitud(ANA, NOVIEMBRE);
   assert.equal(avisar.mock.callCount(), 0);
   assert.equal(registrar.mock.calls[0].arguments[0].idSupervisor, null);
@@ -102,7 +120,7 @@ test("sin supervisor asignado no intenta notificar", async () => {
 });
 
 test("bloquea el registro por saldo insuficiente", async () => {
-  modelo.sumarDiasEnCurso.mock.mockImplementation(async () => 27);
+  modelo.listarMovimientos.mock.mockImplementation(async () => [{ id_estado_movimiento: 1, dias: 27 }]);
   await assert.rejects(servicio.registrarSolicitud(ANA, NOVIEMBRE), (error) => {
     assert.equal(error.estado, 409);
     assert.equal(error.message, "Saldo insuficiente: solicita 5 días hábiles y tiene 3 disponibles.");

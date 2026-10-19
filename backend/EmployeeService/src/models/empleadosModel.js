@@ -66,18 +66,40 @@ const obtenerFicha = async (db, idEmpleado) => {
   return rows[0] || null;
 };
 
-// Datos mínimos para otros servicios (p. ej. AttendanceService al registrar marcajes y vacaciones).
-// El supervisor es quien ocupa el cargo jefe directo; si hay varios, el de mayor antigüedad.
+// Datos mínimos para otros servicios (p. ej. AttendanceService al registrar marcajes).
 const obtenerResumen = async (db, idEmpleado) => {
   const { rows } = await db.query(
     `SELECT e.id_empleado,
             e.nombres,
             concat_ws(' ', e.primer_apellido, e.segundo_apellido) AS apellidos,
-            ee.permite_acceso AS activo,
-            e.fecha_ingreso,
-            sup.supervisor
+            ee.permite_acceso AS activo
        FROM empleados e
        JOIN estados_empleado ee ON ee.id_estado_empleado = e.id_estado_empleado
+      WHERE e.id_empleado = $1`,
+    [idEmpleado]
+  );
+  return rows[0] || null;
+};
+
+const actualizarAsignacionActual = async (db, idEmpleado, { id_cargo, id_sucursal }) => {
+  await db.query(
+    `UPDATE empleados
+        SET id_cargo_actual = $1,
+            id_sucursal_actual = $2,
+            actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_empleado = $3`,
+    [id_cargo, id_sucursal, idEmpleado]
+  );
+};
+
+// Supervisor directo (p. ej. para que AttendanceService avise una solicitud de vacaciones):
+// quien ocupa el cargo jefe directo del cargo del empleado; si hay varios, el de mayor antigüedad.
+// Devuelve undefined si el empleado no existe y supervisor null si no hay quien lo supervise.
+const obtenerSupervisor = async (db, idEmpleado) => {
+  const { rows } = await db.query(
+    `SELECT e.id_empleado,
+            sup.supervisor
+       FROM empleados e
        JOIN cargos c ON c.id_cargo = e.id_cargo_actual
        LEFT JOIN LATERAL (
          SELECT json_build_object(
@@ -96,18 +118,7 @@ const obtenerResumen = async (db, idEmpleado) => {
       WHERE e.id_empleado = $1`,
     [idEmpleado]
   );
-  return rows[0] || null;
+  return rows[0];
 };
 
-const actualizarAsignacionActual = async (db, idEmpleado, { id_cargo, id_sucursal }) => {
-  await db.query(
-    `UPDATE empleados
-        SET id_cargo_actual = $1,
-            id_sucursal_actual = $2,
-            actualizado_en = CURRENT_TIMESTAMP
-      WHERE id_empleado = $3`,
-    [id_cargo, id_sucursal, idEmpleado]
-  );
-};
-
-module.exports = { listar, bloquearPorId, obtenerFicha, obtenerResumen, actualizarAsignacionActual };
+module.exports = { listar, bloquearPorId, obtenerFicha, obtenerResumen, obtenerSupervisor, actualizarAsignacionActual };

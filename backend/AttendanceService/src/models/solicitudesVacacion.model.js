@@ -7,7 +7,7 @@ const conEstado = (origen) => `
          s.id_supervisor, s.supervisor_notificado, s.creado_en,
          c.codigo AS estado_codigo, c.nombre AS estado_nombre
   FROM ${origen} s
-  JOIN catalogos_estado_solicitud_vacacion c USING (id_estado_solicitud)`;
+  JOIN catalogos_estado_solicitud c USING (id_estado_solicitud)`;
 
 async function hoy(db = pool) {
   const { rows } = await db.query(`SELECT ${HOY_BOLIVIA} AS hoy`);
@@ -30,13 +30,22 @@ async function listarPorEmpleado(idEmpleado, db = pool) {
   return rows;
 }
 
-async function sumarDiasEnCurso(idEmpleado, estados, db = pool) {
+// Días gozados o en proceso de aprobación (KAN-52): con ellos se calcula el saldo disponible.
+async function listarMovimientos(idEmpleado, db = pool) {
   const { rows } = await db.query(
-    `SELECT COALESCE(SUM(dias_habiles), 0)::int AS total
-     FROM solicitudes_vacacion WHERE id_empleado = $1 AND id_estado_solicitud = ANY($2)`,
-    [idEmpleado, estados]
+    "SELECT id_estado_movimiento, dias FROM movimientos_vacacion WHERE id_empleado = $1",
+    [idEmpleado]
   );
-  return rows[0].total;
+  return rows;
+}
+
+// Turnos del rol publicado dentro del rango: definen qué días trabaja o descansa el colaborador.
+async function listarTurnosPublicados(idEmpleado, fechaInicio, fechaFin, db = pool) {
+  const { rows } = await db.query(
+    "SELECT fecha, es_descanso FROM turnos_publicados WHERE id_empleado = $1 AND fecha BETWEEN $2 AND $3",
+    [idEmpleado, fechaInicio, fechaFin]
+  );
+  return rows;
 }
 
 async function listarSolapadas(idEmpleado, fechaInicio, fechaFin, estados, db = pool) {
@@ -50,12 +59,16 @@ async function listarSolapadas(idEmpleado, fechaInicio, fechaFin, estados, db = 
   return rows;
 }
 
+// Guarda la solicitud y, en la misma sentencia, reserva sus días como movimiento «en proceso» (estado 1) del saldo.
 async function registrar({ idEmpleado, fechaInicio, fechaFin, diasHabiles, idSupervisor }, db = pool) {
   const { rows } = await db.query(
     `WITH nueva AS (
        INSERT INTO solicitudes_vacacion (id_empleado, fecha_inicio, fecha_fin, dias_habiles, id_supervisor)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *
+     ), movimiento AS (
+       INSERT INTO movimientos_vacacion (id_empleado, id_estado_movimiento, id_solicitud_origen, fecha_inicio, fecha_fin, dias)
+       SELECT id_empleado, 1, id_solicitud, fecha_inicio, fecha_fin, dias_habiles FROM nueva
      ) ${conEstado("nueva")}`,
     [idEmpleado, fechaInicio, fechaFin, diasHabiles, idSupervisor]
   );
@@ -90,7 +103,8 @@ module.exports = {
   hoy,
   listarFeriados,
   listarPorEmpleado,
-  sumarDiasEnCurso,
+  listarMovimientos,
+  listarTurnosPublicados,
   listarSolapadas,
   registrar,
   marcarNotificada,

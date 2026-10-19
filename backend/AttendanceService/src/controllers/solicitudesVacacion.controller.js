@@ -1,4 +1,4 @@
-const servicio = require("../services/vacaciones.service");
+const servicio = require("../services/solicitudesVacacion.service");
 
 async function consultarSaldo(req, res) {
   res.json(await servicio.consultarSaldo(req.idEmpleado));

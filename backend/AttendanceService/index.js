@@ -3,7 +3,7 @@ const cors = require("cors");
 const pool = require("./src/config/db");
 const turnosRoutes = require("./src/routes/turnos.routes");
 const marcajesRoutes = require("./src/routes/marcajes.routes");
-const vacacionesRoutes = require("./src/routes/vacaciones.routes");
+const solicitudesVacacionRoutes = require("./src/routes/solicitudesVacacion.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 
 const app = express();
@@ -37,7 +37,7 @@ app.get("/health", async (req, res) => {
 
 app.use(turnosRoutes);
 app.use(marcajesRoutes);
-app.use(vacacionesRoutes);
+app.use(solicitudesVacacionRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {

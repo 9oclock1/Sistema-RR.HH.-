@@ -10,7 +10,7 @@ import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import TurnosPage from "../features/turnos/TurnosPage";
-import VacacionesPage from "../features/vacaciones/VacacionesPage";
+import SolicitudVacacionesPage from "../features/solicitud-vacaciones/SolicitudVacacionesPage";
 import VacantesView from "../features/Vacantes/VacantesView";
 import { puedeAcceder } from "../utils/permisos";
 
@@ -113,12 +113,12 @@ export const SECCIONES = [
         pagina: TurnosPage,
       },
       {
-        ruta: "/asistencia/vacaciones",
-        etiqueta: "Vacaciones",
-        descripcion: "Saldo de vacaciones y envío de solicitudes al supervisor.",
+        ruta: "/asistencia/solicitud-vacaciones",
+        etiqueta: "Solicitud de vacaciones",
+        descripcion: "Envío de solicitudes de vacaciones al supervisor, con el cálculo de días hábiles.",
         icono: TreePalm,
         roles: ["empleado"],
-        pagina: VacacionesPage,
+        pagina: SolicitudVacacionesPage,
       },
     ],
   },

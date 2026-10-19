@@ -28,7 +28,7 @@ const COLUMNAS = [
 
 export default function TablaSolicitudes({ solicitudes, cargando }) {
   return (
-    <Tarjeta titulo="Mis solicitudes" nivelTitulo={2} className="vacaciones-tarjeta">
+    <Tarjeta titulo="Mis solicitudes" nivelTitulo={2} className="solicitud-vacaciones-tarjeta">
       <Tabla
         columnas={COLUMNAS}
         filas={solicitudes}
@@ -36,7 +36,7 @@ export default function TablaSolicitudes({ solicitudes, cargando }) {
         descripcion="Solicitudes de vacaciones enviadas"
         cargando={cargando}
         filasCargando={3}
-        className="vacaciones-tabla"
+        className="solicitud-vacaciones-tabla"
         vacio={<EstadoVacio icono={CalendarDays} titulo="Aún no envió solicitudes de vacaciones" />}
       />
     </Tarjeta>

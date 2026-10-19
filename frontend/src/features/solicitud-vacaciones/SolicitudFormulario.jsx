@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
-import { calcularDias, registrarSolicitud } from "../../api/vacaciones";
+import { calcularDias, registrarSolicitud } from "../../api/solicitudesVacacion";
 import { Alerta, Boton, CampoTexto, Esqueleto, ModalConfirmacion, Tarjeta } from "../../components/ui";
 import { mapearErroresApi } from "../../utils/erroresApi";
 import { TITULOS_PROBLEMA, formatearFechaConDia, formatearPeriodo, plural } from "./formato";
@@ -103,9 +103,9 @@ export default function SolicitudFormulario({ idEmpleado, saldo, supervisor, onR
   };
 
   return (
-    <Tarjeta titulo="Nueva solicitud" nivelTitulo={2} className="vacaciones-tarjeta">
-      <form className="vacaciones-formulario" onSubmit={intentarEnviar} noValidate>
-        <div className="vacaciones-formulario__campos">
+    <Tarjeta titulo="Nueva solicitud" nivelTitulo={2} className="solicitud-vacaciones-tarjeta">
+      <form className="solicitud-vacaciones-formulario" onSubmit={intentarEnviar} noValidate>
+        <div className="solicitud-vacaciones-formulario__campos">
           <CampoTexto
             name="fecha_inicio"
             type="date"
@@ -130,18 +130,18 @@ export default function SolicitudFormulario({ idEmpleado, saldo, supervisor, onR
           />
         </div>
 
-        <div aria-live="polite" className="vacaciones-formulario__calculo">
+        <div aria-live="polite" className="solicitud-vacaciones-formulario__calculo">
           {calculando && !calculo && (
-            <div className="vacaciones-calculo" aria-busy="true">
+            <div className="solicitud-vacaciones-calculo" aria-busy="true">
               <p className="ds-solo-lector">Calculando días hábiles…</p>
               <Esqueleto ancho="40%" />
               <Esqueleto ancho="70%" />
             </div>
           )}
           {calculo && (
-            <div className="vacaciones-calculo" aria-busy={calculando || undefined}>
-              <dl className="vacaciones-calculo__cifras">
-                <div className="vacaciones-calculo__principal">
+            <div className="solicitud-vacaciones-calculo" aria-busy={calculando || undefined}>
+              <dl className="solicitud-vacaciones-calculo__cifras">
+                <div className="solicitud-vacaciones-calculo__principal">
                   <dt>Días hábiles solicitados</dt>
                   <dd>{calculo.dias_habiles}</dd>
                 </div>
@@ -150,7 +150,7 @@ export default function SolicitudFormulario({ idEmpleado, saldo, supervisor, onR
                   <dd>{calculo.dias_calendario}</dd>
                 </div>
                 <div>
-                  <dt>Fines de semana</dt>
+                  <dt>Días de descanso</dt>
                   <dd>{calculo.dias_descanso}</dd>
                 </div>
                 <div>
@@ -159,7 +159,7 @@ export default function SolicitudFormulario({ idEmpleado, saldo, supervisor, onR
                 </div>
               </dl>
               {calculo.feriados.length > 0 && (
-                <p className="vacaciones-nota">
+                <p className="solicitud-vacaciones-nota">
                   No se cuentan {plural(calculo.feriados.length, "feriado", "feriados")}:{" "}
                   {calculo.feriados
                     .map((feriado) => `${feriado.nombre} (${formatearFechaConDia(feriado.fecha)})`)
@@ -172,7 +172,7 @@ export default function SolicitudFormulario({ idEmpleado, saldo, supervisor, onR
         </div>
 
         {problemas.length > 0 && (
-          <div className="vacaciones-problemas" ref={refProblemas} tabIndex={-1}>
+          <div className="solicitud-vacaciones-problemas" ref={refProblemas} tabIndex={-1}>
             {problemas.map((problema) => (
               <Alerta
                 key={`${problema.codigo}-${problema.mensaje}`}
@@ -192,11 +192,11 @@ export default function SolicitudFormulario({ idEmpleado, saldo, supervisor, onR
           </Alerta>
         )}
 
-        <div className="vacaciones-formulario__accion">
+        <div className="solicitud-vacaciones-formulario__accion">
           <Boton variante="primario" type="submit" icono={Send} disabled={enviando}>
             Enviar solicitud
           </Boton>
-          <p className="vacaciones-nota">
+          <p className="solicitud-vacaciones-nota">
             {supervisor
               ? `Quedará pendiente y se notificará a su supervisor, ${supervisor.nombres} ${supervisor.apellidos}.`
               : "Quedará pendiente. Su cargo no tiene supervisor directo asignado para notificar."}

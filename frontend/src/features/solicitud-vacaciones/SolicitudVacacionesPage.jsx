@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { ArrowLeftRight } from "lucide-react";
-import { consultarSaldo, listarSolicitudes } from "../../api/vacaciones";
+import { consultarSaldo, listarSolicitudes } from "../../api/solicitudesVacacion";
 import { Alerta, Avatar, Boton, EncabezadoPagina, Esqueleto, Tarjeta } from "../../components/ui";
 import IdentificacionEmpleado from "../marcaje/IdentificacionEmpleado";
 import { guardarEmpleado, leerEmpleado, olvidarEmpleado } from "../marcaje/sesionEmpleado";
@@ -11,13 +11,13 @@ import TablaSolicitudes from "./TablaSolicitudes";
 import { formatearFecha, formatearPeriodo, plural } from "./formato";
 // Estilos de la tarjeta de identificación, compartida con el marcaje.
 import "../marcaje/marcaje.css";
-import "./vacaciones.css";
+import "./solicitudVacaciones.css";
 
 const esRechazoDeIdentidad = (error) => error.estado === 401 || error.estado === 403;
 
 function CargandoSaldo() {
   return (
-    <Tarjeta className="vacaciones-tarjeta" aria-busy="true">
+    <Tarjeta className="solicitud-vacaciones-tarjeta" aria-busy="true">
       <p className="ds-solo-lector" role="status">
         Consultando saldo de vacaciones…
       </p>
@@ -27,7 +27,7 @@ function CargandoSaldo() {
   );
 }
 
-export default function VacacionesPage() {
+export default function SolicitudVacacionesPage() {
   const [idInicial] = useState(leerEmpleado);
   const [idEmpleado, setIdEmpleado] = useState(idInicial);
   const [saldo, setSaldo] = useState(null);
@@ -102,7 +102,7 @@ export default function VacacionesPage() {
   const nombre = empleado ? `${empleado.nombres} ${empleado.apellidos}` : "";
 
   return (
-    <section className="vacaciones" aria-labelledby="vacaciones-titulo">
+    <section className="solicitud-vacaciones" aria-labelledby="vacaciones-titulo">
       <EncabezadoPagina
         migas={[{ etiqueta: "Inicio", href: "/" }, { etiqueta: "Asistencia" }]}
         enlace={Link}
@@ -111,7 +111,7 @@ export default function VacacionesPage() {
         descripcion="Consulte su saldo y solicite vacaciones indicando el periodo."
       />
 
-      <div className="vacaciones-columna">
+      <div className="solicitud-vacaciones-columna">
         {errorCarga && (
           <Alerta
             tono="peligro"
@@ -143,7 +143,7 @@ export default function VacacionesPage() {
 
         {saldo && (
           <>
-            <Tarjeta className="vacaciones-tarjeta">
+            <Tarjeta className="solicitud-vacaciones-tarjeta">
               <div className="marcaje-empleado">
                 <Avatar nombre={nombre} tamano="lg" decorativo />
                 <div className="marcaje-empleado__datos">

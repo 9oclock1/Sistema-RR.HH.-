@@ -2,14 +2,13 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const {
   contarDiasHabiles,
-  aniosCumplidos,
-  diasGanados,
   calcularSaldo,
   validarFechas,
   verificarAntiguedad,
   buscarProblemas,
-} = require("../src/utils/vacaciones");
+} = require("../src/utils/solicitudesVacacion");
 
+const EN_PROCESO_12 = { id_estado_movimiento: 1, dias: 12 };
 const AGOSTO = [{ fecha: "2026-08-06", nombre: "Día de la Independencia" }];
 
 test("cuenta de lunes a viernes y excluye fines de semana", () => {
@@ -47,24 +46,27 @@ test("el rango cruza fin de mes y de año", () => {
   assert.equal(calculo.dias_habiles, 6);
 });
 
-test("años cumplidos según el aniversario de ingreso", () => {
-  assert.equal(aniosCumplidos("2025-10-18", "2026-10-17"), 0);
-  assert.equal(aniosCumplidos("2025-10-18", "2026-10-18"), 1);
-  assert.equal(aniosCumplidos("2019-03-11", "2026-10-18"), 7);
-  assert.equal(aniosCumplidos("2026-12-01", "2026-10-18"), 0);
+test("un turno publicado manda sobre el fin de semana: trabajo hábil, descanso no", () => {
+  // Lunes 9 a domingo 15 de noviembre de 2026: descansa el martes y trabaja el sábado.
+  const turnos = [
+    { fecha: "2026-11-10", es_descanso: true },
+    { fecha: "2026-11-14", es_descanso: false },
+  ];
+  const calculo = contarDiasHabiles("2026-11-09", "2026-11-15", [], turnos);
+  assert.equal(calculo.dias_habiles, 5);
+  assert.equal(calculo.dias_descanso, 2);
 });
 
-test("días ganados: 15 hasta el 5.º año, 20 hasta el 10.º y 30 desde el 11.º", () => {
-  assert.equal(diasGanados(0), 0);
-  assert.equal(diasGanados(1), 15);
-  assert.equal(diasGanados(5), 75);
-  assert.equal(diasGanados(6), 95);
-  assert.equal(diasGanados(10), 175);
-  assert.equal(diasGanados(11), 205);
+test("un feriado no se cuenta aunque el día tenga turno de trabajo", () => {
+  const calculo = contarDiasHabiles("2026-11-02", "2026-11-02", [{ fecha: "2026-11-02", nombre: "Todos los Difuntos" }], [
+    { fecha: "2026-11-02", es_descanso: false },
+  ]);
+  assert.equal(calculo.dias_habiles, 0);
+  assert.equal(calculo.feriados.length, 1);
 });
 
 test("el saldo descuenta los días comprometidos y fija la fecha mínima de inicio", () => {
-  const saldo = calcularSaldo({ fechaIngreso: "2024-01-15", hoy: "2026-10-18", diasComprometidos: 12 });
+  const saldo = calcularSaldo({ fechaIngreso: "2024-01-15", hoy: "2026-10-18", movimientos: [EN_PROCESO_12] });
   assert.equal(saldo.anios_servicio, 2);
   assert.equal(saldo.dias_ganados, 30);
   assert.equal(saldo.dias_disponibles, 18);
@@ -74,7 +76,7 @@ test("el saldo descuenta los días comprometidos y fija la fecha mínima de inic
 });
 
 test("sin un año de antigüedad no está habilitado e indica desde cuándo", () => {
-  const saldo = calcularSaldo({ fechaIngreso: "2026-02-02", hoy: "2026-10-18", diasComprometidos: 0 });
+  const saldo = calcularSaldo({ fechaIngreso: "2026-02-02", hoy: "2026-10-18", movimientos: [] });
   assert.equal(saldo.habilitado, false);
   assert.equal(saldo.habilitado_desde, "2027-02-02");
   assert.throws(() => verificarAntiguedad(saldo), {
@@ -100,7 +102,7 @@ test("valida formato y orden de las fechas", () => {
   }
 });
 
-const saldo = calcularSaldo({ fechaIngreso: "2024-01-15", hoy: "2026-10-18", diasComprometidos: 20 });
+const saldo = calcularSaldo({ fechaIngreso: "2024-01-15", hoy: "2026-10-18", movimientos: [{ id_estado_movimiento: 1, dias: 20 }] });
 const codigos = (problemas) => problemas.map((problema) => problema.codigo);
 
 test("sin problemas cuando cumple saldo, anticipación y no se solapa", () => {
