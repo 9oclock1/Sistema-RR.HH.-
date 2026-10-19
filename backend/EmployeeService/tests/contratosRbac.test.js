@@ -187,11 +187,34 @@ describe('restricciones RBAC de contratos y adendas (KAN-301)', () => {
       expect(archivosGuardados()).toEqual(antes);
     });
 
-    test('sin X-Usuario-Id el registro guarda el rol y deja el autor sin identificar', async () => {
+    test('sin X-Usuario-Id responde 401, no registra la versión y descarta el documento', async () => {
+      const [antes, total] = [archivosGuardados(), await totalContratos()];
       const { status, body } = await registrar(adenda(), { 'X-Rol': 'admin' });
 
-      expect(status).toBe(201);
-      expect(body).toMatchObject({ registrado_por: null, registrado_por_nombre: null, registrado_rol: 'admin' });
+      expect(status).toBe(401);
+      expect(body.campos_faltantes).toEqual(['X-Usuario-Id']);
+      expect(await totalContratos()).toBe(total);
+      expect(archivosGuardados()).toEqual(antes);
+    });
+
+    test('un X-Usuario-Id que no corresponde a un empleado responde 400 y no registra la versión', async () => {
+      const total = await totalContratos();
+      const { status, body } = await registrar(adenda(), { 'X-Rol': 'admin', 'X-Usuario-Id': id(999) });
+
+      expect(status).toBe(400);
+      expect(body.errores[0].campo).toBe('registrado_por');
+      expect(await totalContratos()).toBe(total);
+    });
+
+    test('cada versión registrada conserva su autor en el historial', async () => {
+      const { body } = await request(app).get(`/contratos?id_empleado=${ANA}`).set('X-Rol', 'admin');
+      const modificaciones = body.filter((version) => version.tipo_modificacion !== 'CONTRATO_INICIAL');
+
+      expect(modificaciones.length).toBeGreaterThan(0);
+      modificaciones.forEach((version) => {
+        expect(version.registrado_por).not.toBeNull();
+        expect(version.registrado_por_nombre).toEqual(expect.any(String));
+      });
     });
   });
 });

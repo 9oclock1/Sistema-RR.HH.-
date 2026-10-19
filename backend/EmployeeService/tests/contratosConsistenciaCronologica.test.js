@@ -182,6 +182,31 @@ describe('consistencia cronológica de contratos y adendas (KAN-301)', () => {
       expect(body.errores.map((e) => e.campo)).toContain('fecha_fin');
     });
 
+    test('una renovación a plazo fijo sin fecha de fin se rechaza', async () => {
+      const { status, body } = await registrar(renovacion({ fecha_fin: '' }));
+
+      expect(status).toBe(400);
+      expect(body.errores).toEqual([{ campo: 'fecha_fin', mensaje: 'El contrato de tipo «Plazo fijo» debe indicar su fecha de fin.' }]);
+    });
+
+    test('una renovación indefinida con fecha de fin se rechaza', async () => {
+      const { status, body } = await registrar(renovacion({ id_tipo_contrato: '1' }));
+
+      expect(status).toBe(400);
+      expect(body.errores).toEqual([{ campo: 'fecha_fin', mensaje: 'Un contrato indefinido no tiene fecha de fin.' }]);
+    });
+
+    test('una renovación con un tipo de contrato inexistente se rechaza', async () => {
+      const { status, body } = await registrar(renovacion({ id_tipo_contrato: '9' }));
+
+      expect(status).toBe(400);
+      expect(body.errores[0].campo).toBe('id_tipo_contrato');
+    });
+
+    test('las renovaciones rechazadas no agregan versiones al historial', async () => {
+      expect(await historial(LUIS)).toHaveLength(1);
+    });
+
     test('un contrato indefinido no se renueva, se modifica con adendas', async () => {
       const { status, body } = await registrar(renovacion({ id_empleado: ROSA, numero_contrato: 'CT-ROSA-2', fecha_fin: '' }));
 
