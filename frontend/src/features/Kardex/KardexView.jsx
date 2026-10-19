@@ -18,9 +18,9 @@ import { useRol } from '../../context/sesion';
 import { useEmpleados } from '../Asignaciones/hooks/useEmpleados';
 import DatosPersonales from './components/DatosPersonales';
 import KardexResumen from './components/KardexResumen';
+import LineaTiempoContratos from './components/LineaTiempoContratos';
 import LineaTiempoTrayectoria from './components/LineaTiempoTrayectoria';
 import TablaCapacitaciones from './components/TablaCapacitaciones';
-import TablaContratos from './components/TablaContratos';
 import TablaMemorandums from './components/TablaMemorandums';
 import { useKardex } from './hooks/useKardex';
 import { RUTA_KARDEX } from './ruta';
@@ -62,7 +62,7 @@ function Expediente({ kardex }) {
       id: 'contratos',
       etiqueta: 'Contratos',
       contador: contratos.length,
-      contenido: <TablaContratos contratos={contratos} nombre={nombre} />,
+      contenido: <LineaTiempoContratos idEmpleado={kardex.id_empleado} nombre={nombre} />,
     },
     {
       id: 'memorandums',

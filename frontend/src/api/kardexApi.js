@@ -5,3 +5,6 @@ export const getKardexEmpleado = (idEmpleado, { rol, signal } = {}) =>
 
 export const descargarCertificadoCapacitacion = (idCapacitacion, { rol } = {}) =>
   requestArchivo(`/empl/capacitaciones/${idCapacitacion}/certificado`, { headers: { 'X-Rol': rol } });
+
+export const descargarDocumentoContrato = (idContrato, { rol } = {}) =>
+  requestArchivo(`/empl/contratos/${idContrato}/documento`, { headers: { 'X-Rol': rol } });
