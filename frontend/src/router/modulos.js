@@ -1,4 +1,4 @@
-import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarRange, ClipboardCheck, FileCheck, FileText, FileUser, FileWarning, Fingerprint, ListTree, Mail, Megaphone, Network, Send, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarRange, ClipboardCheck, FileCheck, FileText, FileUser, FileWarning, Fingerprint, IdCard, ListTree, Mail, Megaphone, Network, Send, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
@@ -9,6 +9,8 @@ import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import GestionComunicacionesPage from "../features/comunicaciones/GestionComunicacionesPage";
 import LicenciasPage from "../features/licencias/LicenciasPage";
 import JerarquiaView from "../features/Jerarquia/JerarquiaView";
+import KardexView from "../features/Kardex/KardexView";
+import { RUTA_KARDEX } from "../features/Kardex/ruta";
 import MarcajePage from "../features/marcaje/MarcajePage";
 import MemorandumsView from "../features/Memorandums/MemorandumsView";
 import MisMemorandumsPage from "../features/Memorandums/acuses/MisMemorandumsPage";
@@ -159,6 +161,20 @@ export const SECCIONES = [
         icono: Timer,
         roles: ["supervisor"],
         pagina: HorasExtraPage,
+      },
+    ],
+  },
+  {
+    titulo: "Expediente",
+    modulos: [
+      {
+        ruta: RUTA_KARDEX,
+        parametroOpcional: "idEmpleado",
+        etiqueta: "Kardex laboral",
+        descripcion: "Ficha consolidada de cada colaborador: contratos, trayectoria, memorándums y capacitaciones.",
+        icono: IdCard,
+        roles: ["gerente"],
+        pagina: KardexView,
       },
     ],
   },
