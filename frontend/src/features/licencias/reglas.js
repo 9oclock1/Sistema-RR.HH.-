@@ -3,6 +3,8 @@ export const MAX_MB = 5;
 export const TIPOS_PERMITIDOS = ["application/pdf", "image/jpeg", "image/png"];
 export const ACEPTAR = ".pdf,.jpg,.jpeg,.png";
 
+export const TONO_ESTADO = { PENDIENTE: "aviso", APROBADA: "exito", RECHAZADA: "peligro", CANCELADA: "neutral" };
+
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
 const fecha = new Intl.DateTimeFormat("es-BO", { timeZone: "UTC", dateStyle: "medium" });

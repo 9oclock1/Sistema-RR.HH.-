@@ -1,10 +1,13 @@
 const pool = require("../config/db");
+const { ESTADO_SOLICITUD } = require("../utils/licencias");
+const { ESTADO_MOVIMIENTO } = require("../utils/vacaciones");
 
 const HOY_BOLIVIA = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date";
 
 const conEstado = (origen) => `
   SELECT s.id_solicitud, s.id_empleado, s.fecha_inicio, s.fecha_fin, s.dias_habiles,
          s.id_supervisor, s.supervisor_notificado, s.creado_en,
+         s.id_empleado_resolutor, s.resuelto_en, s.motivo_resolucion,
          c.codigo AS estado_codigo, c.nombre AS estado_nombre
   FROM ${origen} s
   JOIN catalogos_estado_solicitud c USING (id_estado_solicitud)`;
@@ -82,6 +85,53 @@ async function marcarNotificada(idSolicitud, db = pool) {
   );
 }
 
+async function obtener(idSolicitud, db = pool) {
+  const { rows } = await db.query(`${conEstado("solicitudes_vacacion")} WHERE s.id_solicitud = $1`, [idSolicitud]);
+  return rows[0];
+}
+
+// KAN-53: resuelve solo una solicitud que sigue pendiente, así dos supervisores no se pisan. En la misma transacción,
+// el movimiento reservado del saldo pasa a «gozado» (débito definitivo) si se aprueba o a «cancelado» (libera los días) si se rechaza.
+async function resolver({ idSolicitud, idEstado, idResolutor, motivo }, db) {
+  const { rowCount } = await db.query(
+    `UPDATE solicitudes_vacacion
+        SET id_estado_solicitud = $2, id_empleado_resolutor = $3, resuelto_en = CURRENT_TIMESTAMP,
+            motivo_resolucion = $4, actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_solicitud = $1 AND id_estado_solicitud = 1`,
+    [idSolicitud, idEstado, idResolutor, motivo]
+  );
+  if (rowCount !== 1) return false;
+
+  const idEstadoMovimiento = idEstado === ESTADO_SOLICITUD.APROBADA ? ESTADO_MOVIMIENTO.GOZADO : ESTADO_MOVIMIENTO.CANCELADO;
+  const movimiento = await db.query(
+    `UPDATE movimientos_vacacion SET id_estado_movimiento = $2, actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_solicitud_origen = $1 AND id_estado_movimiento = $3`,
+    [idSolicitud, idEstadoMovimiento, ESTADO_MOVIMIENTO.EN_PROCESO]
+  );
+  // Sin su movimiento reservado el saldo quedaría inconsistente: se deshace toda la resolución.
+  if (movimiento.rowCount !== 1) throw new Error(`La solicitud ${idSolicitud} no tiene un movimiento de saldo en proceso`);
+  return true;
+}
+
+async function marcarResolucionNotificada(idSolicitud) {
+  await pool.query(
+    "UPDATE solicitudes_vacacion SET resolucion_notificada_en = CURRENT_TIMESTAMP WHERE id_solicitud = $1",
+    [idSolicitud]
+  );
+}
+
+// Resoluciones sin aviso confirmado; se espera unos segundos para no competir con el envío en línea.
+async function listarResolucionesSinNotificar(limite) {
+  const { rows } = await pool.query(
+    `${conEstado("solicitudes_vacacion")}
+     WHERE s.resuelto_en IS NOT NULL AND s.resolucion_notificada_en IS NULL
+       AND s.resuelto_en < CURRENT_TIMESTAMP - INTERVAL '30 seconds'
+     ORDER BY s.resuelto_en LIMIT $1`,
+    [limite]
+  );
+  return rows;
+}
+
 // Ejecuta en una transacción bloqueando al empleado, para que dos envíos simultáneos no superen el saldo ni se solapen.
 async function enTransaccionDeEmpleado(idEmpleado, trabajo) {
   const cliente = await pool.connect();
@@ -108,5 +158,9 @@ module.exports = {
   listarSolapadas,
   registrar,
   marcarNotificada,
+  obtener,
+  resolver,
+  marcarResolucionNotificada,
+  listarResolucionesSinNotificar,
   enTransaccionDeEmpleado,
 };

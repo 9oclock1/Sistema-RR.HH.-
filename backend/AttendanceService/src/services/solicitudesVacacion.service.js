@@ -2,8 +2,10 @@ const modelo = require("../models/solicitudesVacacion.model");
 const empleados = require("./empleados.service");
 const supervisores = require("./supervisores.service");
 const notificaciones = require("./notificaciones.service");
+const indisponibilidad = require("./indisponibilidad.service");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
+const { DECISIONES, validarResolucion } = require("../utils/licencias");
 const {
   ESTADOS_EN_CURSO,
   DIAS_ANTICIPACION_MINIMA,
@@ -102,4 +104,80 @@ async function registrarSolicitud(idEmpleado, datos) {
   };
 }
 
-module.exports = { consultarSaldo, listarSolicitudes, calcular, registrarSolicitud };
+async function verificarResolutor(idResolutor) {
+  const resolutor = UUID_RE.test(idResolutor) ? await empleados.obtener(idResolutor) : null;
+  if (!resolutor) throw new ErrorApp(403, "El usuario no corresponde a un empleado registrado.");
+  if (resolutor.activo !== true) throw new ErrorApp(403, "El empleado no está activo, por lo que no puede resolver solicitudes.");
+}
+
+// Avisa al colaborador y deja constancia; si falla, la resolución sigue firme y el reintento periódico lo completa.
+async function avisarResolucion(solicitud) {
+  const idResolutor = solicitud.id_empleado_resolutor;
+  const nombreResolutor = await empleados.obtenerNombre(idResolutor);
+  const { aceptada, reintentable } = await notificaciones.notificarResolucion({
+    solicitud,
+    idResolutor,
+    nombreResolutor,
+    categoria: "VACACIONES",
+  });
+  if (aceptada || !reintentable) await modelo.marcarResolucionNotificada(solicitud.id_solicitud);
+  return aceptada;
+}
+
+// KAN-53: el supervisor o RRHH aprueba o rechaza una solicitud de vacaciones pendiente.
+// Aprobar debita definitivamente los días del saldo y sincroniza la indisponibilidad con Producción o Entregas;
+// rechazar exige justificación y libera los días retenidos. Todo ocurre en una sola transacción.
+async function resolverSolicitud(idResolutor, idSolicitud, datos) {
+  await verificarResolutor(idResolutor);
+  const { errores, decision, motivo } = validarResolucion(datos);
+  if (errores.length > 0) throw new ErrorApp(400, "Datos de resolución inválidos", errores);
+
+  const solicitud = UUID_RE.test(idSolicitud) ? await modelo.obtener(idSolicitud) : null;
+  if (!solicitud) throw new ErrorApp(404, "Solicitud no encontrada");
+  if (solicitud.id_empleado === idResolutor) throw new ErrorApp(403, "No puede resolver su propia solicitud.");
+  const yaResuelta = () => new ErrorApp(409, `La solicitud ya fue resuelta (${solicitud.estado_nombre.toLowerCase()}).`);
+  if (solicitud.estado_codigo !== "PENDIENTE") throw yaResuelta();
+
+  const sincronizacion =
+    decision === "APROBADA"
+      ? await indisponibilidad.prepararEvento({
+          solicitud,
+          categoria: "VACACIONES",
+          nombreResolutor: await empleados.obtenerNombre(idResolutor),
+        })
+      : null;
+
+  const resuelta = await modelo.enTransaccionDeEmpleado(solicitud.id_empleado, async (db) => {
+    const guardada = await modelo.resolver({ idSolicitud, idEstado: DECISIONES[decision], idResolutor, motivo }, db);
+    if (guardada && sincronizacion) await sincronizacion.alResolver(db);
+    return guardada;
+  });
+  if (!resuelta) throw yaResuelta();
+
+  const actualizada = await modelo.obtener(idSolicitud);
+  const notificada = await avisarResolucion(actualizada);
+  return {
+    ...actualizada,
+    notificacion_enviada: notificada,
+    eventos_sincronizacion: sincronizacion?.resultado.eventosRegistrados ?? 0,
+  };
+}
+
+// Reintenta los avisos de resoluciones que NotificationService no alcanzó a confirmar.
+async function reintentarAvisosPendientes(limite = 50) {
+  const pendientes = await modelo.listarResolucionesSinNotificar(limite);
+  let enviados = 0;
+  for (const solicitud of pendientes) {
+    if (await avisarResolucion(solicitud)) enviados += 1;
+  }
+  return { pendientes: pendientes.length, enviados };
+}
+
+module.exports = {
+  consultarSaldo,
+  listarSolicitudes,
+  calcular,
+  registrarSolicitud,
+  resolverSolicitud,
+  reintentarAvisosPendientes,
+};

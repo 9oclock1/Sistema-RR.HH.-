@@ -116,3 +116,34 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Detalle de una solicitud (destino de las alertas de resultado) */
+.solicitud-vacaciones-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+}
+
+.solicitud-vacaciones-detalle div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.solicitud-vacaciones-detalle dt {
+  min-width: calc(var(--space-8) * 2);
+  color: var(--color-text-subtle);
+  font-weight: var(--font-weight-semibold);
+}
+
+.solicitud-vacaciones-detalle dd {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.solicitud-vacaciones-detalle__texto {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
