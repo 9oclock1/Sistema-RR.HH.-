@@ -51,18 +51,18 @@ INSERT INTO asignaciones_empleado (id_asignacion, id_empleado, id_cargo, id_sucu
 INSERT INTO tipos_contrato VALUES (1, 'INDEFINIDO', 'Indefinido'), (2, 'PLAZO_FIJO', 'Plazo fijo');
 INSERT INTO tipos_jornada VALUES (1, 'COMPLETA', 'Jornada completa', 48);
 INSERT INTO contratos (id_contrato, id_empleado, id_tipo_contrato, id_tipo_jornada, numero_contrato, periodo_vigencia,
-                       haber_mensual_pactado, es_adenda, motivo_adenda, registrado_en) VALUES
+                       haber_mensual_pactado, es_adenda, motivo_adenda, registrado_en, tipo_modificacion, id_contrato_anterior) VALUES
   ('${id(201)}', '${ANA}', 2, 1, 'CT-0001',
    daterange((CURRENT_DATE - INTERVAL '3 years 2 months')::date, (CURRENT_DATE - INTERVAL '2 years')::date, '[]'),
-   3000, FALSE, NULL, now() - INTERVAL '3 years'),
+   3000, FALSE, NULL, now() - INTERVAL '3 years', 'CONTRATO_INICIAL', NULL),
   ('${id(202)}', '${ANA}', 1, 1, 'CT-0002', daterange((CURRENT_DATE - INTERVAL '2 years')::date + 1, NULL),
-   3500, FALSE, NULL, now() - INTERVAL '2 years'),
+   3500, FALSE, NULL, now() - INTERVAL '2 years', 'RENOVACION', '${id(201)}'),
   ('${id(203)}', '${ANA}', 1, 1, 'CT-0002-A1', daterange((CURRENT_DATE - INTERVAL '6 months')::date, NULL),
-   6000, TRUE, 'Ascenso a supervisor', now() - INTERVAL '6 months'),
+   6000, TRUE, 'Ascenso a supervisor', now() - INTERVAL '6 months', 'AJUSTE_SALARIAL', '${id(202)}'),
   ('${id(204)}', '${ANA}', 1, 1, 'CT-0002-A2', daterange((CURRENT_DATE + INTERVAL '1 month')::date, NULL),
-   6500, TRUE, 'Ajuste salarial programado', now()),
+   6500, TRUE, 'Ajuste salarial programado', now(), 'AJUSTE_SALARIAL', '${id(203)}'),
   ('${id(205)}', '${LUIS}', 1, 1, 'CT-0003', daterange((CURRENT_DATE - INTERVAL '5 years')::date, NULL),
-   3200, FALSE, NULL, now() - INTERVAL '5 years');
+   3200, FALSE, NULL, now() - INTERVAL '5 years', 'CONTRATO_INICIAL', NULL);
 
 INSERT INTO memorandums (id_memorandum, id_empleado_receptor, id_tipo_memo, id_empleado_emisor, codigo_cite, asunto,
                          contenido_descripcion, fecha_emision, gestion, numero_correlativo, naturaleza_falta, gravedad_falta,

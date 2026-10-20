@@ -3,17 +3,7 @@ import { Download } from 'lucide-react';
 import { descargarCertificadoCapacitacion } from '../../../api/kardexApi';
 import { Boton, TextoTruncado, useAvisos } from '../../../components/ui';
 import { useRol } from '../../../context/sesion';
-
-const guardarComo = (blob, nombre) => {
-  const url = URL.createObjectURL(blob);
-  const enlace = document.createElement('a');
-  enlace.href = url;
-  enlace.download = nombre;
-  document.body.appendChild(enlace);
-  enlace.click();
-  enlace.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-};
+import { guardarComo } from '../utils/descarga';
 
 export default function DescargaCertificado({ capacitacion }) {
   const rol = useRol();
@@ -35,7 +25,7 @@ export default function DescargaCertificado({ capacitacion }) {
   return (
     <div className="kardex-certificado">
       <Boton
-        variante="sutil"
+        variante="enlace"
         tamano="sm"
         soloIcono
         icono={Download}

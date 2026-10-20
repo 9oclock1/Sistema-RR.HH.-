@@ -58,10 +58,41 @@ CREATE TABLE CONTRATOS (
     periodo_vigencia daterange NOT NULL,
     haber_mensual_pactado numeric(12, 2) NOT NULL,
     documento_adjunto_url varchar(255) NULL,
+    documento_nombre_original varchar(255) NULL,
+    documento_tipo_mime varchar(50) NULL,
+    documento_tamano_bytes int NULL,
+    documento_hash_sha256 char(64) NULL,
     es_adenda boolean NOT NULL DEFAULT FALSE,
     motivo_adenda text NULL,
+    tipo_modificacion varchar(20) NOT NULL DEFAULT 'CONTRATO_INICIAL',
+    id_contrato_anterior UUID NULL,
+    registrado_por UUID NULL,
+    registrado_rol varchar(20) NULL,
     registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT CONTRATOS_pk PRIMARY KEY (id_contrato)
+    CONSTRAINT CONTRATOS_pk PRIMARY KEY (id_contrato),
+    CONSTRAINT uq_contrato_numero UNIQUE (numero_contrato),
+    CONSTRAINT uq_contrato_version_anterior UNIQUE (id_contrato_anterior),
+    CONSTRAINT ck_contrato_tipo_modificacion CHECK (
+        tipo_modificacion IN ('CONTRATO_INICIAL', 'RENOVACION', 'CAMBIO_JORNADA', 'AJUSTE_SALARIAL', 'AJUSTE_CONDICIONES')
+    ),
+    CONSTRAINT ck_contrato_adenda_segun_tipo CHECK (
+        es_adenda = (tipo_modificacion NOT IN ('CONTRATO_INICIAL', 'RENOVACION'))
+    ),
+    CONSTRAINT ck_contrato_version_encadenada CHECK (
+        (tipo_modificacion = 'CONTRATO_INICIAL') = (id_contrato_anterior IS NULL)
+    ),
+    CONSTRAINT ck_contrato_no_se_reemplaza CHECK (id_contrato_anterior <> id_contrato),
+    CONSTRAINT ck_contrato_fecha_vigencia CHECK (NOT isempty(periodo_vigencia) AND NOT lower_inf(periodo_vigencia)),
+    CONSTRAINT ck_contrato_haber_positivo CHECK (haber_mensual_pactado > 0),
+    CONSTRAINT ck_contrato_documento_mime CHECK (documento_tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png')),
+    CONSTRAINT ck_contrato_documento_tamano CHECK (documento_tamano_bytes > 0),
+    CONSTRAINT ck_contrato_documento_hash CHECK (documento_hash_sha256 ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT ck_contrato_documento_completo CHECK (
+        (documento_adjunto_url IS NULL) = (documento_nombre_original IS NULL)
+        AND (documento_adjunto_url IS NULL) = (documento_tipo_mime IS NULL)
+        AND (documento_adjunto_url IS NULL) = (documento_tamano_bytes IS NULL)
+        AND (documento_adjunto_url IS NULL) = (documento_hash_sha256 IS NULL)
+    )
 );
 -- Table: CONVOCATORIAS_ASCENSO
 CREATE TABLE CONVOCATORIAS_ASCENSO (
@@ -286,6 +317,12 @@ ADD CONSTRAINT CONTRATOS_TIPOS_CONTRATO FOREIGN KEY (id_tipo_contrato) REFERENCE
 -- Reference: CONTRATOS_TIPOS_JORNADA (table: CONTRATOS)
 ALTER TABLE CONTRATOS
 ADD CONSTRAINT CONTRATOS_TIPOS_JORNADA FOREIGN KEY (id_tipo_jornada) REFERENCES TIPOS_JORNADA (id_tipo_jornada) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONTRATOS_CONTRATO_ANTERIOR (table: CONTRATOS)
+ALTER TABLE CONTRATOS
+ADD CONSTRAINT CONTRATOS_CONTRATO_ANTERIOR FOREIGN KEY (id_contrato_anterior) REFERENCES CONTRATOS (id_contrato) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONTRATOS_EMPLEADOS_REGISTRADOR (table: CONTRATOS)
+ALTER TABLE CONTRATOS
+ADD CONSTRAINT CONTRATOS_EMPLEADOS_REGISTRADOR FOREIGN KEY (registrado_por) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- Reference: CONVOCATORIAS_ASCENSO_CARGOS (table: CONVOCATORIAS_ASCENSO)
 ALTER TABLE CONVOCATORIAS_ASCENSO
 ADD CONSTRAINT CONVOCATORIAS_ASCENSO_CARGOS FOREIGN KEY (id_cargo) REFERENCES CARGOS (id_cargo) NOT DEFERRABLE INITIALLY IMMEDIATE;

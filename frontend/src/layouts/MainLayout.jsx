@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { House, Menu, Search } from "lucide-react";
 import { Boton, ElementoNavegacion, Selector, useAvisos } from "../components/ui";
-import { cambiarRol, useRol } from "../context/sesion";
+import { cambiarRol, cambiarUsuario, useRol, useUsuario } from "../context/sesion";
+import { useEmpleados } from "../features/Asignaciones/hooks/useEmpleados";
 import { seccionesPara } from "../router/modulos";
 import { ROLES } from "../utils/permisos";
 import "./MainLayout.css";
@@ -61,6 +62,8 @@ export default function MainLayout() {
   const navegar = useNavigate();
   const avisar = useAvisos();
   const rol = useRol();
+  const usuario = useUsuario();
+  const empleados = useEmpleados();
 
   const consulta = normalizar(busqueda.trim());
   const secciones = filtrarSecciones(seccionesPara(rol), consulta);
@@ -106,6 +109,13 @@ export default function MainLayout() {
     const nuevo = evento.target.value;
     cambiarRol(nuevo);
     avisar({ tono: "info", titulo: "Rol de prueba cambiado", mensaje: ROLES[nuevo].nombre });
+  };
+
+  const alCambiarUsuario = (evento) => {
+    const nuevo = evento.target.value;
+    cambiarUsuario(nuevo);
+    const nombre = empleados.empleados.find((e) => e.id_empleado === nuevo)?.nombre_completo;
+    avisar({ tono: "info", titulo: "Usuario de prueba cambiado", mensaje: nombre ?? "Sin usuario" });
   };
 
   const alPresionarEnBusqueda = (evento) => {
@@ -185,12 +195,16 @@ export default function MainLayout() {
         </nav>
 
         <div className="app-lateral__pie">
+          <Selector etiqueta="Rol de prueba" opciones={OPCIONES_ROL} value={rol} onChange={alCambiarRol} />
           <Selector
-            etiqueta="Rol de prueba"
-            ayuda="Temporal hasta contar con inicio de sesión."
-            opciones={OPCIONES_ROL}
-            value={rol}
-            onChange={alCambiarRol}
+            etiqueta="Usuario de prueba"
+            ayuda="Temporal hasta contar con inicio de sesión. Queda como autor de los registros."
+            value={usuario ?? ""}
+            onChange={alCambiarUsuario}
+            disabled={empleados.cargando || Boolean(empleados.error)}
+            textoVacio={empleados.cargando ? "Cargando…" : "Sin usuario"}
+            opciones={empleados.empleados.map((e) => ({ valor: e.id_empleado, etiqueta: e.nombre_completo }))}
+            error={empleados.error ? "No se pudieron cargar los empleados." : undefined}
           />
         </div>
       </aside>

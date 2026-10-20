@@ -390,8 +390,132 @@
   min-width: 0;
 }
 
+.kardex-contratos__barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.kardex-contratos__filtro {
+  width: calc(var(--size-sidebar) + var(--space-4));
+  max-width: 100%;
+}
+
+.kardex-contratos__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.kardex-version--contrato .kardex-hito__marca {
+  border-color: var(--color-info);
+  background: var(--color-info-bg);
+  color: var(--color-info-text);
+}
+
+.kardex-version--vigente .kardex-hito__cuerpo {
+  border-color: var(--color-success);
+}
+
+.kardex-version--programada .kardex-hito__cuerpo {
+  border-style: dashed;
+}
+
+.kardex-version__condiciones {
+  color: var(--color-text-secondary);
+}
+
+.kardex-cambios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kardex-cambio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  padding: 0 var(--space-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-page);
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.kardex-cambio__campo {
+  color: var(--color-text-secondary);
+}
+
+.kardex-cambio__antes {
+  text-decoration: line-through;
+}
+
+.kardex-cambio__despues {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.kardex-version__acciones {
+  display: flex;
+  margin-left: calc(var(--space-2) * -1);
+}
+
+.kardex-version__detalle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.kardex-version__dato {
+  min-width: 0;
+}
+
+.kardex-version__dato--ancho {
+  grid-column: 1 / -1;
+}
+
+.kardex-version__dato dt {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.kardex-version__dato dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.kardex-version__justificacion {
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.kardex-version__hash {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.kardex-version__tamano {
+  flex: none;
+}
+
 @media (max-width: 640px) {
-  .kardex-datos {
+  .kardex-datos,
+  .kardex-version__detalle {
     grid-template-columns: minmax(0, 1fr);
   }
 }
