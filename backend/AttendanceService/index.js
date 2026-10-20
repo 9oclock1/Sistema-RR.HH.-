@@ -14,9 +14,11 @@ const solicitudesVacacionRoutes = require("./src/routes/solicitudesVacacion.rout
 const vacacionesRoutes = require("./src/routes/vacaciones.routes");
 const reportesRoutes = require("./src/routes/reportes.routes");
 const miAsistenciaRoutes = require("./src/routes/miAsistencia.routes");
+const aprobacionesRoutes = require("./src/routes/aprobaciones.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 const { iniciarDespachador } = require("./src/services/eventos.service");
 const { iniciarContraste } = require("./src/services/novedades.service");
+const { iniciarReintentoDeAvisos } = require("./src/services/aprobaciones.service");
 
 const app = express();
 const PORT = process.env.PORT || 3004;
@@ -61,10 +63,12 @@ app.use(solicitudesVacacionRoutes);
 app.use(vacacionesRoutes);
 app.use(reportesRoutes);
 app.use(miAsistenciaRoutes);
+app.use(aprobacionesRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`AttendanceService corriendo en http://0.0.0.0:${PORT}`);
   iniciarDespachador();
   iniciarContraste();
+  iniciarReintentoDeAvisos();
 });

@@ -121,6 +121,7 @@ services:
     volumes:
       - ./backend/AttendanceService:/app
       - /app/node_modules
+      - ./credentials:/credentials:ro
     depends_on:
       - postgres
     networks:
