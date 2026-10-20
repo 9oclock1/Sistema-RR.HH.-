@@ -3,9 +3,12 @@ const convocatoriasModel = require("../models/convocatoriasModel");
 const { PostulacionModel } = require("../models/postulacionModel");
 const { calcularAfinidad } = require("../utils/affinityCalculator");
 
+// Los pesos pertenecen a la convocatoria: así todos sus postulantes se comparan con la misma escala.
+const pesosDe = (convocatoria) => convocatoria.pesos_afinidad || {};
+
 const AffinityService = {
   // Individual
-  async procesarAfinidadPostulacion(idPostulacion, pesosPersonalizados = null) {
+  async procesarAfinidadPostulacion(idPostulacion) {
     const postulacion = await PostulacionModel.obtenerPorId(idPostulacion);
     if (!postulacion) {
       throw new Error(`No se encontró la postulación con ID ${idPostulacion}`);
@@ -26,7 +29,7 @@ const AffinityService = {
     const desglose = await calcularAfinidad({
       convocatoria,
       datosCv,
-      pesosPersonalizados: pesosPersonalizados || {},
+      pesosPersonalizados: pesosDe(convocatoria),
     });
 
     await PostulacionModel.guardarAfinidadPostulacion(idPostulacion, {
@@ -42,10 +45,7 @@ const AffinityService = {
   },
 
   // Recalculo masivo
-  async recalcularAfinidadConvocatoria(
-    idConvocatoria,
-    pesosPersonalizados = null,
-  ) {
+  async recalcularAfinidadConvocatoria(idConvocatoria) {
     const convocatoria = await convocatoriasModel.obtenerPorId(
       pool,
       idConvocatoria,
@@ -57,25 +57,25 @@ const AffinityService = {
     const postulaciones =
       await PostulacionModel.listarPorConvocatoriaParaRecalculo(idConvocatoria);
 
-    for (const pos of postulaciones) {
-      if (pos.datos_extraidos_cv) {
-        const desglose = await calcularAfinidad({
-          convocatoria,
-          datosCv: pos.datos_extraidos_cv,
-          pesosPersonalizados: pesosPersonalizados || {},
-        });
+    const conCv = postulaciones.filter((pos) => pos.datos_extraidos_cv);
 
-        await PostulacionModel.guardarAfinidadPostulacion(pos.id_postulacion, {
-          porcentajeAfinidad: desglose.porcentajeTotal,
-          afinidadDetalle: desglose,
-        });
-      }
+    for (const pos of conCv) {
+      const desglose = await calcularAfinidad({
+        convocatoria,
+        datosCv: pos.datos_extraidos_cv,
+        pesosPersonalizados: pesosDe(convocatoria),
+      });
+
+      await PostulacionModel.guardarAfinidadPostulacion(pos.id_postulacion, {
+        porcentajeAfinidad: desglose.porcentajeTotal,
+        afinidadDetalle: desglose,
+      });
     }
 
     await PostulacionModel.actualizarRankingsPorConvocatoria(idConvocatoria);
 
     return {
-      totalRecalculados: postulaciones.length,
+      totalRecalculados: conCv.length,
       idConvocatoria,
     };
   },

@@ -105,10 +105,9 @@ export const postulacionApi = {
     return res.data?.data || res.data;
   },
 
-  async recalcularAfinidadPostulacion(idPostulacion, pesos = null) {
+  async recalcularAfinidadPostulacion(idPostulacion) {
     const res = await cliente.post(
       `${BASE_RECRUITMENT}/postulaciones/${idPostulacion}/recalcular-afinidad`,
-      pesos || undefined,
     );
     return res.data?.data || res.data;
   },

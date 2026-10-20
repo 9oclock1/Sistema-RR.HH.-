@@ -182,6 +182,16 @@ const CvDataController = {
           fileName: resolvedFileName,
         });
 
+      try {
+        const afinidad = await AffinityService.procesarAfinidadPostulacion(id);
+        datosExtraidos.afinidadDetalle = afinidad;
+      } catch (errAfinidad) {
+        console.warn(
+          "[CvDataController] Advertencia al recalcular afinidad tras analizar CV:",
+          errAfinidad.message,
+        );
+      }
+
       return res.status(200).json({
         success: true,
         message: "CV analizado exitosamente.",

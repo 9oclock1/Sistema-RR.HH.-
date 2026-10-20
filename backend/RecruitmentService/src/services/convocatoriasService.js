@@ -10,14 +10,14 @@ const { AffinityService } = require("./affinityService");
 
 const noEncontrada = () =>
   new HttpError(404, "La convocatoria solicitada no existe.");
+const ESTADOS_EDITABLES = ["borrador", "publicada"];
 const ESTADO_REQUERIDO = {
-  editar: "borrador",
+  editar: ESTADOS_EDITABLES,
   publicar: "borrador",
   cerrar: "publicada",
 };
 const MENSAJES_TRANSICION_INVALIDA = {
   editar: {
-    publicada: "Una convocatoria publicada ya no se puede editar.",
     cerrada: "Una convocatoria cerrada no se puede editar.",
   },
   publicar: {
@@ -31,7 +31,7 @@ const MENSAJES_TRANSICION_INVALIDA = {
 };
 
 const exigirTransicion = (convocatoria, accion) => {
-  if (convocatoria.estado !== ESTADO_REQUERIDO[accion]) {
+  if (![].concat(ESTADO_REQUERIDO[accion]).includes(convocatoria.estado)) {
     throw new HttpError(
       409,
       MENSAJES_TRANSICION_INVALIDA[accion][convocatoria.estado],
@@ -98,6 +98,7 @@ const CAMPOS_REQUISITOS_MATCHING = [
   "nivel_educacion_min",
   "year_experiencia_min",
   "habilidades_clave_requeridas",
+  "pesos_afinidad",
 ];
 
 const actualizarConvocatoria = async (idConvocatoria, cambios) => {
@@ -118,9 +119,15 @@ const actualizarConvocatoria = async (idConvocatoria, cambios) => {
     exigirTransicion(actual, "editar");
 
     await convocatoriasModel.actualizar(client, idConvocatoria, cambios);
-    return aRespuesta(
-      await convocatoriasModel.obtenerPorId(client, idConvocatoria),
-    );
+    const editada = await convocatoriasModel.obtenerPorId(client, idConvocatoria);
+    // Una convocatoria publicada ya recibe postulaciones: debe seguir cumpliendo lo exigido para publicarse.
+    if (actual.estado === "publicada") {
+      lanzarSiHayErrores(
+        erroresParaPublicar(editada, hoy()),
+        "Una convocatoria publicada debe conservar todos sus requisitos.",
+      );
+    }
+    return aRespuesta(editada);
   });
 
   if (huboCambioEnRequisitos) {
@@ -180,38 +187,12 @@ const cerrarConvocatoria = (idConvocatoria) =>
     );
   });
 
-const actualizarRequisitos = async (idConvocatoria, requisitos) => {
-  return withTransaction(async (client) => {
-    const actual = await convocatoriasModel.bloquearPorId(
-      client,
-      idConvocatoria,
-    );
-    if (!actual) throw noEncontrada();
-
-    if (actual.estado === "cerrada") {
-      throw new HttpError(
-        409,
-        "No se pueden modificar los requisitos de una convocatoria cerrada.",
-      );
-    }
-
-    await convocatoriasModel.actualizar(client, idConvocatoria, requisitos);
-
-    await AffinityService.recalcularAfinidadConvocatoria(idConvocatoria);
-
-    return aRespuesta(
-      await convocatoriasModel.obtenerPorId(client, idConvocatoria),
-    );
-  });
-};
-
 module.exports = {
   listarConvocatorias,
   obtenerConvocatoria,
   obtenerPerfilDesdeCargo,
   crearConvocatoria,
   actualizarConvocatoria,
-  actualizarRequisitos,
   publicarConvocatoria,
   cerrarConvocatoria,
 };

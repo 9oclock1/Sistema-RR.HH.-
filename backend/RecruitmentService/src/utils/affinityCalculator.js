@@ -15,7 +15,7 @@ const PATRONES_NIVEL_TITULO = [
   {
     codigo: "LICENCIATURA",
     regex:
-      /\b(licenciatura|licenciado|licenciada|ingenier[ií]a|ingeniero|ingeniera|abogad[oa]|arquitect[oa]|contador|medicina)\b/i,
+      /\b(licenciatura|licenciado|licenciada|bachelor|ingenier[ií]a|ingeniero|ingeniera|abogad[oa]|arquitect[oa]|contador|medicina)\b/i,
   },
   { codigo: "TECNICO_SUPERIOR", regex: /\b(t[eé]cnico superior|tsu)\b/i },
   { codigo: "TECNICO_MEDIO", regex: /\b(t[eé]cnico medio|t[eé]cnico)\b/i },
@@ -25,13 +25,20 @@ const PATRONES_NIVEL_TITULO = [
   },
 ];
 
+// Formación que todavía no se concluyó no acredita el grado.
+const REGEX_TITULO_EN_CURSO =
+  /\b(estudiante|cursando|en curso|incompleto|incompleta|trunco|truncos|truncada)\b/i;
+
+// Por debajo de este porcentaje de cumplimiento, un requisito de educación o experiencia deja al candidato "no apto".
+const UMBRAL_NO_APTO = 50;
+
 function normalizarTexto(texto = "") {
   return texto
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/([a-z0-9]+)[\.\-\s]+(js|net|ts)\b/gi, "$1$2")
-    .replace(/[^\w\s]/gi, " ")
+    .replace(/[^\w\s+#]/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -46,7 +53,12 @@ function detectarNivelEducacionMaximo(titulos = []) {
   let mejorTitulo = "";
 
   for (const item of titulos) {
-    const tituloTexto = typeof item === "string" ? item : item?.titulo || "";
+    // El extractor "regex" guarda el grado detectado en la institución y deja un título genérico: se miran ambos.
+    const tituloTexto =
+      typeof item === "string"
+        ? item
+        : [item?.titulo, item?.institucion].filter(Boolean).join(" ");
+    if (REGEX_TITULO_EN_CURSO.test(tituloTexto)) continue;
     const normalizado = normalizarTexto(tituloTexto);
 
     for (const { codigo, regex } of PATRONES_NIVEL_TITULO) {
@@ -87,13 +99,13 @@ function similitudCoseno(vecA, vecB) {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
+// Compara por palabras completas: "Java" no se parece a "JavaScript" ni "SQL" a "NoSQL".
 function similitudLexica(strA, strB) {
   const normA = normalizarTexto(strA);
   const normB = normalizarTexto(strB);
 
   if (normA === normB) return 1.0;
   if (!normA || !normB) return 0.0;
-  if (normA.includes(normB) || normB.includes(normA)) return 0.9;
 
   const tokensA = new Set(normA.split(" ").filter((t) => t.length > 2));
   const tokensB = new Set(normB.split(" ").filter((t) => t.length > 2));
@@ -103,29 +115,58 @@ function similitudLexica(strA, strB) {
   for (const token of tokensA) {
     if (tokensB.has(token)) interseccion++;
   }
+  // Todas las palabras de una habilidad están en la otra ("Excel" / "Excel avanzado").
+  if (interseccion === Math.min(tokensA.size, tokensB.size)) return 0.9;
+
   const union = new Set([...tokensA, ...tokensB]).size;
   return interseccion / union;
 }
 
-async function obtenerEmbedding(texto) {
-  const provider = process.env.CV_PARSER_PROVIDER || "regex";
+// La primera llamada puede tardar ~25 s mientras Ollama carga el modelo en memoria.
+const TIMEOUT_EMBEDDING_MS = 30000;
+const PAUSA_EMBEDDINGS_MS = 60000;
+const MAX_CACHE_EMBEDDINGS = 500;
+const cacheEmbeddings = new Map();
+let embeddingsPausadosHasta = 0;
 
+// El coseno depende del modelo: en Gemini lo ajeno ya llega a ~0.62 y lo cercano arranca en ~0.66, mientras que en
+// Ollama (nomic-embed-text) lo ajeno queda bajo 0.50. Se puede ajustar con AFFINITY_UMBRAL_EXACTO / _PARCIAL.
+function umbralesSimilitud() {
+  const nube = (process.env.CV_PARSER_PROVIDER || "regex") === "cloud";
+  const exacto = Number(process.env.AFFINITY_UMBRAL_EXACTO);
+  const parcial = Number(process.env.AFFINITY_UMBRAL_PARCIAL);
+  return {
+    exacto: exacto > 0 && exacto <= 1 ? exacto : 0.78,
+    parcial: parcial > 0 && parcial <= 1 ? parcial : nube ? 0.7 : 0.6,
+  };
+}
+
+// Un proveedor mal configurado no debe degradar el cálculo en silencio: se avisa una vez por minuto.
+let ultimoAvisoEmbeddings = 0;
+function avisarFalloEmbeddings(motivo) {
+  if (Date.now() - ultimoAvisoEmbeddings < PAUSA_EMBEDDINGS_MS) return;
+  ultimoAvisoEmbeddings = Date.now();
+  console.warn(`[Afinidad] Embeddings no disponibles (${motivo}); se usa comparación léxica.`);
+}
+
+async function solicitarEmbedding(texto, provider) {
   // Ollama local
   if (provider === "local") {
-    try {
-      const baseUrl =
-        process.env.OLLAMA_BASE_URL || "http://host.docker.internal:11434";
-      const model = process.env.OLLAMA_MODEL_EMBEDDING || "nomic-embed-text";
-      const res = await fetch(`${baseUrl}/api/embeddings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, prompt: texto }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.embedding)) return data.embedding;
-      }
-    } catch {}
+    const baseUrl =
+      process.env.OLLAMA_BASE_URL || "http://host.docker.internal:11434";
+    const model = process.env.OLLAMA_MODEL_EMBEDDING || "nomic-embed-text";
+    const res = await fetch(`${baseUrl}/api/embeddings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, prompt: texto }),
+      signal: AbortSignal.timeout(TIMEOUT_EMBEDDING_MS),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.embedding)) return data.embedding;
+    } else {
+      avisarFalloEmbeddings(`Ollama respondió ${res.status} para el modelo ${model}`);
+    }
   }
 
   // Google Cloud API
@@ -134,27 +175,56 @@ async function obtenerEmbedding(texto) {
     (process.env.CLOUD_PROVIDER || "google") === "google" &&
     process.env.GOOGLE_API_KEY
   ) {
-    try {
-      const apiKey = process.env.GOOGLE_API_KEY;
-      const modelName =
-        process.env.EMBEDDING_MODEL || "models/text-embedding-004";
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/${modelName}:embedContent?key=${apiKey}`;
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: modelName,
-          content: { parts: [{ text: texto }] },
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.embedding?.values) return data.embedding.values;
-      }
-    } catch {}
+    const apiKey = process.env.GOOGLE_API_KEY;
+    // La API exige el prefijo "models/"; se acepta el nombre con o sin él.
+    const configurado = process.env.EMBEDDING_MODEL || "text-embedding-004";
+    const modelName = configurado.startsWith("models/")
+      ? configurado
+      : `models/${configurado}`;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/${modelName}:embedContent?key=${apiKey}`;
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modelName,
+        content: { parts: [{ text: texto }] },
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_EMBEDDING_MS),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.embedding?.values) return data.embedding.values;
+    } else {
+      avisarFalloEmbeddings(`Google respondió ${res.status} para el modelo ${modelName}`);
+    }
   }
 
   return null;
+}
+
+// Devuelve null si no hay proveedor disponible; el llamador cae a la comparación léxica.
+async function obtenerEmbedding(texto) {
+  const provider = process.env.CV_PARSER_PROVIDER || "regex";
+  if (Date.now() < embeddingsPausadosHasta) return null;
+
+  const clave = `${provider}|${normalizarTexto(texto)}`;
+  if (cacheEmbeddings.has(clave)) return cacheEmbeddings.get(clave);
+
+  try {
+    const vec = await solicitarEmbedding(texto, provider);
+    if (vec) {
+      if (cacheEmbeddings.size >= MAX_CACHE_EMBEDDINGS) {
+        cacheEmbeddings.delete(cacheEmbeddings.keys().next().value);
+      }
+      cacheEmbeddings.set(clave, vec);
+    }
+    return vec;
+  } catch (error) {
+    avisarFalloEmbeddings(error.message);
+    // Proveedor caído o lento: se evita esperar el timeout por cada habilidad.
+    embeddingsPausadosHasta = Date.now() + PAUSA_EMBEDDINGS_MS;
+    return null;
+  }
 }
 
 async function evaluarHabilidades(
@@ -168,6 +238,7 @@ async function evaluarHabilidades(
     return {
       totalRequeridas: 0,
       totalCumplidas: 0,
+      totalParciales: 0,
       cumplidas: [],
       incumplidas: [],
       habilidadesExtraCandidato: destrezasCandidato,
@@ -189,11 +260,11 @@ async function evaluarHabilidades(
     })),
   );
 
-  const UMBRAL_EXACTO = 0.78;
-  const UMBRAL_PARCIAL = 0.6;
+  const { exacto: UMBRAL_EXACTO, parcial: UMBRAL_PARCIAL } = umbralesSimilitud();
 
   const cumplidas = [];
   const incumplidas = [];
+  let totalParciales = 0;
   const destrezasCoincidentesSet = new Set();
   let sumaPuntosHabilidades = 0;
 
@@ -225,6 +296,7 @@ async function evaluarHabilidades(
       destrezasCoincidentesSet.add(mejorDestreza);
     } else if (mejorSimilitud >= UMBRAL_PARCIAL) {
       sumaPuntosHabilidades += 0.5;
+      totalParciales++;
       cumplidas.push({
         habilidadRequerida: req.texto,
         habilidadCoincidente: `${mejorDestreza} (Parcial)`,
@@ -246,7 +318,8 @@ async function evaluarHabilidades(
 
   return {
     totalRequeridas: habilidadesRequeridas.length,
-    totalCumplidas: cumplidas.length,
+    totalCumplidas: cumplidas.length - totalParciales,
+    totalParciales,
     cumplidas,
     incumplidas,
     habilidadesExtraCandidato,
@@ -294,6 +367,7 @@ async function calcularAfinidad({
         totalRequeridas: (convocatoria?.habilidades_clave_requeridas || [])
           .length,
         totalCumplidas: 0,
+        totalParciales: 0,
         cumplidas: [],
         incumplidas: convocatoria?.habilidades_clave_requeridas || [],
         habilidadesExtraCandidato: [],
@@ -317,9 +391,12 @@ async function calcularAfinidad({
     ? 100
     : Math.max(0, Math.round((nivelCandidato.orden / ordenRequerido) * 100));
 
-  if (!cumpleEducacion && ordenRequerido >= 2) {
+  // No se descarta a quien se queda cerca: el porcentaje alcanzado ya pondera en el total, y solo
+  // queda "no apto" quien está lejos del mínimo.
+  // El nivel mínimo (bachiller) no se usa como excluyente: un CV sin estudios listados no basta para descartar.
+  if (ordenRequerido >= 2 && porcentajeEducacion < UMBRAL_NO_APTO) {
     motivosNoApto.push(
-      `No cumple el nivel educativo mínimo requerido (${nivelMinimoRequerido}). Nivel detectado: ${nivelCandidato.codigo}.`,
+      `Está lejos del nivel educativo mínimo requerido (${nivelMinimoRequerido}): alcanza ${porcentajeEducacion}%. Nivel detectado: ${nivelCandidato.codigo}.`,
     );
   }
 
@@ -337,9 +414,9 @@ async function calcularAfinidad({
       (aniosCandidato / aniosMinimosRequeridos) * 100,
     );
 
-    if (aniosMinimosRequeridos >= 2 && aniosCandidato === 0) {
+    if (porcentajeExperiencia < UMBRAL_NO_APTO) {
       motivosNoApto.push(
-        `La vacante exige al menos ${aniosMinimosRequeridos} años de experiencia laboral y el candidato registra 0 años.`,
+        `La vacante exige al menos ${aniosMinimosRequeridos} años de experiencia laboral y el candidato registra ${aniosCandidato} (${Math.round(porcentajeExperiencia)}% del mínimo).`,
       );
     }
   }
@@ -391,6 +468,7 @@ async function calcularAfinidad({
     habilidades: {
       totalRequeridas: habilidadesEvaluadas.totalRequeridas,
       totalCumplidas: habilidadesEvaluadas.totalCumplidas,
+      totalParciales: habilidadesEvaluadas.totalParciales,
       cumplidas: habilidadesEvaluadas.cumplidas,
       incumplidas: habilidadesEvaluadas.incumplidas,
       habilidadesExtraCandidato: habilidadesEvaluadas.habilidadesExtraCandidato,

@@ -6,8 +6,8 @@ import "./AffinityRangeFilter.css";
 const PRESETS = [
   { id: "todos", etiqueta: "Todos", min: "", max: "" },
   { id: "top", etiqueta: "Top matches (≥ 75%)", min: "75", max: "" },
-  { id: "medios", etiqueta: "Afinidad media (50% - 74%)", min: "50", max: "74" },
-  { id: "bajos", etiqueta: "Menor afinidad (< 50%)", min: "", max: "49" },
+  { id: "medios", etiqueta: "Afinidad media (50% - 74.99%)", min: "50", max: "74.99" },
+  { id: "bajos", etiqueta: "Menor afinidad (< 50%)", min: "", max: "49.99" },
 ];
 
 export default function AffinityRangeFilter({
@@ -19,8 +19,10 @@ export default function AffinityRangeFilter({
   const [minLocal, setMinLocal] = useState(minAfinidad);
   const [maxLocal, setMaxLocal] = useState(maxAfinidad);
   const [presetActivo, setPresetActivo] = useState("todos");
+  const [errorRango, setErrorRango] = useState(null);
 
   const aplicarPreset = (preset) => {
+    setErrorRango(null);
     setPresetActivo(preset.id);
     setMinLocal(preset.min);
     setMaxLocal(preset.max);
@@ -29,11 +31,17 @@ export default function AffinityRangeFilter({
 
   const manejarSubmitManual = (e) => {
     e.preventDefault();
+    if (minLocal !== "" && maxLocal !== "" && Number(minLocal) > Number(maxLocal)) {
+      setErrorRango("El mínimo no puede ser mayor que el máximo.");
+      return;
+    }
+    setErrorRango(null);
     setPresetActivo("custom");
     onCambiarRango({ minAfinidad: minLocal, maxAfinidad: maxLocal });
   };
 
   const limpiarFiltro = () => {
+    setErrorRango(null);
     setPresetActivo("todos");
     setMinLocal("");
     setMaxLocal("");
@@ -108,6 +116,11 @@ export default function AffinityRangeFilter({
             />
           )}
         </div>
+        {errorRango && (
+          <p className="affinity-filtro__error" role="alert">
+            {errorRango}
+          </p>
+        )}
       </form>
     </div>
   );

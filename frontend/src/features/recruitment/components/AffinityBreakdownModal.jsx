@@ -8,7 +8,6 @@ import {
   GraduationCap, 
   RefreshCw, 
   Sliders, 
-  X, 
   XCircle 
 } from "lucide-react";
 import { Alerta, Boton, CampoTexto, Esqueleto, Etiqueta, Modal } from "../../../components/ui";
@@ -83,13 +82,9 @@ export default function AffinityBreakdownModal({
     setRecalculando(true);
     setError(null);
     try {
-      const res = await postulacionApi.recalcularAfinidadPostulacion(idPostulacion, pesos);
-      setDatos((prev) => ({
-        ...prev,
-        porcentajeAfinidad: res.porcentajeAfinidad,
-        esApto: res.esApto,
-        desglose: res.desglose,
-      }));
+      // Los pesos pertenecen a la convocatoria: se guardan y se recalcula todo su ranking.
+      await postulacionApi.recalcularAfinidadConvocatoria(datos.idConvocatoria, pesos);
+      setDatos(await postulacionApi.obtenerAfinidadPostulacion(idPostulacion));
       setMostrarPesos(false);
       if (alRecalcular) alRecalcular();
     } catch (err) {
@@ -158,7 +153,7 @@ export default function AffinityBreakdownModal({
                 <div className="affinity-resumen-card__alertas">
                   <div className="affinity-alerta-item">
                     <AlertTriangle className="ds-icono" aria-hidden="true" />
-                    <span>Incumple requisito(s) excluyente(s) obligatorio(s) de la vacante:</span>
+                    <span>Está lejos de requisito(s) obligatorio(s) de la vacante:</span>
                   </div>
                   <ul className="affinity-alerta-lista">
                     {motivos.map((motivo, idx) => (
@@ -174,7 +169,9 @@ export default function AffinityBreakdownModal({
               <form onSubmit={aplicarNuevosPesos} className="affinity-pesos-form">
                 <div className="affinity-pesos-form__cabecera">
                   <span className="affinity-pesos-form__titulo">Ponderación de Requisitos (%)</span>
-                  <span className="affinity-pesos-form__meta">Deben sumar exactamente 100%</span>
+                  <span className="affinity-pesos-form__meta">
+                    Deben sumar exactamente 100%. Se aplican a todos los postulantes de la vacante.
+                  </span>
                 </div>
 
                 {errorPesos && (
@@ -222,7 +219,7 @@ export default function AffinityBreakdownModal({
                     icono={RefreshCw}
                     cargando={recalculando}
                   >
-                    Recalcular con estos pesos
+                    Guardar y recalcular ranking
                   </Boton>
                 </div>
               </form>
@@ -257,7 +254,12 @@ export default function AffinityBreakdownModal({
                       {desglose.educacion.cumple ? (
                         <Etiqueta tono="exito" icono={CheckCircle2}>Cumple requisito</Etiqueta>
                       ) : (
-                        <Etiqueta tono="peligro" icono={XCircle}>Grado insuficiente</Etiqueta>
+                        <Etiqueta
+                          tono={desglose.educacion.porcentajeObtenido >= 50 ? "aviso" : "peligro"}
+                          icono={desglose.educacion.porcentajeObtenido >= 50 ? AlertTriangle : XCircle}
+                        >
+                          {desglose.educacion.porcentajeObtenido}% alcanzado
+                        </Etiqueta>
                       )}
                     </div>
                   </div>
@@ -289,7 +291,10 @@ export default function AffinityBreakdownModal({
                       {desglose.experiencia.cumple ? (
                         <Etiqueta tono="exito" icono={CheckCircle2}>Cumple experiencia</Etiqueta>
                       ) : (
-                        <Etiqueta tono="aviso" icono={AlertTriangle}>
+                        <Etiqueta
+                          tono={desglose.experiencia.porcentajeObtenido >= 50 ? "aviso" : "peligro"}
+                          icono={desglose.experiencia.porcentajeObtenido >= 50 ? AlertTriangle : XCircle}
+                        >
                           {desglose.experiencia.porcentajeObtenido}% alcanzado
                         </Etiqueta>
                       )}
@@ -302,7 +307,11 @@ export default function AffinityBreakdownModal({
                   <div className="affinity-seccion__cabecera">
                     <div className="affinity-seccion__titulo">
                       <Award className="ds-icono" aria-hidden="true" />
-                      <span>Habilidades Técnicas ({desglose.habilidades.totalCumplidas} de {desglose.habilidades.totalRequeridas})</span>
+                      <span>
+                        Habilidades Técnicas ({desglose.habilidades.totalCumplidas} cumplidas
+                        {desglose.habilidades.totalParciales > 0 && `, ${desglose.habilidades.totalParciales} parciales`} de{" "}
+                        {desglose.habilidades.totalRequeridas})
+                      </span>
                     </div>
                     <span className="affinity-seccion__puntos">
                       {desglose.habilidades.puntosAportados} / {desglose.habilidades.pesoAsignado} pts

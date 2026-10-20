@@ -63,6 +63,7 @@ const DesgloseAfinidadSchema = z.object({
   habilidades: z.object({
     totalRequeridas: z.number(),
     totalCumplidas: z.number(),
+    totalParciales: z.number().optional(),
     cumplidas: z.array(
       z.object({
         habilidadRequerida: z.string(),

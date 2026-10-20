@@ -119,6 +119,7 @@ export default function VacanteForm({ convocatoria, cargos, errorCargos, cargand
   const cargoFaltante =
     valores.id_cargo_referencial && !cargos.some((c) => c.id_cargo === valores.id_cargo_referencial);
   const pendientes = convocatoria?.campos_pendientes ?? [];
+  const esPublicada = convocatoria?.estado === 'publicada';
 
   const propsCampo = (campo) => ({
     id: idCampo(campo),
@@ -131,7 +132,11 @@ export default function VacanteForm({ convocatoria, cargos, errorCargos, cargand
   return (
     <Modal
       abierto
-      titulo={esEdicion ? `Editar borrador ${convocatoria.codigo_convocatoria}` : 'Nueva vacante'}
+      titulo={
+        esEdicion
+          ? `Editar ${esPublicada ? 'vacante' : 'borrador'} ${convocatoria.codigo_convocatoria}`
+          : 'Nueva vacante'
+      }
       onCerrar={onCancelar}
       bloqueado={guardando}
       pie={
@@ -149,11 +154,17 @@ export default function VacanteForm({ convocatoria, cargos, errorCargos, cargand
         {!esEdicion && <p>Elige un cargo para precargar su perfil y completa los requisitos.</p>}
 
         {errorGeneral && (
-          <Alerta tono="peligro" role="alert" titulo="No se pudo guardar el borrador">
+          <Alerta tono="peligro" role="alert" titulo={esPublicada ? 'No se pudo guardar los cambios' : 'No se pudo guardar el borrador'}>
             {errorGeneral}
           </Alerta>
         )}
-        {esEdicion && (
+        {esPublicada && (
+          <Alerta tono="info" role="status">
+            Esta vacante ya recibe postulaciones. Al guardar, se recalcula la afinidad y el ranking de todos sus
+            postulantes con los nuevos requisitos.
+          </Alerta>
+        )}
+        {esEdicion && !esPublicada && (
           <Alerta tono={pendientes.length > 0 ? 'aviso' : 'exito'} role="status">
             {pendientes.length > 0
               ? `Para publicar falta: ${pendientes.map((c) => ETIQUETAS_CAMPO[c] ?? c).join(', ')}.`

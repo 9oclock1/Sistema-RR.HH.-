@@ -46,7 +46,7 @@ export default function VacantesView() {
     recargar();
     avisar({
       tono: 'exito',
-      titulo: actual ? 'Borrador actualizado' : 'Borrador guardado',
+      titulo: actual ? (actual.estado === 'publicada' ? 'Vacante actualizada' : 'Borrador actualizado') : 'Borrador guardado',
       mensaje: `${guardada.codigo_convocatoria} · ${guardada.titulo_puesto}`,
     });
   };

@@ -54,25 +54,16 @@ const AffinityController = {
   async recalcularAfinidadPostulacion(req, res, next) {
     try {
       const { id } = req.params;
-      let pesos = null;
 
-      if (req.body && Object.keys(req.body).length > 0) {
-        const validacion = PesosAfinidadSchema.safeParse(req.body);
-        if (!validacion.success) {
-          return res.status(400).json({
-            success: false,
-            message:
-              "Los pesos especificados son inválidos. Deben sumar exactamente 100%.",
-            errores: validacion.error.format(),
-          });
-        }
-        pesos = validacion.data;
+      const postulacion = await PostulacionModel.obtenerPorId(id);
+      if (!postulacion) {
+        return res.status(404).json({
+          success: false,
+          message: "No se encontró la postulación indicada.",
+        });
       }
 
-      const desglose = await AffinityService.procesarAfinidadPostulacion(
-        id,
-        pesos,
-      );
+      const desglose = await AffinityService.procesarAfinidadPostulacion(id);
 
       return res.status(200).json({
         success: true,
@@ -115,10 +106,14 @@ const AffinityController = {
         });
       }
 
-      const resultado = await AffinityService.recalcularAfinidadConvocatoria(
-        id,
-        pesos,
-      );
+      // Con body se redefinen los pesos de la convocatoria; sin body se usan los ya guardados.
+      if (pesos) {
+        await convocatoriasModel.actualizar(pool, id, {
+          pesos_afinidad: pesos,
+        });
+      }
+
+      const resultado = await AffinityService.recalcularAfinidadConvocatoria(id);
 
       return res.status(200).json({
         success: true,

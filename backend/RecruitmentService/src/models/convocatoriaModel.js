@@ -10,12 +10,12 @@ const ConvocatoriaModel = {
 
     if (minAfinidad !== null && !isNaN(Number(minAfinidad))) {
       valores.push(Number(minAfinidad));
-      condicionesExtra += ` AND COALESCE(p.porcentaje_afinidad, 0) >= $${valores.length}`;
+      condicionesExtra += ` AND p.porcentaje_afinidad >= $${valores.length}`;
     }
 
     if (maxAfinidad !== null && !isNaN(Number(maxAfinidad))) {
       valores.push(Number(maxAfinidad));
-      condicionesExtra += ` AND COALESCE(p.porcentaje_afinidad, 0) <= $${valores.length}`;
+      condicionesExtra += ` AND p.porcentaje_afinidad <= $${valores.length}`;
     }
 
     const query = `

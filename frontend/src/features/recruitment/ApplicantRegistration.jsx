@@ -148,6 +148,8 @@ export default function ApplicantRegistration() {
     setSelectedOpening(opening);
     setFormData((prev) => ({ ...prev, id_convocatoria: openingId }));
     setAlerta(null);
+    // Cada convocatoria arranca sin filtro de afinidad.
+    setFiltroAfinidad({ minAfinidad: "", maxAfinidad: "" });
     if (opening) {
       setLoadingApplicants(true);
       cargarPostulantes(opening.id_convocatoria);
@@ -189,7 +191,7 @@ export default function ApplicantRegistration() {
           ...prev,
           id_convocatoria: selectedOpening.id_convocatoria,
         }));
-        await cargarPostulantes(selectedOpening.id_convocatoria);
+        await cargarPostulantes(selectedOpening.id_convocatoria, filtroAfinidad);
       }
 
     } catch (err) {
@@ -361,7 +363,7 @@ export default function ApplicantRegistration() {
           acciones={
             <Boton
               tamano="sm"
-              onClick={() => cargarPostulantes(selectedOpening?.id_convocatoria)}
+              onClick={() => cargarPostulantes(selectedOpening?.id_convocatoria, filtroAfinidad)}
               icono={RefreshCw}
             >
               Reintentar
@@ -383,6 +385,7 @@ export default function ApplicantRegistration() {
           }
         >
           <AffinityRangeFilter
+            key={selectedOpening.id_convocatoria}
             minAfinidad={filtroAfinidad.minAfinidad}
             maxAfinidad={filtroAfinidad.maxAfinidad}
             onCambiarRango={manejarCambioRangoAfinidad}
@@ -403,7 +406,7 @@ export default function ApplicantRegistration() {
         onCerrar={() => setPostulanteAfinidad(null)}
         idPostulacion={postulanteAfinidad?.id_postulacion}
         nombrePostulante={`${postulanteAfinidad?.nombres || ""} ${postulanteAfinidad?.apellidos || ""}`.trim()}
-        alRecalcular={() => cargarPostulantes(selectedOpening?.id_convocatoria)}
+        alRecalcular={() => cargarPostulantes(selectedOpening?.id_convocatoria, filtroAfinidad)}
       />
     </section>
   );

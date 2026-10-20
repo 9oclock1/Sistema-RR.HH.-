@@ -1,5 +1,6 @@
 const applicantService = require("../services/applicantService");
 const { ErrorApp } = require("../utils/errores");
+const { leerFiltroAfinidad } = require("../utils/filtroAfinidad");
 
 /**
  * Controller: ApplicantController
@@ -60,7 +61,6 @@ async function registerApplicant(req, res, next) {
 async function getApplicantsByJobOpening(req, res, next) {
   try {
     const { id_convocatoria } = req.params;
-    const { minAfinidad, maxAfinidad } = req.query;
 
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -73,10 +73,7 @@ async function getApplicantsByJobOpening(req, res, next) {
 
     const result = await applicantService.getApplicantsByJobOpening(
       id_convocatoria,
-      {
-        minAfinidad: minAfinidad !== undefined ? Number(minAfinidad) : null,
-        maxAfinidad: maxAfinidad !== undefined ? Number(maxAfinidad) : null,
-      },
+      leerFiltroAfinidad(req.query),
     );
     return res.status(result.statusCode).json(result);
   } catch (error) {

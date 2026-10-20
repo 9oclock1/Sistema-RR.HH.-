@@ -236,7 +236,7 @@ describe("RF-12: Algoritmo de comparación y matching de CV vs requisitos (QA & 
     it("Debe calcular similitud de coseno y similitud léxica sin lanzar excepciones ante cadenas vacías", () => {
       assert.equal(similitudCoseno([], []), 0);
       assert.equal(similitudCoseno([1, 0], [0, 1]), 0);
-      assert.equal(similitudCoseno([1, 1], [1, 1]), 1);
+      assert.ok(Math.abs(similitudCoseno([1, 1], [1, 1]) - 1) < 1e-9);
       assert.equal(similitudLexica("", ""), 1);
       assert.equal(similitudLexica("React", "Angular"), 0);
     });
@@ -254,6 +254,140 @@ describe("RF-12: Algoritmo de comparación y matching de CV vs requisitos (QA & 
       );
       assert.equal(res.status, 404);
       assert.equal(res.body.success, false);
+      // Distingue "postulación inexistente" de "ruta no registrada" (ambas son 404).
+      assert.match(res.body.message, /postulaci[oó]n/i);
+      assert.doesNotMatch(res.body.message, /ruta no encontrada/i);
+    });
+
+    it("Debe tener registrados los endpoints de recálculo (404 por recurso inexistente, no por ruta)", async () => {
+      const inexistente = "00000000-0000-0000-0000-000000000099";
+      const rutas = [
+        `/postulaciones/${inexistente}/recalcular-afinidad`,
+        `/convocatorias/${inexistente}/recalcular-afinidad`,
+      ];
+      for (const ruta of rutas) {
+        const res = await request(app).post(ruta);
+        assert.equal(res.status, 404);
+        assert.doesNotMatch(res.body.message, /ruta no encontrada/i);
+      }
+    });
+
+    it("Debe rechazar con 400 un recálculo de convocatoria con pesos que no suman 100", async () => {
+      const res = await request(app)
+        .post("/convocatorias/00000000-0000-0000-0000-000000000099/recalcular-afinidad")
+        .send({ pesoEducacion: 50, pesoExperiencia: 50, pesoHabilidades: 50 });
+      assert.equal(res.status, 400);
+    });
+
+    it("Debe validar el filtro de rango de afinidad del listado de postulantes", async () => {
+      const id = "00000000-0000-0000-0000-000000000099";
+      const base = `/applicants/by-opening/${id}`;
+      assert.equal((await request(app).get(`${base}?minAfinidad=abc`)).status, 400);
+      assert.equal((await request(app).get(`${base}?minAfinidad=80&maxAfinidad=20`)).status, 400);
+      assert.equal((await request(app).get(`${base}?maxAfinidad=150`)).status, 400);
+    });
+  });
+
+  describe("Requisitos excluyentes proporcionales", () => {
+    const vacante = {
+      nivel_educacion_min: "LICENCIATURA",
+      year_experiencia_min: 4,
+      habilidades_clave_requeridas: [],
+    };
+    const cv = (anios, titulo = "Licenciatura en Informática") => ({
+      estadoExtraccion: "EXITOSA",
+      educacion: [{ titulo, institucion: "U" }],
+      aniosExperienciaEstimados: anios,
+      destrezasTecnicas: [],
+    });
+
+    it("No debe descartar a quien está cerca del mínimo de experiencia, solo ponderarlo", async () => {
+      const cerca = await calcularAfinidad({ convocatoria: vacante, datosCv: cv(3) });
+      assert.equal(cerca.esApto, true);
+      assert.equal(cerca.experiencia.porcentajeObtenido, 75);
+    });
+
+    it("Debe marcar no apto y limitar a 49% a quien está lejos del mínimo de experiencia", async () => {
+      const lejos = await calcularAfinidad({ convocatoria: vacante, datosCv: cv(1) });
+      assert.equal(lejos.esApto, false);
+      assert.ok(lejos.porcentajeTotal <= 49);
+    });
+
+    it("Debe puntuar más alto a quien está más cerca del mínimo", async () => {
+      const a = await calcularAfinidad({ convocatoria: vacante, datosCv: cv(3) });
+      const b = await calcularAfinidad({ convocatoria: vacante, datosCv: cv(2.5) });
+      assert.ok(a.porcentajeTotal > b.porcentajeTotal);
+    });
+
+    it("No debe descartar a quien tiene un grado cercano al exigido (Técnico Superior vs Licenciatura)", async () => {
+      const r = await calcularAfinidad({
+        convocatoria: vacante,
+        datosCv: cv(4, "Técnico Superior en Sistemas"),
+      });
+      assert.equal(r.esApto, true);
+      assert.equal(r.educacion.cumple, false);
+      assert.equal(r.educacion.porcentajeObtenido, 75);
+    });
+
+    it("Debe ignorar títulos en curso al detectar el nivel educativo", () => {
+      const nivel = detectarNivelEducacionMaximo([
+        { titulo: "Estudiante de Ingeniería de Sistemas" },
+      ]);
+      assert.equal(nivel.codigo, "SIN_EDUCACION");
+      assert.equal(
+        detectarNivelEducacionMaximo([{ titulo: "Bachelor of Science" }]).codigo,
+        "LICENCIATURA",
+      );
+    });
+  });
+
+  describe("Compatibilidad con el extractor regex y umbrales por proveedor", () => {
+    it("Debe detectar el grado cuando el extractor regex lo guarda en la institución", () => {
+      const nivel = detectarNivelEducacionMaximo([
+        {
+          institucion: "Licenciatura en Ingenieria de Sistemas - Universidad Mayor de San Andres (2015)",
+          titulo: "Grado académico detectado",
+        },
+      ]);
+      assert.equal(nivel.codigo, "LICENCIATURA");
+    });
+
+    it("Debe permitir ajustar los umbrales de similitud por variables de entorno", async () => {
+      const previo = { ...process.env };
+      try {
+        process.env.CV_PARSER_PROVIDER = "regex";
+        const conv = { nivel_educacion_min: "BACHILLER", year_experiencia_min: 0, habilidades_clave_requeridas: ["Excel"] };
+        const cv = { estadoExtraccion: "EXITOSA", educacion: [], aniosExperienciaEstimados: 0, destrezasTecnicas: ["Excel avanzado"] };
+        // léxico: "Excel" vs "Excel avanzado" = 0.9, parcial con umbral exacto 0.95 y cumplida con 0.78
+        process.env.AFFINITY_UMBRAL_EXACTO = "0.95";
+        process.env.AFFINITY_UMBRAL_PARCIAL = "0.8";
+        const parcial = await calcularAfinidad({ convocatoria: conv, datosCv: cv });
+        assert.equal(parcial.habilidades.totalParciales, 1);
+        delete process.env.AFFINITY_UMBRAL_EXACTO;
+        delete process.env.AFFINITY_UMBRAL_PARCIAL;
+        const completa = await calcularAfinidad({ convocatoria: conv, datosCv: cv });
+        assert.equal(completa.habilidades.totalCumplidas, 1);
+        assert.equal(completa.habilidades.totalParciales, 0);
+      } finally {
+        process.env.CV_PARSER_PROVIDER = previo.CV_PARSER_PROVIDER;
+        delete process.env.AFFINITY_UMBRAL_EXACTO;
+        delete process.env.AFFINITY_UMBRAL_PARCIAL;
+      }
+    });
+  });
+
+  describe("Comparación léxica de habilidades (sin embeddings)", () => {
+    it("No debe confundir habilidades distintas que comparten letras", () => {
+      assert.equal(similitudLexica("C", "Excel"), 0);
+      assert.equal(similitudLexica("R", "PowerPoint"), 0);
+      assert.equal(similitudLexica("SQL", "NoSQL"), 0);
+      assert.equal(similitudLexica("Java", "JavaScript"), 0);
+      assert.equal(similitudLexica("C++", "C#"), 0);
+    });
+
+    it("Debe seguir reconociendo variantes de escritura y habilidades ampliadas", () => {
+      assert.equal(similitudLexica("Node.js", "NodeJS"), 1);
+      assert.equal(similitudLexica("Excel", "Excel avanzado"), 0.9);
     });
   });
 });

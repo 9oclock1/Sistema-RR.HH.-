@@ -51,6 +51,9 @@ app.use("/postulaciones", postulacionRoutes);
 // RF-11: datos extraídos del CV.
 app.use(cvDataRoutes);
 
+// RF-12: cálculo y desglose de afinidad CV vs requisitos.
+app.use(affinityRoutes);
+
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -59,12 +62,6 @@ app.use((req, res) => {
     message: "Ruta no encontrada.",
   });
 });
-
-// RF-11: datos extraídos del CV.
-app.use(cvDataRoutes);
-
-// RF-12: cálculo y desglose de afinidad CV vs requisitos.
-app.use(affinityRoutes);
 
 // Debe ir después de todas las rutas.
 app.use(errorHandler);
