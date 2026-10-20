@@ -1,0 +1,114 @@
+classDiagram
+  direction LR
+
+  class SolicitudVacacionesPage {
+    <<KAN-50>>
+    +identificar al empleado
+    +verDetalle(solicitud)
+    +API: api/solicitudesVacacion.js
+  }
+  class SolicitudFormulario {
+    +calcular dias habiles
+    +alertas de saldo y cruces
+  }
+  class TablaSolicitudes
+  class DetalleSolicitudVacacion
+
+  class LicenciasPage {
+    <<KAN-51>>
+    +API: api/licencias.js
+  }
+  class SolicitudLicenciaFormulario {
+    +causal y comprobantes
+  }
+  class MisSolicitudes
+  class DetalleSolicitud
+
+  class VacacionesPage {
+    <<KAN-52>>
+    +API: api/vacaciones.js
+  }
+  class MiSaldo
+  class HistorialVacaciones
+  class ConsultaRRHH
+  class useSaldoVacaciones {
+    <<hook>>
+  }
+
+  class BandejaAprobacionesPage {
+    <<KAN-53>>
+    +filtros sucursal, area, tipo, prioridad
+    +pestanas por estado
+    +API: api/aprobaciones.js
+  }
+  class DetalleAprobacion {
+    +saldo y cobertura del equipo
+    +comprobantes
+  }
+  class ModalDecision {
+    +confirma la aprobacion
+    +motivo obligatorio al rechazar
+    +API: api/aprobaciones.js
+  }
+
+  class CampanaNotificaciones {
+    <<KAN-54>>
+    +contador de no leidas
+    +panel desplegable
+  }
+  class NotificacionesPage {
+    +pestanas Todas y Sin leer
+    +Ver mas
+    +API: api/notificaciones.js
+  }
+  class useNotificaciones {
+    <<hook>>
+    +consulta cada 30 s
+    +API: api/notificaciones.js
+  }
+  class eventosNotificaciones {
+    <<bus de eventos>>
+    +avisarCambioNotificaciones()
+  }
+
+  class CalendarioAusenciasPage {
+    <<KAN-55>>
+    +vistas mes, semana y dia
+    +filtros sucursal y departamento
+    +API: api/calendarioAusencias.js
+  }
+  class Cuadricula
+  class VistaDia
+  class DetalleAusencia
+  class UmbralesCobertura {
+    +solo RRHH
+    +API: api/calendarioAusencias.js
+  }
+  class calendario {
+    <<logica pura>>
+    rangoDeVista()
+    indexarPorDia()
+    textoDeAlerta()
+  }
+
+  SolicitudVacacionesPage *-- SolicitudFormulario
+  SolicitudVacacionesPage *-- TablaSolicitudes
+  SolicitudVacacionesPage *-- DetalleSolicitudVacacion
+  LicenciasPage *-- SolicitudLicenciaFormulario
+  LicenciasPage *-- MisSolicitudes
+  LicenciasPage *-- DetalleSolicitud
+  VacacionesPage *-- MiSaldo
+  VacacionesPage *-- ConsultaRRHH
+  MiSaldo *-- HistorialVacaciones
+  MiSaldo ..> useSaldoVacaciones
+  BandejaAprobacionesPage *-- DetalleAprobacion
+  DetalleAprobacion *-- ModalDecision
+  NotificacionesPage ..> eventosNotificaciones : avisa
+  CampanaNotificaciones ..> useNotificaciones
+  useNotificaciones ..> eventosNotificaciones : escucha
+  CalendarioAusenciasPage *-- Cuadricula
+  CalendarioAusenciasPage *-- VistaDia
+  CalendarioAusenciasPage *-- DetalleAusencia
+  CalendarioAusenciasPage *-- UmbralesCobertura
+  CalendarioAusenciasPage ..> calendario
+
