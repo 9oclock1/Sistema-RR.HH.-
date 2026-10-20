@@ -1,9 +1,11 @@
-import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarDays, CalendarRange, ClipboardCheck, FileCheck, FileText, FileUser, FileWarning, Fingerprint, IdCard, ListTree, Mail, Megaphone, Network, Send, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarDays, CalendarRange, ClipboardCheck, FileCheck, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, IdCard, ListTree, Mail, Megaphone, Network, Send, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
+import CapacitacionesView from "../features/Capacitaciones/CapacitacionesView";
+import { RUTA_CAPACITACIONES } from "../features/Capacitaciones/utils/opciones";
 import CargosList from "../features/Cargos/CargosList";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import GestionComunicacionesPage from "../features/comunicaciones/GestionComunicacionesPage";
@@ -193,6 +195,14 @@ export const SECCIONES = [
         icono: IdCard,
         roles: ["gerente"],
         pagina: KardexView,
+      },
+      {
+        ruta: RUTA_CAPACITACIONES,
+        etiqueta: "Capacitaciones",
+        descripcion: "Registro de cursos, carnets y certificaciones del personal con su vigencia y certificado.",
+        icono: GraduationCap,
+        roles: ["gerente"],
+        pagina: CapacitacionesView,
       },
     ],
   },
