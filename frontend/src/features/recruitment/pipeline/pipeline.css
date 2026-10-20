@@ -1,0 +1,206 @@
+.pl-pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.pl-sutil {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.pl-texto {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.pl-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-4);
+}
+
+.pl-barra__convocatoria {
+  flex: 1 1 280px;
+  max-width: calc(var(--space-8) * 16);
+}
+
+/* Tablero: una columna por etapa. Se desplaza en horizontal dentro de su propio contenedor. */
+.pl-tablero {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(260px, 1fr);
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+}
+
+.pl-columna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-page);
+  transition: border-color var(--transition), background-color var(--transition), opacity var(--transition);
+}
+
+.pl-columna--permitida {
+  border-style: dashed;
+  border-color: var(--color-primary);
+}
+
+.pl-columna--bloqueada {
+  opacity: 0.55;
+}
+
+.pl-columna--sobre {
+  border-style: solid;
+  background: var(--color-bg-selected);
+}
+
+.pl-columna__cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.pl-columna__titulo {
+  margin: 0;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
+}
+
+.pl-columna__tarjetas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pl-columna__vacia {
+  padding: var(--space-4) 0;
+  text-align: center;
+}
+
+/* Tarjeta del postulante */
+.pl-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.pl-tarjeta--movible {
+  cursor: grab;
+}
+
+.pl-tarjeta--arrastrando {
+  opacity: 0.5;
+}
+
+.pl-tarjeta__cabecera {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.pl-tarjeta__nombre {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pl-tarjeta__titulo {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+}
+
+.pl-tarjeta__etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.pl-tarjeta__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* Modales */
+.pl-formulario,
+.pl-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.pl-cambio {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.pl-seccion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pl-seccion__titulo {
+  margin: 0;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.pl-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pl-lista__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-page);
+}
+
+.pl-lista__fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* En el teléfono las etapas se apilan: arrastrar en horizontal no es práctico y «Mover» cubre el cambio. */
+@media (max-width: 640px) {
+  .pl-tablero {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    overflow-x: visible;
+  }
+}

@@ -7,6 +7,16 @@ const {
 
 const ROLES_RECLUTAMIENTO = ["admin", "reclutador"];
 
+// Las cabeceras HTTP solo admiten ASCII: el portal envía el nombre con encodeURIComponent («Pérez» → «P%C3%A9rez»).
+const decodificarCabecera = (valor) => {
+  if (!valor) return valor;
+  try {
+    return decodeURIComponent(valor);
+  } catch {
+    return valor;
+  }
+};
+
 const identificarReclutador = (req, res, next) => {
   const rol = req.get("X-Rol")?.trim().toLowerCase();
   if (!rol) throw new HttpError(401, "Identifíquese para continuar.");
@@ -25,7 +35,7 @@ const identificarReclutador = (req, res, next) => {
     errores,
   );
   const nombre = normalizarTexto(
-    req.get("X-Usuario-Nombre"),
+    decodificarCabecera(req.get("X-Usuario-Nombre")),
     "X-Usuario-Nombre",
     { maxLength: 120 },
     errores,

@@ -1,5 +1,6 @@
 const modelo = require("../models/etapaPostulacionModel");
 const integracionService = require("./integracionService");
+const jobOpeningModel = require("../models/jobOpeningModel");
 const HttpError = require("../utils/HttpError");
 const { withTransaction } = require("../utils/transaction");
 const { ETAPA, verificarCambioEtapa } = require("../utils/etapas");
@@ -92,4 +93,18 @@ async function obtenerHistorial(idPostulacion) {
 
 const obtenerCatalogo = () => modelo.obtenerCatalogo();
 
-module.exports = { cambiarEtapa, obtenerHistorial, obtenerCatalogo };
+async function obtenerPipeline(idConvocatoria) {
+  const convocatoria = await jobOpeningModel.findById(idConvocatoria);
+  if (!convocatoria) throw new HttpError(404, "La convocatoria indicada no existe.");
+  return {
+    convocatoria: {
+      id_convocatoria: convocatoria.id_convocatoria,
+      codigo_convocatoria: convocatoria.codigo_convocatoria,
+      titulo_puesto: convocatoria.titulo_puesto,
+      cantidad_vacantes: convocatoria.cantidad_vacantes,
+    },
+    postulaciones: await modelo.listarPipeline(idConvocatoria),
+  };
+}
+
+module.exports = { cambiarEtapa, obtenerHistorial, obtenerCatalogo, obtenerPipeline };

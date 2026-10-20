@@ -1,5 +1,6 @@
 const pool = require("../../db/pool");
 const { ETAPA } = require("../utils/etapas");
+const { ESTADO_EVENTO } = require("../utils/integracion");
 
 // Bloquea la postulación para que dos cambios simultáneos no partan de la misma etapa.
 async function bloquearPostulacion(client, idPostulacion) {
@@ -178,7 +179,29 @@ async function obtenerCatalogo() {
   };
 }
 
+// Pipeline de una convocatoria: cada postulación con su etapa, el cargo asignado y el estado de su alta en el ERP.
+async function listarPipeline(idConvocatoria) {
+  const { rows } = await pool.query(
+    `SELECT p.id_postulacion, p.id_etapa, e.codigo AS codigo_etapa, e.nombre AS nombre_etapa,
+            p.porcentaje_afinidad, p.posicion_ranking, p.fecha_postulacion, p.actualizado_en,
+            p.esta_archivada, p.contratado_en, p.alta_contabilidad_enviada, p.alta_operativa_enviada,
+            c.codigo AS codigo_cargo, c.nombre AS nombre_cargo,
+            pos.nombres, pos.apellidos, pos.correo_electronico, pos.ciudad,
+            (SELECT COUNT(*)::int FROM EVENTOS_SALIENTES ev
+              WHERE ev.id_postulacion = p.id_postulacion AND ev.id_estado_evento = $2) AS integraciones_fallidas
+       FROM POSTULACIONES p
+       INNER JOIN POSTULANTES pos ON pos.id_postulante = p.id_postulante
+       INNER JOIN CATALOGOS_ETAPA_POSTULACION e ON e.id_etapa = p.id_etapa
+       LEFT JOIN CATALOGOS_CARGO_OPERATIVO c ON c.id_cargo_operativo = p.id_cargo_operativo
+      WHERE p.id_convocatoria = $1
+      ORDER BY p.posicion_ranking ASC NULLS LAST, p.porcentaje_afinidad DESC NULLS LAST, p.fecha_postulacion`,
+    [idConvocatoria, ESTADO_EVENTO.FALLIDO],
+  );
+  return rows;
+}
+
 module.exports = {
+  listarPipeline,
   bloquearPostulacion,
   obtenerEtapa,
   obtenerTransicion,

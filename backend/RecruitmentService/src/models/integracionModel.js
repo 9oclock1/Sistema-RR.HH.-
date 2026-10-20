@@ -79,14 +79,41 @@ async function marcarEntregado(evento) {
   );
 }
 
-async function marcarError(idEvento, { error, esperaMs }) {
+// fallido: el evento deja de reintentarse (error permanente o intentos agotados).
+async function marcarError(idEvento, { error, esperaMs, fallido = false }) {
   await pool.query(
     `UPDATE EVENTOS_SALIENTES
         SET intentos = intentos + 1, ultimo_error = left($2, 255),
-            proximo_intento_en = CURRENT_TIMESTAMP + make_interval(secs => $3)
+            proximo_intento_en = CURRENT_TIMESTAMP + make_interval(secs => $3),
+            id_estado_evento = CASE WHEN $4 THEN $5::smallint ELSE id_estado_evento END
       WHERE id_evento = $1`,
-    [idEvento, error, esperaMs / 1000],
+    [idEvento, error, esperaMs / 1000, fallido, ESTADO_EVENTO.FALLIDO],
   );
+}
+
+// Reintento manual: el evento vuelve a PENDIENTE con el contador en cero y sale en el siguiente ciclo.
+async function reencolar(idEvento) {
+  const { rowCount } = await pool.query(
+    `UPDATE EVENTOS_SALIENTES
+        SET id_estado_evento = $2, intentos = 0, ultimo_error = NULL, proximo_intento_en = CURRENT_TIMESTAMP
+      WHERE id_evento = $1 AND id_estado_evento = $3`,
+    [idEvento, ESTADO_EVENTO.PENDIENTE, ESTADO_EVENTO.FALLIDO],
+  );
+  return rowCount > 0;
+}
+
+async function obtener(idEvento) {
+  const { rows } = await pool.query(
+    `SELECT ev.id_evento, ev.id_mensaje, ev.id_postulacion, ev.tipo_evento,
+            d.codigo AS codigo_destino, d.grupo, d.nombre_modulo, d.canal,
+            es.codigo AS estado, ev.intentos, ev.ultimo_error, ev.proximo_intento_en, ev.entregado_en, ev.creado_en
+       FROM EVENTOS_SALIENTES ev
+       INNER JOIN CATALOGOS_DESTINO_INTEGRACION d ON d.id_destino = ev.id_destino
+       INNER JOIN CATALOGOS_ESTADO_EVENTO es ON es.id_estado_evento = ev.id_estado_evento
+      WHERE ev.id_evento = $1`,
+    [idEvento],
+  );
+  return rows[0] || null;
 }
 
 async function listarPorPostulacion(idPostulacion) {
@@ -111,5 +138,7 @@ module.exports = {
   reservarPendientes,
   marcarEntregado,
   marcarError,
+  reencolar,
+  obtener,
   listarPorPostulacion,
 };
