@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { contarNoLeidas, listarNotificaciones, marcarLeida, marcarTodasLeidas } from "../../api/notificaciones";
+import { alCambiarNotificaciones } from "./eventosNotificaciones";
 
 const INTERVALO_MS = 30 * 1000;
 const LIMITE_PANEL = 20;
@@ -32,10 +33,13 @@ export function useNotificaciones(idEmpleado) {
     consultar();
     const temporizador = setInterval(consultar, INTERVALO_MS);
     document.addEventListener("visibilitychange", consultar);
+    // La vista completa avisa cuando lee alertas, para que la campana no espere al próximo ciclo.
+    const darDeBaja = alCambiarNotificaciones(consultar);
     return () => {
       vigente = false;
       clearInterval(temporizador);
       document.removeEventListener("visibilitychange", consultar);
+      darDeBaja();
     };
   }, [idEmpleado, actualizar]);
 
