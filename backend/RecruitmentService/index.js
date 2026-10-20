@@ -1,6 +1,7 @@
 const app = require("./src/app");
 const pool = require("./db/pool");
 const { iniciarDespachador } = require("./src/services/integracionService");
+const notificacionesEntrevista = require("./src/services/notificacionEntrevistaService");
 
 const PORT = process.env.PORT || 3003;
 
@@ -51,4 +52,5 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`RecruitmentService corriendo en http://0.0.0.0:${PORT}`);
   initDbSeed();
   iniciarDespachador();
+  notificacionesEntrevista.iniciarDespachador();
 });

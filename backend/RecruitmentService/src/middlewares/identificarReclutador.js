@@ -23,7 +23,7 @@ const identificarReclutador = (req, res, next) => {
   if (!ROLES_RECLUTAMIENTO.includes(rol)) {
     throw new HttpError(
       403,
-      "Solo el encargado de reclutamiento puede cambiar la etapa de un postulante.",
+      "Solo el encargado de reclutamiento puede realizar esta acción.",
     );
   }
 

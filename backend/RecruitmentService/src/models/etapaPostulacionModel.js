@@ -1,6 +1,7 @@
 const pool = require("../../db/pool");
 const { ETAPA } = require("../utils/etapas");
 const { ESTADO_EVENTO } = require("../utils/integracion");
+const { ESTADOS_ACTIVOS } = require("../utils/entrevistas");
 
 // Bloquea la postulación para que dos cambios simultáneos no partan de la misma etapa.
 async function bloquearPostulacion(client, idPostulacion) {
@@ -179,7 +180,8 @@ async function obtenerCatalogo() {
   };
 }
 
-// Pipeline de una convocatoria: cada postulación con su etapa, el cargo asignado y el estado de su alta en el ERP.
+// Pipeline de una convocatoria: cada postulación con su etapa, el cargo asignado, el estado de su alta en el ERP
+// y su próxima entrevista.
 async function listarPipeline(idConvocatoria) {
   const { rows } = await pool.query(
     `SELECT p.id_postulacion, p.id_etapa, e.codigo AS codigo_etapa, e.nombre AS nombre_etapa,
@@ -188,14 +190,17 @@ async function listarPipeline(idConvocatoria) {
             c.codigo AS codigo_cargo, c.nombre AS nombre_cargo,
             pos.nombres, pos.apellidos, pos.numero_documento, pos.correo_electronico, pos.telefono_contacto, pos.ciudad,
             (SELECT COUNT(*)::int FROM EVENTOS_SALIENTES ev
-              WHERE ev.id_postulacion = p.id_postulacion AND ev.id_estado_evento = $2) AS integraciones_fallidas
+              WHERE ev.id_postulacion = p.id_postulacion AND ev.id_estado_evento = $2) AS integraciones_fallidas,
+            (SELECT MIN(en.fecha_hora_programada) FROM ENTREVISTAS en
+              WHERE en.id_postulacion = p.id_postulacion AND en.id_estado_entrevista = ANY($3::smallint[])
+                AND en.fecha_hora_programada >= CURRENT_TIMESTAMP) AS proxima_entrevista
        FROM POSTULACIONES p
        INNER JOIN POSTULANTES pos ON pos.id_postulante = p.id_postulante
        INNER JOIN CATALOGOS_ETAPA_POSTULACION e ON e.id_etapa = p.id_etapa
        LEFT JOIN CATALOGOS_CARGO_OPERATIVO c ON c.id_cargo_operativo = p.id_cargo_operativo
       WHERE p.id_convocatoria = $1
       ORDER BY p.posicion_ranking ASC NULLS LAST, p.porcentaje_afinidad DESC NULLS LAST, p.fecha_postulacion`,
-    [idConvocatoria, ESTADO_EVENTO.FALLIDO],
+    [idConvocatoria, ESTADO_EVENTO.FALLIDO, ESTADOS_ACTIVOS],
   );
   return rows;
 }
