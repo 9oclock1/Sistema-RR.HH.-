@@ -49,6 +49,42 @@ test("criterio 1: genera la alerta del portal para el colaborador con el resulta
   assert.match(datos.mensaje, /02\/11\/2026 al 04\/11\/2026/);
 });
 
+test("criterio 1: una licencia (o sin categoría) enlaza al detalle de licencias", async () => {
+  await servicio.notificarResolucionSolicitud(resolucion());
+  await servicio.notificarResolucionSolicitud(resolucion({ categoria: "licencia" }));
+
+  for (const llamada of crear.mock.calls) {
+    assert.equal(llamada.arguments[0].enlace, `/asistencia/licencias?solicitud=${ID_SOLICITUD}`);
+  }
+});
+
+test("criterio 1: una solicitud de vacaciones genera la alerta y enlaza a su propio detalle", async () => {
+  await servicio.notificarResolucionSolicitud(resolucion({ categoria: "VACACIONES", tipo_solicitud: "Vacaciones" }));
+
+  const datos = crear.mock.calls[0].arguments[0];
+  assert.equal(datos.tipo, "SOLICITUD_APROBADA");
+  assert.equal(datos.titulo, "Solicitud aprobada: Vacaciones");
+  assert.equal(datos.enlace, `/asistencia/vacaciones?solicitud=${ID_SOLICITUD}`);
+});
+
+test("la ruta de vacaciones se puede configurar", async () => {
+  process.env.RUTA_VACACIONES = "/vacaciones/mis-solicitudes";
+  try {
+    await servicio.notificarResolucionSolicitud(resolucion({ categoria: "VACACIONES" }));
+  } finally {
+    delete process.env.RUTA_VACACIONES;
+  }
+  assert.equal(crear.mock.calls[0].arguments[0].enlace, `/vacaciones/mis-solicitudes?solicitud=${ID_SOLICITUD}`);
+});
+
+test("rechaza una categoría desconocida", async () => {
+  await assert.rejects(servicio.notificarResolucionSolicitud(resolucion({ categoria: "PERMISO" })), (error) => {
+    assert.equal(error.estado, 400);
+    assert.equal(error.detalles[0].campo, "categoria");
+    return true;
+  });
+});
+
 test("criterio 2: el rechazo incluye la justificación formal del supervisor", async () => {
   await servicio.notificarResolucionSolicitud(
     resolucion({ estado: "rechazada", motivo_resolucion: "  Falta cobertura en el área.  " })

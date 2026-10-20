@@ -14,6 +14,12 @@ const RESOLUCIONES = {
   RECHAZADA: { tipo: TIPO_NOTIFICACION.SOLICITUD_RECHAZADA, verbo: "rechazada" },
 };
 
+// Cada categoría de ausencia abre su propia pantalla de detalle. Sin categoría se asume licencia (emisores anteriores).
+const CATEGORIAS = {
+  LICENCIA: () => "/asistencia/licencias",
+  VACACIONES: () => process.env.RUTA_VACACIONES || "/asistencia/vacaciones",
+};
+
 const LIMITE_POR_DEFECTO = 20;
 const LIMITE_MAXIMO = 50;
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -29,6 +35,9 @@ function validarResolucion(datos = {}) {
   if (!Object.hasOwn(RESOLUCIONES, estado)) agregar("estado", "El resultado debe ser APROBADA o RECHAZADA.");
   if (!esUuidValido(datos.id_solicitud)) agregar("id_solicitud", "Identificador de solicitud inválido.");
   if (!esUuidValido(datos.id_empleado)) agregar("id_empleado", "Identificador de empleado inválido.");
+
+  const categoria = texto(datos.categoria).toUpperCase() || "LICENCIA";
+  if (!Object.hasOwn(CATEGORIAS, categoria)) agregar("categoria", "La categoría debe ser LICENCIA o VACACIONES.");
 
   const tipoSolicitud = texto(datos.tipo_solicitud);
   if (!tipoSolicitud) agregar("tipo_solicitud", "Indique el tipo de solicitud resuelta.");
@@ -48,6 +57,7 @@ function validarResolucion(datos = {}) {
 
   return {
     estado,
+    categoria,
     idSolicitud: datos.id_solicitud.toLowerCase(),
     idEmpleado: datos.id_empleado.toLowerCase(),
     tipoSolicitud,
@@ -83,7 +93,7 @@ async function notificarResolucionSolicitud(datos) {
   const { tipo, verbo } = RESOLUCIONES[resolucion.estado];
   const mensaje = armarMensaje(resolucion);
   // Criterio 4: la alerta abre el detalle de la solicitud resuelta.
-  const enlace = `/asistencia/licencias?solicitud=${resolucion.idSolicitud}`;
+  const enlace = `${CATEGORIAS[resolucion.categoria]()}?solicitud=${resolucion.idSolicitud}`;
 
   const { notificacion, creada } = await modelo.crear({
     idEmpleado: resolucion.idEmpleado,
