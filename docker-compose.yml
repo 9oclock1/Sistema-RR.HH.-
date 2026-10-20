@@ -105,6 +105,7 @@ services:
     volumes:
       - ./backend/RecruitmentService:/app
       - /app/node_modules
+      - ./credentials:/credentials:ro
     depends_on:
       - postgres
     networks:

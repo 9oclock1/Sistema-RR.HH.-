@@ -9,6 +9,7 @@ const cvDataRoutes = require("./routes/cvDataRoutes");
 const errorHandler = require("./middlewares/errorHandler");
 const affinityRoutes = require("./routes/affinityRoutes");
 const rankingRoutes = require("./routes/rankingRoutes");
+const etapaPostulacionRoutes = require("./routes/etapaPostulacionRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -57,6 +58,9 @@ app.use(affinityRoutes);
 
 // RF-13: Ranking de postulantes por score de matching
 app.use("/convocatorias", rankingRoutes);
+
+// RF-14: cambio de etapa del postulante, historial y catálogo del pipeline.
+app.use(etapaPostulacionRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
