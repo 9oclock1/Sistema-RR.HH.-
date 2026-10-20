@@ -114,21 +114,46 @@ const atributosDe = ({ encabezado }) => ({
   version_esquema: String(encabezado.version_esquema),
 });
 
-// Mensaje legible para ultimo_error a partir del código gRPC que devuelve Pub/Sub.
+// RF-14.5: reintentos con espera exponencial (30 s, 1 min, 2 min… hasta 1 h). Al agotar los intentos el evento
+// queda FALLIDO y solo sale de nuevo con un reintento manual.
+const MAXIMO_INTENTOS = 8;
+const ESPERA_BASE_MS = 30 * 1000;
+const ESPERA_MAXIMA_MS = 60 * 60 * 1000;
+
+const esperaReintento = (intentos) =>
+  Math.min(ESPERA_BASE_MS * 2 ** Math.max(intentos - 1, 0), ESPERA_MAXIMA_MS);
+
+// Un tópico inexistente o un mensaje inválido no se arreglan reintentando; la red o las credenciales, sí.
 function errorDePublicacion(error, topico) {
   switch (error?.code) {
     case 5:
-      return `El tópico ${topico} no existe en Pub/Sub`;
+      return { mensaje: `El tópico ${topico} no existe en Pub/Sub`, permanente: true };
     case 3:
-      return "Pub/Sub rechazó el mensaje";
+      return { mensaje: "Pub/Sub rechazó el mensaje", permanente: true };
     case 7:
     case 16:
-      return "Pub/Sub rechazó las credenciales";
+      return { mensaje: "Pub/Sub rechazó las credenciales", permanente: false };
     case "ENOENT":
-      return "No se encontró la llave de la cuenta de servicio";
+      return { mensaje: "No se encontró la llave de la cuenta de servicio", permanente: false };
     default:
-      return error?.message === "Pub/Sub no respondió a tiempo" ? error.message : "No se pudo conectar con Pub/Sub";
+      return {
+        mensaje: error?.message === "Pub/Sub no respondió a tiempo" ? error.message : "No se pudo conectar con Pub/Sub",
+        permanente: false,
+      };
   }
+}
+
+/**
+ * Qué hacer con la respuesta REST del ERP:
+ * - 2xx: entregado. 409: el destino ya tenía ese id_mensaje (un reintento anterior sí llegó), también entregado.
+ * - 408, 429 y 5xx, o sin respuesta (red, tiempo agotado): se reintenta.
+ * - Otro 4xx: el destino rechazó el mensaje; reintentar el mismo contenido no lo arregla.
+ */
+function clasificarRespuestaRest(resultado) {
+  if (resultado.ok || resultado.estado === 409) return { entregado: true };
+  const reintentable =
+    resultado.estado === undefined || resultado.estado >= 500 || [408, 429].includes(resultado.estado);
+  return { entregado: false, mensaje: resultado.error, permanente: !reintentable };
 }
 
 module.exports = {
@@ -139,5 +164,8 @@ module.exports = {
   armarMensaje,
   armarMensajesAlta,
   atributosDe,
+  MAXIMO_INTENTOS,
+  esperaReintento,
   errorDePublicacion,
+  clasificarRespuestaRest,
 };

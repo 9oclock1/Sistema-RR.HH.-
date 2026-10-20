@@ -17,7 +17,6 @@ module.exports = {
     },
     tiempoEsperaMs: Number(process.env.INTEGRACION_TIMEOUT_MS) || 5000,
     intervaloMs: Number(process.env.INTERVALO_EVENTOS_MS) || 5000,
-    esperaReintentoMs: 30 * 1000,
     topicoPubSub: process.env.PUBSUB_TOPICO || "ucb-sis323-sub-f",
     tiempoPublicacionMs: Number(process.env.PUBSUB_TIMEOUT_MS) || 15000,
   },

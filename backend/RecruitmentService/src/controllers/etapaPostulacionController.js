@@ -39,4 +39,28 @@ async function obtenerIntegraciones(req, res) {
   res.status(200).json({ success: true, statusCode: 200, data: integraciones });
 }
 
-module.exports = { cambiarEtapa, obtenerHistorial, obtenerCatalogo, obtenerIntegraciones };
+async function obtenerPipeline(req, res) {
+  const idConvocatoria = validarIdRuta(req.params.id, "id_convocatoria");
+  const pipeline = await servicio.obtenerPipeline(idConvocatoria);
+  res.status(200).json({ success: true, statusCode: 200, data: pipeline });
+}
+
+async function reintentarIntegracion(req, res) {
+  const idEvento = validarIdRuta(req.params.id, "id_evento");
+  const evento = await integracionService.reintentar(idEvento);
+  res.status(200).json({
+    success: true,
+    statusCode: 200,
+    message: `El alta para ${evento.nombre_modulo} se volverá a enviar en unos segundos.`,
+    data: evento,
+  });
+}
+
+module.exports = {
+  cambiarEtapa,
+  obtenerHistorial,
+  obtenerCatalogo,
+  obtenerIntegraciones,
+  obtenerPipeline,
+  reintentarIntegracion,
+};

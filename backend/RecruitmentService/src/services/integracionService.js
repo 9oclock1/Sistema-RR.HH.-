@@ -4,7 +4,15 @@ const clienteRest = require("./clienteRestErp");
 const pubsub = require("../config/pubsub");
 const HttpError = require("../utils/HttpError");
 const { integracion } = require("../config");
-const { DESTINO, armarMensajesAlta, atributosDe, errorDePublicacion } = require("../utils/integracion");
+const {
+  DESTINO,
+  MAXIMO_INTENTOS,
+  armarMensajesAlta,
+  atributosDe,
+  esperaReintento,
+  errorDePublicacion,
+  clasificarRespuestaRest,
+} = require("../utils/integracion");
 
 const LOTE = 10;
 const SEGUNDOS_RESERVA = 60;
@@ -46,9 +54,15 @@ async function registrarAltaContratacion(
   return registrados;
 }
 
-const registrarFallo = async (evento, error) => {
-  console.error(`[Integración] Falló el envío a ${evento.codigo_destino} (evento ${evento.id_evento}): ${error}`);
-  await modelo.marcarError(evento.id_evento, { error, esperaMs: integracion.esperaReintentoMs });
+// Un error permanente o el último intento dejan el evento FALLIDO; si no, se reintenta con espera creciente.
+const registrarFallo = async (evento, { mensaje, permanente }) => {
+  const intentos = evento.intentos + 1;
+  const fallido = permanente || intentos >= MAXIMO_INTENTOS;
+  console.error(
+    `[Integración] Falló el envío a ${evento.codigo_destino} (evento ${evento.id_evento}, intento ${intentos}): ${mensaje}` +
+      (fallido ? " — queda FALLIDO hasta un reintento manual." : ""),
+  );
+  await modelo.marcarError(evento.id_evento, { error: mensaje, esperaMs: esperaReintento(intentos), fallido });
 };
 
 const registrarEntrega = async (evento, via) => {
@@ -82,13 +96,13 @@ async function publicar(clientePubSub, evento) {
 async function entregar(evento, url, clientePubSub) {
   if (!url) return publicar(clientePubSub, evento);
 
-  const resultado = await clienteRest.enviar(evento, url);
-  if (resultado.ok) return registrarEntrega(evento, "REST");
+  const respuesta = clasificarRespuestaRest(await clienteRest.enviar(evento, url));
+  if (respuesta.entregado) return registrarEntrega(evento, "REST");
   if (evento.canal === "PUBSUB" && clientePubSub) {
-    console.error(`[Integración] El endpoint de ${evento.codigo_destino} falló (${resultado.error}); se publica por Pub/Sub.`);
+    console.error(`[Integración] El endpoint de ${evento.codigo_destino} falló (${respuesta.mensaje}); se publica por Pub/Sub.`);
     return publicar(clientePubSub, evento);
   }
-  return registrarFallo(evento, resultado.error);
+  return registrarFallo(evento, respuesta);
 }
 
 // Toma los eventos pendientes de los destinos que tienen algún camino (URL REST o Pub/Sub configurado).
@@ -130,9 +144,20 @@ async function listarDePostulacion(idPostulacion) {
   return eventos;
 }
 
+// Un reclutador reenvía un alta que agotó sus reintentos (p. ej. tras arreglar el endpoint del ERP).
+async function reintentar(idEvento) {
+  const evento = await modelo.obtener(idEvento);
+  if (!evento) throw new HttpError(404, "El evento de integración indicado no existe.");
+  if (!(await modelo.reencolar(idEvento))) {
+    throw new HttpError(409, "Solo se pueden reintentar las altas que quedaron fallidas.", { estado: evento.estado });
+  }
+  return modelo.obtener(idEvento);
+}
+
 module.exports = {
   registrarAltaContratacion,
   despachar,
   iniciarDespachador,
   listarDePostulacion,
+  reintentar,
 };
