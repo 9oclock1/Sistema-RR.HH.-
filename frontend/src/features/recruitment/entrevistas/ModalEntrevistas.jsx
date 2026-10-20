@@ -1,99 +1,15 @@
 import { useEffect, useState } from "react";
-import { CalendarPlus, CalendarX, MapPin, Pencil, RotateCcw, Video } from "lucide-react";
-import { Alerta, Boton, CampoAreaTexto, Esqueleto, Etiqueta, Modal, useAvisos } from "../../../components/ui";
-import { cancelarEntrevista, obtenerEntrevistasPostulacion, reintentarAvisoEntrevista } from "../../../api/entrevistas";
+import { CalendarPlus, CalendarX, MapPin, Pencil, Video } from "lucide-react";
+import { Alerta, Boton, Esqueleto, Etiqueta, Modal, useAvisos } from "../../../components/ui";
+import { obtenerEntrevistasPostulacion, reintentarAvisoEntrevista } from "../../../api/entrevistas";
+import EstadoAviso from "./EstadoAviso";
 import FormularioEntrevista from "./FormularioEntrevista";
-import { AVISO, MAX_MOTIVO, MODALIDAD, esAgendable, estaActiva, formatearCita, nombreCandidato, tonoEstado } from "./reglasEntrevista";
+import ModalCancelarEntrevista from "./ModalCancelarEntrevista";
+import { MODALIDAD, esAgendable, estaActiva, formatearCita, nombreCandidato, tonoEstado } from "./reglasEntrevista";
 import "./entrevistas.css";
 
 // Mientras un correo siga en cola se consulta su estado; el despachador envía cada pocos segundos.
 const INTERVALO_AVISOS_MS = 3000;
-
-const errorDeCampo = (error, campo) => error?.errores?.find((e) => e.campo === campo)?.mensaje;
-
-function Cancelacion({ entrevista, sesion, onCancelada, onVolver }) {
-  const [motivo, setMotivo] = useState("");
-  const [procesando, setProcesando] = useState(false);
-  const [error, setError] = useState(null);
-
-  const confirmar = async (evento) => {
-    evento.preventDefault();
-    if (!motivo.trim()) {
-      setError({ errores: [{ campo: "motivo", mensaje: "Indique el motivo de la cancelación; se incluye en el correo al candidato." }] });
-      return;
-    }
-    setProcesando(true);
-    setError(null);
-    try {
-      onCancelada(await cancelarEntrevista(entrevista.id_entrevista, motivo.trim(), sesion));
-    } catch (falla) {
-      setError(falla);
-      setProcesando(false);
-    }
-  };
-
-  return (
-    <Modal
-      abierto
-      titulo="Cancelar entrevista"
-      onCerrar={onVolver}
-      bloqueado={procesando}
-      pie={
-        <>
-          <Boton variante="sutil" onClick={onVolver} disabled={procesando}>
-            Volver
-          </Boton>
-          <Boton type="submit" form="en-form-cancelar" variante="peligro" cargando={procesando}>
-            Cancelar entrevista
-          </Boton>
-        </>
-      }
-    >
-      <form id="en-form-cancelar" className="pl-formulario" onSubmit={confirmar} noValidate>
-        <p className="pl-texto">
-          Se cancelará la entrevista del <strong>{formatearCita(entrevista)}</strong> con {entrevista.nombre_entrevistador}.
-        </p>
-        <CampoAreaTexto
-          etiqueta="Motivo"
-          requerido
-          value={motivo}
-          onChange={(e) => setMotivo(e.target.value)}
-          maxLength={MAX_MOTIVO}
-          filas={3}
-          ayuda={`${motivo.length}/${MAX_MOTIVO} caracteres. Se incluye en el correo al candidato.`}
-          error={errorDeCampo(error, "motivo")}
-          data-autofocus
-        />
-        {error && !error.errores?.length && (
-          <Alerta tono="peligro" role="alert" titulo="No se pudo cancelar la entrevista">
-            {error.message}
-          </Alerta>
-        )}
-      </form>
-    </Modal>
-  );
-}
-
-function EstadoAviso({ entrevista, reintentando, puedeEditar, onReintentar }) {
-  const aviso = AVISO[entrevista.estado_ultimo_aviso];
-  if (!aviso) return null;
-  return (
-    <>
-      <Etiqueta tono={aviso.tono}>{aviso.texto}</Etiqueta>
-      {entrevista.estado_ultimo_aviso === "FALLIDO" && puedeEditar && (
-        <Boton
-          tamano="sm"
-          variante="sutil"
-          icono={RotateCcw}
-          cargando={reintentando === entrevista.id_ultimo_aviso}
-          onClick={() => onReintentar(entrevista)}
-        >
-          Reintentar correo
-        </Boton>
-      )}
-    </>
-  );
-}
 
 /**
  * RF-15: entrevistas de una postulación. Desde aquí se agenda una nueva (si el postulante está en «Entrevista
@@ -159,7 +75,7 @@ export default function ModalEntrevistas({ postulacion, empleados, sesion, puede
   }
   if (vista.modo === "cancelar") {
     return (
-      <Cancelacion
+      <ModalCancelarEntrevista
         entrevista={vista.entrevista}
         sesion={sesion}
         onCancelada={alGuardar("Entrevista cancelada")}

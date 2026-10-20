@@ -21,15 +21,10 @@ module.exports = {
     tiempoPublicacionMs: Number(process.env.PUBSUB_TIMEOUT_MS) || 15000,
   },
 
-  // RF-15: correo al candidato. Sin SMTP_HOST los avisos quedan pendientes en NOTIFICACIONES_ENTREVISTA.
-  correo: {
-    host: process.env.SMTP_HOST || null,
-    puerto: Number(process.env.SMTP_PORT) || 587,
-    seguro: process.env.SMTP_SECURE === "true",
-    usuario: process.env.SMTP_USER || null,
-    clave: process.env.SMTP_PASS || null,
-    remitente: process.env.SMTP_FROM || process.env.SMTP_USER || null,
-    tiempoEsperaMs: Number(process.env.SMTP_TIMEOUT_MS) || 10000,
+  // RF-15: los correos al candidato los envía NotificationService; aquí queda la cola con sus reintentos.
+  notificaciones: {
+    url: (process.env.NOTIFICATION_SERVICE_URL || "http://notification-service:3007").replace(/\/+$/, ""),
+    tiempoEsperaMs: Number(process.env.NOTIFICATION_SERVICE_TIMEOUT_MS) || 15000,
     intervaloMs: Number(process.env.CORREO_INTERVALO_MS) || 5000,
   },
 };

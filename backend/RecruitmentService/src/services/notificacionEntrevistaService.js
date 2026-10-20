@@ -1,14 +1,29 @@
 const modelo = require("../models/notificacionEntrevistaModel");
-const correoService = require("./correoService");
+const notificationService = require("./notificationServiceClient");
 const HttpError = require("../utils/HttpError");
 const { withTransaction } = require("../utils/transaction");
-const { correo } = require("../config");
+const { notificaciones } = require("../config");
 const { MAXIMO_INTENTOS, esperaReintento } = require("../utils/integracion");
 const { TIPO_NOTIFICACION } = require("../utils/entrevistas");
-const { armarCarga, armarCorreo } = require("../utils/plantillasEntrevista");
 
 const LOTE = 10;
 const SEGUNDOS_RESERVA = 60;
+
+// Datos de la cita que viajan en NOTIFICACIONES_ENTREVISTA.carga y que NotificationService pone en el correo.
+function armarCarga({ entrevista, historial = null }) {
+  return {
+    candidato: { nombres: entrevista.nombres, apellidos: entrevista.apellidos },
+    puesto: entrevista.titulo_puesto,
+    codigo_convocatoria: entrevista.codigo_convocatoria,
+    fecha_hora: new Date(entrevista.fecha_hora_programada).toISOString(),
+    duracion_minutos: entrevista.duracion_minutos,
+    modalidad: entrevista.modalidad,
+    lugar_enlace: entrevista.lugar_enlace,
+    evaluador: entrevista.nombre_entrevistador,
+    fecha_hora_anterior: historial?.fecha_hora_anterior ? new Date(historial.fecha_hora_anterior).toISOString() : null,
+    motivo: historial?.motivo ?? null,
+  };
+}
 
 /**
  * Deja en cola el correo al candidato, dentro de la transacción que guardó el cambio de la cita.
@@ -38,12 +53,17 @@ async function enviarUna(idNotificacion) {
     if (!aviso) return;
 
     try {
-      const { asunto, texto, html } = armarCorreo(aviso.tipo_notificacion, aviso.carga);
-      const idMensaje = await correoService.enviar({ para: aviso.correo_destino, asunto, texto, html });
+      await notificationService.enviarAvisoEntrevista({
+        idMensaje: aviso.id_notificacion,
+        para: aviso.correo_destino,
+        tipo: aviso.tipo_notificacion,
+        datos: aviso.carga,
+      });
       await modelo.marcarEnviada(client, aviso);
-      console.log(`[Correo] Aviso ${aviso.tipo_notificacion} enviado a ${aviso.correo_destino} (${idMensaje})`);
+      console.log(`[Correo] Aviso ${aviso.tipo_notificacion} enviado a ${aviso.correo_destino} por NotificationService`);
     } catch (error) {
-      const { permanente, mensaje } = correoService.clasificarError(error);
+      const permanente = error.permanente === true;
+      const mensaje = error.message;
       const intentos = aviso.intentos + 1;
       const fallido = permanente || intentos >= MAXIMO_INTENTOS;
       console.error(
@@ -57,7 +77,6 @@ async function enviarUna(idNotificacion) {
 
 // Uno por uno: el servidor SMTP limita los envíos simultáneos y cada envío retiene el bloqueo de su entrevista.
 async function despachar() {
-  if (!correoService.estaConfigurado()) return 0;
   const ids = await modelo.reservarPendientes(LOTE, SEGUNDOS_RESERVA);
   for (const id of ids) {
     await enviarUna(id);
@@ -66,9 +85,6 @@ async function despachar() {
 }
 
 function iniciarDespachador() {
-  if (!correoService.estaConfigurado()) {
-    console.warn("[Correo] SMTP_HOST no está configurado: los avisos de entrevista quedarán pendientes.");
-  }
   let ocupado = false;
   setInterval(async () => {
     if (ocupado) return;
@@ -80,10 +96,10 @@ function iniciarDespachador() {
     } finally {
       ocupado = false;
     }
-  }, correo.intervaloMs).unref();
+  }, notificaciones.intervaloMs).unref();
 }
 
-// Un reclutador reenvía un aviso que agotó sus reintentos (p. ej. tras corregir el correo SMTP).
+// Un reclutador reenvía un aviso que agotó sus reintentos (p. ej. tras corregir el SMTP de NotificationService).
 async function reintentar(idNotificacion) {
   const aviso = await modelo.obtener(idNotificacion);
   if (!aviso) throw new HttpError(404, "La notificación indicada no existe.");
@@ -96,6 +112,7 @@ async function reintentar(idNotificacion) {
 }
 
 module.exports = {
+  armarCarga,
   encolar,
   despachar,
   iniciarDespachador,

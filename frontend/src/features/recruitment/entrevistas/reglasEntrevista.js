@@ -113,3 +113,71 @@ export function esUrlValida(texto) {
 }
 
 export const nombreCandidato = (entrevista) => `${entrevista.nombres} ${entrevista.apellidos}`.trim();
+
+// ---- Calendario semanal (RF-15.5) ----
+
+export const HORA_INICIO_CALENDARIO = 7;
+export const HORA_FIN_CALENDARIO = 21;
+
+// Lunes de la semana de 'AAAA-MM-DD'.
+export function lunesDe(fecha) {
+  const [anio, mes, dia] = fecha.split("-").map(Number);
+  const diaSemana = new Date(Date.UTC(anio, mes - 1, dia)).getUTCDay();
+  return sumarDias(fecha, diaSemana === 0 ? -6 : 1 - diaSemana);
+}
+
+export const diasDeSemana = (lunes) => Array.from({ length: 7 }, (_, i) => sumarDias(lunes, i));
+
+const formatoCabecera = new Intl.DateTimeFormat("es-BO", { timeZone: "UTC", weekday: "short", day: "numeric" });
+const formatoMes = new Intl.DateTimeFormat("es-BO", { timeZone: "UTC", month: "long", year: "numeric" });
+const formatoDiaLargo = new Intl.DateTimeFormat("es-BO", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" });
+const aFechaUtc = (fecha) => new Date(`${fecha}T12:00:00Z`);
+
+export const cabeceraDia = (fecha) => formatoCabecera.format(aFechaUtc(fecha));
+export const diaLargo = (fecha) => formatoDiaLargo.format(aFechaUtc(fecha));
+
+// «20 – 26 de octubre de 2026» o, si la semana cruza de mes, «27 oct – 2 nov 2026».
+export function tituloSemana(lunes) {
+  const domingo = sumarDias(lunes, 6);
+  const [, mesInicio, diaInicio] = lunes.split("-").map(Number);
+  const [, mesFin, diaFin] = domingo.split("-").map(Number);
+  if (mesInicio === mesFin) return `${diaInicio} – ${diaFin} de ${formatoMes.format(aFechaUtc(domingo))}`;
+  const corto = new Intl.DateTimeFormat("es-BO", { timeZone: "UTC", day: "numeric", month: "short" });
+  return `${corto.format(aFechaUtc(lunes))} – ${corto.format(aFechaUtc(domingo))} ${domingo.slice(0, 4)}`;
+}
+
+/**
+ * Agrupa las citas por día ('AAAA-MM-DD' en La Paz) y, dentro de cada día, les asigna un carril para que las que se
+ * cruzan se muestren lado a lado: { carril, carriles } con carriles = cuántas comparten el grupo de cruces.
+ */
+export function distribuirPorDia(citas) {
+  const porDia = new Map();
+  for (const cita of citas) {
+    const { fecha, hora } = partesLocales(cita.fecha_hora_programada);
+    const inicio = aMinutos(hora);
+    const item = { cita, inicio, fin: inicio + cita.duracion_minutos };
+    if (!porDia.has(fecha)) porDia.set(fecha, []);
+    porDia.get(fecha).push(item);
+  }
+
+  for (const items of porDia.values()) {
+    items.sort((a, b) => a.inicio - b.inicio || b.fin - a.fin);
+    let grupo = [];
+    let finGrupo = -1;
+    const cerrarGrupo = () => grupo.forEach((item) => (item.carriles = Math.max(...grupo.map((g) => g.carril)) + 1));
+    for (const item of items) {
+      if (item.inicio >= finGrupo) {
+        cerrarGrupo();
+        grupo = [];
+      }
+      const ocupados = new Set(grupo.filter((g) => g.fin > item.inicio).map((g) => g.carril));
+      let carril = 0;
+      while (ocupados.has(carril)) carril++;
+      item.carril = carril;
+      grupo.push(item);
+      finGrupo = Math.max(finGrupo, item.fin);
+    }
+    cerrarGrupo();
+  }
+  return porDia;
+}

@@ -1,6 +1,6 @@
 const modelo = require("../models/entrevistaModel");
 const notificaciones = require("./notificacionEntrevistaService");
-const { obtenerEmpleado } = require("./employeeServiceClient");
+const employeeService = require("./employeeServiceClient");
 const HttpError = require("../utils/HttpError");
 const { withTransaction } = require("../utils/transaction");
 const {
@@ -17,7 +17,7 @@ const nombreCompleto = (empleado) => [empleado.nombres, empleado.apellidos].filt
 
 async function agendar(idPostulacion, datos, usuario) {
   // EmployeeService se consulta antes de abrir la transacción para no retener bloqueos mientras responde.
-  const evaluador = await obtenerEmpleado(datos.id_entrevistador_empleado);
+  const evaluador = await employeeService.obtenerEmpleado(datos.id_entrevistador_empleado);
 
   return withTransaction(async (client) => {
     const postulacion = await modelo.bloquearPostulacion(client, idPostulacion);
@@ -66,7 +66,7 @@ async function agendar(idPostulacion, datos, usuario) {
 
 async function reprogramar(idEntrevista, datos, usuario) {
   const evaluadorNuevo = datos.id_entrevistador_empleado
-    ? await obtenerEmpleado(datos.id_entrevistador_empleado)
+    ? await employeeService.obtenerEmpleado(datos.id_entrevistador_empleado)
     : undefined;
 
   return withTransaction(async (client) => {
