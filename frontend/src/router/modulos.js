@@ -1,4 +1,4 @@
-import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarDays, CalendarRange, ClipboardCheck, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, IdCard, ListTree, Mail, Megaphone, Network, Send, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarDays, CalendarRange, ClipboardCheck, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, IdCard, ListTree, Mail, Megaphone, Network, Send, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
@@ -22,6 +22,7 @@ import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import ReconocimientosView from "../features/Reconocimientos/ReconocimientosView";
+import ReportesAsistenciaPage from "../features/reportes-asistencia/ReportesAsistenciaPage";
 import RolTurnosPage from "../features/rol-turnos/RolTurnosPage";
 import SeguimientoAcusesPage from "../features/Memorandums/acuses/SeguimientoAcusesPage";
 import TurnosPage from "../features/turnos/TurnosPage";
@@ -183,6 +184,14 @@ export const SECCIONES = [
         icono: Timer,
         roles: ["supervisor"],
         pagina: HorasExtraPage,
+      },
+      {
+        ruta: "/asistencia/reportes",
+        etiqueta: "Reportes de asistencia",
+        descripcion: "Consolidado de asistencia, ausentismo y puntualidad por sucursal y área, exportable a PDF y Excel.",
+        icono: FileChartColumn,
+        roles: ["supervisor"],
+        pagina: ReportesAsistenciaPage,
       },
     ],
   },
