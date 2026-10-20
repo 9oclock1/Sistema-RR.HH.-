@@ -112,4 +112,32 @@ INSERT INTO catalogos_estado_mensaje (codigo, nombre) VALUES
     ('CONFIRMADO', 'Confirmado')
 ON CONFLICT (codigo) DO NOTHING;
 
+-- KAN-54 (RF-34): notificaciones internas del portal (alertas de resultado de solicitudes de ausencia).
+-- Es idempotente (IF NOT EXISTS) para aplicarse también sobre una base ya creada.
+-- Table: notificaciones
+CREATE TABLE IF NOT EXISTS notificaciones (
+    id_notificacion uuid NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado uuid NOT NULL,
+    tipo varchar(40) NOT NULL,
+    titulo varchar(150) NOT NULL,
+    mensaje text NOT NULL,
+    enlace varchar(255) NULL,
+    id_referencia uuid NULL,
+    leida boolean NOT NULL DEFAULT false,
+    fecha_lectura timestamptz NULL,
+    correo_estado varchar(15) NOT NULL DEFAULT 'NO_APLICA',
+    correo_detalle varchar(200) NULL,
+    creado_en timestamptz NOT NULL DEFAULT current_timestamp,
+    CONSTRAINT pk_notificaciones PRIMARY KEY (id_notificacion),
+    CONSTRAINT chk_notificacion_titulo CHECK (length(trim(titulo)) > 0),
+    CONSTRAINT chk_notificacion_mensaje CHECK (length(trim(mensaje)) > 0),
+    CONSTRAINT chk_notificacion_correo CHECK (correo_estado IN ('NO_APLICA', 'ENVIADO', 'FALLIDO')),
+    CONSTRAINT chk_notificacion_lectura CHECK (leida = (fecha_lectura IS NOT NULL))
+);
+-- Bandeja del empleado y contador de no leídas (campana del encabezado).
+CREATE INDEX IF NOT EXISTS idx_notificaciones_empleado ON notificaciones (id_empleado, creado_en DESC);
+CREATE INDEX IF NOT EXISTS idx_notificaciones_no_leidas ON notificaciones (id_empleado) WHERE NOT leida;
+-- Un mismo evento (p. ej. la resolución de una solicitud) notifica una sola vez al empleado, aunque se reintente el envío.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_notificacion_evento ON notificaciones (tipo, id_referencia, id_empleado) WHERE id_referencia IS NOT NULL;
+
 -- End of file.
