@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { House, Menu, Search } from "lucide-react";
 import { Boton, ElementoNavegacion, Selector, useAvisos } from "../components/ui";
 import { cambiarRol, useRol } from "../context/sesion";
+import CampanaNotificaciones from "../features/notificaciones/CampanaNotificaciones";
 import { seccionesPara } from "../router/modulos";
 import { ROLES } from "../utils/permisos";
 import "./MainLayout.css";
@@ -149,6 +150,7 @@ export default function MainLayout() {
             onKeyDown={alPresionarEnBusqueda}
           />
         </div>
+        <CampanaNotificaciones />
       </header>
 
       <aside id="app-lateral" className="app-lateral" aria-label="Barra lateral">

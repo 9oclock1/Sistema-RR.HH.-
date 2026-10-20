@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { ArrowLeftRight } from "lucide-react";
 import { descargarComprobante, listarMisSolicitudes, listarTiposLicencia } from "../../api/licencias";
 import { Alerta, Boton, EncabezadoPagina, useAvisos } from "../../components/ui";
 import IdentificacionEmpleado from "../marcaje/IdentificacionEmpleado";
 import { guardarEmpleado, leerEmpleado, olvidarEmpleado } from "../marcaje/sesionEmpleado";
+import DetalleSolicitud from "./DetalleSolicitud";
 import MisSolicitudes from "./MisSolicitudes";
 import SolicitudLicenciaFormulario from "./SolicitudLicenciaFormulario";
 import "./licencias.css";
@@ -23,6 +24,11 @@ export default function LicenciasPage() {
   const [radicada, setRadicada] = useState(null);
   const [enfocarIdentificacion, setEnfocarIdentificacion] = useState(false);
   const refResultado = useRef(null);
+  const refDetalle = useRef(null);
+  // RF-34: las alertas de resultado abren esta pantalla con ?solicitud=<id>.
+  const [parametros, setParametros] = useSearchParams();
+  const idDetalle = parametros.get("solicitud");
+  const detalle = solicitudes.find((s) => s.id_solicitud === idDetalle);
 
   const cargar = useCallback(
     (id) =>
@@ -55,6 +61,15 @@ export default function LicenciasPage() {
   useEffect(() => {
     if (radicada) refResultado.current?.focus();
   }, [radicada]);
+
+  useEffect(() => {
+    if (!detalle) return;
+    refDetalle.current?.scrollIntoView({ block: "start" });
+    refDetalle.current?.focus({ preventScroll: true });
+  }, [detalle]);
+
+  const verDetalle = (solicitud) => setParametros({ solicitud: solicitud.id_solicitud });
+  const cerrarDetalle = () => setParametros({});
 
   const identificar = (id) => {
     setErrorIdentificacion(null);
@@ -161,10 +176,16 @@ export default function LicenciasPage() {
                 ))}
               </Alerta>
             )}
+            {detalle && <DetalleSolicitud ref={refDetalle} solicitud={detalle} onCerrar={cerrarDetalle} />}
+            {idDetalle && !detalle && !cargando && (
+              <Alerta tono="aviso" titulo="No se encontró la solicitud" onCerrar={cerrarDetalle}>
+                La solicitud indicada no existe o pertenece a otro empleado.
+              </Alerta>
+            )}
             {tipos.length > 0 && (
               <SolicitudLicenciaFormulario idEmpleado={idEmpleado} tipos={tipos} onRadicada={alRadicar} />
             )}
-            <MisSolicitudes solicitudes={solicitudes} cargando={cargando} onDescargar={descargar} />
+            <MisSolicitudes solicitudes={solicitudes} cargando={cargando} onDescargar={descargar} onVerDetalle={verDetalle} />
           </>
         )}
       </div>

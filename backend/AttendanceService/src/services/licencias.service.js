@@ -1,11 +1,12 @@
 const modelo = require("../models/licencias.model");
 const empleados = require("./empleados.service");
+const notificaciones = require("./notificaciones.service");
 const almacenamiento = require("../utils/almacenamiento");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const { validarSolicitudLicencia } = require("../utils/validarSolicitudLicencia");
 const { coincideFirma } = require("../utils/firmaArchivo");
-const { ESTADO_SOLICITUD, diasSolicitados, evaluarLimite } = require("../utils/licencias");
+const { ESTADO_SOLICITUD, DECISIONES, diasSolicitados, evaluarLimite, validarResolucion } = require("../utils/licencias");
 
 const EXCLUSION_VIOLADA = "23P01";
 
@@ -124,4 +125,70 @@ async function obtenerAdjunto(idEmpleado, idSolicitud, idAdjunto) {
   };
 }
 
-module.exports = { listarTipos, listarMisSolicitudes, radicar, obtenerAdjunto };
+// Avisa al colaborador y deja constancia; si falla, la resolución sigue firme y el reintento periódico lo completa.
+async function avisarResolucion(solicitud) {
+  const idResolutor = solicitud.id_empleado_resolutor;
+  const nombreResolutor = await empleados.obtenerNombre(idResolutor);
+  const { aceptada, reintentable } = await notificaciones.notificarResolucion({ solicitud, idResolutor, nombreResolutor });
+  // Un rechazo definitivo del aviso no se reintenta: se deja constancia en el registro de errores del servicio.
+  if (aceptada || !reintentable) await modelo.marcarResolucionNotificada(solicitud.id_solicitud);
+  return aceptada;
+}
+
+// KAN-54: el supervisor aprueba o rechaza una solicitud pendiente y el colaborador recibe la alerta.
+async function resolver(idResolutor, idSolicitud, datos) {
+  await verificarEmpleado(idResolutor);
+  const { errores, decision, motivo } = validarResolucion(datos);
+  if (errores.length > 0) throw new ErrorApp(400, "Datos de resolución inválidos", errores);
+
+  const solicitud = UUID_RE.test(idSolicitud) ? await modelo.obtener(idSolicitud) : null;
+  if (!solicitud) throw new ErrorApp(404, "Solicitud no encontrada");
+  if (solicitud.id_empleado === idResolutor) throw new ErrorApp(403, "No puede resolver su propia solicitud.");
+  const yaResuelta = () => new ErrorApp(409, `La solicitud ya fue resuelta (${solicitud.estado_nombre.toLowerCase()}).`);
+  if (solicitud.estado_codigo !== "PENDIENTE") throw yaResuelta();
+
+  const resuelta = await modelo.resolver({ idSolicitud, idEstado: DECISIONES[decision], idResolutor, motivo });
+  if (!resuelta) throw yaResuelta();
+
+  const actualizada = await modelo.obtener(idSolicitud);
+  const notificada = await avisarResolucion(actualizada);
+  return { ...conClasificacion(actualizada), notificacion_enviada: notificada };
+}
+
+// Reintenta los avisos de resoluciones que NotificationService no alcanzó a confirmar.
+async function reintentarAvisosPendientes(limite = 50) {
+  const pendientes = await modelo.listarResolucionesSinNotificar(limite);
+  let enviados = 0;
+  for (const solicitud of pendientes) {
+    if (await avisarResolucion(solicitud)) enviados += 1;
+  }
+  return { pendientes: pendientes.length, enviados };
+}
+
+function iniciarReintentoDeAvisos() {
+  const intervalo = Number(process.env.INTERVALO_AVISOS_MS) || 60 * 1000;
+  let ocupado = false;
+  const ejecutar = async () => {
+    if (ocupado) return;
+    ocupado = true;
+    try {
+      await reintentarAvisosPendientes();
+    } catch (error) {
+      console.error("Error al reintentar los avisos de resolución:", error.message);
+    } finally {
+      ocupado = false;
+    }
+  };
+  setTimeout(ejecutar, 15 * 1000);
+  setInterval(ejecutar, intervalo);
+}
+
+module.exports = {
+  listarTipos,
+  listarMisSolicitudes,
+  radicar,
+  obtenerAdjunto,
+  resolver,
+  reintentarAvisosPendientes,
+  iniciarReintentoDeAvisos,
+};

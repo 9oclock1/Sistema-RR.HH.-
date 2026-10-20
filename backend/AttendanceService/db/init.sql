@@ -566,6 +566,7 @@ CREATE TABLE IF NOT EXISTS SOLICITUDES_LICENCIA (
     id_empleado_resolutor UUID NULL,
     resuelto_en TIMESTAMPTZ NULL,
     motivo_resolucion text NULL,
+    resolucion_notificada_en TIMESTAMPTZ NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT SOLICITUDES_LICENCIA_pk PRIMARY KEY (id_solicitud),
@@ -577,6 +578,8 @@ CREATE TABLE IF NOT EXISTS SOLICITUDES_LICENCIA (
         daterange(fecha_inicio, fecha_fin, '[]') WITH &&
     ) WHERE (id_estado_solicitud IN (1, 2))
 );
+-- KAN-54: fecha en que NotificationService aceptó el aviso de la resolución (sin ella, se reintenta).
+ALTER TABLE SOLICITUDES_LICENCIA ADD COLUMN IF NOT EXISTS resolucion_notificada_en TIMESTAMPTZ NULL;
 -- Tabla: ADJUNTOS_SOLICITUD_LICENCIA (respaldo digital: baja médica, certificado de defunción, etc.)
 CREATE TABLE IF NOT EXISTS ADJUNTOS_SOLICITUD_LICENCIA (
     id_adjunto UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -596,6 +599,8 @@ CREATE INDEX IF NOT EXISTS ix_solicitud_licencia_empleado ON SOLICITUDES_LICENCI
 CREATE INDEX IF NOT EXISTS ix_solicitud_licencia_estado ON SOLICITUDES_LICENCIA (id_estado_solicitud, creado_en);
 -- Cronograma de ausencias aprobadas por rango de fechas (KAN-55).
 CREATE INDEX IF NOT EXISTS ix_solicitud_licencia_aprobadas_fechas ON SOLICITUDES_LICENCIA (fecha_inicio, fecha_fin) WHERE id_estado_solicitud = 2;
+-- Resoluciones cuyo aviso al colaborador aún no se confirmó (KAN-54).
+CREATE INDEX IF NOT EXISTS ix_solicitud_licencia_sin_notificar ON SOLICITUDES_LICENCIA (resuelto_en) WHERE resuelto_en IS NOT NULL AND resolucion_notificada_en IS NULL;
 CREATE INDEX IF NOT EXISTS ix_adjunto_licencia_solicitud ON ADJUNTOS_SOLICITUD_LICENCIA (id_solicitud);
 -- llaves foráneas
 DO $$
