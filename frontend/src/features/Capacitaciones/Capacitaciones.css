@@ -1,0 +1,68 @@
+.capa {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.capa .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+.capa-contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: calc(var(--size-sidebar) * 3);
+}
+
+.capa-resultado {
+  border-radius: var(--radius-card);
+}
+
+.capa-resultado:focus {
+  outline: none;
+}
+
+.capa-resultado:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-border-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.capa-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.capa-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.capa-fila {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.capa-fila--tres {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.capa-form__pie {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .capa-fila,
+  .capa-fila--tres {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
