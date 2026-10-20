@@ -4,10 +4,18 @@
 process.env.NODE_ENV = "test";
 const { test, before, after, beforeEach, mock } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const dotenv = require("dotenv");
+const nodemailer = require("nodemailer");
 const modelo = require("../src/models/notificaciones.model");
 const empleados = require("../src/services/empleados.service");
 const correo = require("../src/services/correo.service");
 const app = require("../index");
+
+// La configuración de correo de esta prueba sale de .env.example (plantilla de pruebas), no del .env de cada máquina.
+const ejemplo = dotenv.parse(fs.readFileSync(path.join(__dirname, "..", ".env.example")));
+const CLAVES_CORREO = ["SMTP_PORT", "SMTP_SECURE", "SMTP_FROM", "PORTAL_URL"];
 
 const ANA = "4192f252-acf0-4522-a109-e051cad9a50b";
 const LUIS = "cb7995a6-4b23-4738-ab8b-37d0b203d73b";
@@ -189,4 +197,40 @@ test("marcar leída y marcar todas respetan al dueño de la bandeja", async () =
   assert.deepEqual(await lote.json(), { marcadas: 3, no_leidas: 0 });
   assert.equal(una.mock.callCount(), 2);
   assert.equal(todas.mock.callCount(), 1);
+});
+
+test("correo real con la configuración de .env.example: remitente, destinatario, asunto y enlace al portal", async () => {
+  for (const clave of CLAVES_CORREO) assert.ok(ejemplo[clave], `.env.example debe definir ${clave}`);
+  const anterior = Object.fromEntries(["SMTP_HOST", ...CLAVES_CORREO].map((c) => [c, process.env[c]]));
+  Object.assign(process.env, Object.fromEntries(CLAVES_CORREO.map((c) => [c, ejemplo[c]])), { SMTP_HOST: "smtp.prueba.local" });
+  const enviados = [];
+  mock.method(nodemailer, "createTransport", () => ({
+    sendMail: async (mensaje) => {
+      enviados.push(mensaje);
+      return { messageId: "x" };
+    },
+  }));
+  correo.enviarCorreo.mock.restore();
+
+  try {
+    await emisor.notificarResolucion({
+      solicitud: vacaciones("RECHAZADA", "Sin cobertura"),
+      idResolutor: LUIS,
+      nombreResolutor: "Luis Rojas",
+      categoria: "VACACIONES",
+    });
+  } finally {
+    for (const [clave, valor] of Object.entries(anterior)) {
+      if (valor === undefined) delete process.env[clave];
+      else process.env[clave] = valor;
+    }
+  }
+
+  assert.equal(enviados.length, 1);
+  assert.equal(enviados[0].from, ejemplo.SMTP_FROM);
+  assert.equal(enviados[0].to, "ana.quispe@ejemplo.com");
+  assert.equal(enviados[0].subject, "Solicitud rechazada: Vacaciones");
+  const portal = ejemplo.PORTAL_URL.replace(/\/+$/, "");
+  assert.ok(enviados[0].text.includes(`${portal}/asistencia/solicitud-vacaciones?solicitud=${ID_VACACION}`));
+  assert.match(enviados[0].text, /Justificación: Sin cobertura/);
 });
