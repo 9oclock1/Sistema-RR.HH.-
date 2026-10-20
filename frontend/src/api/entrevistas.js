@@ -50,3 +50,7 @@ export const reintentarAvisoEntrevista = (idNotificacion, sesion) =>
     method: "POST",
     headers: comoReclutador(sesion),
   });
+
+// Detalle de una entrevista con su historial de cambios y los correos enviados al candidato.
+export const obtenerDetalleEntrevista = async (idEntrevista, { signal } = {}) =>
+  (await request(`${BASE}/entrevistas/${idEntrevista}`, { signal })).data;

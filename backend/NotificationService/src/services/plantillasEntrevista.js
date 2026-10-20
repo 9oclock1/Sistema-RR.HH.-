@@ -1,5 +1,8 @@
-const { zonaHoraria } = require("../config");
-const { MODALIDAD, TIPO_NOTIFICACION } = require("./entrevistas");
+// RF-15 (RecruitmentService): correos al candidato sobre su entrevista laboral.
+const zonaHoraria = process.env.APP_TIMEZONE || "America/La_Paz";
+
+const MODALIDAD = { PRESENCIAL: "PRESENCIAL", VIRTUAL: "VIRTUAL" };
+const TIPO_AVISO = { PROGRAMACION: "PROGRAMACION", REPROGRAMACION: "REPROGRAMACION", CANCELACION: "CANCELACION" };
 
 const NOMBRE_ZONA = zonaHoraria.split("/").pop().replace(/_/g, " ");
 
@@ -24,22 +27,6 @@ const cuando = (iso) => `${fechaLarga(iso)}, ${hora(iso)}`;
 const escaparHtml = (texto) =>
   String(texto ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-// Datos de la cita que viajan en NOTIFICACIONES_ENTREVISTA.carga: lo que el candidato debe saber en ese momento.
-function armarCarga({ entrevista, historial = null }) {
-  return {
-    candidato: { nombres: entrevista.nombres, apellidos: entrevista.apellidos },
-    puesto: entrevista.titulo_puesto,
-    codigo_convocatoria: entrevista.codigo_convocatoria,
-    fecha_hora: new Date(entrevista.fecha_hora_programada).toISOString(),
-    duracion_minutos: entrevista.duracion_minutos,
-    modalidad: entrevista.modalidad,
-    lugar_enlace: entrevista.lugar_enlace,
-    evaluador: entrevista.nombre_entrevistador,
-    fecha_hora_anterior: historial?.fecha_hora_anterior ? new Date(historial.fecha_hora_anterior).toISOString() : null,
-    motivo: historial?.motivo ?? null,
-  };
-}
-
 // Filas «etiqueta: valor» de la cita; en las virtuales el lugar es el enlace de la reunión.
 function detallesCita(carga) {
   const virtual = carga.modalidad === MODALIDAD.VIRTUAL;
@@ -55,7 +42,7 @@ function detallesCita(carga) {
 }
 
 const CONTENIDO = {
-  [TIPO_NOTIFICACION.PROGRAMACION]: (carga) => ({
+  [TIPO_AVISO.PROGRAMACION]: (carga) => ({
     asunto: `Entrevista programada: ${carga.puesto}`,
     parrafos: [
       `Nos complace informarle que fue seleccionado(a) para una entrevista laboral en el proceso de ${carga.puesto}.`,
@@ -65,7 +52,7 @@ const CONTENIDO = {
     ],
     conDetalle: true,
   }),
-  [TIPO_NOTIFICACION.REPROGRAMACION]: (carga) => ({
+  [TIPO_AVISO.REPROGRAMACION]: (carga) => ({
     asunto: `Entrevista reprogramada: ${carga.puesto}`,
     parrafos: [
       carga.fecha_hora_anterior && carga.fecha_hora_anterior !== carga.fecha_hora
@@ -76,7 +63,7 @@ const CONTENIDO = {
     ],
     conDetalle: true,
   }),
-  [TIPO_NOTIFICACION.CANCELACION]: (carga) => ({
+  [TIPO_AVISO.CANCELACION]: (carga) => ({
     asunto: `Entrevista cancelada: ${carga.puesto}`,
     parrafos: [
       `Le informamos que su entrevista para ${carga.puesto}, prevista para el ${cuando(carga.fecha_hora)}, fue cancelada.`,
@@ -132,4 +119,4 @@ ${filasHtml ? `<table role="presentation" style="border-collapse:collapse;margin
   return { asunto, texto, html };
 }
 
-module.exports = { armarCarga, armarCorreo };
+module.exports = { MODALIDAD, TIPO_AVISO, armarCorreo };

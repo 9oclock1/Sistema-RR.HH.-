@@ -5,9 +5,10 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "test": "node --test src/tests/cvUploadTest.js src/tests/cvExtractionTest.js src/tests/affinityCalculationTest.js src/tests/rankingScoreTest.js src/tests/etapaTransicionTest.js src/tests/integracionErpTest.js src/tests/despachoAsincronoTest.js && node test/acceptance_criteria.test.js",
+    "test": "node --test src/tests/cvUploadTest.js src/tests/cvExtractionTest.js src/tests/affinityCalculationTest.js src/tests/rankingScoreTest.js src/tests/etapaTransicionTest.js src/tests/integracionErpTest.js src/tests/despachoAsincronoTest.js src/tests/entrevistaTest.js src/tests/notificacionEntrevistaTest.js && node test/acceptance_criteria.test.js",
     "test:ranking": "node --test src/tests/rankingScoreTest.js",
-    "test:kan34": "node --test src/tests/etapaTransicionTest.js src/tests/integracionErpTest.js src/tests/despachoAsincronoTest.js"
+    "test:kan34": "node --test src/tests/etapaTransicionTest.js src/tests/integracionErpTest.js src/tests/despachoAsincronoTest.js",
+    "test:kan35": "node --test src/tests/entrevistaTest.js src/tests/notificacionEntrevistaTest.js"
   },
   "keywords": [],
   "author": "",
@@ -21,7 +22,6 @@
     "express": "^5.2.1",
     "mammoth": "^1.13.0",
     "multer": "^2.4.0",
-    "nodemailer": "^10.1.7",
     "pdf-parse": "^2.4.5",
     "pdf2pic": "^3.2.0",
     "pg": "^8.23.0",
