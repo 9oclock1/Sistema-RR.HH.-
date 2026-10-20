@@ -4,6 +4,7 @@ const { PostulacionModel } = require("../models/postulacionModel");
 const { PostulacionService } = require("../services/postulacionService");
 const { CvProcessingService } = require("../services/cvProcessingService");
 const { ActualizarDatosCvManualSchema } = require("../utils/cvDataSchema");
+const { AffinityService } = require("../services/affinityService");
 
 async function obtenerBufferDeArchivo(fileDetails) {
   if (Buffer.isBuffer(fileDetails)) {
@@ -121,6 +122,15 @@ const CvDataController = {
         validacion.data,
       );
 
+      try {
+        await AffinityService.procesarAfinidadPostulacion(id);
+      } catch (errAfinidad) {
+        console.warn(
+          "[CvDataController] Advertencia al recalcular afinidad manual:",
+          errAfinidad.message,
+        );
+      }
+
       return res.status(200).json({
         success: true,
         message: "Datos del CV actualizados y verificados correctamente.",
@@ -171,6 +181,16 @@ const CvDataController = {
           mimetype: finalMimetype,
           fileName: resolvedFileName,
         });
+
+      try {
+        const afinidad = await AffinityService.procesarAfinidadPostulacion(id);
+        datosExtraidos.afinidadDetalle = afinidad;
+      } catch (errAfinidad) {
+        console.warn(
+          "[CvDataController] Advertencia al recalcular afinidad tras analizar CV:",
+          errAfinidad.message,
+        );
+      }
 
       return res.status(200).json({
         success: true,

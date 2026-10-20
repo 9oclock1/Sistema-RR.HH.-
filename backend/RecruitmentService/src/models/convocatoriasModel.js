@@ -23,6 +23,7 @@ const SELECT_CONVOCATORIA = `
     NULLIF(c.fecha_publicacion, 'infinity') AS fecha_publicacion,
     NULLIF(c.fecha_limite_postulacion, 'infinity') AS fecha_limite_postulacion,
     c.esta_activa,
+    c.pesos_afinidad,
     c.creado_en,
     ${ESTADO_SQL} AS estado
   FROM convocatorias c
@@ -103,6 +104,7 @@ const CAMPOS_EDITABLES = [
   'nivel_educacion_min',
   'habilidades_clave_requeridas',
   'fecha_limite_postulacion',
+  'pesos_afinidad',
 ];
 
 const actualizar = async (db, idConvocatoria, cambios) => {
@@ -110,12 +112,14 @@ const actualizar = async (db, idConvocatoria, cambios) => {
   const asignaciones = [];
 
   CAMPOS_EDITABLES.filter((campo) => campo in cambios).forEach((campo) => {
-    valores.push(cambios[campo]);
+    valores.push(campo === 'pesos_afinidad' && cambios[campo] ? JSON.stringify(cambios[campo]) : cambios[campo]);
     const parametro = `$${valores.length}`;
     asignaciones.push(
       campo === 'fecha_limite_postulacion'
         ? `${campo} = COALESCE(${parametro}::date, 'infinity')`
-        : `${campo} = ${parametro}`
+        : campo === 'pesos_afinidad'
+          ? `${campo} = ${parametro}::jsonb`
+          : `${campo} = ${parametro}`
     );
   });
 

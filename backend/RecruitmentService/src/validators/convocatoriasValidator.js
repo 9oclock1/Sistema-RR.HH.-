@@ -1,4 +1,5 @@
 const HttpError = require('../utils/HttpError');
+const { PesosAfinidadSchema } = require('../utils/cvDataSchema');
 const { CODIGOS_NIVEL_EDUCACION } = require('../utils/nivelesEducacion');
 const {
   esVacio,
@@ -90,6 +91,20 @@ const normalizarHabilidades = (valor, errores) => {
   return habilidades;
 };
 
+// null = volver a los pesos por defecto (educación 25, experiencia 35, habilidades 40).
+const normalizarPesosAfinidad = (valor, errores) => {
+  const campo = 'pesos_afinidad';
+  if (valor === null) return null;
+  const resultado = PesosAfinidadSchema.safeParse(valor);
+  if (!resultado.success || typeof valor !== 'object' || Array.isArray(valor)) {
+    errores.push(
+      invalido(campo, `El campo '${campo}' debe tener pesoEducacion, pesoExperiencia y pesoHabilidades y sumar 100.`)
+    );
+    return null;
+  }
+  return resultado.data;
+};
+
 // null = sin fecha límite todavía (se guarda como 'infinity' mientras sea borrador).
 const normalizarFecha = (valor, campo, errores) => {
   if (esVacio(valor)) return null;
@@ -133,6 +148,9 @@ const validarCamposDeContenido = (datos, errores) => {
   }
   if (presente(datos, 'fecha_limite_postulacion')) {
     campos.fecha_limite_postulacion = normalizarFecha(datos.fecha_limite_postulacion, 'fecha_limite_postulacion', errores);
+  }
+  if (presente(datos, 'pesos_afinidad')) {
+    campos.pesos_afinidad = normalizarPesosAfinidad(datos.pesos_afinidad, errores);
   }
   return campos;
 };

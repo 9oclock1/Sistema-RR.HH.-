@@ -63,15 +63,35 @@ async function findByConvocatoriaAndPostulante(
 
 /**
  * Retrieves all applicants associated with a given job opening,
- * ordered by application date (most recent first).
+ * supporting affinity range filtering and ordered by ranking/affinity.
  * @param {string} id_convocatoria
+ * @param {Object} [filtros={}]
  * @returns {Array}
  */
-async function findByConvocatoria(id_convocatoria) {
+async function findByConvocatoria(
+  id_convocatoria,
+  { minAfinidad = null, maxAfinidad = null } = {},
+) {
+  const valores = [id_convocatoria];
+  let condicionesExtra = "";
+
+  if (minAfinidad !== null && !isNaN(Number(minAfinidad))) {
+    valores.push(Number(minAfinidad));
+    condicionesExtra += ` AND p.porcentaje_afinidad >= $${valores.length}`;
+  }
+
+  if (maxAfinidad !== null && !isNaN(Number(maxAfinidad))) {
+    valores.push(Number(maxAfinidad));
+    condicionesExtra += ` AND p.porcentaje_afinidad <= $${valores.length}`;
+  }
+
   const query = `
     SELECT 
       p.id_postulacion,
       p.id_convocatoria,
+      p.porcentaje_afinidad,
+      p.posicion_ranking,
+      p.datos_extraidos_cv,
       p.fecha_postulacion,
       p.id_etapa,
       pos.id_postulante,
@@ -87,9 +107,13 @@ async function findByConvocatoria(id_convocatoria) {
     JOIN POSTULANTES pos ON pos.id_postulante = p.id_postulante
     LEFT JOIN CATALOGOS_ETAPA_POSTULACION cep ON cep.id_etapa = p.id_etapa
     WHERE p.id_convocatoria = $1
-    ORDER BY p.fecha_postulacion DESC;
+    ${condicionesExtra}
+    ORDER BY 
+      p.posicion_ranking ASC NULLS LAST,
+      p.porcentaje_afinidad DESC NULLS LAST,
+      p.fecha_postulacion DESC;
   `;
-  const result = await pool.query(query, [id_convocatoria]);
+  const result = await pool.query(query, valores);
   return result.rows;
 }
 

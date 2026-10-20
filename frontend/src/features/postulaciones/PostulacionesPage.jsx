@@ -7,6 +7,7 @@ import CvUploadForm from "./components/CvUploadForm";
 import CvViewer from "./components/CvViewer";
 import "./PostulacionesPage.css";
 import CvDatosExtraidos from "./components/CvDatosExtraidos";
+import AffinityBadge from "../recruitment/components/AffinityBadge";
 
 const tieneCvValido = (postulante) => {
   if (!postulante || !postulante.cv_archivo_url) return false;
@@ -146,10 +147,17 @@ export default function PostulacionesPage() {
                 <div className="postulaciones-vacante-info__meta">
                   <span><strong>Correo:</strong> {postulanteActual.correo_electronico}</span>
                   <span><strong>Teléfono:</strong> {postulanteActual.telefono_contacto}</span>
-                  <div style={{ marginTop: "var(--space-2)" }}>
+                  <div style={{ marginTop: "var(--space-2)", display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
                     <Etiqueta tono={tieneCv ? "exito" : "aviso"}>
                       {tieneCv ? "Documento recibido" : "Pendiente de CV"}
                     </Etiqueta>
+                    {tieneCv && postulanteActual.porcentaje_afinidad !== null && (
+                      <AffinityBadge
+                        porcentaje={postulanteActual.porcentaje_afinidad}
+                        esApto={postulanteActual.datos_extraidos_cv?.afinidadDetalle?.esApto ?? true}
+                        ranking={postulanteActual.posicion_ranking}
+                      />
+                    )}
                   </div>
                 </div>
               </div>

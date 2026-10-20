@@ -24,6 +24,7 @@ CREATE TABLE CONVOCATORIAS (
     fecha_publicacion date NOT NULL,
     fecha_limite_postulacion date NOT NULL,
     esta_activa boolean NOT NULL DEFAULT TRUE,
+    pesos_afinidad JSONB NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT CONVOCATORIAS_pk PRIMARY KEY (id_convocatoria)
 );

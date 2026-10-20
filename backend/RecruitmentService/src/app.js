@@ -7,6 +7,7 @@ const applicantRoutes = require("./routes/applicantRoutes");
 const postulacionRoutes = require("./routes/postulacionRoutes");
 const cvDataRoutes = require("./routes/cvDataRoutes");
 const errorHandler = require("./middlewares/errorHandler");
+const affinityRoutes = require("./routes/affinityRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -49,6 +50,9 @@ app.use("/postulaciones", postulacionRoutes);
 
 // RF-11: datos extraídos del CV.
 app.use(cvDataRoutes);
+
+// RF-12: cálculo y desglose de afinidad CV vs requisitos.
+app.use(affinityRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
