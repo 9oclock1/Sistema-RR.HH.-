@@ -3,23 +3,27 @@ const pool = require("./db/pool");
 
 const PORT = process.env.PORT || 3003;
 
-// ── Stage Catalog Auto-Seed Self-Healing ──
 async function initDbSeed() {
   try {
     await pool.query(`
-      INSERT INTO CATALOGOS_ETAPA_POSTULACION (id_etapa, codigo, nombre, orden_flujo) VALUES
-      (1, 'POSTULADO', 'Postulación Recibida', 1),
-      (2, 'REVISION_CV', 'Revisión Curricular', 2),
-      (3, 'ENTREVISTA', 'Entrevista', 3),
-      (4, 'EVALUACION', 'Evaluación Técnica', 4),
-      (5, 'FINALISTA', 'Finalista / Oferta', 5),
-      (6, 'CONTRATADO', 'Contratado', 6),
-      (7, 'RECHAZADO', 'No Seleccionado', 7)
+      INSERT INTO CATALOGOS_ETAPA_POSTULACION (id_etapa, codigo, nombre, orden_flujo, es_final, esta_activa) VALUES
+      (1, 'POSTULADO', 'Postulación Recibida', 1, FALSE, TRUE),
+      (2, 'EN_REVISION', 'En revisión', 2, FALSE, TRUE),
+      (3, 'ENTREVISTA_TECNICA', 'Entrevista técnica', 3, FALSE, TRUE),
+      (4, 'APTO', 'Apto', 4, FALSE, TRUE),
+      (5, 'FINALISTA', 'Finalista / Oferta', 5, FALSE, FALSE),
+      (6, 'CONTRATADO', 'Contratado', 6, TRUE, TRUE),
+      (7, 'RECHAZADO', 'Rechazado', 7, TRUE, TRUE)
       ON CONFLICT (id_etapa) DO NOTHING;
     `);
-    console.log("[DB] Catálogo de etapas inicializado/verificado correctamente.");
+    console.log(
+      "[DB] Catálogo de etapas inicializado/verificado correctamente.",
+    );
   } catch (err) {
-    console.warn("[DB] Advertencia al verificar catálogo de etapas:", err.message);
+    console.warn(
+      "[DB] Advertencia al verificar catálogo de etapas:",
+      err.message,
+    );
   }
 }
 
