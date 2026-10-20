@@ -12,12 +12,14 @@ import {
   reintentarIntegracion,
 } from "../../../api/pipelineSeleccion";
 import { getConvocatorias } from "../../../api/convocatoriasApi";
+import { obtenerEntrevistasPostulacion } from "../../../api/entrevistas";
 import ProveedorAvisos from "../../../components/ui/ProveedorAvisos";
 import { cambiarRol, cambiarUsuario } from "../../../context/sesion";
 import PipelineSeleccionPage from "./PipelineSeleccionPage";
 
 vi.mock("../../../api/pipelineSeleccion");
 vi.mock("../../../api/convocatoriasApi");
+vi.mock("../../../api/entrevistas");
 vi.mock("../../Asignaciones/hooks/useEmpleados", () => ({
   useEmpleados: () => ({ empleados: [{ id_empleado: MARIA, nombre_completo: "María Pérez" }] }),
 }));
@@ -302,5 +304,26 @@ describe("Historial de la postulación", () => {
     const dialogo = await screen.findByRole("dialog", { name: "Ana Pérez" });
     expect(await within(dialogo).findByText("CV completo")).toBeInTheDocument();
     expect(within(dialogo).getByText(/María Pérez/)).toBeInTheDocument();
+  });
+});
+
+// KAN-35 (RF-15.4): desde la tarjeta se agendan las entrevistas de quienes están en «Entrevista técnica» o «Apto».
+describe("Entrevistas desde el pipeline", () => {
+  it("ofrece las entrevistas solo a postulantes agendables y muestra la próxima cita", async () => {
+    obtenerPipeline.mockResolvedValue({
+      convocatoria,
+      postulaciones: [ana, { ...luis, proxima_entrevista: "2030-03-15T14:00:00.000Z" }, eva],
+    });
+    obtenerEntrevistasPostulacion.mockResolvedValue([]);
+    pintar();
+
+    const tarjetaLuis = await tarjetaDe("Luis Rojas");
+    expect(within(tarjetaLuis).getByText(/Entrevista .*15 mar.* · 10:00/)).toBeInTheDocument();
+    expect(within(await tarjetaDe("Ana Pérez")).queryByRole("button", { name: "Entrevistas" })).not.toBeInTheDocument();
+
+    await userEvent.click(within(tarjetaLuis).getByRole("button", { name: "Entrevistas" }));
+    const dialogo = await screen.findByRole("dialog", { name: "Entrevistas de Luis Rojas" });
+    expect(await within(dialogo).findByText("Aún no tiene entrevistas agendadas.")).toBeInTheDocument();
+    expect(within(dialogo).getByRole("button", { name: /Agendar entrevista/ })).toBeInTheDocument();
   });
 });

@@ -25,6 +25,7 @@ import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import PipelineSeleccionPage from "../features/recruitment/pipeline/PipelineSeleccionPage";
+import AgendaEntrevistasPage from "../features/recruitment/entrevistas/AgendaEntrevistasPage";
 import ReconocimientosView from "../features/Reconocimientos/ReconocimientosView";
 import CalendarioAusenciasPage from "../features/calendario-ausencias/CalendarioAusenciasPage";
 import ReportesAsistenciaPage from "../features/reportes-asistencia/ReportesAsistenciaPage";
@@ -120,6 +121,14 @@ export const SECCIONES = [
         icono: SquareKanban,
         roles: ["reclutador"],
         pagina: PipelineSeleccionPage,
+      },
+      {
+        ruta: "/reclutamiento/entrevistas",
+        etiqueta: "Agenda de entrevistas",
+        descripcion: "Calendario semanal de entrevistas por evaluador, con reprogramación y cancelación.",
+        icono: CalendarClock,
+        roles: ["reclutador"],
+        pagina: AgendaEntrevistasPage,
       },
     ],
   },

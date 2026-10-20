@@ -8,6 +8,7 @@ import { useEmpleados } from "../../Asignaciones/hooks/useEmpleados";
 import ModalCambioEtapa from "./ModalCambioEtapa";
 import ModalContratacion from "./ModalContratacion";
 import ModalDetallePostulacion from "./ModalDetallePostulacion";
+import ModalEntrevistas from "../entrevistas/ModalEntrevistas";
 import TarjetaPostulante from "./TarjetaPostulante";
 import { CODIGO_ETAPA, destinosPermitidos, nombreCompleto, puedeMoverse } from "./reglas";
 import "./pipeline.css";
@@ -56,6 +57,7 @@ export default function PipelineSeleccionPage() {
   const [columnaActiva, setColumnaActiva] = useState(null);
   const [movimiento, setMovimiento] = useState(null);
   const [detalle, setDetalle] = useState(null);
+  const [entrevistas, setEntrevistas] = useState(null);
 
   const sesion = useMemo(
     () => ({
@@ -241,6 +243,7 @@ export default function PipelineSeleccionPage() {
                       }}
                       alMover={(p) => setMovimiento({ postulacion: p, idDestino: null })}
                       alVerDetalle={setDetalle}
+                      alVerEntrevistas={setEntrevistas}
                     />
                   ))
                 )}
@@ -313,6 +316,17 @@ export default function PipelineSeleccionPage() {
           onCerrar={() => setMovimiento(null)}
           onConfirmar={confirmarCambio}
           onFormalizar={formalizar}
+        />
+      )}
+      {entrevistas && (
+        <ModalEntrevistas
+          key={entrevistas.id_postulacion}
+          postulacion={entrevistas}
+          empleados={empleados}
+          sesion={sesion}
+          puedeEditar={puedeEditar}
+          onCerrar={() => setEntrevistas(null)}
+          onActualizar={recargar}
         />
       )}
       {detalle && (

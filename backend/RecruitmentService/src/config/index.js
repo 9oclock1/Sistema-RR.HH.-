@@ -20,4 +20,11 @@ module.exports = {
     topicoPubSub: process.env.PUBSUB_TOPICO || "ucb-sis323-sub-f",
     tiempoPublicacionMs: Number(process.env.PUBSUB_TIMEOUT_MS) || 15000,
   },
+
+  // RF-15: los correos al candidato los envía NotificationService; aquí queda la cola con sus reintentos.
+  notificaciones: {
+    url: (process.env.NOTIFICATION_SERVICE_URL || "http://notification-service:3007").replace(/\/+$/, ""),
+    tiempoEsperaMs: Number(process.env.NOTIFICATION_SERVICE_TIMEOUT_MS) || 15000,
+    intervaloMs: Number(process.env.CORREO_INTERVALO_MS) || 5000,
+  },
 };

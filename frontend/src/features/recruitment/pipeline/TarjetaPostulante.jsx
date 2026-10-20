@@ -1,5 +1,6 @@
-import { ArrowRightLeft, CircleAlert, History } from "lucide-react";
+import { ArrowRightLeft, CalendarClock, CircleAlert, History } from "lucide-react";
 import { Avatar, Boton, Etiqueta, TextoTruncado } from "../../../components/ui";
+import { esAgendable, formatearDia, partesLocales } from "../entrevistas/reglasEntrevista";
 import { CODIGO_ETAPA, formatearAfinidad, formatearFecha, nombreCompleto } from "./reglas";
 
 // Estado del alta del colaborador contratado en Contabilidad y en el módulo operativo de su cargo.
@@ -23,10 +24,12 @@ export default function TarjetaPostulante({
   alTerminarArrastre,
   alMover,
   alVerDetalle,
+  alVerEntrevistas,
 }) {
   const nombre = nombreCompleto(postulacion);
   const afinidad = formatearAfinidad(postulacion.porcentaje_afinidad);
   const contratado = postulacion.codigo_etapa === CODIGO_ETAPA.CONTRATADO;
+  const conEntrevistas = esAgendable(postulacion) || Boolean(postulacion.proxima_entrevista);
 
   const iniciarArrastre = (evento) => {
     evento.dataTransfer.effectAllowed = "move";
@@ -59,6 +62,11 @@ export default function TarjetaPostulante({
         {contratado && postulacion.nombre_cargo && <Etiqueta tono="morado">{postulacion.nombre_cargo}</Etiqueta>}
         {contratado && <EstadoAlta postulacion={postulacion} />}
         {postulacion.esta_archivada && <Etiqueta>Archivada</Etiqueta>}
+        {postulacion.proxima_entrevista && (
+          <Etiqueta tono="morado" icono={CalendarClock}>
+            {`Entrevista ${formatearDia(postulacion.proxima_entrevista)} · ${partesLocales(postulacion.proxima_entrevista).hora}`}
+          </Etiqueta>
+        )}
       </div>
 
       <p className="pl-sutil">Desde el {formatearFecha(postulacion.actualizado_en)}</p>
@@ -67,6 +75,11 @@ export default function TarjetaPostulante({
         {movible && (
           <Boton variante="sutil" tamano="sm" icono={ArrowRightLeft} onClick={() => alMover(postulacion)}>
             Mover
+          </Boton>
+        )}
+        {conEntrevistas && (
+          <Boton variante="sutil" tamano="sm" icono={CalendarClock} onClick={() => alVerEntrevistas(postulacion)}>
+            Entrevistas
           </Boton>
         )}
         <Boton variante="sutil" tamano="sm" icono={History} onClick={() => alVerDetalle(postulacion)}>
