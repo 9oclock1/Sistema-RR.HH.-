@@ -23,6 +23,10 @@ import ApplicantList from "./ApplicantList";
 import "./ApplicantRegistration.css";
 import AffinityBreakdownModal from "./components/AffinityBreakdownModal";
 import AffinityRangeFilter from "./components/AffinityRangeFilter";
+import { Briefcase, Calendar, Plus, RefreshCw, Users, X, Award, ListFilter } from "lucide-react";
+import { useCandidateRanking } from "../../hooks/useCandidateRanking";
+import CandidateRankingTable from "./CandidateRankingTable";
+import RankingFilters from "./RankingFilters";
 
 function formatearFechaLimite(fecha) {
   if (!fecha) return "Abierta";
@@ -141,6 +145,19 @@ export default function ApplicantRegistration() {
     }
   };
 
+  const [vistaActiva, setVistaActiva] = useState("ranking"); // 'ranking' | 'lista'
+
+  const {
+    candidatos: rankingCandidatos,
+    paginacion: paginacionRanking,
+    cargando: cargandoRanking,
+    error: errorRanking,
+    filtros: filtrosRanking,
+    actualizarFiltro: actualizarFiltroRanking,
+    cambiarPagina: cambiarPaginaRanking,
+    recargar: recargarRanking,
+  } = useCandidateRanking(selectedOpening?.id_convocatoria);
+
   // Manejar cambio en el selector de convocatoria
   function handleOpeningChange(e) {
     const openingId = e.target.value;
@@ -191,7 +208,8 @@ export default function ApplicantRegistration() {
           ...prev,
           id_convocatoria: selectedOpening.id_convocatoria,
         }));
-        await cargarPostulantes(selectedOpening.id_convocatoria, filtroAfinidad);
+        await cargarPostulantes(selectedOpening.id_convocatoria);
+        await recargarRanking();
       }
 
     } catch (err) {
@@ -279,61 +297,88 @@ export default function ApplicantRegistration() {
         </Alerta>
       )}
 
-      {/* Tarjeta del selector de convocatoria */}
-      <Tarjeta className="postulantes-selector-tarjeta">
-        <div className="postulantes-selector-fila">
-          {loadingOpenings ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", width: "100%" }}>
-              <Esqueleto ancho="160px" alto="16px" />
-              <Esqueleto ancho="100%" alto="32px" />
+      {/* Contenedor de postulantes con selector de vista (Lista / Ranking) */}
+      {selectedOpening && (
+        <Tarjeta
+          titulo={vistaActiva === "ranking" ? "Ranking de Idoneidad de Candidatos" : "Postulantes Registrados"}
+          acciones={
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+              <Contador aria-label={`${vistaActiva === "ranking" ? paginacionRanking.total_registros : applicants.length} registros`}>
+                {vistaActiva === "ranking" ? paginacionRanking.total_registros : applicants.length}
+              </Contador>
+              <Boton
+                tamano="sm"
+                variante="sutil"
+                icono={RefreshCw}
+                onClick={vistaActiva === "ranking" ? recargarRanking : () => cargarPostulantes(selectedOpening.id_convocatoria)}
+                aria-label="Refrescar lista"
+              />
             </div>
+          }
+        >
+          {/* Navegación por pestañas */}
+          <div className="postulantes-vistas-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={vistaActiva === "ranking"}
+              className={`postulantes-tab-btn ${vistaActiva === "ranking" ? "postulantes-tab-btn--activo" : ""}`}
+              onClick={() => setVistaActiva("ranking")}
+            >
+              <Award className="ds-icono" aria-hidden="true" />
+              Ranking de Afinidad (RF-13)
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={vistaActiva === "lista"}
+              className={`postulantes-tab-btn ${vistaActiva === "lista" ? "postulantes-tab-btn--activo" : ""}`}
+              onClick={() => setVistaActiva("lista")}
+            >
+              <ListFilter className="ds-icono" aria-hidden="true" />
+              Recepción cronológica
+            </button>
+          </div>
+
+          {errorRanking && vistaActiva === "ranking" && (
+            <Alerta tono="peligro" role="alert" titulo="Error al consultar el ranking">
+              {errorRanking}
+            </Alerta>
+          )}
+
+          {vistaActiva === "ranking" ? (
+            <>
+              {/* Controles de orden secundario y filtros rápidos */}
+              <RankingFilters
+                filtros={filtrosRanking}
+                alCambiarFiltro={actualizarFiltroRanking}
+                alLimpiar={() => {
+                  actualizarFiltroRanking("desempate", "experiencia");
+                  actualizarFiltroRanking("orden_desempate", "desc");
+                  actualizarFiltroRanking("experiencia_min", "");
+                  actualizarFiltroRanking("pretension_salarial_max", "");
+                }}
+              />
+
+              {/* Tabla de ranking con insignias y orden matemático */}
+              <CandidateRankingTable
+                candidatos={rankingCandidatos}
+                paginacion={paginacionRanking}
+                cargando={cargandoRanking}
+                tituloConvocatoria={selectedOpening.titulo_puesto}
+                alCambiarPagina={cambiarPaginaRanking}
+              />
+            </>
           ) : (
-            <Selector
-              id="selector-convocatoria"
-              etiqueta="Convocatoria activa"
-              textoVacio="— Seleccione una convocatoria activa —"
-              opciones={opcionesConvocatorias}
-              value={formData.id_convocatoria}
-              onChange={handleOpeningChange}
-              error={fieldErrors.id_convocatoria}
-              ayuda={jobOpenings.length === 0 ? "No hay convocatorias activas disponibles actualmente." : undefined}
+            <ApplicantList
+              applicants={applicants}
+              loading={loadingApplicants}
+              openingTitle={selectedOpening.titulo_puesto}
+              onRegistrarPrimerPostulante={handleToggleForm}
             />
           )}
-        </div>
-
-        {/* Resumen de la convocatoria seleccionada */}
-        {selectedOpening && (
-          <div className="postulantes-convocatoria-resumen">
-            <div className="postulantes-metrica">
-              <span className="postulantes-metrica__etiqueta">Puesto</span>
-              <span className="postulantes-metrica__valor">
-                <Briefcase className="ds-icono" aria-hidden="true" />
-                {selectedOpening.titulo_puesto}
-              </span>
-            </div>
-            <div className="postulantes-metrica">
-              <span className="postulantes-metrica__etiqueta">Vacantes</span>
-              <span className="postulantes-metrica__valor">
-                <Users className="ds-icono" aria-hidden="true" />
-                {selectedOpening.cantidad_vacantes ?? 1}
-              </span>
-            </div>
-            <div className="postulantes-metrica">
-              <span className="postulantes-metrica__etiqueta">Fecha límite</span>
-              <span className="postulantes-metrica__valor">
-                <Calendar className="ds-icono" aria-hidden="true" />
-                {formatearFechaLimite(selectedOpening.fecha_limite_postulacion)}
-              </span>
-            </div>
-            <div className="postulantes-metrica">
-              <span className="postulantes-metrica__etiqueta">Estado</span>
-              <span className="postulantes-metrica__valor">
-                <Etiqueta tono="exito">Convocatoria activa</Etiqueta>
-              </span>
-            </div>
-          </div>
-        )}
-      </Tarjeta>
+        </Tarjeta>
+      )}
 
       {/* Formulario de registro (colapsable o visible a demanda) */}
       {showForm && selectedOpening && (

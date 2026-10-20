@@ -10,3 +10,4 @@ export { default as ApplicantList } from "./ApplicantList";
 
 export { default as RankingBadge } from "./RankingBadge";
 export { default as CandidateRankingTable } from "./CandidateRankingTable";
+export { default as RankingFilters } from "./RankingFilters";
