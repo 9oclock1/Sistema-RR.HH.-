@@ -6,6 +6,7 @@ import { cambiarEtapaPostulacion, obtenerCatalogoPipeline, obtenerPipeline } fro
 import { useRol, useUsuario } from "../../../context/sesion";
 import { useEmpleados } from "../../Asignaciones/hooks/useEmpleados";
 import ModalCambioEtapa from "./ModalCambioEtapa";
+import ModalContratacion from "./ModalContratacion";
 import ModalDetallePostulacion from "./ModalDetallePostulacion";
 import TarjetaPostulante from "./TarjetaPostulante";
 import { CODIGO_ETAPA, destinosPermitidos, nombreCompleto, puedeMoverse } from "./reglas";
@@ -123,21 +124,34 @@ export default function PipelineSeleccionPage() {
       });
       return;
     }
-    setMovimiento({ postulacion, idDestino: etapa.id_etapa });
+    setMovimiento({
+      postulacion,
+      idDestino: etapa.id_etapa,
+      contratacion: etapa.codigo === CODIGO_ETAPA.CONTRATADO,
+    });
   };
 
-  const confirmarCambio = async (cuerpo) => {
+  const enviarCambio = async (cuerpo) => {
     try {
       const respuesta = await cambiarEtapaPostulacion(movimiento.postulacion.id_postulacion, cuerpo, sesion);
-      setMovimiento(null);
-      avisar({ tono: "exito", titulo: "Etapa actualizada", mensaje: respuesta.message });
       recargar();
+      return respuesta;
     } catch (falla) {
       // Otro reclutador pudo mover la tarjeta antes: el tablero se pone al día.
       if (falla.status === 409 || falla.status === 404) recargar();
       throw falla;
     }
   };
+
+  const confirmarCambio = async (cuerpo) => {
+    const respuesta = await enviarCambio(cuerpo);
+    setMovimiento(null);
+    avisar({ tono: "exito", titulo: "Etapa actualizada", mensaje: respuesta.message });
+  };
+
+  // Desde «Mover», elegir «Contratado» pasa al modal de formalización.
+  const formalizar = (idEtapa) =>
+    setMovimiento((actual) => ({ ...actual, idDestino: idEtapa, contratacion: true }));
 
   const contratados = postulaciones.filter((p) => p.codigo_etapa === CODIGO_ETAPA.CONTRATADO).length;
   const opcionesConvocatoria = (convocatorias ?? []).map((c) => ({
@@ -278,15 +292,27 @@ export default function PipelineSeleccionPage() {
 
       {tablero}
 
-      {movimiento && (
+      {movimiento?.contratacion && (
+        <ModalContratacion
+          key={`contratacion-${movimiento.postulacion.id_postulacion}`}
+          postulacion={movimiento.postulacion}
+          convocatoria={vista.datos.convocatoria}
+          idEtapaContratado={movimiento.idDestino}
+          cargos={catalogo.cargos_operativos}
+          sesion={sesion}
+          onCerrar={() => setMovimiento(null)}
+          onContratar={enviarCambio}
+        />
+      )}
+      {movimiento && !movimiento.contratacion && (
         <ModalCambioEtapa
           key={`${movimiento.postulacion.id_postulacion}-${movimiento.idDestino}`}
           postulacion={movimiento.postulacion}
           destinos={destinosDe(movimiento.postulacion)}
           idDestinoInicial={movimiento.idDestino}
-          cargos={catalogo.cargos_operativos}
           onCerrar={() => setMovimiento(null)}
           onConfirmar={confirmarCambio}
+          onFormalizar={formalizar}
         />
       )}
       {detalle && (
