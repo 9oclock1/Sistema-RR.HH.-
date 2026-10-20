@@ -1,0 +1,34 @@
+sequenceDiagram
+  autonumber
+  actor C as Colaborador
+  participant P as Licencias
+  participant GW as API Gateway
+  participant S as LicenciasService
+  participant E as EmployeeService
+  participant A as Almacenamiento
+  participant M as Modelo
+  participant DB as AttendanceDB
+
+  C->>P: causal, fechas y comprobantes
+  P->>GW: POST /att/licencias/solicitudes (multipart)
+  GW->>S: radicar(idEmpleado, datos, archivos)
+  S->>E: empleado activo
+  S->>M: obtenerTipo(causal)
+  M->>DB: CATALOGOS_TIPO_LICENCIA
+  alt la causal exige respaldo y no hay archivo
+    S-->>P: 400 adjunte el respaldo digital
+  else hay respaldo o no se exige
+    S->>S: valida firma del archivo (PDF, JPG o PNG)
+    S->>A: guarda cada archivo
+    S->>S: evaluarLimite(tipo, días)
+    S->>M: crear(solicitud, adjuntos)
+    M->>DB: BEGIN, INSERT solicitud y adjuntos, COMMIT
+    alt fechas cruzadas con otra licencia activa
+      DB-->>M: 23P01 (EXCLUDE)
+      S->>A: elimina los archivos guardados
+      S-->>P: 409 elija fechas que no se solapen
+    else registrada
+      S-->>P: 201 con clasificación CON_GOCE o SIN_GOCE
+      Note over S,P: si excede el tope, requiere_autorizacion_rrhh = true y se advierte
+    end
+  end

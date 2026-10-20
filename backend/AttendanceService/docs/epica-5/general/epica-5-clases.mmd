@@ -1,0 +1,72 @@
+classDiagram
+  direction TB
+
+  class Empleado {
+    <<EmployeeService>>
+    id_empleado
+    fecha_ingreso
+    cargo · área · sucursal
+    supervisor directo
+  }
+
+  class SolicitudVacacion {
+    <<KAN-50 · KAN-52>>
+    id_solicitud
+    fecha_inicio · fecha_fin
+    dias_habiles
+    estado
+  }
+  class MovimientoVacacion {
+    <<KAN-52>>
+    dias
+    estado: EN_PROCESO · GOZADO · CANCELADO
+  }
+  class SolicitudLicencia {
+    <<KAN-51>>
+    id_solicitud
+    fecha_inicio · fecha_fin
+    es_con_goce_haberes
+    excede_limite_dias
+    estado
+  }
+  class TipoLicencia {
+    <<catálogo>>
+    codigo · nombre
+    dias_maximos_continuos
+    requiere_adjunto
+  }
+  class AdjuntoLicencia {
+    nombre_original
+    formato_mimetype
+  }
+  class EventoSaliente {
+    <<KAN-53>>
+    PERSONAL_NO_DISPONIBLE
+    topico · estado · intentos
+  }
+  class Notificacion {
+    <<KAN-54 · NotificationDB>>
+    titulo · mensaje · enlace
+    leida
+    correo_estado
+  }
+  class UmbralCobertura {
+    <<KAN-55>>
+    sucursal · área
+    max_ausentes_porcentaje
+    min_presentes
+  }
+
+  SolicitudVacacion "1" --> "1" MovimientoVacacion : reserva y debita los días
+  SolicitudLicencia "*" --> "1" TipoLicencia
+  SolicitudLicencia "1" *-- "0..*" AdjuntoLicencia
+  SolicitudVacacion ..> Empleado : id_empleado
+  SolicitudLicencia ..> Empleado : id_empleado
+  SolicitudVacacion ..> EventoSaliente : al aprobar
+  SolicitudLicencia ..> EventoSaliente : al aprobar
+  EventoSaliente ..> Notificacion : mismo resultado, otro canal
+  SolicitudVacacion ..> Notificacion : avisa el resultado
+  SolicitudLicencia ..> Notificacion : avisa el resultado
+  UmbralCobertura ..> Empleado : sucursal y área
+  UmbralCobertura ..> SolicitudVacacion : cobertura con ausencias aprobadas
+  UmbralCobertura ..> SolicitudLicencia : cobertura con ausencias aprobadas

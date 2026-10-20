@@ -1,0 +1,38 @@
+sequenceDiagram
+  autonumber
+  actor C as Colaborador
+  participant P as Solicitud de vacaciones
+  participant GW as API Gateway
+  participant S as SolicitudesVacacionService
+  participant E as EmployeeService
+  participant M as Modelo
+  participant DB as AttendanceDB
+  participant N as NotificationService
+
+  C->>P: fecha de inicio y de fin
+  P->>GW: GET /att/vacaciones/solicitudes/calculo
+  GW->>S: calcular(idEmpleado, fechas)
+  S->>E: GET /empleados/:id
+  S->>M: feriados, turnos publicados y solicitudes cruzadas
+  M->>DB: FERIADOS, TURNOS_PUBLICADOS, SOLICITUDES_VACACION
+  S-->>P: días hábiles y problemas (saldo, cruce, anticipación)
+  C->>P: Enviar solicitud
+  P->>GW: POST /att/vacaciones/solicitudes
+  GW->>S: registrarSolicitud(idEmpleado, fechas)
+  S->>E: empleado activo con un año de antigüedad
+  S->>E: GET /empleados/:id/supervisor
+  S->>M: enTransaccionDeEmpleado
+  M->>DB: BEGIN y pg_advisory_xact_lock
+  S->>S: vuelve a evaluar saldo, anticipación y cruces
+  alt hay problemas
+    S-->>P: 409 saldo insuficiente, conflicto de fechas o anticipación
+    M->>DB: ROLLBACK
+  else todo válido
+    M->>DB: INSERT solicitud PENDIENTE y movimiento EN_PROCESO (una sentencia)
+    M->>DB: COMMIT
+    S->>N: POST /comunicaciones/directa al supervisor
+    opt NotificationService acepta
+      S->>M: marcarNotificada
+    end
+    S-->>P: 201 solicitud pendiente y aviso si el supervisor no se pudo notificar
+  end

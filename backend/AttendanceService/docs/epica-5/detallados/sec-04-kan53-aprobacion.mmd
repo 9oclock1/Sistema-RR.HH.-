@@ -1,0 +1,64 @@
+sequenceDiagram
+  autonumber
+  actor S as Supervisor o RRHH
+  participant P as Aprobaciones
+  participant GW as API Gateway
+  participant MW as exigirResolutor
+  participant AP as AprobacionesService
+  participant V as SolicitudesVacacionService
+  participant L as LicenciasService
+  participant I as IndisponibilidadService
+  participant E as EmployeeService
+  participant M as Modelo
+  participant DB as AttendanceDB
+  participant N as NotificationService
+
+  S->>P: sucursal, área, tipo y prioridad
+  P->>GW: GET /att/aprobaciones/solicitudes
+  GW->>MW: cabecera X-Rol
+  alt rol distinto de supervisor, gerente o admin
+    MW-->>P: 403 solo un supervisor o RRHH puede resolver
+  else autorizado
+    MW->>AP: listarBandeja(filtros)
+    AP->>E: personal de la sucursal y el área
+    AP->>M: vacaciones y licencias de ese personal
+    M->>DB: SOLICITUDES_VACACION y SOLICITUDES_LICENCIA
+    AP-->>P: solicitudes ordenadas por prioridad y contadores por estado
+  end
+
+  S->>P: Revisar una solicitud
+  P->>GW: GET /att/aprobaciones/solicitudes/:categoria/:id
+  GW->>AP: obtenerDetalle(categoría, id)
+  AP->>E: ubicación y equipo del colaborador
+  AP->>M: ausencias del equipo que se cruzan con las fechas
+  AP-->>P: fechas, días, causal, comprobantes, saldo y cobertura del equipo
+
+  S->>P: Aprobar, o Rechazar con motivo
+  P->>GW: POST /att/aprobaciones/solicitudes/:categoria/:id/resolucion
+  GW->>AP: resolver(categoría, resolutor, datos, rol)
+  alt categoría VACACIONES
+    AP->>V: resolverSolicitud(resolutor, id, datos)
+  else categoría LICENCIA
+    AP->>L: resolver(resolutor, id, datos, rol)
+    opt licencia sobre su tope y rol supervisor al aprobar
+      L-->>P: 403 solo RRHH puede autorizarla
+    end
+  end
+  alt rechazo sin motivo, solicitud propia o ya resuelta
+    V-->>P: 400, 403 o 409
+  else decisión válida
+    opt aprobación
+      V->>I: prepararEvento(solicitud)
+      I->>E: nombre y área del empleado
+      Note over I,E: sin área conocida no se aprueba (503)
+    end
+    V->>M: transacción bloqueando al empleado
+    M->>DB: UPDATE solicitud, solo si sigue PENDIENTE
+    M->>DB: movimiento EN_PROCESO pasa a GOZADO si se aprueba, o a CANCELADO si se rechaza
+    opt aprobación
+      M->>DB: INSERT EVENTOS_SALIENTES tipo PERSONAL_NO_DISPONIBLE
+    end
+    M->>DB: COMMIT
+    V->>N: aviso del resultado al colaborador (KAN-54)
+    V-->>P: 200 resuelta, notificacion_enviada y eventos_sincronizacion
+  end
