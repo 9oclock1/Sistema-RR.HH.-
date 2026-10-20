@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, ClipboardCheck, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, ClipboardCheck, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
@@ -24,6 +24,7 @@ import MiAsistenciaPage from "../features/mi-asistencia/MiAsistenciaPage";
 import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
+import PipelineSeleccionPage from "../features/recruitment/pipeline/PipelineSeleccionPage";
 import ReconocimientosView from "../features/Reconocimientos/ReconocimientosView";
 import ReportesAsistenciaPage from "../features/reportes-asistencia/ReportesAsistenciaPage";
 import RolTurnosPage from "../features/rol-turnos/RolTurnosPage";
@@ -110,6 +111,14 @@ export const SECCIONES = [
         icono: FileUser,
         roles: ["reclutador"],
         pagina: PostulacionesPage,
+      },
+      {
+        ruta: "/reclutamiento/pipeline",
+        etiqueta: "Pipeline de selección",
+        descripcion: "Etapas de cada postulante, trazabilidad de los cambios y alta de los contratados.",
+        icono: SquareKanban,
+        roles: ["reclutador"],
+        pagina: PipelineSeleccionPage,
       },
     ],
   },
