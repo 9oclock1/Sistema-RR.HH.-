@@ -1,4 +1,4 @@
-import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarDays, CalendarRange, ClipboardCheck, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, IdCard, ListTree, Mail, Megaphone, Network, Send, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarDays, CalendarRange, ClipboardCheck, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
@@ -18,6 +18,7 @@ import { RUTA_KARDEX } from "../features/Kardex/ruta";
 import MarcajePage from "../features/marcaje/MarcajePage";
 import MemorandumsView from "../features/Memorandums/MemorandumsView";
 import MisMemorandumsPage from "../features/Memorandums/acuses/MisMemorandumsPage";
+import MiAsistenciaPage from "../features/mi-asistencia/MiAsistenciaPage";
 import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
@@ -120,6 +121,14 @@ export const SECCIONES = [
         icono: Fingerprint,
         roles: ["empleado"],
         pagina: MarcajePage,
+      },
+      {
+        ruta: "/asistencia/mi-asistencia",
+        etiqueta: "Mi asistencia",
+        descripcion: "Historial de sus marcajes, atrasos acumulados, faltas y horas computadas.",
+        icono: History,
+        roles: ["empleado"],
+        pagina: MiAsistenciaPage,
       },
       {
         ruta: "/asistencia/licencias",
