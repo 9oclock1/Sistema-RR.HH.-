@@ -3,6 +3,7 @@ const modelo = require("../models/eventos.model");
 const pubsub = require("../config/pubsub");
 const {
   TIPO_EVENTO,
+  ORIGEN,
   DESTINOS,
   topicosDelArea,
   esperaReintento,
@@ -17,6 +18,13 @@ const LOTE = 10;
 const SEGUNDOS_RESERVA = 60;
 
 const prefijoTopico = () => process.env.PUBSUB_PREFIJO_TOPICO || "ucb-sis323-sub-";
+
+// Además del tópico del grupo destino, una copia en el tópico propio (F), por si cada grupo lee el del remitente.
+function topicosDeEnvio(grupoDestino) {
+  const topicos = [topicoDelGrupo(prefijoTopico(), grupoDestino)];
+  if (process.env.PUBSUB_COPIA_PROPIA !== "false") topicos.push(topicoDelGrupo(prefijoTopico(), ORIGEN.grupo));
+  return topicos;
+}
 
 const topicosDe = (codigoArea) =>
   topicosDelArea(codigoArea, {
@@ -48,20 +56,30 @@ async function registrarPublicacion(cliente, detalle) {
   }
 }
 
+// Si un tópico falla se reintenta el evento completo; los receptores descartan duplicados por id_mensaje.
 async function publicar(clientePubSub, evento) {
-  const topico = topicoDelGrupo(prefijoTopico(), DESTINOS[evento.topico].grupo);
-  try {
-    await clientePubSub.topic(topico).publishMessage({ json: evento.carga, attributes: atributosDe(evento.carga) });
+  const topicos = topicosDeEnvio(DESTINOS[evento.topico].grupo);
+  const mensaje = { json: evento.carga, attributes: atributosDe(evento.carga) };
+  const resultados = await Promise.allSettled(topicos.map((topico) => clientePubSub.topic(topico).publishMessage(mensaje)));
+  resultados.forEach((resultado, i) => {
+    if (resultado.status === "fulfilled") {
+      console.log(`Evento ${evento.id_evento} publicado en ${topicos[i]} (mensaje ${resultado.value})`);
+    }
+  });
+  const fallo = resultados.findIndex((resultado) => resultado.status === "rejected");
+  if (fallo === -1) {
     await modelo.marcarEntregado(evento.id_evento);
-  } catch (error) {
-    console.error(`Error al publicar el evento ${evento.id_evento} en ${topico}:`, error.message);
-    const { mensaje, permanente } = errorDePublicacion(error, topico);
-    await modelo.marcarError(evento.id_evento, {
-      error: mensaje,
-      esperaMs: esperaReintento(evento.intentos + 1),
-      fallido: permanente,
-    });
+    return;
   }
+  const topico = topicos[fallo];
+  const error = resultados[fallo].reason;
+  console.error(`Error al publicar el evento ${evento.id_evento} en ${topico}:`, error.message);
+  const { mensaje: motivo, permanente } = errorDePublicacion(error, topico);
+  await modelo.marcarError(evento.id_evento, {
+    error: motivo,
+    esperaMs: esperaReintento(evento.intentos + 1),
+    fallido: permanente,
+  });
 }
 
 // Envía a Pub/Sub los eventos pendientes; sin Pub/Sub configurado quedan en la base hasta que lo esté.

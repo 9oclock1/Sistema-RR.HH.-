@@ -38,24 +38,29 @@ const pendiente = (cambios = {}) => ({
   ...cambios,
 });
 
-// Cliente de Pub/Sub falso: guarda lo publicado por tópico o falla con el error indicado.
-function clienteFalso(error) {
+// Cliente de Pub/Sub falso: guarda lo publicado por tópico; `fallos` indica el error de cada tópico que debe fallar.
+function clienteFalso(fallos = {}) {
   const publicados = [];
   return {
     publicados,
     topic: (nombre) => ({
       publishMessage: async (mensaje) => {
-        if (error) throw error;
+        if (fallos[nombre]) throw fallos[nombre];
         publicados.push({ topico: nombre, ...mensaje });
-        return "id-pubsub";
+        return `id-${nombre}`;
       },
     }),
   };
 }
 
+const errorGrpc = (code) => Object.assign(new Error(`grpc ${code}`), { code });
+
 beforeEach(() => {
   mock.restoreAll();
+  mock.method(console, "log", () => {});
+  mock.method(console, "error", () => {});
   delete process.env.PUBSUB_PREFIJO_TOPICO;
+  delete process.env.PUBSUB_COPIA_PROPIA;
   process.env.AREAS_PRODUCCION = "PAN";
   process.env.AREAS_REPARTO = "PAN";
 });
@@ -86,41 +91,53 @@ test("sin Pub/Sub configurado no reserva ni envía nada", async () => {
   assert.equal(reservar.mock.callCount(), 0);
 });
 
-test("publica en el tópico del grupo con el encabezado como atributos y marca entregado", async () => {
+test("publica en el tópico del grupo destino y una copia igual en el propio, y marca entregado", async () => {
   const cliente = clienteFalso();
   mock.method(pubsub, "obtenerCliente", () => cliente);
   const reservar = mock.method(modelo, "reservarPendientes", async () => [pendiente()]);
   const entregado = mock.method(modelo, "marcarEntregado", async () => 1);
-  process.env.PUBSUB_PREFIJO_TOPICO = "ucb-sis323-sub-";
 
   assert.equal(await servicio.despachar(), 1);
   assert.deepEqual(reservar.mock.calls[0].arguments[0], ["produccion-logistica", "entregas-despachos"]);
-  assert.equal(cliente.publicados.length, 1);
-  const [publicado] = cliente.publicados;
-  assert.equal(publicado.topico, "ucb-sis323-sub-g");
-  assert.deepEqual(publicado.json, pendiente().carga);
-  assert.equal(publicado.attributes.origen, "F");
-  assert.equal(publicado.attributes.destino, "G");
+  assert.deepEqual(cliente.publicados.map((p) => p.topico), ["ucb-sis323-sub-g", "ucb-sis323-sub-f"]);
+  for (const publicado of cliente.publicados) {
+    assert.deepEqual(publicado.json, pendiente().carga);
+    assert.equal(publicado.attributes.origen, "F");
+    assert.equal(publicado.attributes.destino, "G");
+  }
   assert.deepEqual(entregado.mock.calls[0].arguments, ["ev-1"]);
 });
 
+test("PUBSUB_COPIA_PROPIA=false publica solo en el tópico del destino", async () => {
+  process.env.PUBSUB_COPIA_PROPIA = "false";
+  const cliente = clienteFalso();
+  mock.method(pubsub, "obtenerCliente", () => cliente);
+  mock.method(modelo, "reservarPendientes", async () => [pendiente()]);
+  mock.method(modelo, "marcarEntregado", async () => 1);
+  await servicio.despachar();
+  assert.deepEqual(cliente.publicados.map((p) => p.topico), ["ucb-sis323-sub-g"]);
+});
+
 test("un error de red se reintenta más tarde; un tópico inexistente queda fallido", async () => {
-  mock.method(console, "error", () => {});
   mock.method(modelo, "reservarPendientes", async () => [pendiente({ intentos: 2 })]);
   const marcarError = mock.method(modelo, "marcarError", async () => {});
+  const entregado = mock.method(modelo, "marcarEntregado", async () => 1);
 
-  mock.method(pubsub, "obtenerCliente", () => clienteFalso(Object.assign(new Error("UNAVAILABLE"), { code: 14 })));
+  mock.method(pubsub, "obtenerCliente", () => clienteFalso({ "ucb-sis323-sub-g": errorGrpc(14), "ucb-sis323-sub-f": errorGrpc(14) }));
   await servicio.despachar();
   assert.deepEqual(marcarError.mock.calls[0].arguments, [
     "ev-1",
     { error: "No se pudo conectar con Pub/Sub", esperaMs: 120000, fallido: false },
   ]);
 
-  mock.method(pubsub, "obtenerCliente", () => clienteFalso(Object.assign(new Error("NOT_FOUND"), { code: 5 })));
+  const cliente = clienteFalso({ "ucb-sis323-sub-f": errorGrpc(5) });
+  mock.method(pubsub, "obtenerCliente", () => cliente);
   await servicio.despachar();
   assert.deepEqual(marcarError.mock.calls[1].arguments[1], {
-    error: "El tópico ucb-sis323-sub-g no existe en Pub/Sub",
+    error: "El tópico ucb-sis323-sub-f no existe en Pub/Sub",
     esperaMs: 120000,
     fallido: true,
   });
+  assert.deepEqual(cliente.publicados.map((p) => p.topico), ["ucb-sis323-sub-g"]);
+  assert.equal(entregado.mock.callCount(), 0);
 });
