@@ -186,7 +186,7 @@ async function listarPipeline(idConvocatoria) {
             p.porcentaje_afinidad, p.posicion_ranking, p.fecha_postulacion, p.actualizado_en,
             p.esta_archivada, p.contratado_en, p.alta_contabilidad_enviada, p.alta_operativa_enviada,
             c.codigo AS codigo_cargo, c.nombre AS nombre_cargo,
-            pos.nombres, pos.apellidos, pos.correo_electronico, pos.ciudad,
+            pos.nombres, pos.apellidos, pos.numero_documento, pos.correo_electronico, pos.telefono_contacto, pos.ciudad,
             (SELECT COUNT(*)::int FROM EVENTOS_SALIENTES ev
               WHERE ev.id_postulacion = p.id_postulacion AND ev.id_estado_evento = $2) AS integraciones_fallidas
        FROM POSTULACIONES p

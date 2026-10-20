@@ -1,11 +1,8 @@
 import { useEffect, useState } from "react";
-import { RotateCcw } from "lucide-react";
 import { Alerta, Boton, Esqueleto, Etiqueta, Modal } from "../../../components/ui";
 import { obtenerHistorialEtapas, obtenerIntegraciones, reintentarIntegracion } from "../../../api/pipelineSeleccion";
+import ListaIntegraciones from "./ListaIntegraciones";
 import { formatearFecha, nombreCompleto, tonoEtapa } from "./reglas";
-
-const TONO_ESTADO = { PENDIENTE: "aviso", ENTREGADO: "exito", FALLIDO: "peligro" };
-const NOMBRE_ESTADO = { PENDIENTE: "En curso", ENTREGADO: "Enviada", FALLIDO: "Fallida" };
 
 // RF-14: trazabilidad de la postulación (quién cambió cada etapa y cuándo) y estado del alta en el ERP.
 export default function ModalDetallePostulacion({ postulacion, sesion, onCerrar, onActualizar }) {
@@ -69,31 +66,11 @@ export default function ModalDetallePostulacion({ postulacion, sesion, onCerrar,
                 {errorReintento}
               </Alerta>
             )}
-            <ul className="pl-lista">
-              {datos.integraciones.map((evento) => (
-                <li key={evento.id_evento} className="pl-lista__item">
-                  <div className="pl-lista__fila">
-                    <strong>{evento.nombre_modulo}</strong>
-                    <Etiqueta tono={TONO_ESTADO[evento.estado]}>{NOMBRE_ESTADO[evento.estado] ?? evento.estado}</Etiqueta>
-                  </div>
-                  <p className="pl-sutil">
-                    {evento.estado === "ENTREGADO"
-                      ? `Enviada el ${formatearFecha(evento.entregado_en, { conHora: true })}`
-                      : `${evento.intentos} intento(s)${evento.ultimo_error ? ` · ${evento.ultimo_error}` : ""}`}
-                  </p>
-                  {evento.estado === "FALLIDO" && (
-                    <Boton
-                      tamano="sm"
-                      icono={RotateCcw}
-                      cargando={reintentando === evento.id_evento}
-                      onClick={() => reintentar(evento)}
-                    >
-                      Reintentar envío
-                    </Boton>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <ListaIntegraciones
+              integraciones={datos.integraciones}
+              reintentando={reintentando}
+              onReintentar={reintentar}
+            />
           </section>
         )}
 
