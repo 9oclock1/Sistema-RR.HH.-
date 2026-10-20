@@ -1,4 +1,4 @@
-import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, ClipboardCheck, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, ClipboardCheck, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
@@ -7,6 +7,7 @@ import ApplicantRegistration from "../features/recruitment/ApplicantRegistration
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
 import CapacitacionesView from "../features/Capacitaciones/CapacitacionesView";
 import { RUTA_CAPACITACIONES } from "../features/Capacitaciones/utils/opciones";
+import NotificacionesPage from "../features/notificaciones/NotificacionesPage";
 import CargosList from "../features/Cargos/CargosList";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import ContratosView from "../features/Contratos/ContratosView";
@@ -287,6 +288,14 @@ export const SECCIONES = [
         icono: Mail,
         roles: ["empleado"],
         pagina: BandejaMensajesPage,
+      },
+      {
+        ruta: "/comunicaciones/notificaciones",
+        etiqueta: "Notificaciones",
+        descripcion: "Resultado de sus solicitudes de vacaciones, permisos y licencias, con su justificación.",
+        icono: Bell,
+        roles: ["empleado"],
+        pagina: NotificacionesPage,
       },
       {
         ruta: "/comunicaciones/memorandums",
