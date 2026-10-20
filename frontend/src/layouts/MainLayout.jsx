@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { House, Menu, Search } from "lucide-react";
+import { iniciarConsolaPubSub } from "../api/mensajesPublicados";
 import { Boton, ElementoNavegacion, Selector, useAvisos } from "../components/ui";
 import { cambiarRol, cambiarUsuario, useRol, useUsuario } from "../context/sesion";
 import { useEmpleados } from "../features/Asignaciones/hooks/useEmpleados";
@@ -72,6 +73,10 @@ export default function MainLayout() {
   const menuVisible = escritorio ? !plegado : abiertoMovil;
   const lateralVisible = menuVisible || Boolean(consulta);
   const superpuesto = !escritorio && lateralVisible;
+
+  useEffect(() => {
+    iniciarConsolaPubSub();
+  }, []);
 
   // Al cambiar de página, el foco pasa al contenido para los lectores de pantalla.
   useEffect(() => {

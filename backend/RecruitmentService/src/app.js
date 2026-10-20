@@ -11,6 +11,7 @@ const affinityRoutes = require("./routes/affinityRoutes");
 const rankingRoutes = require("./routes/rankingRoutes");
 const etapaPostulacionRoutes = require("./routes/etapaPostulacionRoutes");
 const entrevistaRoutes = require("./routes/entrevistaRoutes");
+const mensajesPublicadosRoutes = require("./routes/mensajesPublicadosRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -65,6 +66,9 @@ app.use(etapaPostulacionRoutes);
 
 // RF-15: agenda de entrevistas (agendar, reprogramar, cancelar) y notificación al candidato.
 app.use(entrevistaRoutes);
+
+// Mensajes publicados en Pub/Sub, para mostrarlos en la consola del navegador.
+app.use(mensajesPublicadosRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

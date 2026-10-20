@@ -1,4 +1,5 @@
 const fs = require('node:fs');
+const mensajesPublicados = require('../utils/mensajesPublicados');
 
 const TIEMPO_ESPERA_MS = 10000;
 const TIPO_SOLICITUD_COMPRA = 'SOLICITUD_COMPRA_CAPACITACION';
@@ -92,6 +93,12 @@ const publicarSolicitudCompraCapacitacion = async (solicitud) => {
   const idPubSub = await conLimiteDeTiempo(
     obtenerTopico().publishMessage({ data: Buffer.from(JSON.stringify(mensaje.cuerpo)), attributes: mensaje.atributos })
   );
+  mensajesPublicados.registrar({
+    topico: configuracion().topic,
+    idPubSub,
+    atributos: mensaje.atributos,
+    cuerpo: mensaje.cuerpo,
+  });
   return { id_pubsub: idPubSub, mensaje };
 };
 
