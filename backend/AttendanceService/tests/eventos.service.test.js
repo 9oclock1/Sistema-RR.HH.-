@@ -126,6 +126,16 @@ test("un error de red se reintenta más tarde; un tópico inexistente queda fall
   });
 });
 
+test("registra en el log el id de mensaje que devuelve Pub/Sub", async () => {
+  const log = mock.method(console, "log", () => {});
+  mock.method(pubsub, "obtenerCliente", () => clienteFalso());
+  mock.method(modelo, "reservarPendientes", async () => [pendiente()]);
+  mock.method(modelo, "marcarEntregado", async () => 1);
+
+  await servicio.despachar();
+  assert.match(log.mock.calls[0].arguments[0], /ev-1 publicado en ucb-sis323-sub-f \(mensaje id-pubsub\)/);
+});
+
 test("Producción y Entregas salen por el mismo tópico de RRHH; solo cambia el destino del encabezado", async () => {
   const cliente = clienteFalso();
   mock.method(pubsub, "obtenerCliente", () => cliente);

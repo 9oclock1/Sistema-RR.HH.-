@@ -30,7 +30,7 @@ async function listarProgramacion(desde, hasta, ids = null) {
      SELECT f.* FROM fijos f
      WHERE NOT EXISTS (SELECT 1 FROM publicados p WHERE p.id_empleado = f.id_empleado AND p.fecha = f.fecha)
      ORDER BY id_empleado, fecha`,
-    [desde, hasta, ids]
+    [desde, hasta, ids],
   );
   return rows;
 }
@@ -46,7 +46,7 @@ async function listarMarcajes(ids, desde, hasta) {
      JOIN catalogos_estado_marcaje e USING (id_estado_marcaje)
      WHERE m.id_empleado = ANY($1::uuid[]) AND m.fecha_jornada BETWEEN $2::date - 1 AND $3::date + 1
      ORDER BY m.fecha_hora_marcaje`,
-    [ids, desde, hasta]
+    [ids, desde, hasta],
   );
   return rows;
 }
@@ -77,7 +77,7 @@ async function registrar(novedades) {
       columna("minutos"),
       columna("minutos_penalizacion"),
       columna("minutos_programados"),
-    ]
+    ],
   );
   return rowCount;
 }
@@ -94,7 +94,10 @@ const conCatalogos = `
 async function listarPorMarcajes(idsMarcajes) {
   const ids = idsMarcajes.filter(Boolean);
   if (ids.length === 0) return [];
-  const { rows } = await pool.query(`${conCatalogos} WHERE n.id_marcaje = ANY($1::uuid[]) ORDER BY n.id_tipo_novedad`, [ids]);
+  const { rows } = await pool.query(
+    `${conCatalogos} WHERE n.id_marcaje = ANY($1::uuid[]) ORDER BY n.id_tipo_novedad`,
+    [ids],
+  );
   return rows;
 }
 
@@ -110,7 +113,7 @@ async function reservarPorConsolidar(cliente, minutosCierre, limite) {
        FOR UPDATE SKIP LOCKED
      )
      ORDER BY n.id_empleado, n.fecha_jornada, n.id_tipo_novedad`,
-    [minutosCierre, limite]
+    [minutosCierre, limite],
   );
   return rows;
 }
@@ -118,7 +121,7 @@ async function reservarPorConsolidar(cliente, minutosCierre, limite) {
 async function marcarConsolidadas(cliente, ids) {
   await cliente.query(
     "UPDATE novedades_asistencia SET consolidada_en = CURRENT_TIMESTAMP WHERE id_novedad = ANY($1::uuid[])",
-    [ids]
+    [ids],
   );
 }
 
@@ -131,7 +134,7 @@ async function sumarAtrasosDelMes(ids, fecha) {
      WHERE n.id_empleado = ANY($1::uuid[]) AND n.id_tipo_novedad = 1 AND n.id_estado_novedad = 1
        AND n.fecha_jornada BETWEEN date_trunc('month', $2::date)::date AND $2::date
      GROUP BY n.id_empleado`,
-    [ids, fecha]
+    [ids, fecha],
   );
   return rows;
 }
@@ -144,12 +147,11 @@ async function listarJustificadas(ids, fecha) {
      FROM novedades_asistencia n
      JOIN catalogos_tipo_novedad t USING (id_tipo_novedad)
      WHERE n.id_empleado = ANY($1::uuid[]) AND n.fecha_jornada = $2::date AND n.id_estado_novedad = 2`,
-    [ids, fecha]
+    [ids, fecha],
   );
   return rows;
 }
 
-// Licencias y vacaciones aprobadas que tocan el rango: en esos días no se registra inasistencia.
 async function listarAusenciasAprobadas(ids, desde, hasta) {
   if (ids.length === 0) return [];
   const { rows } = await pool.query(
@@ -158,13 +160,15 @@ async function listarAusenciasAprobadas(ids, desde, hasta) {
      UNION ALL
      SELECT id_empleado, fecha_inicio, fecha_fin FROM solicitudes_vacacion
      WHERE id_estado_solicitud = 2 AND id_empleado = ANY($1::uuid[]) AND fecha_inicio <= $3 AND fecha_fin >= $2`,
-    [ids, desde, hasta]
+    [ids, desde, hasta],
   );
   return rows;
 }
 
 async function momentoActual() {
-  const { rows } = await pool.query(`SELECT CURRENT_TIMESTAMP AS ahora, ${HOY_BOLIVIA} AS hoy`);
+  const { rows } = await pool.query(
+    `SELECT CURRENT_TIMESTAMP AS ahora, ${HOY_BOLIVIA} AS hoy`,
+  );
   return rows[0];
 }
 

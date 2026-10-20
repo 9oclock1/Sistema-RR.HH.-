@@ -73,12 +73,13 @@ async function registrarConsolidacion(cliente, carga) {
 async function publicar(clientePubSub, evento) {
   const topico = topicoDelGrupo(prefijoTopico(), ORIGEN.grupo);
   try {
-    await clientePubSub
+    const idMensaje = await clientePubSub
       .topic(topico)
       .publishMessage({
         json: evento.carga,
         attributes: atributosDe(evento.carga),
       });
+    console.log(`Evento ${evento.id_evento} publicado en ${topico} (mensaje ${idMensaje})`);
     await modelo.marcarEntregado(evento.id_evento);
   } catch (error) {
     console.error(
