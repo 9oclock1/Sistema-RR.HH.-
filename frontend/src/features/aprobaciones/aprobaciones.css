@@ -1,0 +1,150 @@
+.ap-sutil {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.ap-texto {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* Cuatro filtros caben mejor en dos columnas que en una fila angosta. */
+.ap-filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+
+/* Detalle de la solicitud */
+.ap-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.ap-datos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-page);
+}
+
+.ap-datos div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.ap-datos dt {
+  min-width: calc(var(--space-8) * 2);
+  color: var(--color-text-subtle);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ap-datos dd {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.ap-seccion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ap-seccion__titulo {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Saldo de vacaciones */
+.ap-saldo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.ap-saldo div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.ap-saldo dt {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+}
+
+.ap-saldo dd {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Cobertura del equipo */
+.ap-cobertura {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ap-cobertura__resumen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.ap-ausencias,
+.ap-comprobantes {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ap-ausencias li,
+.ap-comprobantes li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.ap-ausencias li:last-child,
+.ap-comprobantes li:last-child {
+  border-bottom: 0;
+}
+
+.ap-ausencias__nombre,
+.ap-comprobantes__nombre {
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+/* Confirmación de la decisión */
+.ap-decision {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ap-decision p {
+  margin: 0;
+}

@@ -64,7 +64,7 @@ test("criterio 1: una solicitud de vacaciones genera la alerta y enlaza a su pro
   const datos = crear.mock.calls[0].arguments[0];
   assert.equal(datos.tipo, "SOLICITUD_APROBADA");
   assert.equal(datos.titulo, "Solicitud aprobada: Vacaciones");
-  assert.equal(datos.enlace, `/asistencia/vacaciones?solicitud=${ID_SOLICITUD}`);
+  assert.equal(datos.enlace, `/asistencia/solicitud-vacaciones?solicitud=${ID_SOLICITUD}`);
 });
 
 test("la ruta de vacaciones se puede configurar", async () => {

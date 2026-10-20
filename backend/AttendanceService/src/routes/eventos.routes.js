@@ -5,5 +5,6 @@ const router = Router();
 
 router.get("/eventos", controlador.listar);
 router.post("/eventos/:id/confirmar", controlador.confirmar);
+router.post("/eventos/:id/reintentar", controlador.reintentar);
 
 module.exports = router;

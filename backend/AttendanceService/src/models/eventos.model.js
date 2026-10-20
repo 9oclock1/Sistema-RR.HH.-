@@ -52,6 +52,15 @@ async function marcarError(id, { error, esperaMs, fallido }) {
   );
 }
 
+async function reencolar(id) {
+  await pool.query(
+    `UPDATE eventos_salientes
+     SET id_estado_evento = 1, intentos = 0, ultimo_error = NULL, proximo_intento_en = CURRENT_TIMESTAMP
+     WHERE id_evento = $1 AND id_estado_evento = 3`,
+    [id]
+  );
+}
+
 async function listarPorRol(idRol) {
   const { rows } = await pool.query(`${conEstado("eventos_salientes")} WHERE ev.id_rol = $1 ORDER BY ev.creado_en DESC`, [
     idRol,
@@ -76,4 +85,4 @@ async function obtener(id) {
   return rows[0];
 }
 
-module.exports = { registrar, reservarPendientes, marcarEntregado, marcarError, listarPorRol, listar, obtener };
+module.exports = { registrar, reservarPendientes, marcarEntregado, marcarError, reencolar, listarPorRol, listar, obtener };

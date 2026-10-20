@@ -40,12 +40,13 @@ async function avisarSolicitudVacaciones({ empleado, supervisor, solicitud }) {
 
 // Avisa al colaborador el resultado de su solicitud (RF-34).
 // Devuelve { aceptada, reintentable }: un 4xx distinto de 408/429 no mejora reintentando.
-async function notificarResolucion({ solicitud, idResolutor, nombreResolutor }) {
+async function notificarResolucion({ solicitud, idResolutor, nombreResolutor, categoria = "LICENCIA" }) {
   const cuerpo = {
+    categoria,
     id_solicitud: solicitud.id_solicitud,
     id_empleado: solicitud.id_empleado,
     estado: solicitud.estado_codigo,
-    tipo_solicitud: solicitud.tipo_nombre,
+    tipo_solicitud: solicitud.tipo_nombre ?? "Vacaciones",
     fecha_inicio: solicitud.fecha_inicio,
     fecha_fin: solicitud.fecha_fin,
     motivo_resolucion: solicitud.motivo_resolucion,
