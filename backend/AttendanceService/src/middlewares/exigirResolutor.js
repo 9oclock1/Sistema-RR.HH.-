@@ -8,5 +8,6 @@ module.exports = (req, res, next) => {
   if (!ROLES_RESOLUTORES.includes(rol)) {
     throw new ErrorApp(403, "Solo un supervisor o RRHH puede aprobar o rechazar solicitudes.");
   }
+  req.rol = rol;
   next();
 };

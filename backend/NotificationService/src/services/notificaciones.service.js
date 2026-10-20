@@ -17,7 +17,7 @@ const RESOLUCIONES = {
 // Cada categoría de ausencia abre su propia pantalla de detalle. Sin categoría se asume licencia (emisores anteriores).
 const CATEGORIAS = {
   LICENCIA: () => "/asistencia/licencias",
-  VACACIONES: () => process.env.RUTA_VACACIONES || "/asistencia/vacaciones",
+  VACACIONES: () => process.env.RUTA_VACACIONES || "/asistencia/solicitud-vacaciones",
 };
 
 const LIMITE_POR_DEFECTO = 20;

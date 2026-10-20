@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const modelo = require("../src/models/licencias.model");
 const empleados = require("../src/services/empleados.service");
 const notificaciones = require("../src/services/notificaciones.service");
+const eventos = require("../src/services/eventos.service");
 const servicio = require("../src/services/licencias.service");
 
 const ANA = "4192f252-acf0-4522-a109-e051cad9a50b";
@@ -28,6 +29,8 @@ const resuelta = (estado, motivo = null) => ({
   motivo_resolucion: motivo,
 });
 
+const UBICACION = { cargo: "Operaria", area: "Panadería", area_codigo: "PAN", sucursal: "Central" };
+
 let resolver;
 let notificar;
 let marcar;
@@ -36,6 +39,7 @@ beforeEach(() => {
   mock.restoreAll();
   mock.method(empleados, "obtener", async () => ({ nombres: "Luis", activo: true }));
   mock.method(empleados, "obtenerNombre", async () => "Luis Rojas");
+  mock.method(empleados, "obtenerUbicacion", async () => UBICACION);
   resolver = mock.method(modelo, "resolver", async () => true);
   marcar = mock.method(modelo, "marcarResolucionNotificada", async () => {});
   mock.method(modelo, "obtener", async () => (resolver.mock.callCount() > 0 ? resuelta("APROBADA") : pendiente));
@@ -131,4 +135,63 @@ test("el reintento envía los avisos pendientes y cuenta los aceptados", async (
 
   assert.deepEqual(resultado, { pendientes: 2, enviados: 1 });
   assert.equal(marcar.mock.callCount(), 1);
+});
+
+test("KAN-53: al aprobar registra la indisponibilidad dentro de la transacción de la resolución", async () => {
+  const registrar = mock.method(eventos, "registrarIndisponibilidad", async () => 1);
+  const cliente = {};
+  resolver.mock.mockImplementation(async (_datos, alResolver) => {
+    await alResolver(cliente);
+    return true;
+  });
+
+  const resultado = await servicio.resolver(LUIS, ID_SOLICITUD, { decision: "APROBADA" }, { rol: "supervisor" });
+
+  const [clienteUsado, datos] = registrar.mock.calls[0].arguments;
+  assert.equal(clienteUsado, cliente);
+  assert.equal(datos.categoria, "LICENCIA");
+  assert.equal(datos.solicitud.id_solicitud, ID_SOLICITUD);
+  assert.equal(datos.empleado.nombre_completo, "Luis Rojas");
+  assert.equal(datos.ubicacion.area_codigo, "PAN");
+  assert.equal(datos.aprobadoPor, "Luis Rojas");
+  assert.equal(resultado.eventos_sincronizacion, 1);
+});
+
+test("KAN-53: un rechazo no sincroniza nada con otros módulos", async () => {
+  const registrar = mock.method(eventos, "registrarIndisponibilidad", async () => 1);
+
+  await servicio.resolver(LUIS, ID_SOLICITUD, { decision: "RECHAZADA", motivo: "Sin cobertura" });
+
+  assert.equal(resolver.mock.calls[0].arguments[1], undefined);
+  assert.equal(registrar.mock.callCount(), 0);
+});
+
+test("KAN-53: si no se conoce el área, no aprueba para no dejar la ausencia sin sincronizar", async () => {
+  empleados.obtenerUbicacion.mock.mockImplementation(async () => null);
+
+  await assert.rejects(servicio.resolver(LUIS, ID_SOLICITUD, { decision: "APROBADA" }), (error) => error.estado === 503);
+  assert.equal(resolver.mock.callCount(), 0);
+  assert.equal(notificar.mock.callCount(), 0);
+});
+
+test("KAN-51 criterio 4: una licencia sobre su tope no la aprueba un supervisor, pero sí puede rechazarla", async () => {
+  const excedida = { ...pendiente, excede_limite_dias: true };
+  modelo.obtener.mock.mockImplementation(async () => (resolver.mock.callCount() > 0 ? resuelta("RECHAZADA", "x") : excedida));
+
+  await assert.rejects(
+    servicio.resolver(LUIS, ID_SOLICITUD, { decision: "APROBADA" }, { rol: "supervisor" }),
+    (error) => error.estado === 403
+  );
+  assert.equal(resolver.mock.callCount(), 0);
+
+  await servicio.resolver(LUIS, ID_SOLICITUD, { decision: "RECHAZADA", motivo: "x" }, { rol: "supervisor" });
+  assert.equal(resolver.mock.callCount(), 1);
+});
+
+test("KAN-51 criterio 4: RRHH sí puede aprobar una licencia sobre su tope", async () => {
+  modelo.obtener.mock.mockImplementation(async () => (resolver.mock.callCount() > 0 ? resuelta("APROBADA") : { ...pendiente, excede_limite_dias: true }));
+
+  await servicio.resolver(LUIS, ID_SOLICITUD, { decision: "APROBADA" }, { rol: "admin" });
+
+  assert.equal(resolver.mock.callCount(), 1);
 });

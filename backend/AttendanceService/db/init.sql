@@ -764,4 +764,27 @@ INSERT INTO CATALOGOS_ESTADO_MOVIMIENTO_VACACION (id_estado_movimiento, codigo, 
     (2, 'GOZADO', 'Gozado'),
     (3, 'CANCELADO', 'Cancelado')
 ON CONFLICT DO NOTHING;
+-- KAN-53 (RF-33): aprobación o rechazo de solicitudes de vacaciones y licencias.
+-- Bloque idempotente: se puede ejecutar a mano sobre una AttendanceDB ya creada.
+-- Las solicitudes de licencia ya guardan su resolución desde KAN-54; aquí las de vacaciones guardan lo mismo.
+-- Al aprobar, el movimiento «en proceso» del saldo (KAN-52) pasa a «gozado» (débito definitivo); al rechazar, a «cancelado» (libera los días).
+-- id_empleado_resolutor referencia EMPLEADOS (EmployeeDB): sin FK por ser otro servicio.
+ALTER TABLE SOLICITUDES_VACACION ADD COLUMN IF NOT EXISTS id_empleado_resolutor UUID NULL;
+ALTER TABLE SOLICITUDES_VACACION ADD COLUMN IF NOT EXISTS resuelto_en TIMESTAMPTZ NULL;
+ALTER TABLE SOLICITUDES_VACACION ADD COLUMN IF NOT EXISTS motivo_resolucion text NULL;
+-- Fecha en que NotificationService aceptó el aviso de la resolución (KAN-54); sin ella, se reintenta.
+ALTER TABLE SOLICITUDES_VACACION ADD COLUMN IF NOT EXISTS resolucion_notificada_en TIMESTAMPTZ NULL;
+DO $
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_solicitud_vacacion_resolucion') THEN
+        ALTER TABLE SOLICITUDES_VACACION
+        ADD CONSTRAINT chk_solicitud_vacacion_resolucion CHECK ((id_empleado_resolutor IS NULL) = (resuelto_en IS NULL));
+    END IF;
+END $;
+-- Bandeja de pendientes del aprobador.
+CREATE INDEX IF NOT EXISTS ix_solicitud_vacacion_estado ON SOLICITUDES_VACACION (id_estado_solicitud, creado_en);
+-- Resoluciones cuyo aviso al colaborador aún no se confirmó.
+CREATE INDEX IF NOT EXISTS ix_solicitud_vacacion_sin_notificar ON SOLICITUDES_VACACION (resuelto_en) WHERE resuelto_en IS NOT NULL AND resolucion_notificada_en IS NULL;
+-- Cobertura del equipo: ausencias aprobadas o pendientes que se cruzan con un rango de fechas.
+CREATE INDEX IF NOT EXISTS ix_solicitud_vacacion_fechas ON SOLICITUDES_VACACION (fecha_inicio, fecha_fin) WHERE id_estado_solicitud IN (1, 2);
 -- Fin del archivo.

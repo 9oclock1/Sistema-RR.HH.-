@@ -94,15 +94,28 @@ async function obtenerAdjunto(idSolicitud, idAdjunto) {
 }
 
 // KAN-54: solo resuelve una solicitud que sigue pendiente, así dos supervisores no se pisan.
-async function resolver({ idSolicitud, idEstado, idResolutor, motivo }) {
-  const { rowCount } = await pool.query(
-    `UPDATE solicitudes_licencia
-        SET id_estado_solicitud = $2, id_empleado_resolutor = $3, resuelto_en = CURRENT_TIMESTAMP,
-            motivo_resolucion = $4, actualizado_en = CURRENT_TIMESTAMP
-      WHERE id_solicitud = $1 AND id_estado_solicitud = 1`,
-    [idSolicitud, idEstado, idResolutor, motivo]
-  );
-  return rowCount === 1;
+// KAN-53: `alResolver` corre en la misma transacción (p. ej. para registrar el evento de indisponibilidad), de modo
+// que la aprobación y su sincronización con otros módulos quedan juntas o no quedan.
+async function resolver({ idSolicitud, idEstado, idResolutor, motivo }, alResolver) {
+  const cliente = await pool.connect();
+  try {
+    await cliente.query("BEGIN");
+    const { rowCount } = await cliente.query(
+      `UPDATE solicitudes_licencia
+          SET id_estado_solicitud = $2, id_empleado_resolutor = $3, resuelto_en = CURRENT_TIMESTAMP,
+              motivo_resolucion = $4, actualizado_en = CURRENT_TIMESTAMP
+        WHERE id_solicitud = $1 AND id_estado_solicitud = 1`,
+      [idSolicitud, idEstado, idResolutor, motivo]
+    );
+    if (rowCount === 1 && alResolver) await alResolver(cliente);
+    await cliente.query("COMMIT");
+    return rowCount === 1;
+  } catch (error) {
+    await cliente.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    cliente.release();
+  }
 }
 
 async function marcarResolucionNotificada(idSolicitud) {

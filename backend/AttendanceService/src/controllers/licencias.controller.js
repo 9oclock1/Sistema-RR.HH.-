@@ -23,7 +23,7 @@ async function descargarAdjunto(req, res) {
 }
 
 async function resolver(req, res) {
-  res.json(await servicio.resolver(req.idEmpleado, req.params.idSolicitud, req.body));
+  res.json(await servicio.resolver(req.idEmpleado, req.params.idSolicitud, req.body, { rol: req.rol }));
 }
 
 module.exports = { listarTipos, listarMisSolicitudes, radicar, descargarAdjunto, resolver };

@@ -3,6 +3,7 @@ const TIPO_EVENTO = {
   JORNADA_CONSOLIDADA: "JORNADA_CONSOLIDADA",
   JORNADA_RECALCULADA: "JORNADA_RECALCULADA",
   HORAS_EXTRA_CONSOLIDADAS: "HORAS_EXTRA_CONSOLIDADAS",
+  PERSONAL_NO_DISPONIBLE: "PERSONAL_NO_DISPONIBLE",
 };
 const ESTADO_EVENTO = { PENDIENTE: 1, ENTREGADO: 2, FALLIDO: 3 };
 
@@ -135,6 +136,29 @@ function armarCargaPublicacion(detalle) {
   };
 }
 
+// KAN-53: ausencia aprobada. Producción y Logística (operarios) y Entregas y Despachos (choferes) la leen para
+// sacar al empleado de su planificación entre esas fechas.
+function armarCargaIndisponibilidad({ solicitud, categoria, empleado, ubicacion, aprobadoPor, aprobadoEn }) {
+  return {
+    id_solicitud: solicitud.id_solicitud,
+    categoria,
+    tipo: solicitud.tipo_nombre ?? "Vacaciones",
+    fecha_inicio: solicitud.fecha_inicio,
+    fecha_fin: solicitud.fecha_fin,
+    dias: solicitud.dias_solicitados ?? solicitud.dias_habiles,
+    con_goce_haberes: categoria === "VACACIONES" ? true : solicitud.es_con_goce_haberes,
+    empleado: {
+      id_empleado: solicitud.id_empleado,
+      nombre_completo: empleado.nombre_completo,
+      cargo: ubicacion.cargo,
+      area: ubicacion.area,
+      sucursal: ubicacion.sucursal,
+    },
+    aprobado_por: aprobadoPor,
+    aprobado_en: aprobadoEn,
+  };
+}
+
 module.exports = {
   TIPO_EVENTO,
   ESTADO_EVENTO,
@@ -149,4 +173,5 @@ module.exports = {
   atributosDe,
   errorDePublicacion,
   armarCargaPublicacion,
+  armarCargaIndisponibilidad,
 };

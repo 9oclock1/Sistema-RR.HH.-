@@ -16,6 +16,7 @@ const {
   atributosDe,
   errorDePublicacion,
   armarCargaPublicacion,
+  armarCargaIndisponibilidad,
 } = require("../utils/eventos");
 
 const TIEMPO_ESPERA_MS = 5000;
@@ -26,8 +27,12 @@ const LIMITE_CONSULTA = 100;
 const prefijoTopico = () =>
   process.env.PUBSUB_PREFIJO_TOPICO || "ucb-sis323-sub-";
 
+// Destinos con endpoint REST propio. Producción y Entregas lo usan para la indisponibilidad (KAN-53) y, si el
+// endpoint falla, el evento sigue por Pub/Sub.
 const destinosHttp = () => ({
   [TOPICO.COMPENSACIONES]: process.env.URL_COMPENSACIONES || null,
+  [TOPICO.PRODUCCION_LOGISTICA]: process.env.URL_PRODUCCION_LOGISTICA || null,
+  [TOPICO.ENTREGAS_DESPACHOS]: process.env.URL_ENTREGAS_DESPACHOS || null,
 });
 
 const topicosDe = (codigoArea) =>
@@ -70,6 +75,31 @@ async function registrarConsolidacion(cliente, carga) {
   });
 }
 
+// KAN-53: se llama dentro de la transacción que aprueba la ausencia. Un evento por módulo que debe enterarse.
+// Devuelve cuántos eventos quedaron registrados (0 si el área no corresponde a Producción ni a Entregas).
+async function registrarIndisponibilidad(cliente, datos) {
+  const topicos = topicosDe(datos.ubicacion.area_codigo);
+  const carga = armarCargaIndisponibilidad(datos);
+  const fecha = new Date().toISOString();
+  for (const topico of topicos) {
+    const idEvento = randomUUID();
+    await modelo.registrar(cliente, {
+      idEvento,
+      topico,
+      tipoEvento: TIPO_EVENTO.PERSONAL_NO_DISPONIBLE,
+      idRol: null,
+      carga: armarMensaje({
+        idMensaje: idEvento,
+        destino: DESTINOS[topico],
+        tipo: TIPO_EVENTO.PERSONAL_NO_DISPONIBLE,
+        fecha,
+        datos: carga,
+      }),
+    });
+  }
+  return topicos.length;
+}
+
 async function publicar(clientePubSub, evento) {
   const topico = topicoDelGrupo(prefijoTopico(), ORIGEN.grupo);
   try {
@@ -94,7 +124,8 @@ async function publicar(clientePubSub, evento) {
   }
 }
 
-async function enviarHttp(evento, url) {
+// Devuelve { ok } o { ok: false, error } sin tocar la base: quien llama decide qué hacer con el fallo.
+async function intentarHttp(evento, url) {
   try {
     const respuesta = await fetch(url, {
       method: "POST",
@@ -106,22 +137,40 @@ async function enviarHttp(evento, url) {
       body: JSON.stringify(evento.carga),
       signal: AbortSignal.timeout(TIEMPO_ESPERA_MS),
     });
-    if (respuesta.ok) {
-      await modelo.marcarEntregado(evento.id_evento);
-      return;
-    }
-    throw new Error(`El destino respondió ${respuesta.status}`);
+    if (respuesta.ok) return { ok: true };
+    return { ok: false, error: `El destino respondió ${respuesta.status}` };
   } catch (error) {
-    const intentos = evento.intentos + 1;
-    await modelo.marcarError(evento.id_evento, {
-      error:
-        error.name === "TimeoutError"
-          ? "El destino no respondió a tiempo"
-          : error.message,
-      esperaMs: esperaReintento(intentos),
-      fallido: intentos >= MAXIMO_INTENTOS,
-    });
+    return { ok: false, error: error.name === "TimeoutError" ? "El destino no respondió a tiempo" : error.message };
   }
+}
+
+async function enviarHttp(evento, url) {
+  const resultado = await intentarHttp(evento, url);
+  if (resultado.ok) {
+    await modelo.marcarEntregado(evento.id_evento);
+    return;
+  }
+  const intentos = evento.intentos + 1;
+  await modelo.marcarError(evento.id_evento, {
+    error: resultado.error,
+    esperaMs: esperaReintento(intentos),
+    fallido: intentos >= MAXIMO_INTENTOS,
+  });
+}
+
+// Con endpoint REST configurado se usa primero; si falla y hay Pub/Sub, el mensaje sale por ahí en ese mismo ciclo
+// en lugar de esperar al reintento. Sin ninguno de los dos caminos, queda pendiente con espera creciente.
+async function entregar(evento, clientePubSub, urls) {
+  const url = urls[evento.topico];
+  if (!url) return publicar(clientePubSub, evento);
+  if (!DESTINOS[evento.topico] || !clientePubSub) return enviarHttp(evento, url);
+  const resultado = await intentarHttp(evento, url);
+  if (resultado.ok) {
+    await modelo.marcarEntregado(evento.id_evento);
+    return;
+  }
+  console.error(`El endpoint de ${evento.topico} falló (${resultado.error}); se publica por Pub/Sub.`);
+  return publicar(clientePubSub, evento);
 }
 
 // Envía a Pub/Sub los eventos pendientes; sin Pub/Sub configurado quedan en la base hasta que lo esté.
@@ -129,8 +178,10 @@ async function despachar() {
   const clientePubSub = pubsub.obtenerCliente();
   const urls = destinosHttp();
   const topicos = [
-    ...(clientePubSub ? Object.keys(DESTINOS) : []),
-    ...Object.keys(urls).filter((topico) => urls[topico]),
+    ...new Set([
+      ...(clientePubSub ? Object.keys(DESTINOS) : []),
+      ...Object.keys(urls).filter((topico) => urls[topico]),
+    ]),
   ];
   if (topicos.length === 0) return 0;
   const eventos = await modelo.reservarPendientes(
@@ -138,13 +189,7 @@ async function despachar() {
     LOTE,
     SEGUNDOS_RESERVA,
   );
-  await Promise.all(
-    eventos.map((evento) =>
-      DESTINOS[evento.topico]
-        ? publicar(clientePubSub, evento)
-        : enviarHttp(evento, urls[evento.topico]),
-    ),
-  );
+  await Promise.all(eventos.map((evento) => entregar(evento, clientePubSub, urls)));
   return eventos.length;
 }
 
@@ -221,12 +266,25 @@ async function confirmar(id) {
   return resumir(await modelo.obtener(evento.id_evento));
 }
 
+// Un operador reenvía un evento que agotó sus reintentos (p. ej. tras arreglar el endpoint del ERP).
+async function reintentar(id) {
+  const evento = UUID_RE.test(id) ? await modelo.obtener(id) : undefined;
+  if (!evento) throw new ErrorApp(404, "Evento no encontrado");
+  if (evento.estado_codigo !== "FALLIDO") {
+    throw new ErrorApp(409, "Solo se pueden reintentar los eventos fallidos.");
+  }
+  await modelo.reencolar(evento.id_evento);
+  return resumir(await modelo.obtener(evento.id_evento));
+}
+
 module.exports = {
   registrarPublicacion,
+  registrarIndisponibilidad,
   registrarConsolidacion,
   despachar,
   iniciarDespachador,
   listarDeRol,
   listar,
   confirmar,
+  reintentar,
 };

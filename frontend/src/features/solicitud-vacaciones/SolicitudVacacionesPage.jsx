@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { ArrowLeftRight } from "lucide-react";
 import { consultarSaldo, listarSolicitudes } from "../../api/solicitudesVacacion";
 import { Alerta, Avatar, Boton, EncabezadoPagina, Esqueleto, Tarjeta } from "../../components/ui";
 import IdentificacionEmpleado from "../marcaje/IdentificacionEmpleado";
 import { guardarEmpleado, leerEmpleado, olvidarEmpleado } from "../marcaje/sesionEmpleado";
+import DetalleSolicitudVacacion from "./DetalleSolicitudVacacion";
 import SaldoVacaciones from "./SaldoVacaciones";
 import SolicitudFormulario from "./SolicitudFormulario";
 import TablaSolicitudes from "./TablaSolicitudes";
@@ -38,6 +39,11 @@ export default function SolicitudVacacionesPage() {
   const [registrada, setRegistrada] = useState(null);
   const [enfocarIdentificacion, setEnfocarIdentificacion] = useState(false);
   const refConfirmacion = useRef(null);
+  const refDetalle = useRef(null);
+  // RF-34: las alertas de resultado abren esta pantalla con ?solicitud=<id>.
+  const [parametros, setParametros] = useSearchParams();
+  const idDetalle = parametros.get("solicitud");
+  const detalle = solicitudes.find((s) => s.id_solicitud === idDetalle);
 
   const cargar = useCallback(
     (id) =>
@@ -70,6 +76,13 @@ export default function SolicitudVacacionesPage() {
   useEffect(() => {
     if (registrada) refConfirmacion.current?.focus();
   }, [registrada]);
+
+  useEffect(() => {
+    if (detalle) refDetalle.current?.focus();
+  }, [detalle]);
+
+  const verDetalle = (solicitud) => setParametros({ solicitud: solicitud.id_solicitud });
+  const cerrarDetalle = () => setParametros({});
 
   const identificar = (id) => {
     setErrorIdentificacion(null);
@@ -192,7 +205,18 @@ export default function SolicitudVacacionesPage() {
               </Alerta>
             )}
 
-            <TablaSolicitudes solicitudes={solicitudes} cargando={cargando && solicitudes.length === 0} />
+            {detalle && <DetalleSolicitudVacacion ref={refDetalle} solicitud={detalle} onCerrar={cerrarDetalle} />}
+            {idDetalle && !detalle && !cargando && (
+              <Alerta tono="aviso" titulo="No se encontró la solicitud" onCerrar={cerrarDetalle}>
+                La solicitud indicada no existe o pertenece a otro empleado.
+              </Alerta>
+            )}
+
+            <TablaSolicitudes
+              solicitudes={solicitudes}
+              cargando={cargando && solicitudes.length === 0}
+              onVerDetalle={verDetalle}
+            />
           </>
         )}
       </div>

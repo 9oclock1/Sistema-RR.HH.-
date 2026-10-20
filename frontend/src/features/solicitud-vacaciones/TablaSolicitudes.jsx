@@ -1,8 +1,8 @@
 import { CalendarDays } from "lucide-react";
-import { EstadoVacio, Etiqueta, Tabla, Tarjeta } from "../../components/ui";
+import { Boton, EstadoVacio, Etiqueta, Tabla, Tarjeta } from "../../components/ui";
 import { ESTADOS, formatearFecha, formatearPeriodo } from "./formato";
 
-const COLUMNAS = [
+const columnas = (onVerDetalle) => [
   {
     clave: "periodo",
     titulo: "Periodo",
@@ -24,13 +24,29 @@ const COLUMNAS = [
     ancho: "20%",
     celda: (solicitud) => formatearFecha(solicitud.creado_en.slice(0, 10)),
   },
+  {
+    clave: "detalle",
+    titulo: <span className="ds-solo-lector">Detalle</span>,
+    ancho: "14%",
+    alinear: "fin",
+    celda: (solicitud) => (
+      <Boton
+        tamano="sm"
+        variante="sutil"
+        onClick={() => onVerDetalle(solicitud)}
+        aria-label={`Ver el detalle de la solicitud del ${formatearPeriodo(solicitud.fecha_inicio, solicitud.fecha_fin)}`}
+      >
+        Ver detalle
+      </Boton>
+    ),
+  },
 ];
 
-export default function TablaSolicitudes({ solicitudes, cargando }) {
+export default function TablaSolicitudes({ solicitudes, cargando, onVerDetalle }) {
   return (
     <Tarjeta titulo="Mis solicitudes" nivelTitulo={2} className="solicitud-vacaciones-tarjeta">
       <Tabla
-        columnas={COLUMNAS}
+        columnas={columnas(onVerDetalle)}
         filas={solicitudes}
         claveFila="id_solicitud"
         descripcion="Solicitudes de vacaciones enviadas"

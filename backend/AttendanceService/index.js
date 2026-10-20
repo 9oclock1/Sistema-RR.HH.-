@@ -12,10 +12,11 @@ const horasExtraRoutes = require("./src/routes/horasExtra.routes");
 const historialAsistenciaRoutes = require("./src/routes/historialAsistencia.routes");
 const solicitudesVacacionRoutes = require("./src/routes/solicitudesVacacion.routes");
 const vacacionesRoutes = require("./src/routes/vacaciones.routes");
+const aprobacionesRoutes = require("./src/routes/aprobaciones.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 const { iniciarDespachador } = require("./src/services/eventos.service");
 const { iniciarContraste } = require("./src/services/novedades.service");
-const { iniciarReintentoDeAvisos } = require("./src/services/licencias.service");
+const { iniciarReintentoDeAvisos } = require("./src/services/aprobaciones.service");
 
 const app = express();
 const PORT = process.env.PORT || 3004;
@@ -58,6 +59,7 @@ app.use(horasExtraRoutes);
 app.use(historialAsistenciaRoutes);
 app.use(solicitudesVacacionRoutes);
 app.use(vacacionesRoutes);
+app.use(aprobacionesRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
