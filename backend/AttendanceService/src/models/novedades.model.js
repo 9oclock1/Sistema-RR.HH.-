@@ -149,6 +149,20 @@ async function listarJustificadas(ids, fecha) {
   return rows;
 }
 
+// Licencias y vacaciones aprobadas que tocan el rango: en esos días no se registra inasistencia.
+async function listarAusenciasAprobadas(ids, desde, hasta) {
+  if (ids.length === 0) return [];
+  const { rows } = await pool.query(
+    `SELECT id_empleado, fecha_inicio, fecha_fin FROM solicitudes_licencia
+     WHERE id_estado_solicitud = 2 AND id_empleado = ANY($1::uuid[]) AND fecha_inicio <= $3 AND fecha_fin >= $2
+     UNION ALL
+     SELECT id_empleado, fecha_inicio, fecha_fin FROM solicitudes_vacacion
+     WHERE id_estado_solicitud = 2 AND id_empleado = ANY($1::uuid[]) AND fecha_inicio <= $3 AND fecha_fin >= $2`,
+    [ids, desde, hasta]
+  );
+  return rows;
+}
+
 async function momentoActual() {
   const { rows } = await pool.query(`SELECT CURRENT_TIMESTAMP AS ahora, ${HOY_BOLIVIA} AS hoy`);
   return rows[0];
@@ -163,5 +177,6 @@ module.exports = {
   marcarConsolidadas,
   sumarAtrasosDelMes,
   listarJustificadas,
+  listarAusenciasAprobadas,
   momentoActual,
 };
