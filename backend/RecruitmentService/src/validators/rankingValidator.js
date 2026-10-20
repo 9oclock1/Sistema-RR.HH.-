@@ -6,9 +6,7 @@ const ORDENES = ["asc", "desc"];
 function validarConsultaRanking(req, res, next) {
   const {
     desempate = "experiencia",
-    orden_desempate = "desc",
     experiencia_min,
-    pretension_salarial_max,
     etapa,
     ciudad,
     pagina = "1",
@@ -25,6 +23,8 @@ function validarConsultaRanking(req, res, next) {
     });
   }
 
+  // Por defecto, la fecha de postulación desempata a favor de quien postuló primero; el resto, de mayor a menor.
+  const { orden_desempate = criterioNormalizado === "fecha_postulacion" ? "asc" : "desc" } = req.query;
   const ordenNormalizado = String(orden_desempate).toLowerCase().trim();
   if (!ORDENES.includes(ordenNormalizado)) {
     errores.push({
@@ -44,26 +44,15 @@ function validarConsultaRanking(req, res, next) {
     }
   }
 
-  if (pretension_salarial_max !== undefined && pretension_salarial_max !== "") {
-    const sal = Number(pretension_salarial_max);
-    if (isNaN(sal) || sal <= 0) {
-      errores.push({
-        campo: "pretension_salarial_max",
-        mensaje:
-          "El filtro 'pretension_salarial_max' debe ser un número positivo.",
-      });
-    }
-  }
-
   const numPagina = Number(pagina);
   const numLimite = Number(limite);
-  if (isNaN(numPagina) || numPagina < 1) {
+  if (!Number.isInteger(numPagina) || numPagina < 1) {
     errores.push({
       campo: "pagina",
       mensaje: "La página debe ser un entero >= 1.",
     });
   }
-  if (isNaN(numLimite) || numLimite < 1 || numLimite > 100) {
+  if (!Number.isInteger(numLimite) || numLimite < 1 || numLimite > 100) {
     errores.push({
       campo: "limite",
       mensaje: "El límite debe ser un entero entre 1 y 100.",
@@ -84,10 +73,6 @@ function validarConsultaRanking(req, res, next) {
     experiencia_min:
       experiencia_min !== undefined && experiencia_min !== ""
         ? Number(experiencia_min)
-        : null,
-    pretension_salarial_max:
-      pretension_salarial_max !== undefined && pretension_salarial_max !== ""
-        ? Number(pretension_salarial_max)
         : null,
     etapa: etapa ? String(etapa).trim() : null,
     ciudad: ciudad ? String(ciudad).trim() : null,

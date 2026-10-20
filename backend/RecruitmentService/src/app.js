@@ -57,7 +57,6 @@ app.use(affinityRoutes);
 
 // RF-13: Ranking de postulantes por score de matching
 app.use("/convocatorias", rankingRoutes);
-app.use("/ranking", rankingRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

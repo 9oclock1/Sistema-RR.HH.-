@@ -150,3 +150,27 @@
   border-bottom-color: var(--color-brand, #0052cc);
   font-weight: var(--font-weight-semibold, 600);
 }
+.ranking-score-celda--boton {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ranking-score-celda--boton:hover .ranking-score-valor {
+  text-decoration: underline;
+}
+
+.ranking-score-celda--boton:focus-visible {
+  outline: 2px solid var(--color-border-focused, #4c9aff);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm, 3px);
+}
+
+.ranking-score-pendiente {
+  color: var(--color-text-subtle);
+  font-size: 12px;
+}

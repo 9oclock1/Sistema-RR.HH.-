@@ -1,4 +1,4 @@
-import { ArrowDownUp, Filter, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { Boton, CampoTexto, Selector } from "../../components/ui";
 import "./CandidateRankingTable.css";
 
@@ -9,8 +9,8 @@ const OPCIONES_DESEMPATE = [
 ];
 
 const OPCIONES_ORDEN = [
-  { valor: "desc", etiqueta: "Descendente (Mayor prioridad)" },
-  { valor: "asc", etiqueta: "Ascendente" },
+  { valor: "desc", etiqueta: "Mayor primero (descendente)" },
+  { valor: "asc", etiqueta: "Menor primero (ascendente)" },
 ];
 
 export default function RankingFilters({ filtros, alCambiarFiltro, alLimpiar }) {
@@ -53,13 +53,12 @@ export default function RankingFilters({ filtros, alCambiarFiltro, alLimpiar }) 
 
         <div className="ranking-filtros-item ranking-filtros-item--sm">
           <CampoTexto
-            id="filtro-pretension-max"
-            name="pretension_salarial_max"
-            type="number"
-            etiqueta="Pretensión máx. (Bs)"
-            placeholder="Ej: 7000"
-            value={filtros.pretension_salarial_max}
-            onChange={(e) => alCambiarFiltro("pretension_salarial_max", e.target.value)}
+            id="filtro-ciudad"
+            name="ciudad"
+            etiqueta="Ciudad"
+            placeholder="Ej: La Paz"
+            value={filtros.ciudad}
+            onChange={(e) => alCambiarFiltro("ciudad", e.target.value)}
           />
         </div>
 

@@ -1,9 +1,10 @@
 import { Award, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 import { Avatar, Boton, EstadoVacio, Etiqueta, Tabla, TextoTruncado } from "../../components/ui";
+import { postulacionApi } from "../../api/postulacion";
 import RankingBadge from "./RankingBadge";
 import "./CandidateRankingTable.css";
 
-function mapearTonoScore(score = 0) {
+function mapearTonoScore(score) {
   if (score >= 80) return "alto";
   if (score >= 50) return "medio";
   return "bajo";
@@ -28,6 +29,7 @@ export default function CandidateRankingTable({
   cargando = false,
   tituloConvocatoria = "",
   alCambiarPagina,
+  alVerAfinidad,
 }) {
   const columnas = [
     {
@@ -41,10 +43,13 @@ export default function CandidateRankingTable({
       titulo: "Afinidad",
       ancho: "130px",
       celda: (fila) => {
-        const score = fila.score_afinidad || 0;
+        const score = fila.score_afinidad;
+        if (score === null || score === undefined) {
+          return <span className="ranking-score-pendiente" title="Pendiente de análisis curricular">Sin evaluar</span>;
+        }
         const tono = mapearTonoScore(score);
-        return (
-          <div className="ranking-score-celda">
+        const contenido = (
+          <>
             <span className="ranking-score-valor">{score}%</span>
             <div className="ranking-score-barra">
               <div
@@ -52,7 +57,19 @@ export default function CandidateRankingTable({
                 style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
               />
             </div>
-          </div>
+          </>
+        );
+        return alVerAfinidad ? (
+          <button
+            type="button"
+            className="ranking-score-celda ranking-score-celda--boton"
+            onClick={() => alVerAfinidad(fila)}
+            aria-label={`Ver el desglose de afinidad de ${fila.nombres} ${fila.apellidos}`}
+          >
+            {contenido}
+          </button>
+        ) : (
+          <div className="ranking-score-celda">{contenido}</div>
         );
       },
     },
@@ -102,10 +119,10 @@ export default function CandidateRankingTable({
       titulo: "CV",
       ancho: "80px",
       celda: (fila) =>
-        fila.cv_archivo_url ? (
+        fila.cv_archivo_url && fila.cv_archivo_url !== "pending" ? (
           <Boton
             as="a"
-            href={fila.cv_archivo_url}
+            href={postulacionApi.obtenerUrlCv(fila.id_postulacion)}
             target="_blank"
             rel="noopener noreferrer"
             variante="sutil"

@@ -1,182 +1,152 @@
-const { describe, it } = require("node:test");
+const { describe, it, beforeEach } = require("node:test");
 const assert = require("node:assert/strict");
+const path = require("node:path");
+
+// El modelo se prueba contra un pool simulado: se captura el SQL y los parámetros que enviaría a PostgreSQL.
+const rutaPool = require.resolve(path.join(__dirname, "../../db/pool"));
+const consultas = [];
+let respuestas = [];
+require.cache[rutaPool] = {
+  id: rutaPool,
+  filename: rutaPool,
+  loaded: true,
+  exports: {
+    query: async (sql, valores) => {
+      consultas.push({ sql, valores });
+      return respuestas.shift() ?? { rows: [] };
+    },
+  },
+};
+
 const rankingModel = require("../models/rankingModel");
+const { validarConsultaRanking } = require("../validators/rankingValidator");
 
-describe("RF-13: Ranking de postulantes y criterios de adecuación", () => {
-  // Mock en memoria emulando la lógica de ordenamiento y filtrado de la base de datos
-  const generarPostulantesPrueba = () => [
-    {
-      id_postulacion: "pos-1",
-      nombres: "Ana",
-      apellidos: "Gómez",
-      score_afinidad: 85.5,
-      anios_experiencia: 4.0,
-      pretension_salarial: 6000,
-      fecha_postulacion: new Date("2026-10-01T10:00:00Z"),
-    },
-    {
-      id_postulacion: "pos-2",
-      nombres: "Carlos",
-      apellidos: "Mendoza",
-      score_afinidad: 92.0,
-      anios_experiencia: 5.5,
-      pretension_salarial: 7500,
-      fecha_postulacion: new Date("2026-10-02T11:00:00Z"),
-    },
-    {
-      id_postulacion: "pos-3",
-      nombres: "Beatriz",
-      apellidos: "Morales",
-      score_afinidad: 85.5,
-      anios_experiencia: 6.0, // Empate con Ana en score, pero mayor experiencia
-      pretension_salarial: 5800,
-      fecha_postulacion: new Date("2026-10-03T09:00:00Z"),
-    },
-    {
-      id_postulacion: "pos-4",
-      nombres: "David",
-      apellidos: "Roca",
-      score_afinidad: 70.0,
-      anios_experiencia: 2.0,
-      pretension_salarial: 4500,
-      fecha_postulacion: new Date("2026-10-04T08:00:00Z"),
-    },
-  ];
+function validar(query) {
+  const req = { query };
+  let error = null;
+  validarConsultaRanking(req, {}, (e) => {
+    error = e ?? null;
+  });
+  return { req, error };
+}
 
-  function ordenarRankingLocal(postulantes, criterioDesempate = "experiencia") {
-    return [...postulantes].sort((a, b) => {
-      // 1. Criterio primario: score_afinidad DESC
-      if (b.score_afinidad !== a.score_afinidad) {
-        return b.score_afinidad - a.score_afinidad;
-      }
-      // 2. Criterio secundario de desempate
-      if (criterioDesempate === "experiencia") {
-        if (b.anios_experiencia !== a.anios_experiencia) {
-          return b.anios_experiencia - a.anios_experiencia;
+describe("RF-13: Ranking de postulantes por porcentaje de afinidad", () => {
+  beforeEach(() => {
+    consultas.length = 0;
+    respuestas = [];
+  });
+
+  describe("Cableado del servicio", () => {
+    it("El archivo de rutas existe con el nombre que importa app.js", () => {
+      assert.doesNotThrow(() => require("../routes/rankingRoutes"));
+    });
+  });
+
+  describe("Criterio 1: orden descendente por afinidad", () => {
+    it("Ordena por porcentaje_afinidad DESC con los nulos al final y numera con ROW_NUMBER", async () => {
+      respuestas = [{ rows: [{ total: "0" }] }, { rows: [] }];
+      await rankingModel.obtenerRankingPorConvocatoria("conv-1");
+
+      const sql = consultas[1].sql;
+      assert.match(sql, /p\.porcentaje_afinidad AS score_afinidad/);
+      assert.doesNotMatch(sql, /p\.score_afinidad/);
+      assert.match(sql, /ROW_NUMBER\(\) OVER \(ORDER BY score_afinidad DESC NULLS LAST,/);
+    });
+
+    it("Devuelve score nulo (no 0%) para un postulante sin análisis de CV", async () => {
+      respuestas = [
+        { rows: [{ total: "1" }] },
+        { rows: [{ posicion_ranking: "1", score_afinidad: null, anios_experiencia: "0", nombres: "Fabio" }] },
+      ];
+      const { postulantes } = await rankingModel.obtenerRankingPorConvocatoria("conv-1");
+      assert.equal(postulantes[0].score_afinidad, null);
+      assert.equal(postulantes[0].posicion_ranking, 1);
+    });
+  });
+
+  describe("Criterio 2: desempate secundario determinista", () => {
+    it("La cláusula usa solo columnas del CTE (sin alias de tabla) y termina en un desempate estable", () => {
+      for (const criterio of ["experiencia", "fecha_postulacion", "educacion"]) {
+        for (const orden of ["asc", "desc"]) {
+          const clausula = rankingModel.construirClausulaDesempate(criterio, orden);
+          assert.doesNotMatch(clausula, /\bp\./, `${criterio}/${orden} no debe usar el alias p.`);
+          assert.match(clausula, /id_postulacion ASC$/);
         }
       }
-      // 3. Antigüedad en postulación
-      return a.fecha_postulacion - b.fecha_postulacion;
-    });
-  }
-
-  describe("Criterio 1: Ordenamiento descendente por porcentaje de afinidad", () => {
-    it("Debe clasificar a los postulantes ordenando de mayor a menor porcentaje de match", () => {
-      const datos = generarPostulantesPrueba();
-      const ordenados = ordenarRankingLocal(datos);
-
-      assert.equal(
-        ordenados[0].id_postulacion,
-        "pos-2",
-        "El primer lugar debe ser el mayor score (92.0)",
-      );
-      assert.ok(
-        ordenados[0].score_afinidad >= ordenados[1].score_afinidad,
-        "El score del puesto 1 debe ser mayor o igual al puesto 2",
-      );
-      assert.ok(
-        ordenados[1].score_afinidad >= ordenados[2].score_afinidad,
-        "El score del puesto 2 debe ser mayor o igual al puesto 3",
-      );
-      assert.ok(
-        ordenados[2].score_afinidad >= ordenados[3].score_afinidad,
-        "El score del puesto 3 debe ser mayor o igual al puesto 4",
-      );
-    });
-  });
-
-  describe("Criterio 2: Lógica determinista de desempate secundario", () => {
-    it("Debe desempatar por mayor experiencia laboral cuando los scores coinciden", () => {
-      const datos = generarPostulantesPrueba();
-      const ordenados = ordenarRankingLocal(datos, "experiencia");
-
-      // Ana y Beatriz empatan en 85.5. Beatriz tiene 6.0 años y Ana 4.0 años
-      const indiceBeatriz = ordenados.findIndex(
-        (p) => p.id_postulacion === "pos-3",
-      );
-      const indiceAna = ordenados.findIndex(
-        (p) => p.id_postulacion === "pos-1",
-      );
-
-      assert.ok(
-        indiceBeatriz < indiceAna,
-        "Beatriz (6 años) debe posicionarse antes que Ana (4 años) ante igual score",
-      );
     });
 
-    it("Debe desempatar por fecha de postulación cuando se selecciona antigüedad", () => {
-      const datos = generarPostulantesPrueba();
-      const ordenados = ordenarRankingLocal(datos, "fecha_postulacion");
+    it("Experiencia: respeta el sentido pedido y desempata después por antigüedad", () => {
+      assert.match(rankingModel.construirClausulaDesempate("experiencia", "desc"), /^anios_experiencia DESC, fecha_postulacion ASC/);
+      assert.match(rankingModel.construirClausulaDesempate("experiencia", "asc"), /^anios_experiencia ASC/);
+    });
 
-      // Ana postuló el 1 de octubre y Beatriz el 3 de octubre
-      const indiceAna = ordenados.findIndex(
-        (p) => p.id_postulacion === "pos-1",
-      );
-      const indiceBeatriz = ordenados.findIndex(
-        (p) => p.id_postulacion === "pos-3",
-      );
+    it("Educación: ordena por el nivel detectado del CV (códigos de nivelesEducacion)", async () => {
+      respuestas = [{ rows: [{ total: "0" }] }, { rows: [] }];
+      await rankingModel.obtenerRankingPorConvocatoria("conv-1", { desempate: "educacion" });
+      const sql = consultas[1].sql;
+      assert.match(sql, /'afinidadDetalle'->'educacion'->>'nivelDetectado'/);
+      for (const codigo of ["DOCTORADO", "MAESTRIA", "LICENCIATURA", "TECNICO_SUPERIOR", "TECNICO_MEDIO", "BACHILLER"]) {
+        assert.match(sql, new RegExp(`WHEN '${codigo}'`));
+      }
+      assert.match(sql, /nivel_educacion_orden DESC, anios_experiencia DESC/);
+    });
 
-      assert.ok(
-        indiceAna < indiceBeatriz,
-        "Ana debe preceder a Beatriz por haber postulado antes (FIFO)",
-      );
+    it("Por defecto, la fecha de postulación favorece a quien postuló primero (asc)", () => {
+      const { req, error } = validar({ desempate: "fecha_postulacion" });
+      assert.equal(error, null);
+      assert.equal(req.querySanitizada.orden_desempate, "asc");
+    });
+
+    it("Experiencia y educación son descendentes por defecto", () => {
+      assert.equal(validar({}).req.querySanitizada.orden_desempate, "desc");
+      assert.equal(validar({ desempate: "educacion" }).req.querySanitizada.orden_desempate, "desc");
     });
   });
 
-  describe("Criterio 3: Mantenimiento de jerarquía con filtros adicionales", () => {
-    it("Debe filtrar por experiencia mínima preservando el orden de afinidad", () => {
-      const datos = generarPostulantesPrueba();
-      const filtrados = datos.filter((p) => p.anios_experiencia >= 5.0);
-      const ordenados = ordenarRankingLocal(filtrados);
-
-      assert.equal(filtrados.length, 2);
-      assert.equal(ordenados[0].id_postulacion, "pos-2");
-      assert.equal(ordenados[1].id_postulacion, "pos-3");
-      assert.ok(ordenados[0].score_afinidad >= ordenados[1].score_afinidad);
+  describe("Criterio 3: filtros que mantienen la jerarquía de afinidad", () => {
+    it("Los filtros restringen el conjunto, y el conteo y la consulta comparten los mismos parámetros", async () => {
+      respuestas = [{ rows: [{ total: "0" }] }, { rows: [] }];
+      await rankingModel.obtenerRankingPorConvocatoria("conv-1", {
+        experiencia_min: 5,
+        ciudad: "La Paz",
+        etapa: "2",
+        pagina: 2,
+        limite: 5,
+      });
+      const [conteo, listado] = consultas;
+      assert.deepEqual(conteo.valores, ["conv-1", 5, "2", "La Paz"]);
+      assert.deepEqual(listado.valores, ["conv-1", 5, "2", "La Paz", 5, 5]);
+      assert.match(listado.sql, /anios_experiencia >= \$2/);
+      assert.match(listado.sql, /id_etapa::text = \$3/);
+      assert.match(listado.sql, /LOWER\(ciudad\) = LOWER\(\$4\)/);
+      assert.match(listado.sql, /LIMIT \$5 OFFSET \$6/);
+      // El orden por afinidad se aplica igual con o sin filtros.
+      assert.match(listado.sql, /ORDER BY score_afinidad DESC NULLS LAST/);
     });
 
-    it("Debe filtrar por pretensión salarial máxima conservando los scores relativos", () => {
-      const datos = generarPostulantesPrueba();
-      const filtrados = datos.filter((p) => p.pretension_salarial <= 6000);
-      const ordenados = ordenarRankingLocal(filtrados);
+    it("Sin filtros solo se envía el id de la convocatoria", async () => {
+      respuestas = [{ rows: [{ total: "0" }] }, { rows: [] }];
+      await rankingModel.obtenerRankingPorConvocatoria("conv-1");
+      assert.deepEqual(consultas[0].valores, ["conv-1"]);
+    });
 
-      assert.equal(filtrados.length, 3);
-      assert.ok(!ordenados.some((p) => p.id_postulacion === "pos-2"));
-      assert.equal(ordenados[0].id_postulacion, "pos-3"); // 85.5% (6 años exp)
+    it("Rechaza criterios, órdenes, experiencia y paginación inválidos", () => {
+      assert.ok(validar({ desempate: "foo" }).error);
+      assert.ok(validar({ orden_desempate: "x" }).error);
+      assert.ok(validar({ experiencia_min: "-1" }).error);
+      assert.ok(validar({ pagina: "1.5" }).error);
+      assert.ok(validar({ pagina: "0" }).error);
+      assert.ok(validar({ limite: "500" }).error);
+      assert.equal(validar({ experiencia_min: "2", pagina: "3", limite: "20" }).error, null);
     });
   });
 
-  describe("Criterio 4: Estabilidad y reposicionamiento ante nuevas postulaciones", () => {
-    it("Debe recalcular la jerarquía insertando al nuevo candidato en su puesto exacto", () => {
-      const datos = generarPostulantesPrueba();
-
-      // Nuevo postulante con un score superior (95.0%)
-      const nuevoPostulanteTop = {
-        id_postulacion: "pos-nuevo-top",
-        nombres: "Esteban",
-        apellidos: "Quispe",
-        score_afinidad: 95.0,
-        anios_experiencia: 7.0,
-        pretension_salarial: 8000,
-        fecha_postulacion: new Date("2026-10-19T14:00:00Z"),
-      };
-
-      const rankingActualizado = ordenarRankingLocal([
-        ...datos,
-        nuevoPostulanteTop,
-      ]);
-
-      assert.equal(
-        rankingActualizado[0].id_postulacion,
-        "pos-nuevo-top",
-        "El nuevo postulante con 95% debe posicionarse en el puesto #1 inmediatamente",
-      );
-      assert.equal(
-        rankingActualizado[1].id_postulacion,
-        "pos-2",
-        "El anterior primer puesto debe desplazarse al puesto #2",
-      );
-      assert.equal(rankingActualizado.length, 5);
+  describe("Criterio 4: el ranking se calcula en cada consulta", () => {
+    it("No depende de posicion_ranking guardada: un postulante nuevo entra en su puesto al refrescar", async () => {
+      respuestas = [{ rows: [{ total: "0" }] }, { rows: [] }];
+      await rankingModel.obtenerRankingPorConvocatoria("conv-1");
+      assert.doesNotMatch(consultas[1].sql, /p\.posicion_ranking/);
+      assert.match(consultas[1].sql, /ROW_NUMBER\(\)/);
     });
   });
 });
