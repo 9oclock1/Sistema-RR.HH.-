@@ -227,3 +227,21 @@ test("HTTP: guardar un umbral exige RRHH y valida el cuerpo", async () => {
   assert.equal(bien.status, 200);
   assert.equal((await bien.json()).id_umbral, ID_UMBRAL);
 });
+
+test("una sucursal o un área que no existen responden 404 y no se guarda el umbral", async () => {
+  const guardar = mock.method(modelo, "guardarUmbral", async (datos) => ({ id_umbral: ID_UMBRAL, ...datos }));
+  empleados.obtenerSucursal.mock.mockImplementation(async () => null);
+  await assert.rejects(servicio.consultar({ id_sucursal: SUC }, rrhh), (e) => e.estado === 404);
+  await assert.rejects(servicio.guardarUmbral({ id_sucursal: SUC, max_ausentes_porcentaje: 30 }, rrhh), (e) => e.estado === 404);
+
+  empleados.obtenerArea.mock.mockImplementation(async () => null);
+  await assert.rejects(servicio.guardarUmbral({ id_departamento: PAN, max_ausentes_porcentaje: 30 }, rrhh), (e) => e.estado === 404);
+  assert.equal(guardar.mock.callCount(), 0);
+});
+
+test("el umbral acepta cualquier UUID válido, no solo los de versión 1 a 5", async () => {
+  mock.method(modelo, "guardarUmbral", async (datos) => ({ id_umbral: ID_UMBRAL, ...datos }));
+  const id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  const umbral = await servicio.guardarUmbral({ id_sucursal: id, max_ausentes_porcentaje: 40 }, rrhh);
+  assert.equal(umbral.idSucursal, id);
+});

@@ -67,6 +67,8 @@ async function consultar(filtros = {}, identidad = {}) {
   const acceso = await resolverAcceso(identidad);
   const { idSucursal, idDepartamento } = leerAlcance(filtros, acceso);
   const rango = leerRango(filtros, await modelo.hoy());
+  // Una sucursal que no existe en EmployeeService no tiene calendario; si no responde, se informa el 503.
+  if (!(await empleados.obtenerSucursal(idSucursal))) throw new ErrorApp(404, "Sucursal no encontrada");
 
   const personal = (await empleados.listarPorArea(idSucursal, idDepartamento)).filter((p) => p.activo);
   const ids = personal.map((p) => p.id_empleado);
@@ -127,6 +129,8 @@ async function guardarUmbral(datos, identidad) {
   const acceso = await resolverAcceso(identidad);
   soloRrhh(acceso);
   const umbral = validarUmbral(datos);
+  if (umbral.idSucursal && !(await empleados.obtenerSucursal(umbral.idSucursal))) throw new ErrorApp(404, "Sucursal no encontrada");
+  if (umbral.idDepartamento && !(await empleados.obtenerArea(umbral.idDepartamento))) throw new ErrorApp(404, "Área no encontrada");
   return modelo.guardarUmbral({ ...umbral, idEmpleado: acceso.idEmpleado });
 }
 

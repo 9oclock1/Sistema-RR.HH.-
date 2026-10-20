@@ -1,4 +1,5 @@
 const { ErrorApp } = require("./errores");
+const { UUID_RE } = require("./formatos");
 const { esFechaValida, sumarDias } = require("./periodos");
 
 // KAN-55 (RF-35): calendario consolidado de ausencias aprobadas y detección de baja cobertura.
@@ -74,9 +75,8 @@ function resolverUmbral(umbrales, idSucursal, idDepartamento) {
 
 function validarUmbral({ id_sucursal, id_departamento, max_ausentes_porcentaje, min_presentes } = {}) {
   const errores = [];
-  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   for (const [campo, valor] of [["id_sucursal", id_sucursal], ["id_departamento", id_departamento]]) {
-    if (valor && !uuid.test(valor)) errores.push({ campo, mensaje: "Identificador inválido." });
+    if (valor && !UUID_RE.test(valor)) errores.push({ campo, mensaje: "Identificador inválido." });
   }
   const maximo = Number(max_ausentes_porcentaje);
   if (!Number.isInteger(maximo) || maximo < 1 || maximo > 100) {
