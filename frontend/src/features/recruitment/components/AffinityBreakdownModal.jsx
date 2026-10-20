@@ -247,7 +247,10 @@ export default function AffinityBreakdownModal({
                     </div>
                     <div className="affinity-comparativa-fila">
                       <span className="affinity-comparativa-fila__label">Detectado en CV:</span>
-                      <span className="affinity-comparativa-fila__val">{desglose.educacion.nivelDetectado}</span>
+                      <span className="affinity-comparativa-fila__val">
+                        {desglose.educacion.nivelDetectado}
+                        {desglose.educacion.enCurso && " (en curso)"}
+                      </span>
                     </div>
                     <div className="affinity-comparativa-fila">
                       <span className="affinity-comparativa-fila__label">Condición:</span>

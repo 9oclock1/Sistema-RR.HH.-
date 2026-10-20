@@ -15,7 +15,7 @@ const PATRONES_NIVEL_TITULO = [
   {
     codigo: "LICENCIATURA",
     regex:
-      /\b(licenciatura|licenciado|licenciada|bachelor|ingenier[ií]a|ingeniero|ingeniera|abogad[oa]|arquitect[oa]|contador|medicina)\b/i,
+      /\b(licenciatura|licenciado|licenciada|ingenier[ií]a|ingeniero|ingeniera|abogad[oa]|arquitect[oa]|contador|medicina)\b/i,
   },
   { codigo: "TECNICO_SUPERIOR", regex: /\b(t[eé]cnico superior|tsu)\b/i },
   { codigo: "TECNICO_MEDIO", regex: /\b(t[eé]cnico medio|t[eé]cnico)\b/i },
@@ -25,9 +25,10 @@ const PATRONES_NIVEL_TITULO = [
   },
 ];
 
-// Formación que todavía no se concluyó no acredita el grado.
+// Quien aún cursa el grado cuenta, pero con menos crédito que quien ya lo terminó.
 const REGEX_TITULO_EN_CURSO =
   /\b(estudiante|cursando|en curso|incompleto|incompleta|trunco|truncos|truncada)\b/i;
+const FACTOR_EN_CURSO = 0.75;
 
 // Por debajo de este porcentaje de cumplimiento, un requisito de educación o experiencia deja al candidato "no apto".
 const UMBRAL_NO_APTO = 50;
@@ -45,10 +46,13 @@ function normalizarTexto(texto = "") {
 
 function detectarNivelEducacionMaximo(titulos = []) {
   if (!Array.isArray(titulos) || titulos.length === 0) {
-    return { codigo: "SIN_EDUCACION", orden: 0, tituloOrigen: "" };
+    return { codigo: "SIN_EDUCACION", orden: 0, ordenEfectivo: 0, enCurso: false, tituloOrigen: "" };
   }
 
+  // Se elige el mejor grado según su valor efectivo: un grado en curso vale menos que uno concluido.
   let mejorOrden = 0;
+  let mejorEfectivo = 0;
+  let mejorEnCurso = false;
   let mejorCodigo = "SIN_EDUCACION";
   let mejorTitulo = "";
 
@@ -58,14 +62,18 @@ function detectarNivelEducacionMaximo(titulos = []) {
       typeof item === "string"
         ? item
         : [item?.titulo, item?.institucion].filter(Boolean).join(" ");
-    if (REGEX_TITULO_EN_CURSO.test(tituloTexto)) continue;
     const normalizado = normalizarTexto(tituloTexto);
 
     for (const { codigo, regex } of PATRONES_NIVEL_TITULO) {
       if (regex.test(normalizado)) {
         const orden = MAPA_ORDEN_EDUCACION[codigo] || 0;
-        if (orden > mejorOrden) {
+        const enCurso = REGEX_TITULO_EN_CURSO.test(tituloTexto);
+        const efectivo = enCurso ? orden * FACTOR_EN_CURSO : orden;
+        // En empate gana el grado concluido.
+        if (efectivo > mejorEfectivo || (efectivo === mejorEfectivo && mejorEnCurso && !enCurso)) {
           mejorOrden = orden;
+          mejorEfectivo = efectivo;
+          mejorEnCurso = enCurso;
           mejorCodigo = codigo;
           mejorTitulo = tituloTexto;
         }
@@ -74,7 +82,13 @@ function detectarNivelEducacionMaximo(titulos = []) {
     }
   }
 
-  return { codigo: mejorCodigo, orden: mejorOrden, tituloOrigen: mejorTitulo };
+  return {
+    codigo: mejorCodigo,
+    orden: mejorOrden,
+    ordenEfectivo: mejorEfectivo,
+    enCurso: mejorEnCurso,
+    tituloOrigen: mejorTitulo,
+  };
 }
 
 // Calcula la similitud de coseno entre dos vectores numéricos
@@ -386,10 +400,15 @@ async function calcularAfinidad({
   const ordenRequerido = MAPA_ORDEN_EDUCACION[nivelMinimoRequerido] || 1;
   const nivelCandidato = detectarNivelEducacionMaximo(datosCv.educacion);
 
-  const cumpleEducacion = nivelCandidato.orden >= ordenRequerido;
+  // Un grado en curso no "cumple" el requisito, pero aporta parte del puntaje.
+  const cumpleEducacion =
+    !nivelCandidato.enCurso && nivelCandidato.orden >= ordenRequerido;
   const porcentajeEducacion = cumpleEducacion
     ? 100
-    : Math.max(0, Math.round((nivelCandidato.orden / ordenRequerido) * 100));
+    : Math.min(
+        100,
+        Math.max(0, Math.round((nivelCandidato.ordenEfectivo / ordenRequerido) * 100)),
+      );
 
   // No se descarta a quien se queda cerca: el porcentaje alcanzado ya pondera en el total, y solo
   // queda "no apto" quien está lejos del mínimo.
@@ -452,6 +471,7 @@ async function calcularAfinidad({
     educacion: {
       nivelRequerido: nivelMinimoRequerido,
       nivelDetectado: nivelCandidato.codigo,
+      enCurso: nivelCandidato.enCurso,
       cumple: cumpleEducacion,
       porcentajeObtenido: Math.round(porcentajeEducacion * 100) / 100,
       pesoAsignado: pesos.pesoEducacion,

@@ -47,6 +47,7 @@ const DesgloseAfinidadSchema = z.object({
   educacion: z.object({
     nivelRequerido: z.string(),
     nivelDetectado: z.string(),
+    enCurso: z.boolean().optional(),
     cumple: z.boolean(),
     porcentajeObtenido: z.number().min(0).max(100),
     pesoAsignado: z.number(),

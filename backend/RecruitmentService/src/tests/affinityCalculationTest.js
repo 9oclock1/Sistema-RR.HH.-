@@ -329,14 +329,45 @@ describe("RF-12: Algoritmo de comparación y matching de CV vs requisitos (QA & 
       assert.equal(r.educacion.porcentajeObtenido, 75);
     });
 
-    it("Debe ignorar títulos en curso al detectar el nivel educativo", () => {
+    it("Debe puntuar menos a quien cursa el grado que a quien lo terminó", async () => {
+      const vacanteLic = { nivel_educacion_min: "LICENCIATURA", year_experiencia_min: 0, habilidades_clave_requeridas: [] };
+      const calc = (titulo) =>
+        calcularAfinidad({
+          convocatoria: vacanteLic,
+          datosCv: { estadoExtraccion: "EXITOSA", educacion: [{ titulo, institucion: "U" }], aniosExperienciaEstimados: 0, destrezasTecnicas: [] },
+        });
+      const terminado = await calc("Licenciatura en Informática");
+      const cursando = await calc("Estudiante de Licenciatura en Informática");
+      assert.equal(terminado.educacion.porcentajeObtenido, 100);
+      assert.equal(terminado.educacion.cumple, true);
+      assert.equal(cursando.educacion.enCurso, true);
+      assert.equal(cursando.educacion.cumple, false);
+      assert.equal(cursando.educacion.porcentajeObtenido, 75);
+      assert.equal(cursando.esApto, true);
+      assert.ok(cursando.porcentajeTotal < terminado.porcentajeTotal);
+    });
+
+    it("Debe preferir un grado concluido sobre uno en curso de valor equivalente", () => {
       const nivel = detectarNivelEducacionMaximo([
-        { titulo: "Estudiante de Ingeniería de Sistemas" },
+        { titulo: "Técnico Superior en Sistemas" },
+        { titulo: "Estudiante de Licenciatura en Sistemas" },
       ]);
-      assert.equal(nivel.codigo, "SIN_EDUCACION");
+      assert.equal(nivel.enCurso, false);
+      assert.equal(nivel.codigo, "TECNICO_SUPERIOR");
+    });
+
+    it("Debe contar como formación a quien está cursando o es estudiante del grado", () => {
       assert.equal(
-        detectarNivelEducacionMaximo([{ titulo: "Bachelor of Science" }]).codigo,
+        detectarNivelEducacionMaximo([{ titulo: "Estudiante de Ingeniería de Sistemas" }]).codigo,
         "LICENCIATURA",
+      );
+      assert.equal(
+        detectarNivelEducacionMaximo([{ titulo: "Cursando Maestría en Finanzas" }]).codigo,
+        "MAESTRIA",
+      );
+      assert.equal(
+        detectarNivelEducacionMaximo([{ titulo: "Bachiller en Humanidades" }]).codigo,
+        "BACHILLER",
       );
     });
   });
