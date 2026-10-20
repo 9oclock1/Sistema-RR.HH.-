@@ -1,4 +1,4 @@
-import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarDays, CalendarRange, ClipboardCheck, FileCheck, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, IdCard, ListTree, Mail, Megaphone, Network, Send, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, BookOpenCheck, Briefcase, Building2, CalendarClock, CalendarDays, CalendarRange, ClipboardCheck, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, IdCard, ListTree, Mail, Megaphone, Network, Send, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
@@ -8,6 +8,8 @@ import CapacitacionesView from "../features/Capacitaciones/CapacitacionesView";
 import { RUTA_CAPACITACIONES } from "../features/Capacitaciones/utils/opciones";
 import CargosList from "../features/Cargos/CargosList";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
+import ContratosView from "../features/Contratos/ContratosView";
+import { RUTA_CONTRATOS } from "../features/Contratos/utils/opciones";
 import GestionComunicacionesPage from "../features/comunicaciones/GestionComunicacionesPage";
 import LicenciasPage from "../features/licencias/LicenciasPage";
 import JerarquiaView from "../features/Jerarquia/JerarquiaView";
@@ -203,6 +205,14 @@ export const SECCIONES = [
         icono: GraduationCap,
         roles: ["gerente"],
         pagina: CapacitacionesView,
+      },
+      {
+        ruta: RUTA_CONTRATOS,
+        etiqueta: "Modificaciones contractuales",
+        descripcion: "Renovaciones, cambios de jornada y adendas de contrato con su documento firmado.",
+        icono: FileSignature,
+        roles: ["gerente"],
+        pagina: ContratosView,
       },
     ],
   },
