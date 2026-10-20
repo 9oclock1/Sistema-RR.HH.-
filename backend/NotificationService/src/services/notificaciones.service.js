@@ -141,14 +141,15 @@ function paginacion({ limite, desplazamiento }) {
   };
 }
 
-// Devuelve la página pedida y el total de no leídas, que alimenta el contador de la campana.
+// Devuelve la página pedida, el total de no leídas (contador de la campana) y el total del filtro (paginación de la vista completa).
 async function listarMisNotificaciones(idEmpleado, { estado, limite, desplazamiento } = {}) {
   const soloNoLeidas = estado === "no_leidas";
-  const [notificaciones, no_leidas] = await Promise.all([
+  const [notificaciones, no_leidas, total] = await Promise.all([
     modelo.listar(idEmpleado, { soloNoLeidas, ...paginacion({ limite, desplazamiento }) }),
     modelo.contarNoLeidas(idEmpleado),
+    modelo.contarTotal(idEmpleado, soloNoLeidas),
   ]);
-  return { notificaciones, no_leidas };
+  return { notificaciones, no_leidas, total };
 }
 
 const contarNoLeidas = async (idEmpleado) => ({ no_leidas: await modelo.contarNoLeidas(idEmpleado) });

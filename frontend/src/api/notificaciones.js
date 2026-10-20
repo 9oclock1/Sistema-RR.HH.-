@@ -4,9 +4,9 @@ const RUTA = "/notf/notificaciones";
 
 const comoEmpleado = (idEmpleado) => ({ "X-Empleado-Id": idEmpleado });
 
-// Devuelve { notificaciones, no_leidas }.
-export const listarNotificaciones = (idEmpleado, { soloNoLeidas = false, limite = 20 } = {}) => {
-  const parametros = new URLSearchParams({ limite });
+// Devuelve { notificaciones, no_leidas, total }; `total` es el del filtro, para paginar la vista completa.
+export const listarNotificaciones = (idEmpleado, { soloNoLeidas = false, limite = 20, desplazamiento = 0 } = {}) => {
+  const parametros = new URLSearchParams({ limite, desplazamiento });
   if (soloNoLeidas) parametros.set("estado", "no_leidas");
   return solicitar(`${RUTA}?${parametros}`, { cabeceras: comoEmpleado(idEmpleado) });
 };
