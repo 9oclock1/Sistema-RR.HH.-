@@ -1,0 +1,49 @@
+sequenceDiagram
+  autonumber
+  participant D as Despachador (cada 5 s)
+  participant M as EventosModel
+  participant DB as AttendanceDB
+  participant ERP as Endpoint REST de Producción o Entregas
+  participant PS as Google Pub/Sub (tópico de RRHH)
+  actor OP as Operador
+
+  loop cada 5 segundos
+    D->>M: reservarPendientes(hasta 10 eventos, reserva de 60 s)
+    M->>DB: UPDATE eventos PENDIENTES vencidos (FOR UPDATE SKIP LOCKED)
+    DB-->>D: eventos PERSONAL_NO_DISPONIBLE y su destino
+    loop por cada evento
+      alt el módulo tiene URL REST configurada
+        D->>ERP: POST del evento (X-Evento-Id y X-Topico, espera máxima 5 s)
+        alt responde 2xx
+          D->>M: marcarEntregado
+          M->>DB: estado ENTREGADO
+        else falla o no responde
+          alt hay Pub/Sub configurado
+            D->>PS: publica el mismo evento (espera máxima 15 s)
+            alt publicado
+              D->>M: marcarEntregado
+            else error de Pub/Sub
+              D->>M: marcarError con espera creciente (30 s, 1 min, 2 min, hasta 1 h)
+            end
+          else sin Pub/Sub
+            D->>M: marcarError con espera creciente
+            Note over D,DB: tras 8 intentos queda FALLIDO
+          end
+        end
+      else sin URL REST
+        D->>PS: publica en el tópico de RRHH, con el destino en el encabezado
+        alt publicado
+          D->>M: marcarEntregado
+        else error
+          D->>M: marcarError (FALLIDO si el tópico no existe o el mensaje es inválido)
+        end
+      end
+    end
+  end
+
+  Note over OP,DB: Un evento FALLIDO no se pierde: queda guardado con su último error
+  OP->>D: POST /att/eventos/:id/reintentar
+  D->>M: reencolar(id)
+  M->>DB: estado PENDIENTE, intentos en cero
+  OP->>D: GET /att/eventos?topico&estado
+  D-->>OP: eventos y su estado, para auditar la entrega

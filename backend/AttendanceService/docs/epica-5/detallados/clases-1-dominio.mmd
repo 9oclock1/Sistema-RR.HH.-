@@ -1,0 +1,125 @@
+classDiagram
+  direction TB
+
+  class SolicitudVacacion {
+    +UUID id_solicitud PK
+    +UUID id_empleado
+    +EstadoSolicitud id_estado_solicitud
+    +date fecha_inicio
+    +date fecha_fin
+    +int dias_habiles
+    +UUID id_supervisor
+    +bool supervisor_notificado
+    +UUID id_empleado_resolutor
+    +timestamptz resuelto_en
+    +text motivo_resolucion
+    +timestamptz resolucion_notificada_en
+    +timestamptz creado_en
+  }
+  class MovimientoVacacion {
+    +UUID id_movimiento PK
+    +UUID id_empleado
+    +EstadoMovimiento id_estado_movimiento
+    +UUID id_solicitud_origen UK
+    +date fecha_inicio
+    +date fecha_fin
+    +int dias
+  }
+  class SolicitudLicencia {
+    +UUID id_solicitud PK
+    +UUID id_empleado
+    +TipoLicencia id_tipo_licencia
+    +EstadoSolicitud id_estado_solicitud
+    +date fecha_inicio
+    +date fecha_fin
+    +int dias_solicitados «derivado»
+    +bool es_con_goce_haberes
+    +bool excede_limite_dias
+    +text motivo
+    +UUID id_empleado_resolutor
+    +timestamptz resuelto_en
+    +text motivo_resolucion
+    +timestamptz resolucion_notificada_en
+  }
+  class AdjuntoLicencia {
+    +UUID id_adjunto PK
+    +UUID id_solicitud FK
+    +string nombre_original
+    +string archivo_url
+    +string formato_mimetype
+    +int tamano_bytes
+  }
+  class TipoLicencia {
+    <<enumeration>>
+    MEDICA · con goce · requiere adjunto
+    MATERNIDAD · con goce · 90 días
+    PATERNIDAD · con goce · 3 días
+    DUELO · con goce · 3 días
+    ACADEMICA · sin goce · 5 días
+    PERSONAL · sin goce · 2 días
+  }
+  class EstadoSolicitud {
+    <<enumeration>>
+    PENDIENTE
+    APROBADA
+    RECHAZADA
+    CANCELADA
+  }
+  class EstadoMovimiento {
+    <<enumeration>>
+    EN_PROCESO
+    GOZADO
+    CANCELADO
+  }
+  class Feriado {
+    +date fecha PK
+    +string nombre
+  }
+  class TurnoPublicado {
+    +UUID id_empleado
+    +date fecha
+    +bool es_descanso
+  }
+  class EventoSaliente {
+    +UUID id_evento PK
+    +string topico
+    +string tipo_evento
+    +jsonb carga
+    +EstadoEvento id_estado_evento
+    +int intentos
+    +timestamptz proximo_intento_en
+  }
+  class UmbralCobertura {
+    +UUID id_umbral PK
+    +UUID id_sucursal «NULL = todas»
+    +UUID id_departamento «NULL = todas»
+    +int max_ausentes_porcentaje
+    +int min_presentes
+    +UUID actualizado_por
+  }
+  class Notificacion {
+    <<NotificationDB>>
+    +UUID id_notificacion PK
+    +UUID id_empleado
+    +string tipo
+    +string titulo
+    +text mensaje
+    +string enlace
+    +UUID id_referencia UK
+    +bool leida
+    +string correo_estado
+  }
+
+  SolicitudVacacion "1" -- "1" MovimientoVacacion : id_solicitud_origen
+  SolicitudVacacion "*" --> "1" EstadoSolicitud
+  SolicitudLicencia "*" --> "1" EstadoSolicitud
+  SolicitudLicencia "*" --> "1" TipoLicencia
+  SolicitudLicencia "1" *-- "0..*" AdjuntoLicencia
+  MovimientoVacacion "*" --> "1" EstadoMovimiento
+  SolicitudVacacion ..> Feriado : días hábiles
+  SolicitudVacacion ..> TurnoPublicado : descansos
+  SolicitudVacacion ..> EventoSaliente : «publica» al aprobar
+  SolicitudLicencia ..> EventoSaliente : «publica» al aprobar
+  SolicitudVacacion ..> Notificacion : «HTTP» resultado
+  SolicitudLicencia ..> Notificacion : «HTTP» resultado
+  UmbralCobertura ..> TurnoPublicado : cobertura por día
