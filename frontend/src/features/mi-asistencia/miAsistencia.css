@@ -1,0 +1,172 @@
+/* RF-28: Mi asistencia. Valores solo desde styles/tokens.css (ver DESIGN.md). */
+
+.ma {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.ma-columna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.ma-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  min-width: 0;
+}
+
+.ma-tarjeta > .ds-tarjeta__encabezado {
+  margin-bottom: 0;
+}
+
+.ma-filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--size-sidebar) * 0.75), 1fr));
+  gap: var(--space-3) var(--space-4);
+  align-items: end;
+}
+
+.ma-filtros__boton {
+  justify-self: start;
+}
+
+.ma-sutil {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+/* ---------- Indicadores ---------- */
+.ma-indicadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--size-sidebar) * 0.75)), 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.ma-indicador {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.ma-indicador__etiqueta,
+.ma-indicador__detalle {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.ma-indicador__valor {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- Tabla ---------- */
+.ma-tabla .ds-tabla {
+  min-width: calc(var(--size-sidebar) * 4);
+  font-variant-numeric: tabular-nums;
+}
+
+.ma-celda {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-block: var(--space-1);
+}
+
+.ma-chips {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-1) 0;
+  list-style: none;
+}
+
+.ma-chips > li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* ---------- Detalle de la jornada ---------- */
+.ma-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.ma-detalle p {
+  margin: 0;
+}
+
+.ma-datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--size-sidebar) * 0.6), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.ma-dato__etiqueta {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ma-dato__valor {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.ma-subtitulo {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ma-lista-incidencias {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ma-incidencia {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.ma-incidencia__estado {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
