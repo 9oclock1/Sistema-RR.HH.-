@@ -150,3 +150,19 @@
 - `MOVIMIENTOS_VACACION` guarda solo los días consumidos o reservados, en estado `EN_PROCESO`, `GOZADO` o `CANCELADO`. `id_empleado` e `id_solicitud_origen` no tienen FK (otro servicio / historia KAN-50). Una solicitud origina un solo movimiento.
 - Saldo disponible = acumulados − gozados − en proceso. Los cancelados no cuentan ni aparecen en el historial. Las historias KAN-50 y KAN-53 crean el movimiento al solicitar y lo pasan a `GOZADO` o `CANCELADO` al resolver; el saldo se actualiza solo porque se calcula al consultar.
 - La fecha de consulta es la de Bolivia (UTC-4). No se modela la caducidad de vacaciones no gozadas.
+
+## Aprobación de ausencias (KAN-53)
+
+- La bandeja (`GET /aprobaciones/solicitudes`) reúne vacaciones y licencias del personal de una sucursal (y área). La prioridad es `ALTA` si la ausencia empieza en 7 días o menos (o ya empezó) o si es una licencia sobre su tope, `MEDIA` hasta 30 días y `BAJA` después. Solo `supervisor`, `gerente` y `admin` (cabecera `X-Rol`) acceden.
+- Resolver (`POST /aprobaciones/solicitudes/:categoria/:id/resolucion`, categoría `VACACIONES` o `LICENCIA`) solo actúa sobre una solicitud `PENDIENTE` y nadie resuelve la suya. Es una sola transacción: el estado, el movimiento de saldo y el evento de indisponibilidad quedan juntos o no queda nada.
+- Aprobar una vacación pasa su movimiento de `EN_PROCESO` a `GOZADO` (débito definitivo); rechazarla exige un motivo y lo pasa a `CANCELADO` (libera los días). Una licencia sobre su tope solo la aprueba `gerente` o `admin`.
+- Al aprobar se guarda un evento `PERSONAL_NO_DISPONIBLE` por módulo del ERP (Producción y Logística o Entregas y Despachos, según el código del área: `AREAS_PRODUCCION`, `AREAS_REPARTO`). Si no se puede saber el área del empleado, no se aprueba (503). Con `URL_PRODUCCION_LOGISTICA` o `URL_ENTREGAS_DESPACHOS` el despachador usa REST y, si falla y hay Pub/Sub, publica por ahí; un evento fallido se reenvía con `POST /eventos/:id/reintentar`.
+- El aviso al colaborador (KAN-54) sale después de confirmar la transacción; si NotificationService no responde, `resolucion_notificada_en` queda vacío y un reintento periódico lo completa.
+
+## Calendario de ausencias (KAN-55)
+
+- `GET /calendario/ausencias?id_sucursal&id_departamento&desde&hasta` devuelve las vacaciones y licencias `APROBADA` del personal activo que se cruzan con el rango (máximo 92 días; por defecto, el mes en curso). Pendientes y rechazadas no aparecen. RRHH (`gerente`, `admin`) elige cualquier sucursal; el supervisor (con `X-Empleado-Id`) solo la suya.
+- Tipos y colores: `VACACIONES` y los códigos de `CATALOGOS_TIPO_LICENCIA` (`MEDICA`, `MATERNIDAD`, `PATERNIDAD`, `DUELO`, `ACADEMICA`, `PERSONAL`).
+- Baja cobertura, por día y por área: se cuenta a quienes deben trabajar ese día (`programados`) y cuántos están ausentes con una ausencia aprobada. Debe trabajar quien tiene un turno publicado de trabajo; sin turno publicado, de lunes a viernes salvo feriados. Hay alerta si el porcentaje de ausentes **supera** el máximo tolerado o si quedan menos presentes que el mínimo. Un día de descanso no resta cobertura.
+- `UMBRALES_COBERTURA` guarda el máximo de ausentes (%) y el mínimo de presentes por sucursal y área; `NULL` en sucursal o área es comodín. Rige el más específico (sucursal y área, área, sucursal, general) y, sin ninguno, el predeterminado: 30 % de ausentes y al menos 1 presente. Solo RRHH los crea (`PUT /calendario/umbrales`) o elimina (`DELETE /calendario/umbrales/:id`); todos pueden consultarlos.
+- La consulta es una sola lectura con los índices de ausencias aprobadas y la respuesta no se guarda en cachés compartidos (`Cache-Control: private, no-store`).

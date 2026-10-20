@@ -1,0 +1,436 @@
+/* RF-35: calendario consolidado de ausencias. Valores solo desde styles/tokens.css (ver DESIGN.md). */
+
+.cal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.cal-sutil {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.cal-identidad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cal-filtros__campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--size-sidebar) * 0.75), 1fr));
+  gap: var(--space-3) var(--space-4);
+  align-items: start;
+}
+
+.cal-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* ---------- Barra de navegación y vistas ---------- */
+.cal-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.cal-barra__navegacion,
+.cal-barra__vistas {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.cal-resumen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.cal-resumen__alerta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-warning-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ---------- Color por tipo de ausencia (criterio 2) ---------- */
+.cal-tipo--vacaciones {
+  --tipo-fondo: var(--color-info-bg);
+  --tipo-borde: var(--color-info);
+  --tipo-texto: var(--color-info-text);
+}
+
+.cal-tipo--medica {
+  --tipo-fondo: var(--color-danger-bg);
+  --tipo-borde: var(--color-danger);
+  --tipo-texto: var(--color-danger-text);
+}
+
+.cal-tipo--maternidad {
+  --tipo-fondo: var(--color-purple-bg);
+  --tipo-borde: var(--color-purple);
+  --tipo-texto: var(--color-purple-text);
+}
+
+.cal-tipo--paternidad {
+  --tipo-fondo: color-mix(in srgb, var(--color-avatar-5) 14%, var(--color-bg-surface));
+  --tipo-borde: var(--color-avatar-5);
+  --tipo-texto: var(--color-avatar-5);
+}
+
+.cal-tipo--duelo {
+  --tipo-fondo: var(--color-bg-neutral);
+  --tipo-borde: var(--color-border-input);
+  --tipo-texto: var(--color-text-secondary);
+}
+
+.cal-tipo--academica {
+  --tipo-fondo: var(--color-warning-bg);
+  --tipo-borde: var(--color-warning);
+  --tipo-texto: var(--color-warning-text);
+}
+
+.cal-tipo--personal {
+  --tipo-fondo: var(--color-success-bg);
+  --tipo-borde: var(--color-success);
+  --tipo-texto: var(--color-success-text);
+}
+
+.cal-tipo--otro {
+  --tipo-fondo: var(--color-bg-hover);
+  --tipo-borde: var(--color-border-hover);
+  --tipo-texto: var(--color-text-secondary);
+}
+
+.cal-etiqueta-tipo {
+  border-color: var(--tipo-borde);
+  background: var(--tipo-fondo);
+  color: var(--tipo-texto);
+}
+
+/* ---------- Leyenda ---------- */
+.cal-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cal-leyenda__tipo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--size-control-sm);
+  padding: 0 var(--space-2);
+  border: var(--border-width) solid var(--tipo-borde);
+  border-radius: var(--radius-control);
+  background: var(--tipo-fondo);
+  color: var(--tipo-texto);
+  font: inherit;
+  font-size: var(--font-size-small);
+  cursor: pointer;
+}
+
+.cal-leyenda__muestra {
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--tipo-borde);
+}
+
+/* Un tipo apagado se tacha y se apaga, no solo cambia de color. */
+.cal-leyenda__tipo--oculto {
+  background: var(--color-bg-surface);
+  border-style: dashed;
+  color: var(--color-text-subtle);
+  text-decoration: line-through;
+}
+
+.cal-leyenda__tipo--oculto .cal-leyenda__muestra {
+  background: transparent;
+  border: var(--border-width) solid var(--color-border-input);
+}
+
+/* ---------- Cuadrícula mensual y semanal ---------- */
+.cal-cuadricula {
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.cal-cuadricula__encabezado,
+.cal-cuadricula__semana {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(calc(var(--size-sidebar) * 0.5), 1fr));
+}
+
+.cal-cuadricula__titulo {
+  padding: var(--space-2);
+  background: var(--color-bg-page);
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
+
+.cal-celda {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: calc(var(--size-sidebar) * 0.5);
+  padding: var(--space-1);
+  border-top: var(--border-width) solid var(--color-border);
+  border-left: var(--border-width) solid var(--color-border);
+  background: var(--color-bg-surface);
+  min-width: 0;
+}
+
+.cal-celda:first-child {
+  border-left: 0;
+}
+
+.cal-celda--fuera {
+  background: var(--color-bg-page);
+}
+
+.cal-celda--fuera .cal-celda__dia {
+  color: var(--color-text-subtle);
+}
+
+.cal-celda--descanso:not(.cal-celda--fuera) {
+  background: var(--color-bg-page);
+}
+
+.cal-celda--hoy .cal-celda__dia {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+/* Baja cobertura: borde y fondo de aviso, además del ícono y el texto para lectores de pantalla. */
+.cal-celda--baja {
+  background: var(--color-warning-bg);
+  box-shadow: inset 0 0 0 var(--border-width-strong, 2px) var(--color-warning);
+}
+
+.cal-celda__cabecera {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.cal-celda__dia {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--size-control-sm);
+  height: var(--size-control-sm);
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-round);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.cal-celda__dia:hover {
+  background: var(--color-bg-hover);
+}
+
+.cal-celda__feriado {
+  overflow: hidden;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-celda__alerta {
+  display: inline-flex;
+  color: var(--color-warning-text);
+}
+
+.cal-celda__conteo {
+  margin-left: auto;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+}
+
+.cal-celda__bloques {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.cal-bloque {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: var(--size-control-sm);
+  padding: 0 var(--space-1);
+  border: var(--border-width) solid var(--tipo-borde);
+  border-left-width: var(--space-1);
+  border-radius: var(--radius-control);
+  background: var(--tipo-fondo);
+  color: var(--tipo-texto);
+  font: inherit;
+  font-size: var(--font-size-small);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cal-bloque:hover {
+  filter: brightness(0.96);
+}
+
+.cal-bloque__tipo {
+  flex: none;
+  font-weight: var(--font-weight-semibold);
+}
+
+.cal-bloque__nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-mas {
+  padding: 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--color-link);
+  font: inherit;
+  font-size: var(--font-size-small);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* ---------- Vista de un día ---------- */
+.cal-dia {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cal-dia__resumen {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.cal-dia__alertas {
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.cal-dia__lista {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cal-dia__fila {
+  display: grid;
+  grid-template-columns: minmax(0, 20rem) 1fr;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-2) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.cal-dia__fila:last-child {
+  border-bottom: 0;
+}
+
+.cal-dia__datos {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cal-dia__cargo {
+  color: var(--color-text);
+}
+
+.cal-dia__periodo {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+}
+
+@media (max-width: 640px) {
+  .cal-dia__fila {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Detalle de una ausencia ---------- */
+.cal-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.cal-detalle div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.cal-detalle dt {
+  min-width: calc(var(--space-8) * 3);
+  color: var(--color-text-subtle);
+  font-weight: var(--font-weight-semibold);
+}
+
+.cal-detalle dd {
+  margin: 0;
+  color: var(--color-text);
+}
+
+/* ---------- Umbrales de cobertura ---------- */
+.cal-umbrales {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cal-umbrales__formulario {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.cal-umbrales__titulo {
+  margin: 0;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.cal-umbrales__campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--size-sidebar) * 0.6), 1fr));
+  gap: var(--space-3) var(--space-4);
+  align-self: stretch;
+}
