@@ -158,6 +158,10 @@ export default function CampanaNotificaciones() {
               </ul>
             )}
           </div>
+
+          <Link to="/comunicaciones/notificaciones" className="campana__ver-todas ds-foco" onClick={() => setAbierto(false)}>
+            Ver todas las notificaciones
+          </Link>
         </section>
       )}
 

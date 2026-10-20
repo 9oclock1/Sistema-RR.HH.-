@@ -47,6 +47,15 @@ async function contarNoLeidas(idEmpleado) {
   return rows[0].cantidad;
 }
 
+// Total de alertas del empleado (todas, o solo las no leídas): permite paginar la vista completa.
+async function contarTotal(idEmpleado, soloNoLeidas) {
+  const { rows } = await pool.query(
+    `SELECT count(*)::int AS cantidad FROM notificaciones WHERE id_empleado = $1 AND ($2::boolean IS FALSE OR NOT leida)`,
+    [idEmpleado, soloNoLeidas]
+  );
+  return rows[0].cantidad;
+}
+
 // Solo el dueño puede marcarla; conserva la fecha de la primera lectura si ya estaba leída.
 async function marcarLeida(idNotificacion, idEmpleado) {
   const { rows } = await pool.query(
@@ -68,4 +77,4 @@ async function marcarTodasLeidas(idEmpleado) {
   return rowCount;
 }
 
-module.exports = { crear, registrarCorreo, listar, contarNoLeidas, marcarLeida, marcarTodasLeidas };
+module.exports = { crear, registrarCorreo, listar, contarNoLeidas, contarTotal, marcarLeida, marcarTodasLeidas };
