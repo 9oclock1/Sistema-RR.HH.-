@@ -103,6 +103,34 @@ function armarMensajesAlta({
   });
 }
 
+// El encabezado repetido como atributos de Pub/Sub: cada grupo filtra su suscripción por `destino` sin leer el cuerpo.
+const atributosDe = ({ encabezado }) => ({
+  id_mensaje: encabezado.id_mensaje,
+  origen: encabezado.origen.grupo,
+  origen_modulo: encabezado.origen.modulo,
+  destino: encabezado.destino.grupo,
+  destino_modulo: encabezado.destino.modulo,
+  tipo: encabezado.tipo,
+  version_esquema: String(encabezado.version_esquema),
+});
+
+// Mensaje legible para ultimo_error a partir del código gRPC que devuelve Pub/Sub.
+function errorDePublicacion(error, topico) {
+  switch (error?.code) {
+    case 5:
+      return `El tópico ${topico} no existe en Pub/Sub`;
+    case 3:
+      return "Pub/Sub rechazó el mensaje";
+    case 7:
+    case 16:
+      return "Pub/Sub rechazó las credenciales";
+    case "ENOENT":
+      return "No se encontró la llave de la cuenta de servicio";
+    default:
+      return error?.message === "Pub/Sub no respondió a tiempo" ? error.message : "No se pudo conectar con Pub/Sub";
+  }
+}
+
 module.exports = {
   TIPO_EVENTO,
   ESTADO_EVENTO,
@@ -110,4 +138,6 @@ module.exports = {
   ORIGEN,
   armarMensaje,
   armarMensajesAlta,
+  atributosDe,
+  errorDePublicacion,
 };
