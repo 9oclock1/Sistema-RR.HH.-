@@ -75,7 +75,33 @@ export async function fetchApplicantsByJobOpening(
   }
 }
 
+/**
+ * Obtiene el ranking de postulantes ordenados por matching score para una convocatoria.
+ * @param {string} id_convocatoria - UUID de la convocatoria
+ * @param {Object} [parametros={}] - Parámetros de consulta (pagina, limite, desempate, filtros)
+ * @returns {Promise<Object>} { convocatoria, paginacion, criterios_aplicados, ranking }
+ */
+export async function fetchCandidateRanking(id_convocatoria, parametros = {}) {
+  try {
+    const query = new URLSearchParams();
+    Object.entries(parametros).forEach(([clave, valor]) => {
+      if (valor !== undefined && valor !== null && valor !== "") {
+        query.append(clave, valor);
+      }
+    });
+
+    const queryString = query.toString() ? `?${query.toString()}` : "";
+    const respuesta = await solicitar(
+      `/recr/convocatorias/${id_convocatoria}/ranking${queryString}`,
+    );
+    return respuesta?.data ?? respuesta ?? { ranking: [] };
+  } catch (error) {
+    throw adaptarError(error);
+  }
+}
+
 // Alias en español para coherencia con el diseño del sistema
 export const listarConvocatoriasActivas = fetchActiveJobOpenings;
 export const registrarPostulante = registerApplicant;
 export const listarPostulantesPorConvocatoria = fetchApplicantsByJobOpening;
+export const obtenerRankingCandidatos = fetchCandidateRanking;
