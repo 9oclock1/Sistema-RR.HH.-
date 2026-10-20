@@ -263,4 +263,84 @@ INSERT INTO CATALOGOS_ESTADO_EVENTO (id_estado_evento, codigo, nombre)
 VALUES (1, 'PENDIENTE', 'Pendiente'),
     (2, 'ENTREGADO', 'Entregado'),
     (3, 'FALLIDO', 'Fallido');
+-- RF-15: programación y notificación de entrevistas
+CREATE TABLE CATALOGOS_ESTADO_ENTREVISTA (
+    id_estado_entrevista SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    es_activa boolean NOT NULL DEFAULT TRUE,
+    CONSTRAINT CATALOGOS_ESTADO_ENTREVISTA_pk PRIMARY KEY (id_estado_entrevista),
+    CONSTRAINT uq_estado_entrevista_codigo UNIQUE (codigo)
+);
+-- La agenda: el evaluador es un empleado de EmployeeDB; su nombre se guarda para mostrar la agenda sin consultarlo.
+ALTER TABLE ENTREVISTAS
+ALTER COLUMN id_entrevista
+SET DEFAULT gen_random_uuid(),
+    DROP COLUMN estado_entrevista,
+    ADD COLUMN id_estado_entrevista SMALLINT NOT NULL DEFAULT 1,
+    ADD COLUMN duracion_minutos SMALLINT NOT NULL DEFAULT 60,
+    ADD COLUMN nombre_entrevistador varchar(120) NOT NULL,
+    ADD COLUMN id_usuario_reclutador UUID NOT NULL,
+    ADD COLUMN nombre_usuario_reclutador varchar(120) NULL,
+    ADD COLUMN creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ADD COLUMN actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ADD CONSTRAINT chk_entrevista_modalidad CHECK (modalidad IN ('PRESENCIAL', 'VIRTUAL')),
+    ADD CONSTRAINT chk_entrevista_duracion CHECK (duracion_minutos BETWEEN 15 AND 480);
+CREATE INDEX idx_entrevistas_postulacion ON ENTREVISTAS (id_postulacion, fecha_hora_programada);
+CREATE INDEX idx_entrevistas_agenda_entrevistador ON ENTREVISTAS (id_entrevistador_empleado, fecha_hora_programada);
+-- Registro de estados: cada programación, reprogramación o cancelación con lo que cambió y quién lo hizo.
+CREATE TABLE HISTORIALES_ENTREVISTA (
+    id_historial UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_entrevista UUID NOT NULL,
+    id_estado_anterior SMALLINT NULL,
+    id_estado SMALLINT NOT NULL,
+    fecha_hora_anterior TIMESTAMPTZ NULL,
+    fecha_hora_nueva TIMESTAMPTZ NOT NULL,
+    motivo TEXT NULL,
+    id_usuario UUID NOT NULL,
+    nombre_usuario varchar(120) NULL,
+    fecha_cambio TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT HISTORIALES_ENTREVISTA_pk PRIMARY KEY (id_historial)
+);
+CREATE INDEX idx_historiales_entrevista ON HISTORIALES_ENTREVISTA (id_entrevista, fecha_cambio DESC);
+-- Correos al candidato pendientes de envío; usa los estados de CATALOGOS_ESTADO_EVENTO (pendiente, entregado, fallido).
+CREATE TABLE NOTIFICACIONES_ENTREVISTA (
+    id_notificacion UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_entrevista UUID NOT NULL,
+    tipo_notificacion varchar(20) NOT NULL,
+    correo_destino varchar(120) NOT NULL,
+    id_estado_evento SMALLINT NOT NULL DEFAULT 1,
+    intentos SMALLINT NOT NULL DEFAULT 0,
+    ultimo_error varchar(255) NULL,
+    proximo_intento_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    enviado_en TIMESTAMPTZ NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT NOTIFICACIONES_ENTREVISTA_pk PRIMARY KEY (id_notificacion),
+    CONSTRAINT chk_notificacion_entrevista_tipo CHECK (
+        tipo_notificacion IN ('PROGRAMACION', 'REPROGRAMACION', 'CANCELACION')
+    ),
+    CONSTRAINT chk_notificacion_entrevista_intentos CHECK (intentos >= 0)
+);
+CREATE INDEX idx_notificaciones_entrevista_pendientes ON NOTIFICACIONES_ENTREVISTA (id_estado_evento, proximo_intento_en);
+CREATE INDEX idx_notificaciones_entrevista_entrevista ON NOTIFICACIONES_ENTREVISTA (id_entrevista, creado_en DESC);
+-- foreign keys
+ALTER TABLE ENTREVISTAS
+ADD CONSTRAINT ENTREVISTAS_CATALOGOS_ESTADO_ENTREVISTA FOREIGN KEY (id_estado_entrevista) REFERENCES CATALOGOS_ESTADO_ENTREVISTA (id_estado_entrevista) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE HISTORIALES_ENTREVISTA
+ADD CONSTRAINT HISTORIALES_ENTREVISTA_ENTREVISTAS FOREIGN KEY (id_entrevista) REFERENCES ENTREVISTAS (id_entrevista) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE HISTORIALES_ENTREVISTA
+ADD CONSTRAINT HISTORIALES_ENTREVISTA_ESTADO FOREIGN KEY (id_estado) REFERENCES CATALOGOS_ESTADO_ENTREVISTA (id_estado_entrevista) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE HISTORIALES_ENTREVISTA
+ADD CONSTRAINT HISTORIALES_ENTREVISTA_ESTADO_ANTERIOR FOREIGN KEY (id_estado_anterior) REFERENCES CATALOGOS_ESTADO_ENTREVISTA (id_estado_entrevista) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE NOTIFICACIONES_ENTREVISTA
+ADD CONSTRAINT NOTIFICACIONES_ENTREVISTA_ENTREVISTAS FOREIGN KEY (id_entrevista) REFERENCES ENTREVISTAS (id_entrevista) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE NOTIFICACIONES_ENTREVISTA
+ADD CONSTRAINT NOTIFICACIONES_ENTREVISTA_CATALOGOS_ESTADO_EVENTO FOREIGN KEY (id_estado_evento) REFERENCES CATALOGOS_ESTADO_EVENTO (id_estado_evento) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- seed
+-- Programada y reprogramada ocupan la agenda del evaluador; cancelada y realizada no.
+INSERT INTO CATALOGOS_ESTADO_ENTREVISTA (id_estado_entrevista, codigo, nombre, es_activa)
+VALUES (1, 'PROGRAMADA', 'Programada', TRUE),
+    (2, 'REPROGRAMADA', 'Reprogramada', TRUE),
+    (3, 'CANCELADA', 'Cancelada', FALSE),
+    (4, 'REALIZADA', 'Realizada', FALSE);
 -- End of file.

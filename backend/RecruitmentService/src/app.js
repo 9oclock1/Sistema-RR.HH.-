@@ -10,6 +10,7 @@ const errorHandler = require("./middlewares/errorHandler");
 const affinityRoutes = require("./routes/affinityRoutes");
 const rankingRoutes = require("./routes/rankingRoutes");
 const etapaPostulacionRoutes = require("./routes/etapaPostulacionRoutes");
+const entrevistaRoutes = require("./routes/entrevistaRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -61,6 +62,9 @@ app.use("/convocatorias", rankingRoutes);
 
 // RF-14: cambio de etapa del postulante, historial y catálogo del pipeline.
 app.use(etapaPostulacionRoutes);
+
+// RF-15: agenda de entrevistas (agendar, reprogramar, cancelar) y notificación al candidato.
+app.use(entrevistaRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
