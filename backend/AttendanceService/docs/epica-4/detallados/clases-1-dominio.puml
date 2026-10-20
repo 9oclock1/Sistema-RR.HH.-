@@ -1,0 +1,326 @@
+@startuml clases-1-dominio
+!pragma layout smetana
+title Épica 4 · Modelo de dominio (AttendanceDB)\nEntidades con sus atributos reales, enumeraciones y multiplicidades
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam nodesep 50
+skinparam ranksep 60
+skinparam class {
+  BackgroundColor #DAE8FC
+  BorderColor #6C8EBF
+  ArrowColor #444444
+  StereotypeFontColor #555555
+}
+skinparam package {
+  BackgroundColor #FAFAFA
+  BorderColor #BBBBBB
+  FontColor #555555
+}
+
+package "EmployeeService (referencias por UUID, sin FK)" {
+  class Empleado <<externo>> #F8CECC {
+    id_empleado: UUID
+    nombres: String
+    apellidos: String
+    activo: Boolean
+  }
+  class Sucursal <<externo>> #F8CECC {
+    id_sucursal: UUID
+    nombre: String
+  }
+  class Departamento <<externo>> #F8CECC {
+    id_departamento: UUID
+    codigo: String
+    nombre: String
+  }
+}
+
+package "KAN-43 · Turnos" {
+  class Turno {
+    id_turno: UUID
+    nombre: String {único}
+    hora_inicio: Time
+    hora_fin: Time
+    minutos_refrigerio: Integer
+    minutos_tolerancia: Integer
+    esta_activo: Boolean
+    /horas_efectivas: Integer
+    /cruza_medianoche: Boolean
+  }
+  class AsignacionTurno {
+    id_asignacion: UUID
+    id_empleado: UUID
+    fecha_desde: Date
+    fecha_hasta: Date [0..1]
+  }
+}
+
+package "KAN-44 · Turnos rotativos" {
+  class RolTurno {
+    id_rol: UUID
+    id_sucursal: UUID
+    id_departamento: UUID
+    fecha_inicio: Date
+    fecha_fin: Date
+    version_publicada: Integer
+    tiene_cambios_sin_publicar: Boolean
+    publicado_en: DateTime [0..1]
+  }
+  class AsignacionRolTurno <<borrador>> {
+    id_asignacion_rol: UUID
+    id_empleado: UUID
+    fecha: Date
+    es_descanso: Boolean
+  }
+  class TurnoPublicado <<copia publicada>> {
+    id_turno_publicado: UUID
+    id_empleado: UUID
+    fecha: Date {único por empleado}
+    es_descanso: Boolean
+    nombre_turno: String [0..1]
+    hora_inicio: Time [0..1]
+    hora_fin: Time [0..1]
+    minutos_refrigerio: Integer [0..1]
+    minutos_tolerancia: Integer [0..1]
+    publicado_en: DateTime
+  }
+}
+
+package "KAN-41 · KAN-42 · Marcajes" {
+  class Marcaje {
+    id_marcaje: UUID
+    id_empleado: UUID
+    fecha_hora_marcaje: DateTime
+    fecha_jornada: Date
+    codigo_dispositivo: String [0..1]
+  }
+}
+
+package "KAN-45 · Novedades" {
+  class NovedadAsistencia {
+    id_novedad: UUID
+    id_empleado: UUID
+    fecha_jornada: Date
+    nombre_turno: String
+    inicio_programado: DateTime
+    fin_programado: DateTime
+    minutos_tolerancia: Integer
+    minutos: Integer
+    minutos_penalizacion: Integer
+    minutos_programados: Integer
+    detectada_en: DateTime
+    consolidada_en: DateTime [0..1]
+  }
+}
+
+package "KAN-46 · Justificaciones" {
+  class SolicitudJustificacion {
+    id_solicitud: UUID
+    id_empleado: UUID
+    descripcion: String [0..1]
+    id_revisor: UUID [0..1]
+    nombre_revisor: String [0..1]
+    comentario_revision: String [0..1]
+    revisada_en: DateTime [0..1]
+  }
+  class AdjuntoJustificacion {
+    id_adjunto: UUID
+    nombre_original: String
+    tipo_mime: PDF | JPG | PNG
+    tamano_bytes: Integer
+    clave_almacenamiento: String {único}
+  }
+}
+
+package "KAN-47 · Horas extra" {
+  class HorasJornada {
+    id_horas_jornada: UUID
+    id_empleado: UUID
+    fecha_jornada: Date
+    nombre_turno: String [0..1]
+    inicio_programado: DateTime [0..1]
+    fin_programado: DateTime [0..1]
+    minutos_refrigerio: Integer
+    entrada_en: DateTime
+    salida_en: DateTime
+    tipo_dia: HABIL | DOMINGO | FERIADO
+    minutos_trabajados: Integer
+    minutos_ordinarios: Integer
+    minutos_ordinarios_nocturnos: Integer
+    minutos_extra: Integer
+    minutos_anticipados: Integer
+    minutos_extra_aprobados: Integer [0..1]
+    minutos_extra_habil: Integer
+    minutos_extra_domingo: Integer
+    minutos_extra_feriado: Integer
+    minutos_domingo: Integer
+    minutos_feriado: Integer
+    minutos_descanso: Integer
+    minutos_extra_nocturnos: Integer
+    minutos_nocturnos: Integer
+    id_revisor: UUID [0..1]
+    comentario_revision: String [0..1]
+    revisada_en: DateTime [0..1]
+    calculada_en: DateTime
+  }
+  class AutorizacionHorasExtra {
+    id_autorizacion: UUID
+    id_empleado: UUID
+    fecha_jornada: Date
+    minutos_autorizados: Integer
+    motivo: String
+    id_autorizador: UUID
+    nombre_autorizador: String
+  }
+  class PeriodoHorasExtra {
+    id_periodo: UUID
+    fecha_inicio: Date
+    fecha_fin: Date
+    id_responsable: UUID
+    nombre_responsable: String
+    cantidad_jornadas: Integer
+    consolidado_en: DateTime
+  }
+  class Feriado {
+    id_feriado: UUID
+    fecha: Date {único}
+    nombre: String
+  }
+}
+
+package "Integración" {
+  class EventoSaliente <<outbox>> {
+    id_evento: UUID
+    topico: String
+    tipo_evento: String
+    carga: JSON
+    intentos: Integer
+    ultimo_error: String [0..1]
+    proximo_intento_en: DateTime
+    entregado_en: DateTime [0..1]
+  }
+}
+
+package "Enumeraciones (catálogos)" {
+  enum TipoJornada #FFF2CC {
+    DIURNO
+    VESPERTINO
+    NOCTURNO
+  }
+  enum TipoMarcaje #FFF2CC {
+    ENTRADA
+    SALIDA
+  }
+  enum OrigenMarcaje #FFF2CC {
+    PORTAL
+    BIOMETRICO
+  }
+  enum EstadoMarcaje #FFF2CC {
+    REGISTRADO
+    PENDIENTE_JUSTIFICACION
+  }
+  enum PeriodoRol #FFF2CC {
+    SEMANAL
+    MENSUAL
+  }
+  enum EstadoRol #FFF2CC {
+    BORRADOR
+    PUBLICADO
+  }
+  enum EstadoEvento #FFF2CC {
+    PENDIENTE
+    ENTREGADO
+    FALLIDO
+  }
+  enum TipoNovedad #FFF2CC {
+    ATRASO
+    INASISTENCIA
+    SALIDA_ANTICIPADA
+    OMISION_SALIDA
+  }
+  enum EstadoNovedad #FFF2CC {
+    REGISTRADA
+    JUSTIFICADA
+  }
+  enum MotivoJustificacion #FFF2CC {
+    SALUD
+    EMERGENCIA_FAMILIAR
+    TRAMITE
+    TRANSPORTE
+    OTRO
+  }
+  enum EstadoJustificacion #FFF2CC {
+    PENDIENTE
+    APROBADA
+    RECHAZADA
+  }
+  enum EstadoHorasExtra #FFF2CC {
+    SIN_EXTRA
+    PENDIENTE
+    APROBADA
+    AJUSTADA
+    RECHAZADA
+  }
+}
+
+Turno "*" --> "1" TipoJornada
+AsignacionTurno "*" --> "1" Turno
+AsignacionTurno "*" ..> "1" Empleado
+
+RolTurno "*" ..> "1" Sucursal
+RolTurno "*" ..> "1" Departamento
+RolTurno "*" --> "1" PeriodoRol
+RolTurno "*" --> "1" EstadoRol
+RolTurno "1" *-- "0..*" AsignacionRolTurno
+AsignacionRolTurno "*" --> "0..1" Turno
+RolTurno "1" o-- "0..*" TurnoPublicado
+TurnoPublicado "*" --> "0..1" Turno
+
+Marcaje "*" ..> "1" Empleado
+Marcaje "*" --> "1" TipoMarcaje
+Marcaje "*" --> "1" OrigenMarcaje
+Marcaje "*" --> "1" EstadoMarcaje
+
+NovedadAsistencia "*" --> "1" TipoNovedad
+NovedadAsistencia "*" --> "1" EstadoNovedad
+NovedadAsistencia "*" --> "0..1" Marcaje
+NovedadAsistencia "*" --> "0..1" Turno
+NovedadAsistencia "*" --> "0..1" RolTurno
+
+SolicitudJustificacion "*" --> "1" NovedadAsistencia
+SolicitudJustificacion "*" --> "1" MotivoJustificacion
+SolicitudJustificacion "*" --> "1" EstadoJustificacion
+SolicitudJustificacion "1" *-- "1..3" AdjuntoJustificacion
+
+HorasJornada "0..1" --> "1" Marcaje : entrada
+HorasJornada "0..1" --> "1" Marcaje : salida
+HorasJornada "*" --> "0..1" Turno
+HorasJornada "*" --> "0..1" RolTurno
+HorasJornada "*" --> "1" EstadoHorasExtra
+HorasJornada "*" --> "0..1" AutorizacionHorasExtra
+PeriodoHorasExtra "0..1" o-- "0..*" HorasJornada
+HorasJornada ..> Feriado : tipo de día
+
+EventoSaliente "*" --> "1" EstadoEvento
+EventoSaliente "*" ..> "0..1" RolTurno
+
+note bottom of NovedadAsistencia
+  Copia el turno del día para que no cambie si después
+  se edita el turno o el rol. Una por tipo, empleado y jornada.
+end note
+
+note bottom of HorasJornada
+  Una fila por empleado y jornada con entrada y salida.
+  Extra del día: como máximo 120 minutos (habil + domingo + feriado).
+end note
+
+note bottom of SolicitudJustificacion
+  A lo sumo una PENDIENTE o APROBADA por novedad.
+  Rechazar exige comentario_revision.
+end note
+@enduml

@@ -1,0 +1,57 @@
+@startuml sec-05-kan45-contraste
+!include _estilo-secuencia.iuml
+title KAN-45 · Detección automática de atrasos e inasistencias (RF-25)\n<size:12><color:#555555>Contraste periódico de turnos y marcajes, consolidación para compensaciones y panel de alertas del supervisor.</color></size>
+
+actor "Supervisor" as SUP
+boundary "AlertasAsistenciaPage" as P #D5E8D4
+participant "API Gateway\n(NGINX)" as GW #F5F5F5
+control "Temporizador\n(iniciarContraste)" as T #F8CECC
+control "NovedadesController" as C
+control "NovedadesService" as NS
+control "HorasExtraService" as HS
+control "EventosService" as EV
+entity "NovedadesModel" as M #E1D5E7
+database "AttendanceDB\n(PostgreSQL)" as DB #FFF2CC
+participant "EmployeeService" as EMP #F8CECC
+
+== Contraste automático ==
+loop cada INTERVALO_CONTRASTE_MS (5 minutos)
+  T -> NS : ejecutarContraste()
+  NS -> M : momentoActual()
+  NS -> EMP : GET /empleados (listarIdsActivos)
+  alt EmployeeService no responde
+    note right of NS : se contrasta sin inasistencias;\nse registran en el siguiente contraste
+  end
+  NS -> NS : contrastar(últimos 7 días, activos)
+  NS -> M : listarProgramacion · listarMarcajes
+  M -> DB : TURNOS_PUBLICADOS / ASIGNACIONES_TURNO · MARCAJES
+  NS -> NS : contrastarJornada(): ATRASO, SALIDA_ANTICIPADA,\nINASISTENCIA (sin entrada al terminar el turno), OMISION_SALIDA
+  NS -> M : registrar(novedades)
+  M -> DB : INSERT NOVEDADES_ASISTENCIA (sin duplicar)
+  loop por lotes, mientras queden jornadas cerradas
+    NS -> M : BEGIN · reservarPorConsolidar()\n(jornadas cerradas hace MINUTOS_CIERRE_JORNADA)
+    NS -> EV : registrarConsolidacion(JORNADA_CONSOLIDADA:\npenalización, minutos justificados y efectivos)
+    EV -> DB : INSERT EVENTOS_SALIENTES (compensaciones)
+    NS -> M : marcarConsolidadas() · COMMIT
+  end
+  NS -> HS : calcular(últimos 7 días)
+  note right of HS : horas ordinarias, nocturnas y extra\nde las jornadas cerradas (sec-07)
+end
+
+== Panel de alertas del día ==
+SUP -> P : sucursal, área y fecha
+P -> GW : GET /api/att/panel-asistencia?id_sucursal&id_departamento&fecha
+GW -> C : panel(req, res)
+C -> NS : panel(filtros)
+NS -> NS : leerFiltrosPanel()
+alt filtros inválidos
+  $error(NS, P, "400 Filtros inválidos")
+else válidos
+  NS -> EMP : GET /empleados?id_sucursal&id_departamento (listarPorArea)
+  NS -> NS : contrastar(día, personal activo)
+  NS -> M : sumarAtrasosDelMes · listarJustificadas
+  NS -> NS : armarFila(): por llegar, sin marcar, puntual,\natraso, falta injustificada, descanso o sin turno
+  C --> P : 200 filas y totales del día
+  P --> SUP : alertas por colaborador
+end
+@enduml

@@ -1,0 +1,97 @@
+@startuml sec-07-kan47-horas-extra
+!include _estilo-secuencia.iuml
+title KAN-47 · Horas extra y recargo nocturno (RF-27)\n<size:12><color:#555555>Cálculo por jornada, autorización previa, conciliación del supervisor y cierre del periodo para planillas.</color></size>
+
+actor "Supervisor" as SUP
+actor "Encargado\nde planillas" as CONT
+boundary "HorasExtraPage\n(AutorizacionHorasExtra,\nRevisionHorasExtra)" as P #D5E8D4
+participant "API Gateway\n(NGINX)" as GW #F5F5F5
+control "HorasExtraController" as C
+control "HorasExtraService" as S
+control "EventosService" as EV
+entity "HorasExtraModel\n· NovedadesModel" as M #E1D5E7
+database "AttendanceDB\n(PostgreSQL)" as DB #FFF2CC
+participant "EmployeeService" as EMP #F8CECC
+
+== Autorización previa (opcional) ==
+SUP -> P : colaborador, día, minutos y motivo
+P -> GW : POST /api/att/horas-extra/autorizaciones [X-Empleado-Id] (autorizarHorasExtra)
+GW -> C : autorizar (tras IdentificarEmpleado)
+C -> S : autorizar(idAutorizador, body)
+S -> S : validarAutorizacion(): de hoy en adelante, con motivo
+S -> EMP : GET /empleados/{id} del autorizador y del colaborador
+alt autoriza sus propias horas o está inactivo
+  $error(S, P, "403 No puede autorizar sus propias horas extra")
+else colaborador inexistente
+  $error(S, P, "404 Colaborador no encontrado")
+else válido
+  S -> M : listarProgramacion(colaborador, día)
+  S -> S : tope: 120 min con turno, 600 sin turno
+  S -> M : guardarAutorizacion() (una por día: reemplaza la anterior)
+  M -> DB : UPSERT AUTORIZACIONES_HORAS_EXTRA
+  S -> S : calcular(día)
+  C --> P : 201 (o 200 si reemplazó)
+end
+
+== Desglose por jornada ==
+SUP -> P : sucursal, área y rango de fechas
+P -> GW : GET /api/att/horas-extra?id_sucursal&id_departamento&desde&hasta (listarHorasExtra)
+GW -> C : listar(req, res)
+C -> S : listar(filtros)
+S -> EMP : GET /empleados?id_sucursal&id_departamento (listarPorArea)
+S -> S : calcular(rango)
+S -> M : listarMarcajes · listarProgramacion · listarFeriados · listarAutorizaciones
+S -> S : filaCalculo(): ordinarias, nocturnas (20:00 a 06:00),\nextra, anticipadas, tipo de día y tope de 2 h por día
+S -> M : guardarCalculos(filas)
+M -> DB : UPSERT HORAS_JORNADA\n(no cambia las revisadas ni las consolidadas)
+S -> M : listar(filtros)
+C --> P : 200 jornadas con estado y totales
+P --> SUP : tabla de horas regulares, extra y nocturnas
+
+== Conciliación del supervisor ==
+SUP -> P : aprueba, ajusta o rechaza (minutos y comentario)
+P -> GW : PATCH /api/att/horas-extra/{id} [X-Empleado-Id] (revisarHorasExtra)
+GW -> C : revisar (tras IdentificarEmpleado)
+C -> S : revisar(id, idRevisor, body)
+S -> EMP : GET /empleados/{idRevisor} (verificarActivo)
+S -> M : BEGIN · bloquear(id)
+alt sus propias horas
+  $error(S, P, "403 No puede revisar sus propias horas extra")
+else jornada ya consolidada o sin horas extra
+  $error(S, P, "409 La jornada ya se consolidó para planillas")
+else revisable
+  S -> S : validarRevision · liquidarJornada():\nmáximo aprobable, tope legal y reparto por tipo de día
+  alt ajusta o rechaza sin comentario, o pasa el máximo
+    $error(S, P, "400 Datos de revisión inválidos")
+  else válido
+    S -> M : registrarRevision(APROBADA | AJUSTADA | RECHAZADA) · COMMIT
+    C --> P : 200 jornada revisada y maximo_aprobable
+  end
+end
+
+== Cierre del periodo para planillas ==
+CONT -> P : «Cerrar periodo» (desde, hasta)
+P -> GW : POST /api/att/horas-extra/periodos [X-Empleado-Id] (consolidarPeriodo)
+GW -> C : consolidar (tras IdentificarEmpleado)
+C -> S : consolidar(idResponsable, body)
+S -> S : leerRango(): hasta 62 días ya terminados
+S -> S : calcular(rango)
+S -> EMP : GET /empleados (listarPersonal)
+S -> M : BEGIN · contarPendientes(rango)
+alt quedan jornadas pendientes de revisión
+  $error(S, P, "409 Hay jornadas pendientes de revisión")
+else se superpone con otro periodo (23P01)
+  $error(S, P, "409 Ya hay un periodo consolidado que incluye esos días")
+else cerrable
+  S -> M : crearPeriodo · cerrarJornadas
+  M -> DB : INSERT PERIODOS_HORAS_EXTRA · HORAS_JORNADA.id_periodo
+  S -> S : armarResumen(): totales por empleado y tipo de día
+  S -> EV : registrarConsolidacion(HORAS_EXTRA_CONSOLIDADAS)
+  EV -> DB : INSERT EVENTOS_SALIENTES (compensaciones) · COMMIT
+  C --> P : 201 periodo consolidado
+end
+CONT -> P : descargar resumen
+P -> GW : GET /api/att/horas-extra/resumen?desde&hasta&formato=csv
+GW -> C : resumen(req, res)
+C --> P : CSV por empleado (separador «;»)
+@enduml
