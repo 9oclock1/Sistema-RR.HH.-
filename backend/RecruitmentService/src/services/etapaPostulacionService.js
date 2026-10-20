@@ -1,4 +1,5 @@
 const modelo = require("../models/etapaPostulacionModel");
+const integracionService = require("./integracionService");
 const HttpError = require("../utils/HttpError");
 const { withTransaction } = require("../utils/transaction");
 const { ETAPA, verificarCambioEtapa } = require("../utils/etapas");
@@ -54,6 +55,14 @@ async function cambiarEtapa(idPostulacion, datos, usuario) {
       usuario,
       motivo: datos.motivo,
     });
+    const integraciones =
+      destino.id_etapa === ETAPA.CONTRATADO
+        ? await integracionService.registrarAltaContratacion(client, {
+            postulacion: actualizada,
+            cargo,
+            usuario,
+          })
+        : [];
 
     return {
       postulacion: {
@@ -71,6 +80,7 @@ async function cambiarEtapa(idPostulacion, datos, usuario) {
         cargo_operativo: cargo,
       },
       historial,
+      integraciones,
     };
   });
 }

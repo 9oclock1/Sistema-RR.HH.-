@@ -1,9 +1,10 @@
 const servicio = require("../services/etapaPostulacionService");
+const integracionService = require("../services/integracionService");
 const { validarIdRuta } = require("../validators/comunes");
 const { validarCambioEtapa } = require("../validators/etapaValidator");
 
 const MENSAJES_CAMBIO = {
-  CONTRATADO: "El postulante fue contratado.",
+  CONTRATADO: "El postulante fue contratado; su alta se enviará a Contabilidad y al módulo operativo de su cargo.",
   RECHAZADO: "El postulante fue rechazado y la postulación quedó archivada.",
 };
 
@@ -32,4 +33,10 @@ async function obtenerCatalogo(req, res) {
   res.status(200).json({ success: true, statusCode: 200, data: catalogo });
 }
 
-module.exports = { cambiarEtapa, obtenerHistorial, obtenerCatalogo };
+async function obtenerIntegraciones(req, res) {
+  const idPostulacion = validarIdRuta(req.params.id, "id_postulacion");
+  const integraciones = await integracionService.listarDePostulacion(idPostulacion);
+  res.status(200).json({ success: true, statusCode: 200, data: integraciones });
+}
+
+module.exports = { cambiarEtapa, obtenerHistorial, obtenerCatalogo, obtenerIntegraciones };
