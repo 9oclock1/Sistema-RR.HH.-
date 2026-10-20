@@ -303,12 +303,14 @@ CREATE TABLE HISTORIALES_ENTREVISTA (
     CONSTRAINT HISTORIALES_ENTREVISTA_pk PRIMARY KEY (id_historial)
 );
 CREATE INDEX idx_historiales_entrevista ON HISTORIALES_ENTREVISTA (id_entrevista, fecha_cambio DESC);
--- Correos al candidato pendientes de envío; usa los estados de CATALOGOS_ESTADO_EVENTO (pendiente, entregado, fallido).
+-- Correos al candidato pendientes de envío; usa los estados de CATALOGOS_ESTADO_EVENTO (pendiente, entregado, fallido,
+-- descartado). carga guarda los datos de la cita al momento del aviso, que es lo que dice el correo.
 CREATE TABLE NOTIFICACIONES_ENTREVISTA (
     id_notificacion UUID NOT NULL DEFAULT gen_random_uuid(),
     id_entrevista UUID NOT NULL,
     tipo_notificacion varchar(20) NOT NULL,
     correo_destino varchar(120) NOT NULL,
+    carga JSONB NOT NULL,
     id_estado_evento SMALLINT NOT NULL DEFAULT 1,
     intentos SMALLINT NOT NULL DEFAULT 0,
     ultimo_error varchar(255) NULL,
@@ -343,4 +345,7 @@ VALUES (1, 'PROGRAMADA', 'Programada', TRUE),
     (2, 'REPROGRAMADA', 'Reprogramada', TRUE),
     (3, 'CANCELADA', 'Cancelada', FALSE),
     (4, 'REALIZADA', 'Realizada', FALSE);
+-- Un aviso que no llegó a salir y fue reemplazado por otro más reciente de la misma entrevista.
+INSERT INTO CATALOGOS_ESTADO_EVENTO (id_estado_evento, codigo, nombre)
+VALUES (4, 'DESCARTADO', 'Descartado');
 -- End of file.

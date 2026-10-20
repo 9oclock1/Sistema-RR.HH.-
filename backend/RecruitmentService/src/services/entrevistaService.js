@@ -1,4 +1,5 @@
 const modelo = require("../models/entrevistaModel");
+const notificaciones = require("./notificacionEntrevistaService");
 const { obtenerEmpleado } = require("./employeeServiceClient");
 const HttpError = require("../utils/HttpError");
 const { withTransaction } = require("../utils/transaction");
@@ -47,14 +48,15 @@ async function agendar(idPostulacion, datos, usuario) {
       fechaHoraNueva: cita.fecha_hora_programada,
       usuario,
     });
-    const notificacion = await modelo.registrarNotificacion(client, {
-      idEntrevista,
+    const entrevista = await modelo.obtenerEntrevista(idEntrevista, client);
+    const notificacion = await notificaciones.encolar(client, {
+      entrevista,
       tipo: TIPO_NOTIFICACION.PROGRAMACION,
-      correo: postulacion.correo_electronico,
+      historial,
     });
 
     return {
-      entrevista: await modelo.obtenerEntrevista(idEntrevista, client),
+      entrevista,
       historial,
       notificacion,
       entrevistas_solapadas: solapamientos,
@@ -127,14 +129,15 @@ async function reprogramar(idEntrevista, datos, usuario) {
       motivo: datos.motivo,
       usuario,
     });
-    const notificacion = await modelo.registrarNotificacion(client, {
-      idEntrevista,
+    const entrevista = await modelo.obtenerEntrevista(idEntrevista, client);
+    const notificacion = await notificaciones.encolar(client, {
+      entrevista,
       tipo: TIPO_NOTIFICACION.REPROGRAMACION,
-      correo: actual.correo_electronico,
+      historial,
     });
 
     return {
-      entrevista: await modelo.obtenerEntrevista(idEntrevista, client),
+      entrevista,
       historial,
       notificacion,
       entrevistas_solapadas: solapamientos,
@@ -161,24 +164,25 @@ async function cancelar(idEntrevista, { motivo }, usuario) {
       motivo,
       usuario,
     });
-    const notificacion = await modelo.registrarNotificacion(client, {
-      idEntrevista,
+    const entrevista = await modelo.obtenerEntrevista(idEntrevista, client);
+    const notificacion = await notificaciones.encolar(client, {
+      entrevista,
       tipo: TIPO_NOTIFICACION.CANCELACION,
-      correo: actual.correo_electronico,
+      historial,
     });
 
-    return { entrevista: await modelo.obtenerEntrevista(idEntrevista, client), historial, notificacion };
+    return { entrevista, historial, notificacion };
   });
 }
 
 async function obtenerDetalle(idEntrevista) {
   const entrevista = await modelo.obtenerEntrevista(idEntrevista);
   if (!entrevista) throw entrevistaNoEncontrada();
-  const [historial, notificaciones] = await Promise.all([
+  const [historial, avisos] = await Promise.all([
     modelo.listarHistorial(idEntrevista),
-    modelo.listarNotificaciones(idEntrevista),
+    notificaciones.listarPorEntrevista(idEntrevista),
   ]);
-  return { ...entrevista, historial, notificaciones };
+  return { ...entrevista, historial, notificaciones: avisos };
 }
 
 async function listarDePostulacion(idPostulacion) {

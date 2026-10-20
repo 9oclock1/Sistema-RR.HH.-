@@ -1,7 +1,7 @@
 const pool = require("../../db/pool");
 const { ESTADO_ENTREVISTA, ESTADOS_ACTIVOS } = require("../utils/entrevistas");
 
-// Datos de la cita con su estado y el postulante, tal como los muestran la agenda y el detalle.
+// Datos de la cita con su estado, el postulante y el último aviso enviado (o por enviar) al candidato.
 const SELECT_ENTREVISTA = `
   SELECT en.id_entrevista, en.id_postulacion, en.fecha_hora_programada, en.duracion_minutos,
          en.fecha_hora_programada + make_interval(mins => en.duracion_minutos) AS fecha_hora_fin,
@@ -11,13 +11,22 @@ const SELECT_ENTREVISTA = `
          en.id_usuario_reclutador, en.nombre_usuario_reclutador, en.creado_en, en.actualizado_en,
          p.id_convocatoria, c.codigo_convocatoria, c.titulo_puesto,
          p.id_etapa, et.codigo AS codigo_etapa, et.nombre AS nombre_etapa,
-         pos.id_postulante, pos.nombres, pos.apellidos, pos.correo_electronico, pos.telefono_contacto
+         pos.id_postulante, pos.nombres, pos.apellidos, pos.correo_electronico, pos.telefono_contacto,
+         ua.id_notificacion AS id_ultimo_aviso, ua.tipo_notificacion AS tipo_ultimo_aviso,
+         ua.codigo_estado AS estado_ultimo_aviso, ua.ultimo_error AS error_ultimo_aviso
     FROM ENTREVISTAS en
     INNER JOIN CATALOGOS_ESTADO_ENTREVISTA es ON es.id_estado_entrevista = en.id_estado_entrevista
     INNER JOIN POSTULACIONES p ON p.id_postulacion = en.id_postulacion
     INNER JOIN CONVOCATORIAS c ON c.id_convocatoria = p.id_convocatoria
     INNER JOIN CATALOGOS_ETAPA_POSTULACION et ON et.id_etapa = p.id_etapa
-    INNER JOIN POSTULANTES pos ON pos.id_postulante = p.id_postulante`;
+    INNER JOIN POSTULANTES pos ON pos.id_postulante = p.id_postulante
+    LEFT JOIN LATERAL (
+      SELECT n.id_notificacion, n.tipo_notificacion, ee.codigo AS codigo_estado, n.ultimo_error
+        FROM NOTIFICACIONES_ENTREVISTA n
+        INNER JOIN CATALOGOS_ESTADO_EVENTO ee ON ee.id_estado_evento = n.id_estado_evento
+       WHERE n.id_entrevista = en.id_entrevista AND ee.codigo <> 'DESCARTADO'
+       ORDER BY n.creado_en DESC
+       LIMIT 1) ua ON TRUE`;
 
 // Bloquea la postulación para que no cambie de etapa mientras se agenda la cita.
 async function bloquearPostulacion(client, idPostulacion) {
@@ -143,18 +152,6 @@ async function registrarHistorial(
   return rows[0];
 }
 
-// El correo al candidato queda en cola dentro de la misma transacción: si la cita no se guarda, tampoco se avisa.
-async function registrarNotificacion(client, { idEntrevista, tipo, correo }) {
-  const { rows } = await client.query(
-    `INSERT INTO NOTIFICACIONES_ENTREVISTA (id_entrevista, tipo_notificacion, correo_destino)
-     VALUES ($1, $2, $3)
-     RETURNING id_notificacion, id_entrevista, tipo_notificacion, correo_destino, id_estado_evento, intentos,
-               proximo_intento_en, creado_en`,
-    [idEntrevista, tipo, correo],
-  );
-  return rows[0];
-}
-
 // db: el cliente de la transacción en curso, para leer la cita recién escrita.
 async function obtenerEntrevista(idEntrevista, db = pool) {
   const { rows } = await db.query(`${SELECT_ENTREVISTA} WHERE en.id_entrevista = $1`, [idEntrevista]);
@@ -203,20 +200,6 @@ async function listarHistorial(idEntrevista) {
   return rows;
 }
 
-async function listarNotificaciones(idEntrevista) {
-  const { rows } = await pool.query(
-    `SELECT n.id_notificacion, n.tipo_notificacion, n.correo_destino, n.id_estado_evento,
-            ee.codigo AS codigo_estado, ee.nombre AS nombre_estado, n.intentos, n.ultimo_error,
-            n.proximo_intento_en, n.enviado_en, n.creado_en
-       FROM NOTIFICACIONES_ENTREVISTA n
-       INNER JOIN CATALOGOS_ESTADO_EVENTO ee ON ee.id_estado_evento = n.id_estado_evento
-      WHERE n.id_entrevista = $1
-      ORDER BY n.creado_en DESC`,
-    [idEntrevista],
-  );
-  return rows;
-}
-
 module.exports = {
   bloquearPostulacion,
   bloquearEntrevista,
@@ -225,11 +208,9 @@ module.exports = {
   insertarEntrevista,
   actualizarEntrevista,
   registrarHistorial,
-  registrarNotificacion,
   obtenerEntrevista,
   existePostulacion,
   listarDePostulacion,
   listarAgenda,
   listarHistorial,
-  listarNotificaciones,
 };

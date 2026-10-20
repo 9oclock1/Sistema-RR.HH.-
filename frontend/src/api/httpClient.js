@@ -11,6 +11,8 @@ export class ApiError extends Error {
     this.status = status;
     // El backend devuelve [{ campo, mensaje }] en los errores de validación (400).
     this.errores = Array.isArray(data?.errores) ? data.errores : [];
+    // Cuerpo completo del error, para respuestas con datos extra (p. ej. las entrevistas que se solapan en un 409).
+    this.datos = data;
   }
 }
 
