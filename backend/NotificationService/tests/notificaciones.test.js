@@ -178,11 +178,14 @@ test("valida los campos de la resolución", async () => {
 test("lista las alertas con el total de no leídas y acota la página", async () => {
   const listar = mock.method(modelo, "listar", async () => [{ id_notificacion: ID_NOTIFICACION }]);
   mock.method(modelo, "contarNoLeidas", async () => 3);
+  const total = mock.method(modelo, "contarTotal", async () => 7);
 
   const resultado = await servicio.listarMisNotificaciones(ANA, { estado: "no_leidas", limite: "500", desplazamiento: "-4" });
 
   assert.deepEqual(listar.mock.calls[0].arguments, [ANA, { soloNoLeidas: true, limite: 50, desplazamiento: 0 }]);
   assert.equal(resultado.no_leidas, 3);
+  assert.equal(resultado.total, 7);
+  assert.deepEqual(total.mock.calls[0].arguments, [ANA, true]);
   assert.equal(resultado.notificaciones.length, 1);
 });
 

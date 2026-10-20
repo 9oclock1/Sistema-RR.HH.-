@@ -163,3 +163,131 @@
   font-size: var(--font-size-small);
   line-height: var(--line-height-small);
 }
+
+/* Vista completa de notificaciones */
+.nt-pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 56rem;
+}
+
+.nt-identidad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.nt-carga {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.nt-lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nt-lista li + li {
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.nt-aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.nt-aviso--nuevo {
+  background: var(--color-bg-selected);
+}
+
+.nt-aviso__icono {
+  flex: none;
+  margin-top: 2px;
+}
+
+.nt-aviso__icono--exito {
+  color: var(--color-success-text);
+}
+
+.nt-aviso__icono--peligro {
+  color: var(--color-danger-text);
+}
+
+.nt-aviso__icono--info {
+  color: var(--color-info-text);
+}
+
+.nt-aviso__cuerpo {
+  display: flex;
+  flex: 1 1 18rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.nt-aviso__titulo {
+  margin: 0;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
+}
+
+.nt-aviso__mensaje {
+  margin: 0;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.nt-aviso__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.nt-aviso__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.nt-pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.nt-pie__conteo {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+}
+
+.campana__ver-todas {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-top: var(--border-width) solid var(--color-border);
+  color: var(--color-link, var(--color-text));
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  text-decoration: none;
+}
+
+.campana__ver-todas:hover {
+  background: var(--color-bg-hover);
+}
