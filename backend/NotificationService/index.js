@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const pool = require("./src/config/db");
 const comunicacionesRoutes = require("./src/routes/comunicaciones.routes");
+const notificacionesRoutes = require("./src/routes/notificaciones.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 
 const app = express();
@@ -43,6 +44,7 @@ app.post("/send", (req, res) => {
 
 // Rutas de microservicio de notificaciones y mensajería
 app.use(comunicacionesRoutes);
+app.use(notificacionesRoutes);
 
 // Manejador para rutas no encontradas en formato JSON (evita HTML 404 por defecto)
 app.use((req, res) => {
