@@ -8,6 +8,7 @@ const postulacionRoutes = require("./routes/postulacionRoutes");
 const cvDataRoutes = require("./routes/cvDataRoutes");
 const errorHandler = require("./middlewares/errorHandler");
 const affinityRoutes = require("./routes/affinityRoutes");
+const rankingRoutes = require("./routes/rankingRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -53,6 +54,9 @@ app.use(cvDataRoutes);
 
 // RF-12: cálculo y desglose de afinidad CV vs requisitos.
 app.use(affinityRoutes);
+
+// RF-13: Ranking de postulantes por score de matching
+app.use("/convocatorias", rankingRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
