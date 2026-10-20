@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { ChevronLeft, ChevronRight, RefreshCw, Settings2, TriangleAlert } from "lucide-react";
 import { consultarCalendarioAusencias, obtenerAlcanceCalendario } from "../../api/calendarioAusencias";
 import { Alerta, Boton, EncabezadoPagina, Esqueleto, EstadoVacio, Selector, Tarjeta } from "../../components/ui";
-import { useRol } from "../../context/sesion";
+import { useRol, useUsuario } from "../../context/sesion";
 import { puedeAcceder } from "../../utils/permisos";
 import Revisor from "../marcaje/Revisor";
 import useRevisor from "../marcaje/useRevisor";
@@ -72,13 +72,14 @@ function Leyenda({ tipos, ocultos, onAlternar }) {
 // RF-35: cronograma general de ausencias aprobadas por sucursal y área, con aviso de baja cobertura.
 export default function CalendarioAusenciasPage() {
   const rol = useRol();
+  const usuario = useUsuario();
   // RRHH (administrador y gerente) elige cualquier sucursal; el supervisor se identifica y ve solo la suya.
   const esRrhh = puedeAcceder(rol, ["gerente"]);
   const { revisor, verificando, identificar, cambiar: cambiarSupervisor } = useRevisor();
   const idSupervisor = revisor?.id ?? null;
   const identidad = useMemo(
-    () => (esRrhh ? { idEmpleado: null, rol } : { idEmpleado: idSupervisor, rol }),
-    [esRrhh, idSupervisor, rol]
+    () => (esRrhh ? { idEmpleado: usuario, rol } : { idEmpleado: idSupervisor, rol }),
+    [esRrhh, idSupervisor, rol, usuario]
   );
   const claveIdentidad = esRrhh ? `rrhh:${rol}` : idSupervisor ? `supervisor:${idSupervisor}` : null;
 

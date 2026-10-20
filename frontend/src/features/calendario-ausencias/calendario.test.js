@@ -1,6 +1,6 @@
 // KAN-55 / KAN-262: lógica del calendario y rendimiento con ausencias masivas.
-// Se ejecuta con: node --test src/features/calendario-ausencias/calendario.test.js
-import { test } from "node:test";
+// Se ejecuta con: npm test
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import {
   diasDelRango,
