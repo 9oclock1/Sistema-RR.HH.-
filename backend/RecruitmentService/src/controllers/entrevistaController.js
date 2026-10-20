@@ -1,4 +1,5 @@
 const servicio = require("../services/entrevistaService");
+const notificaciones = require("../services/notificacionEntrevistaService");
 const { validarIdRuta } = require("../validators/comunes");
 const {
   validarProgramacion,
@@ -33,7 +34,7 @@ async function reprogramar(req, res) {
     success: true,
     statusCode: 200,
     message:
-      "La entrevista fue reprogramada y se enviará la notificación actualizada al candidato." +
+      `La entrevista fue reprogramada y se enviarán los datos actualizados al candidato en ${resultado.notificacion.correo_destino}.` +
       (resultado.entrevistas_solapadas.length > 0 ? AVISO_SOLAPAMIENTO : ""),
     data: resultado,
   });
@@ -47,7 +48,9 @@ async function cancelar(req, res) {
   res.status(200).json({
     success: true,
     statusCode: 200,
-    message: "La entrevista fue cancelada y se avisará al candidato.",
+    message: resultado.notificacion
+      ? `La entrevista fue cancelada y se avisará al candidato en ${resultado.notificacion.correo_destino}.`
+      : "La entrevista fue cancelada. El candidato aún no había recibido la citación, así que no se le envía aviso.",
     data: resultado,
   });
 }
@@ -74,4 +77,23 @@ async function listarAgenda(req, res) {
   });
 }
 
-module.exports = { agendar, reprogramar, cancelar, obtenerDetalle, listarDePostulacion, listarAgenda };
+async function reintentarNotificacion(req, res) {
+  const idNotificacion = validarIdRuta(req.params.id, "id_notificacion");
+  const notificacion = await notificaciones.reintentar(idNotificacion);
+  res.status(200).json({
+    success: true,
+    statusCode: 200,
+    message: `El aviso a ${notificacion.correo_destino} se volverá a enviar en unos segundos.`,
+    data: notificacion,
+  });
+}
+
+module.exports = {
+  agendar,
+  reprogramar,
+  cancelar,
+  obtenerDetalle,
+  listarDePostulacion,
+  listarAgenda,
+  reintentarNotificacion,
+};

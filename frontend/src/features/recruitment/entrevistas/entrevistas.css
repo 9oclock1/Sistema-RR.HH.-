@@ -1,0 +1,68 @@
+/* RF-15: formulario y listado de entrevistas. Reutiliza los bloques del pipeline (pl-*). */
+.en-rejilla {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.en-lugar {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  overflow-wrap: anywhere;
+}
+
+.en-lugar .ds-icono {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.pl-seccion__titulo .ds-icono {
+  vertical-align: -2px;
+}
+
+/* Agenda del evaluador para el día elegido. */
+.en-agenda {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.en-agenda__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-page);
+  font-size: var(--font-size-small);
+}
+
+.en-agenda__item span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.en-agenda__item--choque {
+  border-color: var(--color-warning);
+  background: var(--color-warning-bg);
+}
+
+.en-agenda__choque {
+  color: var(--color-warning-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+@media (max-width: 640px) {
+  .en-rejilla {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
