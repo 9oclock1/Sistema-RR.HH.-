@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, ClipboardCheck, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
@@ -26,6 +26,7 @@ import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import PipelineSeleccionPage from "../features/recruitment/pipeline/PipelineSeleccionPage";
 import ReconocimientosView from "../features/Reconocimientos/ReconocimientosView";
+import CalendarioAusenciasPage from "../features/calendario-ausencias/CalendarioAusenciasPage";
 import ReportesAsistenciaPage from "../features/reportes-asistencia/ReportesAsistenciaPage";
 import RolTurnosPage from "../features/rol-turnos/RolTurnosPage";
 import SeguimientoAcusesPage from "../features/Memorandums/acuses/SeguimientoAcusesPage";
@@ -212,6 +213,14 @@ export const SECCIONES = [
         icono: Timer,
         roles: ["supervisor"],
         pagina: HorasExtraPage,
+      },
+      {
+        ruta: "/asistencia/calendario-ausencias",
+        etiqueta: "Calendario de ausencias",
+        descripcion: "Vacaciones, permisos y licencias aprobadas por sucursal y área, con aviso de baja cobertura.",
+        icono: CalendarSearch,
+        roles: ["supervisor"],
+        pagina: CalendarioAusenciasPage,
       },
       {
         ruta: "/asistencia/reportes",
