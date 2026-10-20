@@ -1,6 +1,7 @@
 const { randomUUID } = require("node:crypto");
 const modelo = require("../models/eventos.model");
 const pubsub = require("../config/pubsub");
+const mensajesPublicados = require("../utils/mensajesPublicados");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const {
@@ -115,6 +116,12 @@ async function publicar(clientePubSub, evento) {
       ),
     ]);
     console.log(`Evento ${evento.id_evento} publicado en ${topico} (mensaje ${idMensaje})`);
+    mensajesPublicados.registrar({
+      topico,
+      idPubSub: idMensaje,
+      atributos: atributosDe(evento.carga),
+      cuerpo: evento.carga,
+    });
     await modelo.marcarEntregado(evento.id_evento);
   } catch (error) {
     console.error(

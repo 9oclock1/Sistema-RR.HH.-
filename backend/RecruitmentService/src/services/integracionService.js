@@ -3,6 +3,7 @@ const etapaModelo = require("../models/etapaPostulacionModel");
 const clienteRest = require("./clienteRestErp");
 const pubsub = require("../config/pubsub");
 const HttpError = require("../utils/HttpError");
+const mensajesPublicados = require("../utils/mensajesPublicados");
 const { integracion } = require("../config");
 const {
   DESTINO,
@@ -83,6 +84,12 @@ async function publicar(clientePubSub, evento) {
         setTimeout(() => rechazar(new Error("Pub/Sub no respondió a tiempo")), integracion.tiempoPublicacionMs).unref(),
       ),
     ]);
+    mensajesPublicados.registrar({
+      topico,
+      idPubSub,
+      atributos: atributosDe(evento.carga),
+      cuerpo: evento.carga,
+    });
     await registrarEntrega(evento, `Pub/Sub (${topico}, mensaje ${idPubSub})`);
   } catch (error) {
     await registrarFallo(evento, errorDePublicacion(error, topico));
