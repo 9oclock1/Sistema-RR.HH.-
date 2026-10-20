@@ -787,4 +787,29 @@ CREATE INDEX IF NOT EXISTS ix_solicitud_vacacion_estado ON SOLICITUDES_VACACION 
 CREATE INDEX IF NOT EXISTS ix_solicitud_vacacion_sin_notificar ON SOLICITUDES_VACACION (resuelto_en) WHERE resuelto_en IS NOT NULL AND resolucion_notificada_en IS NULL;
 -- Cobertura del equipo: ausencias aprobadas o pendientes que se cruzan con un rango de fechas.
 CREATE INDEX IF NOT EXISTS ix_solicitud_vacacion_fechas ON SOLICITUDES_VACACION (fecha_inicio, fecha_fin) WHERE id_estado_solicitud IN (1, 2);
+-- KAN-55 (RF-35): umbrales de cobertura del calendario consolidado de ausencias.
+-- Bloque idempotente: se puede ejecutar a mano sobre una AttendanceDB ya creada. Es una tabla nueva: no modifica las existentes.
+-- Cada fila fija cuánta ausencia tolera un área: sucursal y área NULL son comodines. Gana el alcance más específico
+-- y, sin ninguna fila, rige el predeterminado (30 % de ausentes y al menos 1 persona presente).
+-- id_sucursal, id_departamento y actualizado_por referencian EmployeeDB: sin FK por ser otro servicio.
+-- Tabla: UMBRALES_COBERTURA
+CREATE TABLE IF NOT EXISTS UMBRALES_COBERTURA (
+    id_umbral UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_sucursal UUID NULL,
+    id_departamento UUID NULL,
+    max_ausentes_porcentaje SMALLINT NOT NULL,
+    min_presentes SMALLINT NOT NULL DEFAULT 1,
+    actualizado_por UUID NULL,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT UMBRALES_COBERTURA_pk PRIMARY KEY (id_umbral),
+    CONSTRAINT chk_umbral_cobertura_porcentaje CHECK (max_ausentes_porcentaje BETWEEN 1 AND 100),
+    CONSTRAINT chk_umbral_cobertura_minimo CHECK (min_presentes >= 0)
+);
+-- Un umbral por alcance; NULL se trata como un valor más para que el comodín tampoco se repita.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_umbral_cobertura_alcance ON UMBRALES_COBERTURA (
+    COALESCE(id_sucursal, '00000000-0000-0000-0000-000000000000'::uuid),
+    COALESCE(id_departamento, '00000000-0000-0000-0000-000000000000'::uuid)
+);
+-- Calendario de ausencias aprobadas por rango de fechas.
+CREATE INDEX IF NOT EXISTS ix_solicitud_vacacion_aprobadas_fechas ON SOLICITUDES_VACACION (fecha_inicio, fecha_fin) WHERE id_estado_solicitud = 2;
 -- Fin del archivo.
