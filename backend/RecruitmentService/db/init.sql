@@ -150,7 +150,6 @@ CREATE TABLE CATALOGOS_DESTINO_INTEGRACION (
     grupo char(1) NOT NULL,
     nombre_modulo varchar(60) NOT NULL,
     canal varchar(10) NOT NULL,
-    topico varchar(60) NULL,
     CONSTRAINT CATALOGOS_DESTINO_INTEGRACION_pk PRIMARY KEY (id_destino),
     CONSTRAINT uq_destino_integracion_codigo UNIQUE (codigo),
     CONSTRAINT chk_destino_integracion_canal CHECK (canal IN ('REST', 'PUBSUB'))
@@ -249,41 +248,12 @@ INSERT INTO CATALOGOS_DESTINO_INTEGRACION (
         codigo,
         grupo,
         nombre_modulo,
-        canal,
-        topico
+        canal
     )
-VALUES (
-        1,
-        'CONTABILIDAD',
-        'D',
-        'Contabilidad',
-        'REST',
-        NULL
-    ),
-    (
-        2,
-        'MARKETPLACE_POS',
-        'E',
-        'Marketplace / POS',
-        'PUBSUB',
-        'marketplace-pos'
-    ),
-    (
-        3,
-        'INVENTARIOS',
-        'I',
-        'Inventarios',
-        'PUBSUB',
-        'inventarios'
-    ),
-    (
-        4,
-        'ENTREGAS',
-        'H',
-        'Entregas y Despachos',
-        'PUBSUB',
-        'entregas-despachos'
-    );
+VALUES (1, 'CONTABILIDAD', 'D', 'Contabilidad', 'REST'),
+    (2, 'MARKETPLACE_POS', 'E', 'Marketplace / POS', 'PUBSUB'),
+    (3, 'INVENTARIOS', 'I', 'Inventarios', 'PUBSUB'),
+    (4, 'ENTREGAS', 'H', 'Entregas y Despachos', 'PUBSUB');
 INSERT INTO CATALOGOS_CARGO_OPERATIVO (id_cargo_operativo, codigo, nombre, id_destino)
 VALUES (1, 'CAJERO', 'Cajero', 2),
     (2, 'VENDEDOR', 'Vendedor', 2),
