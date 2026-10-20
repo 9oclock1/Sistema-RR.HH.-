@@ -7,21 +7,19 @@ const UUID_REGEX =
 async function getRankingByConvocatoria(req, res, next) {
   try {
     const { id_convocatoria } = req.params;
-    const { pagina, limite } = req.query;
 
-    if (!UUID_REGEX.test(idConvocatoriaParaValidar(id_convocatoria))) {
+    if (!id_convocatoria || !UUID_REGEX.test(id_convocatoria.trim())) {
       throw new ErrorApp(
         400,
         "El ID de la convocatoria no tiene un formato UUID válido.",
       );
     }
 
+    const opciones = req.querySanitizada || req.query;
+
     const resultado = await rankingService.obtenerRankingCandidatos(
-      id_convocatoria,
-      {
-        pagina,
-        limite,
-      },
+      id_convocatoria.trim(),
+      opciones,
     );
 
     return res.status(200).json({
@@ -32,10 +30,6 @@ async function getRankingByConvocatoria(req, res, next) {
   } catch (error) {
     next(error);
   }
-}
-
-function idConvocatoriaParaValidar(id) {
-  return typeof id === "string" ? id.trim() : "";
 }
 
 module.exports = {

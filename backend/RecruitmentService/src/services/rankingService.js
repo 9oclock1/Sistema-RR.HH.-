@@ -8,14 +8,25 @@ async function obtenerRankingCandidatos(idConvocatoria, opciones = {}) {
     throw new ErrorApp(404, "La convocatoria especificada no existe.");
   }
 
-  const pagina = Math.max(1, parseInt(opciones.pagina, 10) || 1);
-  const limite = Math.min(
-    100,
-    Math.max(1, parseInt(opciones.limite, 10) || 10),
-  );
+  const {
+    desempate = "experiencia",
+    orden_desempate = "desc",
+    experiencia_min = null,
+    pretension_salarial_max = null,
+    etapa = null,
+    ciudad = null,
+    pagina = 1,
+    limite = 10,
+  } = opciones;
 
   const { postulantes, totalRegistros } =
     await rankingModel.obtenerRankingPorConvocatoria(idConvocatoria, {
+      desempate,
+      orden_desempate,
+      experiencia_min,
+      pretension_salarial_max,
+      etapa,
+      ciudad,
       pagina,
       limite,
     });
@@ -28,6 +39,17 @@ async function obtenerRankingCandidatos(idConvocatoria, opciones = {}) {
       codigo_convocatoria: convocatoria.codigo_convocatoria,
       titulo_puesto: convocatoria.titulo_puesto,
       esta_activa: convocatoria.esta_activa,
+    },
+    criterios_aplicados: {
+      orden_primario: "score_afinidad DESC",
+      criterio_desempate: desempate,
+      sentido_desempate: orden_desempate.toUpperCase(),
+      filtros: {
+        experiencia_min,
+        pretension_salarial_max,
+        etapa,
+        ciudad,
+      },
     },
     paginacion: {
       total_registros: totalRegistros,
