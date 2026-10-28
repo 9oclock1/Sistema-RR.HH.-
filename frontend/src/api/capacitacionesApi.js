@@ -11,5 +11,13 @@ export const getOrdenesServicioEmitidas = (idCurso, { rol, signal } = {}) =>
     headers: conRol(rol),
   });
 
-export const createCapacitacion = (datos, { rol } = {}) =>
+// KAN-60: registra la solicitud y la publica a Compras por Pub/Sub. Si la publicación falla, queda PENDIENTE_ENVIO y se reintenta.
+export const solicitarCompraCapacitacion = (idCurso, datos, { rol } = {}) =>
+  request(`/empl/cursos-capacitacion/${encodeURIComponent(idCurso)}/solicitar-compra`, {
+    method: 'POST',
+    body: datos,
+    headers: conRol(rol),
+  });
+
+export const createCapacitacion =(datos, { rol } = {}) =>
   request('/empl/capacitaciones', { method: 'POST', body: datos, headers: conRol(rol) });

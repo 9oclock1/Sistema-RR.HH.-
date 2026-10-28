@@ -55,6 +55,18 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+/* El botón se alinea con el selector, no con su texto de ayuda. */
+.capa-compra {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.capa-compra > .ds-boton {
+  margin-top: calc(var(--line-height-small) + var(--space-1));
+}
+
 .capa-form__pie {
   display: flex;
   justify-content: flex-end;
@@ -62,7 +74,12 @@
 
 @media (max-width: 640px) {
   .capa-fila,
-  .capa-fila--tres {
+  .capa-fila--tres,
+  .capa-compra {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .capa-compra > .ds-boton {
+    margin-top: 0;
   }
 }

@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { Save } from 'lucide-react';
+import { Save, ShoppingCart } from 'lucide-react';
 import FileInput from '../../../components/common/FileInput';
 import { Alerta, Boton, CampoTexto, Selector, Tarjeta } from '../../../components/ui';
 import { useRol } from '../../../context/sesion';
@@ -16,6 +16,7 @@ import {
   SIN_VENCIMIENTO,
   TIPOS_CAPACITACION,
 } from '../utils/opciones';
+import SolicitudCompraModal from './SolicitudCompraModal';
 
 const CAMPOS = [
   'id_empleado',
@@ -113,6 +114,8 @@ export default function CapacitacionForm({ idEmpleado, onCambiarEmpleado, onRegi
   const [errores, setErrores] = useState({});
   const [rechazo, setRechazo] = useState(null);
   const [enviando, setEnviando] = useState(false);
+  const [modalCompra, setModalCompra] = useState(0);
+  const [solicitudCompra, setSolicitudCompra] = useState(null);
 
   const curso = cursos.cursos.find((c) => c.id_curso === valores.id_curso) ?? null;
   const ordenes = useOrdenesServicio(valores.id_curso, rol);
@@ -141,6 +144,7 @@ export default function CapacitacionForm({ idEmpleado, onCambiarEmpleado, onRegi
       fecha_vencimiento: '',
       id_solicitud_servicio: '',
     }));
+    setSolicitudCompra(null);
     quitarError('id_curso', 'fecha_vencimiento', 'id_solicitud_servicio');
   };
 
@@ -321,24 +325,45 @@ export default function CapacitacionForm({ idEmpleado, onCambiarEmpleado, onRegi
             )}
           </div>
 
-          <Selector
-            id={idCampo('id_solicitud_servicio')}
-            etiqueta="Orden de servicio de Compras"
-            value={valores.id_solicitud_servicio}
-            onChange={(e) => actualizarCampo('id_solicitud_servicio', e.target.value)}
-            disabled={!curso || ordenes.cargando || ordenes.ordenes.length === 0}
-            textoVacio={ordenes.cargando ? 'Cargando…' : 'No corresponde a un servicio externo'}
-            opciones={ordenes.ordenes.map((o) => ({
-              valor: o.id_solicitud_servicio,
-              etiqueta: `${o.numero_orden_servicio} · ${o.proveedor_nombre}`,
-            }))}
-            error={errores.id_solicitud_servicio}
-            ayuda={
-              errores.id_solicitud_servicio
-                ? undefined
-                : 'Opcional. Solo si la capacitación fue un servicio externo con orden emitida por Compras.'
-            }
-          />
+          {solicitudCompra && (
+            <Alerta
+              tono={solicitudCompra.estado === 'ENVIADA' ? 'exito' : 'aviso'}
+              role="status"
+              titulo={
+                solicitudCompra.estado === 'ENVIADA'
+                  ? 'Solicitud enviada a Compras'
+                  : 'La solicitud quedó pendiente de envío'
+              }
+            >
+              {solicitudCompra.estado === 'ENVIADA'
+                ? 'Cuando Compras emita la orden de servicio, aparecerá en la lista de abajo.'
+                : `Se reintentará automáticamente. Motivo: ${solicitudCompra.ultimo_error ?? 'desconocido'}.`}
+            </Alerta>
+          )}
+
+          <div className="capa-compra">
+            <Selector
+              id={idCampo('id_solicitud_servicio')}
+              etiqueta="Orden de servicio de Compras"
+              value={valores.id_solicitud_servicio}
+              onChange={(e) => actualizarCampo('id_solicitud_servicio', e.target.value)}
+              disabled={!curso || ordenes.cargando || ordenes.ordenes.length === 0}
+              textoVacio={ordenes.cargando ? 'Cargando…' : 'No corresponde a un servicio externo'}
+              opciones={ordenes.ordenes.map((o) => ({
+                valor: o.id_solicitud_servicio,
+                etiqueta: `${o.numero_orden_servicio} · ${o.proveedor_nombre}`,
+              }))}
+              error={errores.id_solicitud_servicio}
+              ayuda={
+                errores.id_solicitud_servicio
+                  ? undefined
+                  : 'Opcional. Solo si la capacitación fue un servicio externo con orden emitida por Compras.'
+              }
+            />
+            <Boton icono={ShoppingCart} disabled={!curso} onClick={() => setModalCompra((n) => n + 1)}>
+              Solicitar a Compras
+            </Boton>
+          </div>
 
           <FileInput
             etiqueta="Certificado"
@@ -361,6 +386,20 @@ export default function CapacitacionForm({ idEmpleado, onCambiarEmpleado, onRegi
           </Boton>
         </div>
       </form>
+
+      {modalCompra > 0 && curso && (
+        <SolicitudCompraModal
+          key={modalCompra}
+          abierto
+          curso={curso}
+          rol={rol}
+          onCerrar={() => setModalCompra(0)}
+          onEnviada={(solicitud) => {
+            setSolicitudCompra(solicitud);
+            setModalCompra(0);
+          }}
+        />
+      )}
     </Tarjeta>
   );
 }
