@@ -1,10 +1,11 @@
 const express = require("express");
 const cors = require("cors");
-const { Pool } = require("pg");
+const pool = require("./src/config/db");
+const plantillasRoutes = require("./src/routes/plantillas.routes");
+const manejadorErrores = require("./src/middlewares/manejadorErrores");
 
 const app = express();
 const PORT = process.env.PORT || 3006;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(cors());
 app.use(express.json());
@@ -42,6 +43,9 @@ app.get("/reviews", (req, res) => {
     },
   ]);
 });
+
+app.use(plantillasRoutes);
+app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`PerformanceService corriendo en http://0.0.0.0:${PORT}`);

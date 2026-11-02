@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Briefcase, Building2, CalendarClock, CalendarRange, FileChartColumn, FileCheck, FileText, FileUser, FileWarning, Fingerprint, History, ListTree, Mail, Megaphone, Network, Send, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Briefcase, Building2, CalendarClock, CalendarRange, ClipboardList, FileChartColumn, FileCheck, FileText, FileUser, FileWarning, Fingerprint, History, ListTree, Mail, Megaphone, Network, Send, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
@@ -14,6 +14,7 @@ import MemorandumsView from "../features/Memorandums/MemorandumsView";
 import MiAsistenciaPage from "../features/mi-asistencia/MiAsistenciaPage";
 import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
+import PlantillasEvaluacionPage from "../features/plantillas-evaluacion/PlantillasEvaluacionPage";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import ReconocimientosView from "../features/Reconocimientos/ReconocimientosView";
 import ReportesAsistenciaPage from "../features/reportes-asistencia/ReportesAsistenciaPage";
@@ -201,6 +202,19 @@ export const SECCIONES = [
         icono: Award,
         roles: ["supervisor"],
         pagina: ReconocimientosView,
+      },
+    ],
+  },
+  {
+    titulo: "Desempeño",
+    modulos: [
+      {
+        ruta: "/desempeno/plantillas",
+        etiqueta: "Plantillas de evaluación",
+        descripcion: "Criterios, preguntas ponderadas y escalas de valoración, con control de versiones.",
+        icono: ClipboardList,
+        roles: ["admin"],
+        pagina: PlantillasEvaluacionPage,
       },
     ],
   },
