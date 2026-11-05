@@ -35,6 +35,19 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 - `umbral_brecha` es el puntaje bajo el cual un área se resalta como brecha en ese ciclo. El valor por defecto de 60 es una suposición.
 - Backend: `id_nivel` debe pertenecer a la escala de la pregunta, y la pregunta a la versión del ciclo. Tampoco se editan evaluaciones `ENVIADA` o `VENCIDA`.
 
+### Cálculo del puntaje final (KAN-24)
+
+- Cada respuesta se convierte a 0-100 con `valor del nivel / valor máximo de su escala × 100`. El máximo es el mayor `valor` de `NIVELES_ESCALA` de esa escala (5 en Likert, 4 en Nivel de cumplimiento).
+- `puntaje_final` es el promedio ponderado de esas respuestas con `peso_porcentual`: `Σ(peso × puntaje de la respuesta) / Σ(peso de las preguntas respondidas)`.
+- Las preguntas opcionales sin responder se excluyen y su peso se reparte entre las respondidas, porque el divisor solo suma los pesos de las preguntas que sí tienen respuesta. Las obligatorias deben estar todas respondidas para enviar.
+- El resultado se redondea a 2 decimales y se congela al enviar. Ejemplo del seed (evaluación `…0125`): `(20×100 + 15×80 + 15×80 + 20×100 + 20×75) / 90 = 87.78`.
+- El desglose por criterio o competencia usa la misma fórmula, pero solo con las preguntas de ese criterio o competencia.
+
+## Datos de prueba
+
+- `seed.sql` carga datos ficticios para probar KAN-24: una plantilla publicada con 6 preguntas (pesos que suman 100 y una opcional), tres ciclos y seis evaluaciones en distintos estados. No se ejecuta al crear la base ni está montado en `docker-compose.yml`; se corre a mano después de `init.sql` y se puede repetir sin duplicar filas.
+- Los empleados del seed son réplicas con id de demostración. Para ver la bandeja con el "Usuario de prueba" del portal, pasa su `id_empleado` de EmployeeService como `-v id_evaluador=<uuid>`; las demás variables (`id_evaluador_2`, `id_creador`, `id_evaluado_1` a `id_evaluado_4`) son opcionales. El encabezado del archivo trae el comando completo.
+
 ## Integración con CRM
 
 - `EVENTOS_SALIENTES` guarda la solicitud de métricas en la misma transacción que el cierre del ciclo (patrón outbox), y un proceso la publica después. `id_evento` es el `id_mensaje` del encabezado. Un ciclo no repite el mismo evento al mismo destino (`uq_evento_ciclo_destino_tipo`).
@@ -42,7 +55,7 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 - `MENSAJES_ENTRANTES` registra cada mensaje del CRM. `uq_mensaje_origen_externo` descarta los duplicados y `carga` es texto para poder guardar también un mensaje con JSON inválido.
 - Estados del mensaje: `RECIBIDO`, `PROCESADO` y `EN_DLQ` (agotó los reintentos y queda para revisión, sin bloquear el consolidado).
 - `METRICAS_CRM` guarda las métricas por ciclo y colaborador, y `id_mensaje` indica de qué mensaje salieron. `minutos_resolucion_promedio` es NULL si no hubo casos.
-- `CATALOGOS_MODULO_EXTERNO.grupo` es la letra del grupo; la del CRM queda en NULL hasta confirmarla.
+- `CATALOGOS_MODULO_EXTERNO.grupo` es la letra del grupo; la del CRM es B.
 
 ## Quejas internas
 
