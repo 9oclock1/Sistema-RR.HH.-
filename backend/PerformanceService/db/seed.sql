@@ -1,5 +1,7 @@
 -- Datos de prueba de PerformanceDB
 -- Requiere que init.sql ya se haya ejecutado.
+-- NO formatear con un formateador de SQL: los comandos de psql (\set, \if, \else, \endif) deben ir
+-- cada uno en su propia línea y el formateador los une y rompe el archivo.
 -- Uso (PowerShell):
 --   Get-Content backend/PerformanceService/db/seed.sql | docker exec -i rrhh-postgres psql -U adminRRHH -d PerformanceDB
 --
@@ -14,22 +16,36 @@
 --   Ciclo "Evaluación de personal nuevo 2026" (activo)     -> 123 PENDIENTE, con una fecha límite más cercana
 --   Ciclo "Evaluación de desempeño 2026-S1" (cerrado)      -> 125 ENVIADA (puntaje 87.78), 126 VENCIDA
 -- La plantilla tiene 6 preguntas con pesos que suman 100; la pregunta 95 es opcional.
-\
-set ON_ERROR_STOP on \ if: { ? id_evaluador } \
-    else \
-set id_evaluador 'f0000000-0000-4000-8000-000000000021' \ endif \ if: { ? id_evaluador_2 } \
-    else \
-set id_evaluador_2 'f0000000-0000-4000-8000-000000000022' \ endif \ if: { ? id_creador } \
-    else \
-set id_creador 'f0000000-0000-4000-8000-000000000023' \ endif \ if: { ? id_evaluado_1 } \
-    else \
-set id_evaluado_1 'f0000000-0000-4000-8000-000000000031' \ endif \ if: { ? id_evaluado_2 } \
-    else \
-set id_evaluado_2 'f0000000-0000-4000-8000-000000000032' \ endif \ if: { ? id_evaluado_3 } \
-    else \
-set id_evaluado_3 'f0000000-0000-4000-8000-000000000033' \ endif \ if: { ? id_evaluado_4 } \
-    else \
-set id_evaluado_4 'f0000000-0000-4000-8000-000000000034' \ endif BEGIN;
+\set ON_ERROR_STOP on
+\if :{?id_evaluador}
+\else
+  \set id_evaluador 'f0000000-0000-4000-8000-000000000021'
+\endif
+\if :{?id_evaluador_2}
+\else
+  \set id_evaluador_2 'f0000000-0000-4000-8000-000000000022'
+\endif
+\if :{?id_creador}
+\else
+  \set id_creador 'f0000000-0000-4000-8000-000000000023'
+\endif
+\if :{?id_evaluado_1}
+\else
+  \set id_evaluado_1 'f0000000-0000-4000-8000-000000000031'
+\endif
+\if :{?id_evaluado_2}
+\else
+  \set id_evaluado_2 'f0000000-0000-4000-8000-000000000032'
+\endif
+\if :{?id_evaluado_3}
+\else
+  \set id_evaluado_3 'f0000000-0000-4000-8000-000000000033'
+\endif
+\if :{?id_evaluado_4}
+\else
+  \set id_evaluado_4 'f0000000-0000-4000-8000-000000000034'
+\endif
+BEGIN;
 -- Réplica mínima de EmployeeDB.
 INSERT INTO DEPARTAMENTOS (id_departamento, nombre)
 VALUES (
