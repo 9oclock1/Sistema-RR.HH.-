@@ -1,0 +1,73 @@
+.ev-bandeja {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.ev-bandeja .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+.ev-filtros {
+  max-width: calc(var(--size-sidebar) * 1.5);
+  margin-block: var(--space-2) var(--space-3);
+}
+
+.ev-bandeja .ds-tabla {
+  min-width: calc(var(--size-sidebar) * 3);
+}
+
+.ev-colaborador {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding-block: var(--space-1);
+}
+
+.ev-celda {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding-block: var(--space-1);
+}
+
+.ev-colaborador .ev-celda {
+  padding-block: 0;
+}
+
+.ev-celda__principal {
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.ev-sutil {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.ev-plazo {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.ev-plazo--corto {
+  color: var(--color-warning-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ev-plazo--vencido {
+  color: var(--color-danger-text);
+}
+
+.ev-ciclo {
+  overflow-wrap: anywhere;
+}
+
+.ev-avance {
+  color: var(--color-text-secondary);
+}
