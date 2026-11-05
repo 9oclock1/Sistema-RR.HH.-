@@ -584,7 +584,7 @@ VALUES (1, 'RECIBIDO', 'Recibido'),
     (2, 'PROCESADO', 'Procesado'),
     (3, 'EN_DLQ', 'En cola de errores');
 INSERT INTO CATALOGOS_MODULO_EXTERNO (id_modulo_externo, codigo, nombre, grupo)
-VALUES (1, 'CRM', 'CRM', NULL);
+VALUES (1, 'CRM', 'CRM', 'B');
 INSERT INTO CATALOGOS_CATEGORIA_QUEJA (id_categoria_queja, codigo, nombre)
 VALUES (1, 'CLIMA_LABORAL', 'Clima laboral'),
     (2, 'ACOSO', 'Acoso'),
