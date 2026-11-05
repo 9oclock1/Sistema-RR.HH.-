@@ -71,3 +71,230 @@
 .ev-avance {
   color: var(--color-text-secondary);
 }
+
+.ev-formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  max-width: calc(var(--size-sidebar) * 4);
+}
+
+.ev-formulario .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+.ev-formulario .ev-sutil {
+  margin: 0;
+}
+
+.ev-requerido {
+  color: var(--color-danger-text);
+}
+
+.ev-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.ev-pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.ev-carga {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Estado del autoguardado */
+.ev-guardado {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ev-guardado__texto {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.ev-guardado__texto--pendiente,
+.ev-guardado__texto--guardando {
+  color: var(--color-text-secondary);
+}
+
+.ev-guardado__texto--guardado {
+  color: var(--color-success-text);
+}
+
+.ev-guardado__texto--error {
+  color: var(--color-danger-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ev-giro {
+  animation: ev-giro 1s linear infinite;
+}
+
+@keyframes ev-giro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ev-giro {
+    animation: none;
+  }
+}
+
+/* Resumen de la evaluación */
+.ev-resumen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.ev-resumen__persona {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.ev-resumen__persona p {
+  margin: 0;
+}
+
+.ev-resumen__nombre {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.ev-datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--size-sidebar) * 0.75), 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-page);
+}
+
+.ev-datos div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.ev-datos dt {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ev-datos dd {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.ev-progreso {
+  appearance: none;
+  width: 100%;
+  max-width: calc(var(--size-sidebar) * 1.5);
+  height: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-round);
+  background: var(--color-bg-neutral);
+  overflow: hidden;
+}
+
+.ev-progreso::-webkit-progress-bar {
+  background: var(--color-bg-neutral);
+}
+
+.ev-progreso::-webkit-progress-value {
+  background: var(--color-primary);
+  transition: width var(--transition);
+}
+
+.ev-progreso::-moz-progress-bar {
+  background: var(--color-primary);
+}
+
+/* Secciones, criterios y preguntas */
+.ev-seccion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ev-seccion > .ds-tarjeta__encabezado {
+  margin-bottom: 0;
+}
+
+.ev-seccion .ds-tarjeta__acciones {
+  align-items: center;
+}
+
+.ev-criterio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.ev-criterio__titulo {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ev-pregunta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding-block: var(--space-2);
+}
+
+.ev-opcional {
+  color: var(--color-text-subtle);
+  font-weight: var(--font-weight-regular);
+}
+
+.ev-lista-errores {
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.ev-lista-errores a {
+  color: inherit;
+}

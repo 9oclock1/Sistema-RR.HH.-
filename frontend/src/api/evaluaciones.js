@@ -16,3 +16,19 @@ export const listarEvaluaciones = (idEmpleado, { idCiclo } = {}) => {
 
 export const listarCiclosEvaluacion = (idEmpleado) =>
   solicitar(`${RUTA}/ciclos`, { cabeceras: comoEvaluador(idEmpleado) });
+
+// Formulario de la evaluación: plantilla del ciclo (escalas y secciones) con las respuestas ya guardadas.
+export const obtenerEvaluacion = (idEmpleado, idEvaluacion) =>
+  solicitar(`${RUTA}/${idEvaluacion}`, { cabeceras: comoEvaluador(idEmpleado) });
+
+// Guardado parcial: solo las respuestas indicadas [{ id_pregunta, id_nivel }]; id_nivel null borra la respuesta.
+export const guardarRespuestas = (idEmpleado, idEvaluacion, respuestas) =>
+  solicitar(`${RUTA}/${idEvaluacion}/respuestas`, {
+    metodo: "PUT",
+    cuerpo: { respuestas },
+    cabeceras: comoEvaluador(idEmpleado),
+  });
+
+// Calcula el puntaje final y bloquea la evaluación. Si faltan obligatorias responde 422 con detalles[].
+export const enviarEvaluacion = (idEmpleado, idEvaluacion) =>
+  solicitar(`${RUTA}/${idEvaluacion}/envio`, { metodo: "POST", cabeceras: comoEvaluador(idEmpleado) });

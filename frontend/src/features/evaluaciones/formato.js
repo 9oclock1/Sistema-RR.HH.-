@@ -27,6 +27,20 @@ export const ESTADOS_EVALUACION = {
   VENCIDA: { tono: "peligro", icono: CircleX, texto: "Vencida" },
 };
 
+export const ACCIONES_EVALUACION = {
+  PENDIENTE: { texto: "Responder", principal: true },
+  BORRADOR: { texto: "Continuar", principal: true },
+  ENVIADA: { texto: "Ver", principal: false },
+  VENCIDA: { texto: "Ver", principal: false },
+};
+
+export const TIPOS_COMPETENCIA = {
+  COMPETENCIA_LABORAL: "Competencia laboral",
+  FACTOR_OPERATIVO: "Factor operativo",
+};
+
+export const idCampoPregunta = (idPregunta) => `ev-pregunta-${idPregunta}`;
+
 // Evaluaciones que todavía se pueden responder.
 export const esAbierta = (evaluacion) =>
   evaluacion.estado_codigo === "PENDIENTE" ||

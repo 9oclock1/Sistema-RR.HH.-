@@ -17,7 +17,8 @@ import {
 } from "../../components/ui";
 import { useUsuario } from "../../context/sesion";
 import { formatearFecha } from "../solicitud-vacaciones/formato";
-import { describirAvance, describirPlazo, ESTADOS_EVALUACION, esAbierta } from "./formato";
+import { ACCIONES_EVALUACION, describirAvance, describirPlazo, ESTADOS_EVALUACION, esAbierta } from "./formato";
+import { rutaEvaluacion } from "./ruta";
 import "./evaluaciones.css";
 
 // «Pendientes» incluye los borradores: son evaluaciones que todavía falta enviar.
@@ -39,7 +40,7 @@ const COLUMNAS = [
   {
     clave: "colaborador",
     titulo: "Colaborador",
-    ancho: "24%",
+    ancho: "22%",
     celda: (e) => (
       <div className="ev-colaborador">
         <Avatar nombre={e.colaborador.nombre_completo} decorativo />
@@ -53,14 +54,14 @@ const COLUMNAS = [
   {
     clave: "ciclo",
     titulo: "Ciclo",
-    ancho: "30%",
+    ancho: "26%",
     // Sin truncar: lo que distingue un ciclo de otro suele ir al final del nombre («… 2026-S1» / «… 2026-S2»).
     celda: (e) => <span className="ev-ciclo">{e.ciclo.nombre}</span>,
   },
   {
     clave: "fecha_limite",
     titulo: "Fecha límite",
-    ancho: "16%",
+    ancho: "15%",
     celda: (e) => {
       // Una evaluación enviada ya no tiene plazo que vigilar.
       const plazo = e.estado_codigo === "ENVIADA" ? null : describirPlazo(e.ciclo.fecha_limite);
@@ -75,7 +76,7 @@ const COLUMNAS = [
   {
     clave: "estado",
     titulo: "Estado",
-    ancho: "13%",
+    ancho: "12%",
     celda: (e) => {
       const estado = ESTADOS_EVALUACION[e.estado_codigo];
       return (
@@ -88,8 +89,28 @@ const COLUMNAS = [
   {
     clave: "avance",
     titulo: "Avance",
-    ancho: "17%",
+    ancho: "14%",
     celda: (e) => <span className="ev-avance">{describirAvance(e)}</span>,
+  },
+  {
+    clave: "accion",
+    titulo: <span className="ds-solo-lector">Acción</span>,
+    ancho: "11%",
+    alinear: "fin",
+    celda: (e) => {
+      const accion = ACCIONES_EVALUACION[e.estado_codigo];
+      return (
+        <Boton
+          as={Link}
+          to={rutaEvaluacion(e.id_evaluacion)}
+          tamano="sm"
+          variante={accion.principal ? "primario" : "predeterminado"}
+          aria-label={`${accion.texto} la evaluación de ${e.colaborador.nombre_completo}`}
+        >
+          {accion.texto}
+        </Boton>
+      );
+    },
   },
 ];
 
@@ -191,7 +212,6 @@ function Bandeja({ idEvaluador, intento, onReintentar }) {
   );
 }
 
-// KAN-24 (RF-04): bandeja del evaluador con las evaluaciones que le asignaron, su ciclo y su fecha límite.
 export default function BandejaEvaluacionesPage() {
   // Usuario de prueba de la barra lateral: hace de evaluador hasta contar con inicio de sesión.
   const idEvaluador = useUsuario();

@@ -1,7 +1,8 @@
 import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardPenLine, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
-import BandejaEvaluacionesPage from "../features/evaluaciones/BandejaEvaluacionesPage";
+import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
+import { RUTA_EVALUACIONES } from "../features/evaluaciones/ruta";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
@@ -310,12 +311,13 @@ export const SECCIONES = [
     titulo: "Desempeño",
     modulos: [
       {
-        ruta: "/desempeno/evaluaciones",
+        ruta: RUTA_EVALUACIONES,
+        parametroOpcional: "idEvaluacion",
         etiqueta: "Evaluaciones",
-        descripcion: "Evaluaciones de desempeño asignadas al evaluador, con su ciclo y su fecha límite.",
+        descripcion: "Evaluaciones de desempeño asignadas al evaluador: bandeja y formulario para responderlas.",
         icono: ClipboardPenLine,
         roles: ["supervisor"],
-        pagina: BandejaEvaluacionesPage,
+        pagina: EvaluacionesPage,
       },
     ],
   },
