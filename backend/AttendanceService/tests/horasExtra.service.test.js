@@ -471,3 +471,21 @@ test("anular una autorización de un día que ya pasó: 409", async () => {
   assert.equal(eliminar.mock.callCount(), 0);
   await assert.rejects(servicio.eliminarAutorizacion("abc", JEFA), { estado: 404 });
 });
+
+test("jornadas de todo el personal: calcula el rango sin filtrar empleados y devuelve las filas", async () => {
+  const marcajes = mock.method(modelo, "listarMarcajes", async () => []);
+  const filas = [{ id_empleado: ANA, fecha_jornada: "2026-10-05", tipo_dia: "HABIL", feriado: null, minutos_nocturnos: 450 }];
+  const listarJornadas = mock.method(modelo, "listarJornadas", async () => filas);
+  const r = await servicio.listarJornadas({ desde: "2026-10-01", hasta: "2026-10-31" });
+  assert.deepEqual(r, { desde: "2026-10-01", hasta: "2026-10-31", jornadas: filas });
+  assert.deepEqual(marcajes.mock.calls[0].arguments, ["2026-10-01", "2026-10-31", null]);
+  assert.deepEqual(listarJornadas.mock.calls[0].arguments, ["2026-10-01", "2026-10-31"]);
+});
+
+test("jornadas de todo el personal: rango inválido o de más de 92 días → 400", async () => {
+  const listarJornadas = mock.method(modelo, "listarJornadas", async () => []);
+  for (const rango of [{ desde: "2026-10-31", hasta: "2026-10-01" }, { desde: "2026-01-01", hasta: "2026-10-31" }, { desde: "ayer" }]) {
+    await assert.rejects(servicio.listarJornadas(rango), (e) => e.estado === 400 && e.detalles[0].campo === "desde");
+  }
+  assert.equal(listarJornadas.mock.callCount(), 0);
+});
