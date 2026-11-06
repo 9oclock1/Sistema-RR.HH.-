@@ -1,5 +1,6 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, IdCard, ListTree, Mail, Megaphone, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
+import AnticiposPage from "../features/anticipos/AnticiposPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
@@ -238,6 +239,19 @@ export const SECCIONES = [
         icono: FileChartColumn,
         roles: ["supervisor"],
         pagina: ReportesAsistenciaPage,
+      },
+    ],
+  },
+  {
+    titulo: "Planillas",
+    modulos: [
+      {
+        ruta: "/planillas/anticipos",
+        etiqueta: "Anticipos y préstamos",
+        descripcion: "Anticipos de sueldo y préstamos con su plan de cuotas, descontados en la planilla del periodo.",
+        icono: HandCoins,
+        roles: ["admin"],
+        pagina: AnticiposPage,
       },
     ],
   },
