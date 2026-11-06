@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, MoonStar, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
@@ -10,6 +10,7 @@ import { RUTA_CAPACITACIONES } from "../features/Capacitaciones/utils/opciones";
 import NotificacionesPage from "../features/notificaciones/NotificacionesPage";
 import CargosList from "../features/Cargos/CargosList";
 import ConceptosPage from "../features/conceptos/ConceptosPage";
+import CondicionesPage from "../features/condiciones/CondicionesPage";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import ContratosView from "../features/Contratos/ContratosView";
 import { RUTA_CONTRATOS } from "../features/Contratos/utils/opciones";
@@ -252,6 +253,14 @@ export const SECCIONES = [
         icono: Calculator,
         roles: ["admin"],
         pagina: ConceptosPage,
+      },
+      {
+        ruta: "/planillas/condiciones",
+        etiqueta: "Condiciones especiales",
+        descripcion: "Bonos por trasnoche, feriados trabajados y áreas como congelados, detectados o asignados por colaborador.",
+        icono: MoonStar,
+        roles: ["admin"],
+        pagina: CondicionesPage,
       },
     ],
   },
