@@ -123,4 +123,14 @@ async function agregarVigencia(id, datos) {
   return obtener(id);
 }
 
-module.exports = { listar, obtener, crear, actualizar, cambiarEstado, eliminar, agregarVigencia };
+module.exports = {
+  traducirErrorBD,
+  formatear,
+  listar,
+  obtener,
+  crear,
+  actualizar,
+  cambiarEstado,
+  eliminar,
+  agregarVigencia,
+};
