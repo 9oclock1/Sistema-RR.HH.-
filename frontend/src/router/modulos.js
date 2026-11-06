@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardPenLine, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardPenLine, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
@@ -11,6 +11,7 @@ import CapacitacionesView from "../features/Capacitaciones/CapacitacionesView";
 import { RUTA_CAPACITACIONES } from "../features/Capacitaciones/utils/opciones";
 import NotificacionesPage from "../features/notificaciones/NotificacionesPage";
 import CargosList from "../features/Cargos/CargosList";
+import ConceptosPage from "../features/conceptos/ConceptosPage";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import ContratosView from "../features/Contratos/ContratosView";
 import { RUTA_CONTRATOS } from "../features/Contratos/utils/opciones";
@@ -240,6 +241,19 @@ export const SECCIONES = [
         icono: FileChartColumn,
         roles: ["supervisor"],
         pagina: ReportesAsistenciaPage,
+      },
+    ],
+  },
+  {
+    titulo: "Planillas",
+    modulos: [
+      {
+        ruta: "/planillas/conceptos",
+        etiqueta: "Conceptos de pago",
+        descripcion: "Ingresos, descuentos y aportes de la planilla con su valor, vigencia y cuenta contable.",
+        icono: Calculator,
+        roles: ["admin"],
+        pagina: ConceptosPage,
       },
     ],
   },

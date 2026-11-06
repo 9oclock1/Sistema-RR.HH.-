@@ -1,10 +1,11 @@
 const express = require("express");
 const cors = require("cors");
-const { Pool } = require("pg");
+const pool = require("./src/config/db");
+const conceptosRoutes = require("./src/routes/conceptos.routes");
+const manejadorErrores = require("./src/middlewares/manejadorErrores");
 
 const app = express();
 const PORT = process.env.PORT || 3005;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(cors());
 app.use(express.json());
@@ -32,14 +33,8 @@ app.get("/health", async (req, res) => {
   }
 });
 
-app.get("/payroll/summary", (req, res) => {
-  res.json({
-    month: "Septiembre",
-    totalSalaries: 45000,
-    currency: "USD",
-    employeesProcessed: 18,
-  });
-});
+app.use(conceptosRoutes);
+app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`CompensationService corriendo en http://0.0.0.0:${PORT}`);
