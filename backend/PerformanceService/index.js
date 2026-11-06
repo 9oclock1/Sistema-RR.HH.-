@@ -1,10 +1,11 @@
 const express = require("express");
 const cors = require("cors");
-const { Pool } = require("pg");
+const pool = require("./src/config/db");
+const evaluacionesRoutes = require("./src/routes/evaluacionesRoutes");
+const manejadorErrores = require("./src/middlewares/manejadorErrores");
 
 const app = express();
 const PORT = process.env.PORT || 3006;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(cors());
 app.use(express.json());
@@ -32,16 +33,8 @@ app.get("/health", async (req, res) => {
   }
 });
 
-app.get("/reviews", (req, res) => {
-  res.json([
-    {
-      employeeId: 1,
-      score: 92,
-      period: "Q3-2026",
-      feedback: "Excelente trabajo Cortez en el Sprint",
-    },
-  ]);
-});
+app.use(evaluacionesRoutes);
+app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`PerformanceService corriendo en http://0.0.0.0:${PORT}`);

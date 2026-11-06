@@ -103,6 +103,7 @@ import { Boton, CampoTexto, Tabla, useAvisos } from "../../components/ui";
 | `Selector` | `<select>` con las mismas props de campo más `opciones` `[{ valor, etiqueta }]` y `textoVacio` |
 | `Casilla` | Checkbox con `etiqueta` y `ayuda`; el resto de atributos van al `<input>` |
 | `Campo` | Envoltorio de etiqueta, ayuda y error para crear otros controles |
+| `GrupoRadios` | Opciones excluyentes como pastillas: `leyenda`, `opciones` `[{ valor, etiqueta, deshabilitada? }]`, `value`, `onChange(valor)`, `ayuda`, `error`, `requerido`, `disabled` (solo lectura: la opción elegida sigue a la vista) |
 | `Tarjeta` | `titulo`, `nivelTitulo` (3 por defecto), `acciones`, `interactiva`, `seleccionada`; con `onClick` se vuelve botón y con `as={Link}` + `to`, enlace |
 | `Etiqueta` | `tono`: `neutral` \| `exito` \| `aviso` \| `peligro` \| `info` \| `morado`; `icono` |
 | `Alerta` | Mensaje en línea que permanece: `tono` (`info` \| `exito` \| `aviso` \| `peligro`), `titulo`, `acciones`, `onCerrar`. Con `role="alert"` para errores; con `tabIndex={-1}` y `ref` para llevar el foco (resumen de errores de un formulario) |
