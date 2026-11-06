@@ -1,3 +1,4 @@
+const pool = require("../config/db");
 const modelo = require("../models/condiciones.model");
 const conceptos = require("../models/conceptos.model");
 const externos = require("./externos.service");
@@ -10,6 +11,8 @@ const {
   DETECTABLES,
   validarCondicion,
   validarEdicionCondicion,
+  validarAsignacion,
+  validarCambioFin,
   rangoPeriodo,
   bonosDetectados,
   bonosAsignados,
@@ -151,4 +154,125 @@ async function procesar({ periodo } = {}) {
   return listarBonos({ periodo });
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, listarBonos, procesar };
+const asignacionNoEncontrada = () => new ErrorApp(404, "Asignación no encontrada");
+const fechaCorta = (fecha) => fecha.split("-").reverse().join("/");
+
+const formatearAsignacion = (a) => ({
+  id_asignacion: a.id_asignacion,
+  id_condicion: a.id_condicion,
+  empleado: { id_empleado: a.id_empleado, nombre_completo: a.nombre_empleado, area: a.area },
+  vigente_desde: a.vigente_desde,
+  vigente_hasta: a.vigente_hasta,
+  motivo: a.motivo,
+  creado_en: a.creado_en,
+});
+
+function errorDeCruces(cruces) {
+  return new ErrorApp(
+    409,
+    "Algunos colaboradores ya tienen la condición en esas fechas",
+    cruces.map((a) => ({
+      campo: "ids_empleado",
+      mensaje: `${a.nombre_empleado} ya la tiene desde el ${fechaCorta(a.vigente_desde)}${
+        a.vigente_hasta ? ` hasta el ${fechaCorta(a.vigente_hasta)}` : ", sin fecha de fin"
+      }.`,
+    }))
+  );
+}
+
+function traducirCruce(error) {
+  if (error.code === "23P01") {
+    throw new ErrorApp(409, "La asignación se cruza con otra del mismo colaborador", [
+      { campo: "vigente_desde", mensaje: "Se cruza con otra asignación del colaborador." },
+    ]);
+  }
+  throw error;
+}
+
+async function asignable(id) {
+  const condicion = await buscar(id);
+  if (condicion.tipo_condicion !== "ASIGNACION") {
+    throw new ErrorApp(409, "Esta condición se detecta de las jornadas marcadas: no se asigna por colaborador.");
+  }
+  return condicion;
+}
+
+async function listarAsignaciones(id) {
+  await buscar(id);
+  return (await modelo.listarAsignaciones(id, hoyLaPaz())).map(formatearAsignacion);
+}
+
+// Nombre y área se copian de EmployeeService al asignar.
+async function asignar(id, datos) {
+  await asignable(id);
+  const { ids, vigente_desde, vigente_hasta, motivo } = validarAsignacion(datos);
+  const personal = new Map((await externos.listarPersonal()).map((e) => [String(e.id_empleado).toLowerCase(), e]));
+  const desconocidos = ids.filter((idEmpleado) => !personal.has(idEmpleado));
+  if (desconocidos.length > 0) {
+    throw new ErrorApp(400, "Datos de la asignación inválidos", [
+      { campo: "ids_empleado", mensaje: `No se encontraron ${desconocidos.length} de los colaboradores seleccionados.` },
+    ]);
+  }
+  const creadas = await enTransaccion(async (cliente) => {
+    const cruces = await modelo.asignacionesQueSeCruzan(cliente, id, ids, vigente_desde, vigente_hasta);
+    if (cruces.length > 0) throw errorDeCruces(cruces);
+    const filas = [];
+    for (const idEmpleado of ids) {
+      const empleado = personal.get(idEmpleado);
+      filas.push(
+        await modelo.crearAsignacion(cliente, id, {
+          id_empleado: idEmpleado,
+          nombre_empleado: empleado.nombre_completo,
+          area: empleado.area ?? null,
+          vigente_desde,
+          vigente_hasta,
+          motivo,
+        })
+      );
+    }
+    return filas;
+  }).catch(traducirCruce);
+  return creadas.map(formatearAsignacion);
+}
+
+async function buscarAsignacion(id, idAsignacion) {
+  await buscar(id);
+  const asignacion = UUID_RE.test(idAsignacion) ? await modelo.obtenerAsignacion(id, idAsignacion) : undefined;
+  if (!asignacion) throw asignacionNoEncontrada();
+  return asignacion;
+}
+
+async function cambiarFinAsignacion(id, idAsignacion, datos) {
+  const actual = await buscarAsignacion(id, idAsignacion);
+  const hasta = validarCambioFin(datos, actual.vigente_desde);
+  const cruces = await modelo.asignacionesQueSeCruzan(
+    pool,
+    id,
+    [actual.id_empleado],
+    actual.vigente_desde,
+    hasta,
+    idAsignacion
+  );
+  if (cruces.length > 0) throw errorDeCruces(cruces);
+  const editada = await modelo.cambiarFinAsignacion(idAsignacion, hasta).catch(traducirCruce);
+  return formatearAsignacion(editada);
+}
+
+async function eliminarAsignacion(id, idAsignacion) {
+  await buscarAsignacion(id, idAsignacion);
+  await modelo.eliminarAsignacion(idAsignacion);
+}
+
+module.exports = {
+  listar,
+  obtener,
+  crear,
+  actualizar,
+  eliminar,
+  listarBonos,
+  procesar,
+  listarAsignaciones,
+  asignar,
+  cambiarFinAsignacion,
+  eliminarAsignacion,
+};

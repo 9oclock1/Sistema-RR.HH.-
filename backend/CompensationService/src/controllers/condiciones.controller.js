@@ -29,4 +29,33 @@ async function procesar(req, res) {
   res.json(await servicio.procesar(req.body));
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, listarBonos, procesar };
+async function listarAsignaciones(req, res) {
+  res.json(await servicio.listarAsignaciones(req.params.id));
+}
+
+async function asignar(req, res) {
+  res.status(201).json(await servicio.asignar(req.params.id, req.body));
+}
+
+async function cambiarFinAsignacion(req, res) {
+  res.json(await servicio.cambiarFinAsignacion(req.params.id, req.params.idAsignacion, req.body));
+}
+
+async function eliminarAsignacion(req, res) {
+  await servicio.eliminarAsignacion(req.params.id, req.params.idAsignacion);
+  res.status(204).end();
+}
+
+module.exports = {
+  listar,
+  obtener,
+  crear,
+  actualizar,
+  eliminar,
+  listarBonos,
+  procesar,
+  listarAsignaciones,
+  asignar,
+  cambiarFinAsignacion,
+  eliminarAsignacion,
+};

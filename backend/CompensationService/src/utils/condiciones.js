@@ -1,5 +1,6 @@
 const { ErrorApp } = require("./errores");
-const { sumarDias } = require("./fechas");
+const { UUID_RE } = require("./formatos");
+const { esFecha, sumarDias } = require("./fechas");
 const { validarConcepto, validarEdicion } = require("./conceptos");
 
 const TIPOS_CONDICION = ["TRASNOCHE", "FERIADO", "ASIGNACION"];
@@ -166,11 +167,54 @@ function bonosAsignados(condiciones, asignaciones, { desde, hasta, dias }) {
   );
 }
 
+const MAXIMO_POR_ASIGNACION = 200;
+
+function validarFin(vigente_desde, vigente_hasta, errores) {
+  if (vigente_hasta === undefined || vigente_hasta === null || vigente_hasta === "") return null;
+  if (!esFecha(vigente_hasta)) errores.push({ campo: "vigente_hasta", mensaje: "Ingrese una fecha válida." });
+  else if (esFecha(vigente_desde) && vigente_hasta < vigente_desde) {
+    errores.push({ campo: "vigente_hasta", mensaje: "Debe ser igual o posterior a la fecha de inicio." });
+  }
+  return vigente_hasta;
+}
+
+// Una o varias personas con la misma condición y fechas (por ejemplo, todo el personal de congelados).
+function validarAsignacion(datos = {}) {
+  const errores = [];
+  const { ids_empleado, vigente_desde } = datos;
+  const motivo = typeof datos.motivo === "string" ? datos.motivo.trim() : "";
+  const ids = Array.isArray(ids_empleado) ? [...new Set(ids_empleado.map((id) => String(id).toLowerCase()))] : [];
+  if (ids.length === 0) errores.push({ campo: "ids_empleado", mensaje: "Seleccione al menos un colaborador." });
+  else if (ids.length > MAXIMO_POR_ASIGNACION) {
+    errores.push({ campo: "ids_empleado", mensaje: `Asigne hasta ${MAXIMO_POR_ASIGNACION} colaboradores a la vez.` });
+  } else if (!ids.every((id) => UUID_RE.test(id))) {
+    errores.push({ campo: "ids_empleado", mensaje: "Hay colaboradores inválidos." });
+  }
+  if (!esFecha(vigente_desde)) errores.push({ campo: "vigente_desde", mensaje: "Ingrese una fecha válida." });
+  const vigente_hasta = validarFin(vigente_desde, datos.vigente_hasta, errores);
+  if (motivo.length > 250) errores.push({ campo: "motivo", mensaje: "Use hasta 250 caracteres." });
+  if (errores.length > 0) throw new ErrorApp(400, "Datos de la asignación inválidos", errores);
+  return { ids, vigente_desde, vigente_hasta, motivo: motivo || null };
+}
+
+// Cambiar o quitar la fecha de fin de una asignación (por ejemplo, al dejar el área de congelados).
+function validarCambioFin(datos = {}, vigente_desde) {
+  const errores = [];
+  if (!("vigente_hasta" in datos)) {
+    errores.push({ campo: "vigente_hasta", mensaje: "Indique la fecha de fin o null para dejarla abierta." });
+  }
+  const vigente_hasta = validarFin(vigente_desde, datos.vigente_hasta, errores);
+  if (errores.length > 0) throw new ErrorApp(400, "Datos de la asignación inválidos", errores);
+  return vigente_hasta;
+}
+
 module.exports = {
   TIPOS_CONDICION,
   DETECTABLES,
   validarCondicion,
   validarEdicionCondicion,
+  validarAsignacion,
+  validarCambioFin,
   rangoPeriodo,
   vigenciaEn,
   cumpleCondicion,

@@ -132,11 +132,76 @@ async function listarBonos(idProceso) {
   return rows;
 }
 
+const COLUMNAS_ASIGNACION = `id_asignacion, id_condicion, id_empleado, nombre_empleado, area,
+  vigente_desde, vigente_hasta, motivo, creado_en`;
+
+// Primero las vigentes o programadas (las que no terminaron antes de `hoy`).
+async function listarAsignaciones(idCondicion, hoy) {
+  const { rows } = await pool.query(
+    `SELECT ${COLUMNAS_ASIGNACION} FROM asignaciones_condicion
+     WHERE id_condicion = $1
+     ORDER BY (vigente_hasta IS NULL OR vigente_hasta >= $2) DESC, nombre_empleado, vigente_desde DESC`,
+    [idCondicion, hoy]
+  );
+  return rows;
+}
+
+async function obtenerAsignacion(idCondicion, idAsignacion) {
+  const { rows } = await pool.query(
+    `SELECT ${COLUMNAS_ASIGNACION} FROM asignaciones_condicion WHERE id_condicion = $1 AND id_asignacion = $2`,
+    [idCondicion, idAsignacion]
+  );
+  return rows[0];
+}
+
+// Asignaciones de esos colaboradores que se cruzan con las fechas pedidas (sin contar `excluir`).
+async function asignacionesQueSeCruzan(db, idCondicion, ids, desde, hasta, excluir = null) {
+  const { rows } = await db.query(
+    `SELECT ${COLUMNAS_ASIGNACION} FROM asignaciones_condicion
+     WHERE id_condicion = $1 AND id_empleado = ANY($2::uuid[])
+       AND daterange(vigente_desde, vigente_hasta, '[]') && daterange($3::date, $4::date, '[]')
+       AND ($5::uuid IS NULL OR id_asignacion <> $5)
+     ORDER BY nombre_empleado`,
+    [idCondicion, ids, desde, hasta, excluir]
+  );
+  return rows;
+}
+
+async function crearAsignacion(cliente, idCondicion, a) {
+  const { rows } = await cliente.query(
+    `INSERT INTO asignaciones_condicion (id_condicion, id_empleado, nombre_empleado, area, vigente_desde, vigente_hasta, motivo)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING ${COLUMNAS_ASIGNACION}`,
+    [idCondicion, a.id_empleado, a.nombre_empleado, a.area, a.vigente_desde, a.vigente_hasta, a.motivo]
+  );
+  return rows[0];
+}
+
+async function cambiarFinAsignacion(idAsignacion, hasta) {
+  const { rows } = await pool.query(
+    `UPDATE asignaciones_condicion SET vigente_hasta = $1, actualizado_en = CURRENT_TIMESTAMP
+     WHERE id_asignacion = $2 RETURNING ${COLUMNAS_ASIGNACION}`,
+    [hasta, idAsignacion]
+  );
+  return rows[0];
+}
+
+async function eliminarAsignacion(idAsignacion) {
+  const { rowCount } = await pool.query("DELETE FROM asignaciones_condicion WHERE id_asignacion = $1", [idAsignacion]);
+  return rowCount;
+}
+
 module.exports = {
   listar,
   obtener,
   crear,
   actualizarMinutos,
+  listarAsignaciones,
+  obtenerAsignacion,
+  asignacionesQueSeCruzan,
+  crearAsignacion,
+  cambiarFinAsignacion,
+  eliminarAsignacion,
   activasConVigencias,
   asignacionesEnRango,
   reemplazarProceso,
