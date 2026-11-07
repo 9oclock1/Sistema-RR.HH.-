@@ -32,6 +32,7 @@ export default function FormularioDerivacion({ caso, sesion, catalogos, responsa
   const enConflicto = useMemo(() => idsEnConflicto(caso), [caso]);
   const conflicto = Boolean(idResponsable) && (enConflicto.has(idResponsable) || conflictoServidor);
   const idActual = caso.responsable?.id_empleado;
+  const idDenunciante = caso.denunciante?.id_empleado;
 
   const opcionesResponsable = useMemo(
     () =>
@@ -39,7 +40,8 @@ export default function FormularioDerivacion({ caso, sesion, catalogos, responsa
         const partes = [persona.nombre_completo, persona.cargo].filter(Boolean).join(" · ");
         const marcas = [
           MOTIVOS_RESPONSABLE[persona.motivo],
-          enConflicto.has(persona.id_empleado) && "involucrado",
+          enConflicto.has(persona.id_empleado) &&
+            (persona.id_empleado === idDenunciante ? "presentó la queja" : "involucrado"),
           persona.id_empleado === idActual && "responsable actual",
         ].filter(Boolean);
         return {
@@ -48,7 +50,7 @@ export default function FormularioDerivacion({ caso, sesion, catalogos, responsa
           deshabilitada: persona.id_empleado === idActual,
         };
       }),
-    [responsables.lista, enConflicto, idActual],
+    [responsables.lista, enConflicto, idActual, idDenunciante],
   );
 
   const datos = { idCategoria, idPrioridad, idResponsable, comentario };
@@ -175,7 +177,10 @@ export default function FormularioDerivacion({ caso, sesion, catalogos, responsa
 
         {conflicto && (
           <Alerta ref={refConflicto} tabIndex={-1} tono="peligro" role="alert" titulo="Conflicto de interés">
-            La persona elegida está involucrada en esta queja, así que no puede atenderla. Derive el caso a otra persona.
+            {idResponsable === idDenunciante
+              ? "La persona elegida presentó esta queja, así que no puede atenderla."
+              : "La persona elegida está involucrada en esta queja, así que no puede atenderla."}{" "}
+            Derive el caso a otra persona.
           </Alerta>
         )}
 
