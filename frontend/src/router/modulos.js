@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardPenLine, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, MoonStar, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, MoonStar, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
@@ -27,6 +27,7 @@ import MisMemorandumsPage from "../features/Memorandums/acuses/MisMemorandumsPag
 import MiAsistenciaPage from "../features/mi-asistencia/MiAsistenciaPage";
 import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
+import PlantillasEvaluacionPage from "../features/plantillas-evaluacion/PlantillasEvaluacionPage";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import PipelineSeleccionPage from "../features/recruitment/pipeline/PipelineSeleccionPage";
 import AgendaEntrevistasPage from "../features/recruitment/entrevistas/AgendaEntrevistasPage";
@@ -333,6 +334,14 @@ export const SECCIONES = [
   {
     titulo: "Desempeño",
     modulos: [
+      {
+        ruta: "/desempeno/plantillas",
+        etiqueta: "Plantillas de evaluación",
+        descripcion: "Criterios, preguntas ponderadas y escalas de valoración, con control de versiones.",
+        icono: ClipboardList,
+        roles: ["admin"],
+        pagina: PlantillasEvaluacionPage,
+      },
       {
         ruta: RUTA_EVALUACIONES,
         parametroOpcional: "idEvaluacion",
