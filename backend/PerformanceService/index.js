@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const pool = require("./src/config/db");
 const evaluacionesRoutes = require("./src/routes/evaluacionesRoutes");
+const plantillasRoutes = require("./src/routes/plantillasRoutes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 
 const app = express();
@@ -34,6 +35,7 @@ app.get("/health", async (req, res) => {
 });
 
 app.use(evaluacionesRoutes);
+app.use(plantillasRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
