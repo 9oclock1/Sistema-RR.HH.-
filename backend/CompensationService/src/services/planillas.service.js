@@ -17,12 +17,6 @@ const nombreMes = (periodo) =>
 const yaAprobada = (periodo) =>
   new ErrorApp(409, `La planilla de ${nombreMes(periodo)} ya fue aprobada: no se puede volver a generar ni modificar.`);
 
-// El disparador de la base rechaza cambios en una planilla aprobada (SQLSTATE PL001).
-function traducirBloqueo(error) {
-  if (error.code === "PL001") throw new ErrorApp(409, error.message);
-  throw error;
-}
-
 const formatearPlanilla = (p) => ({
   id_planilla: p.id_planilla,
   periodo: p.periodo,
@@ -153,10 +147,10 @@ async function generar(datos = {}, identidad = {}) {
     const actual = await modelo.bloquearPeriodo(cliente, periodo);
     if (actual && actual.estado !== "BORRADOR") throw yaAprobada(periodo);
     const idPlanilla = actual ? actual.id_planilla : await modelo.crear(cliente, cabecera);
-    if (actual) await modelo.reemplazar(cliente, idPlanilla, cabecera);
+    if (actual && !(await modelo.reemplazar(cliente, idPlanilla, cabecera))) throw yaAprobada(periodo);
     await modelo.guardarEmpleados(cliente, idPlanilla, empleados);
     return { id: idPlanilla, creada: !actual };
-  }).catch(traducirBloqueo);
+  });
 
   return { creada, planilla: await obtener(id) };
 }
@@ -169,11 +163,10 @@ async function descartar(id, identidad = {}) {
   await enTransaccion(async (cliente) => {
     const planilla = await modelo.bloquear(cliente, id);
     if (!planilla) throw noEncontrada();
-    if (planilla.estado !== "BORRADOR") {
-      throw new ErrorApp(409, `La planilla de ${nombreMes(planilla.periodo)} ya fue aprobada: no se puede descartar.`);
-    }
-    await modelo.eliminar(cliente, id);
-  }).catch(traducirBloqueo);
+    const noSeDescarta = () =>
+      new ErrorApp(409, `La planilla de ${nombreMes(planilla.periodo)} ya fue aprobada: no se puede descartar.`);
+    if (planilla.estado !== "BORRADOR" || !(await modelo.eliminar(cliente, id))) throw noSeDescarta();
+  });
 }
 
 // Criterio 2: el Administrador aprueba el borrador y la planilla queda bloqueada para edición.
@@ -196,8 +189,10 @@ async function aprobar(id, identidad = {}) {
     if ((await modelo.contarEmpleados(cliente, id)) === 0) {
       throw new ErrorApp(409, `La planilla de ${mes} no tiene colaboradores: no se puede aprobar.`);
     }
-    await modelo.aprobar(cliente, id, { idEmpleado: idResponsable, nombre });
-  }).catch(traducirBloqueo);
+    if (!(await modelo.aprobar(cliente, id, { idEmpleado: idResponsable, nombre }))) {
+      throw new ErrorApp(409, `La planilla de ${mes} ya fue aprobada.`);
+    }
+  });
   return obtener(id);
 }
 

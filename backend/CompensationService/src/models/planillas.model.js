@@ -75,15 +75,18 @@ async function crear(cliente, c) {
   return rows[0].id_planilla;
 }
 
-// Volver a generar un borrador: misma planilla, datos nuevos.
+// Volver a generar un borrador: misma planilla, datos nuevos. Solo cambia mientras está en borrador
+// (sin triggers: cada escritura lleva la condición). Devuelve false si ya no era borrador.
 async function reemplazar(cliente, id, c) {
-  await cliente.query("DELETE FROM planilla_empleados WHERE id_planilla = $1", [id]);
-  await cliente.query(
+  const { rowCount } = await cliente.query(
     `UPDATE planillas SET datos_hasta = $2, advertencias = $3, generada_por = $4, generada_por_nombre = $5,
             generada_en = CURRENT_TIMESTAMP
-     WHERE id_planilla = $1`,
+     WHERE id_planilla = $1 AND estado = 'BORRADOR'`,
     [id, c.datos_hasta, c.advertencias, c.generada_por, c.generada_por_nombre]
   );
+  if (rowCount === 0) return false;
+  await cliente.query("DELETE FROM planilla_empleados WHERE id_planilla = $1", [id]);
+  return true;
 }
 
 async function guardarEmpleados(cliente, idPlanilla, empleados) {
@@ -122,15 +125,17 @@ async function listarEmpleados(id) {
 }
 
 async function eliminar(cliente, id) {
-  await cliente.query("DELETE FROM planillas WHERE id_planilla = $1", [id]);
+  const { rowCount } = await cliente.query("DELETE FROM planillas WHERE id_planilla = $1 AND estado = 'BORRADOR'", [id]);
+  return rowCount === 1;
 }
 
 async function aprobar(cliente, id, { idEmpleado, nombre }) {
-  await cliente.query(
+  const { rowCount } = await cliente.query(
     `UPDATE planillas SET estado = 'APROBADA', aprobada_por = $2, aprobada_por_nombre = $3, aprobada_en = CURRENT_TIMESTAMP
-     WHERE id_planilla = $1`,
+     WHERE id_planilla = $1 AND estado = 'BORRADOR'`,
     [id, idEmpleado, nombre]
   );
+  return rowCount === 1;
 }
 
 async function contarEmpleados(cliente, id) {

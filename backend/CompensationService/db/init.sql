@@ -145,7 +145,8 @@ CREATE TABLE BONOS_CONDICION (
 CREATE INDEX idx_bonos_condicion_proceso ON BONOS_CONDICION (id_proceso);
 CREATE INDEX idx_bonos_condicion_empleado ON BONOS_CONDICION (id_empleado);
 -- Tabla: PLANILLAS
--- Planilla mensual (periodo AAAA-MM): BORRADOR → APROBADA → CERRADA. Fuera de borrador no se edita.
+-- Planilla mensual (periodo AAAA-MM): BORRADOR → APROBADA → CERRADA. Fuera de borrador no se edita ni se
+-- elimina, ni cambia su detalle: lo valida el servicio (sin triggers, por decisión del equipo).
 -- datos_hasta: último día consolidado; en el mes en curso llega hasta ayer y solo se aprueba el mes completo.
 -- Contabilidad y Pagos confirman por separado; con ambas confirmaciones la planilla se cierra.
 CREATE TABLE PLANILLAS (
@@ -284,65 +285,6 @@ CREATE TABLE EVENTOS_SALIENTES (
 );
 CREATE INDEX idx_eventos_salientes_pendientes ON EVENTOS_SALIENTES (estado, proximo_intento_en);
 CREATE INDEX idx_eventos_salientes_planilla ON EVENTOS_SALIENTES (id_planilla);
--- funciones
--- Una planilla aprobada o cerrada queda bloqueada: no se edita ni se elimina. Solo avanza de estado
--- (BORRADOR → APROBADA → CERRADA) y registra las confirmaciones de Contabilidad y Pagos.
-CREATE FUNCTION fn_planilla_bloqueada() RETURNS trigger AS $$
-BEGIN
-    IF TG_OP = 'DELETE' THEN
-        IF OLD.estado <> 'BORRADOR' THEN
-            RAISE EXCEPTION 'La planilla % ya fue aprobada: no se puede eliminar.', OLD.periodo USING ERRCODE = 'PL001';
-        END IF;
-        RETURN OLD;
-    END IF;
-    IF OLD.estado <> 'BORRADOR' AND (
-        NEW.periodo, NEW.fecha_inicio, NEW.fecha_fin, NEW.datos_hasta, NEW.advertencias, NEW.generada_por,
-        NEW.generada_por_nombre, NEW.generada_en, NEW.aprobada_por, NEW.aprobada_por_nombre, NEW.aprobada_en
-    ) IS DISTINCT FROM (
-        OLD.periodo, OLD.fecha_inicio, OLD.fecha_fin, OLD.datos_hasta, OLD.advertencias, OLD.generada_por,
-        OLD.generada_por_nombre, OLD.generada_en, OLD.aprobada_por, OLD.aprobada_por_nombre, OLD.aprobada_en
-    ) THEN
-        RAISE EXCEPTION 'La planilla % ya fue aprobada: no se puede modificar.', OLD.periodo USING ERRCODE = 'PL001';
-    END IF;
-    IF NEW.estado <> OLD.estado AND NOT (
-        (OLD.estado = 'BORRADOR' AND NEW.estado = 'APROBADA') OR (OLD.estado = 'APROBADA' AND NEW.estado = 'CERRADA')
-    ) THEN
-        RAISE EXCEPTION 'La planilla % no puede pasar de % a %.', OLD.periodo, OLD.estado, NEW.estado USING ERRCODE = 'PL001';
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
--- El detalle de una planilla aprobada no cambia. Al eliminar un borrador, su detalle se borra en cascada.
-CREATE FUNCTION fn_detalle_planilla_bloqueado() RETURNS trigger AS $$
-DECLARE
-    v_fila record;
-    v_planilla UUID;
-    v_estado varchar(10);
-BEGIN
-    IF TG_OP = 'DELETE' THEN
-        v_fila := OLD;
-    ELSE
-        v_fila := NEW;
-    END IF;
-    IF TG_TABLE_NAME = 'planilla_empleados' THEN
-        v_planilla := v_fila.id_planilla;
-    ELSE
-        SELECT pe.id_planilla INTO v_planilla FROM planilla_empleados pe
-        WHERE pe.id_planilla_empleado = v_fila.id_planilla_empleado;
-    END IF;
-    SELECT estado INTO v_estado FROM planillas WHERE id_planilla = v_planilla;
-    IF v_estado IS NOT NULL AND v_estado <> 'BORRADOR' THEN
-        RAISE EXCEPTION 'La planilla ya fue aprobada: su detalle no se puede modificar.' USING ERRCODE = 'PL001';
-    END IF;
-    RETURN v_fila;
-END;
-$$ LANGUAGE plpgsql;
-CREATE TRIGGER trg_planilla_bloqueada BEFORE UPDATE OR DELETE ON PLANILLAS
-    FOR EACH ROW EXECUTE FUNCTION fn_planilla_bloqueada();
-CREATE TRIGGER trg_planilla_empleados_bloqueado BEFORE INSERT OR UPDATE OR DELETE ON PLANILLA_EMPLEADOS
-    FOR EACH ROW EXECUTE FUNCTION fn_detalle_planilla_bloqueado();
-CREATE TRIGGER trg_novedades_planilla_bloqueado BEFORE INSERT OR UPDATE OR DELETE ON NOVEDADES_PLANILLA
-    FOR EACH ROW EXECUTE FUNCTION fn_detalle_planilla_bloqueado();
 -- datos iniciales
 -- Aportes de ley sobre el total ganado (Ley 065 de Pensiones y seguridad social de corto plazo).
 -- Cuentas contables referenciales: ajustar al plan de cuentas de Contabilidad.
