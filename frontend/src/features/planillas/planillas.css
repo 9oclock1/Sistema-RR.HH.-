@@ -123,3 +123,42 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Cálculo (KAN-64) */
+.planilla-alerta-fila {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+}
+
+.planilla-negativo {
+  color: var(--color-danger-text);
+}
+
+.planilla-calculo__grupo {
+  display: flex;
+  flex-direction: column;
+}
+
+.planilla-calculo__subtitulo {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+}
+
+.planilla-calculo__total,
+.planilla-calculo__liquido {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-2) 0;
+  font-weight: var(--font-weight-semibold);
+}
+
+.planilla-calculo__liquido {
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-page);
+  font-size: var(--font-size-section);
+}

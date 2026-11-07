@@ -1,4 +1,4 @@
-import { Boton, Modal } from "../../components/ui";
+import { Alerta, Boton, Modal } from "../../components/ui";
 import { formatearFecha, formatearValor } from "../conceptos/formato";
 import { formatearBs, formatearHoras, plural, TIPOS_MINUTOS } from "./formato";
 
@@ -11,9 +11,46 @@ function Dato({ termino, children }) {
   );
 }
 
+// "12,71 % sobre Bs 3.976,67 · 27 de 30 días"
+function describir(r) {
+  const valor = formatearValor(r.valor, r.forma_calculo);
+  const base = r.forma_calculo === "PORCENTAJE" && r.base !== null ? `${valor} sobre ${formatearBs(r.base)}` : valor;
+  return [base, r.detalle].filter(Boolean).join(" · ");
+}
+
+// Renglones de un tipo (ingresos, descuentos o aportes) con su total.
+function GrupoCalculo({ id, titulo, renglones, total, etiquetaTotal, vacio }) {
+  return (
+    <div className="planilla-calculo__grupo" aria-labelledby={id} role="group">
+      <h4 id={id} className="planilla-calculo__subtitulo">
+        {titulo}
+      </h4>
+      {renglones.length === 0 ? (
+        <p className="concepto-nota">{vacio}</p>
+      ) : (
+        <ul className="planilla-detalle__bonos">
+          {renglones.map((r) => (
+            <li key={r.orden}>
+              <div className="conceptos-nombre">
+                <span>{r.nombre}</span>
+                <span className="conceptos-nota">{describir(r)}</span>
+              </div>
+              <span className="planilla-cifra">{formatearBs(r.resultado)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="planilla-calculo__total">
+        <span>{etiquetaTotal}</span>
+        <span className="planilla-cifra">{formatearBs(total)}</span>
+      </p>
+    </div>
+  );
+}
+
 // Novedades consolidadas de un colaborador: contrato, días, atrasos, horas y bonos del mes.
 export default function DetalleColaboradorModal({ fila, onCerrar }) {
-  const { empleado, contrato, dias, atrasos, minutos, novedades, observaciones } = fila;
+  const { empleado, contrato, dias, atrasos, minutos, novedades, observaciones, calculo, alertas } = fila;
   const subtitulo = [empleado.cargo, empleado.area, empleado.sucursal].filter(Boolean).join(" · ");
 
   return (
@@ -36,6 +73,16 @@ export default function DetalleColaboradorModal({ fila, onCerrar }) {
           </p>
         )}
 
+        {alertas.length > 0 && (
+          <Alerta tono="peligro" titulo="Inconsistencias del cálculo">
+            <ul className="planilla-advertencias">
+              {alertas.map((texto) => (
+                <li key={texto}>{texto}</li>
+              ))}
+            </ul>
+          </Alerta>
+        )}
+
         {observaciones.length > 0 && (
           <ul className="planilla-detalle__observaciones">
             {observaciones.map((texto) => (
@@ -43,6 +90,40 @@ export default function DetalleColaboradorModal({ fila, onCerrar }) {
             ))}
           </ul>
         )}
+
+        <section aria-labelledby="detalle-calculo" className="planilla-calculo">
+          <h3 id="detalle-calculo" className="planilla-detalle__titulo">
+            Cálculo
+          </h3>
+          <GrupoCalculo
+            id="calculo-ingresos"
+            titulo="Haberes"
+            renglones={calculo.ingresos}
+            total={calculo.total_ganado}
+            etiquetaTotal="Total ganado"
+            vacio="Sin haberes en el mes."
+          />
+          <GrupoCalculo
+            id="calculo-descuentos"
+            titulo="Descuentos"
+            renglones={calculo.descuentos}
+            total={calculo.total_descuentos}
+            etiquetaTotal="Total descuentos"
+            vacio="Sin descuentos en el mes."
+          />
+          <p className={`planilla-calculo__liquido${calculo.liquido_pagable < 0 ? " planilla-negativo" : ""}`}>
+            <span>Líquido pagable</span>
+            <span className="planilla-cifra">{formatearBs(calculo.liquido_pagable)}</span>
+          </p>
+          <GrupoCalculo
+            id="calculo-aportes"
+            titulo="Aportes patronales (a cargo del empleador)"
+            renglones={calculo.aportes}
+            total={calculo.total_aportes}
+            etiquetaTotal="Total aportes patronales"
+            vacio="Sin aportes patronales."
+          />
+        </section>
 
         <section aria-labelledby="detalle-contrato">
           <h3 id="detalle-contrato" className="planilla-detalle__titulo">

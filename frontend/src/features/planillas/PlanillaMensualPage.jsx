@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { FileSpreadsheet, ListChecks, RefreshCw, Search, Trash2 } from "lucide-react";
+import { FileSpreadsheet, ListChecks, RefreshCw, Search, Trash2, TriangleAlert } from "lucide-react";
 import { descartarPlanilla, generarPlanilla, listarPlanillas, obtenerPlanilla } from "../../api/planillas";
 import {
   Alerta,
   Boton,
   CampoTexto,
+  Casilla,
   EncabezadoPagina,
   EstadoVacio,
   Etiqueta,
@@ -17,29 +18,24 @@ import {
 import { useRol, useUsuario } from "../../context/sesion";
 import { formatearFecha } from "../conceptos/formato";
 import { formatearMes, formatearMomento, mesActual } from "../condiciones/formato";
-// Nombre del mes dentro de una frase: "planilla de octubre de 2026".
-const nombreMes = (periodo) => formatearMes(periodo).toLowerCase();
 import DetalleColaboradorModal from "./DetalleColaboradorModal";
-import { ESTADOS_PLANILLA, formatearBs, formatearHoras, mesAnterior, minutosExtra, plural } from "./formato";
+import { ESTADOS_PLANILLA, formatearBs, mesAnterior, plural } from "./formato";
 import "../conceptos/conceptos.css";
 import "./planillas.css";
 
 const PERIODO_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const RUTA_HORAS_EXTRA = "/asistencia/horas-extra";
 
+// Nombre del mes dentro de una frase: "planilla de octubre de 2026".
+const nombreMes = (periodo) => formatearMes(periodo).toLowerCase();
+
 const normalizar = (texto) =>
   (texto ?? "")
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/\p{Diacritic}/gu, "")
     .toLowerCase();
 
-function faltasYLicencias({ dias }) {
-  const partes = [];
-  if (dias.faltas_injustificadas) partes.push(plural(dias.faltas_injustificadas, "falta", "faltas"));
-  if (dias.licencia_sin_goce) partes.push(`${dias.licencia_sin_goce} sin goce`);
-  if (dias.licencia_con_goce) partes.push(`${dias.licencia_con_goce} con goce`);
-  return partes.length > 0 ? partes.join(" · ") : "—";
-}
+const cifra = (valor) => <span className="planilla-cifra">{formatearBs(valor)}</span>;
 
 function columnas(onDetalle) {
   return [
@@ -50,15 +46,13 @@ function columnas(onDetalle) {
         <div className="conceptos-nombre">
           <span>{f.empleado.nombre_completo}</span>
           <span className="conceptos-nota">{[f.empleado.cargo, f.empleado.area].filter(Boolean).join(" · ")}</span>
+          {f.alertas.length > 0 && (
+            <Etiqueta tono="peligro" icono={TriangleAlert} className="planilla-alerta-fila">
+              {plural(f.alertas.length, "inconsistencia", "inconsistencias")}
+            </Etiqueta>
+          )}
         </div>
       ),
-    },
-    {
-      clave: "haber",
-      titulo: "Haber mensual",
-      ancho: "13%",
-      alinear: "fin",
-      celda: (f) => <span className="planilla-cifra">{formatearBs(f.contrato.haber_mensual)}</span>,
     },
     {
       clave: "dias",
@@ -71,27 +65,19 @@ function columnas(onDetalle) {
         </span>
       ),
     },
-    { clave: "faltas", titulo: "Faltas y licencias", ancho: "17%", celda: faltasYLicencias },
+    { clave: "haber", titulo: "Haber mensual", ancho: "13%", alinear: "fin", celda: (f) => cifra(f.contrato.haber_mensual) },
+    { clave: "ganado", titulo: "Total ganado", ancho: "13%", alinear: "fin", celda: (f) => cifra(f.calculo.total_ganado) },
+    { clave: "descuentos", titulo: "Descuentos", ancho: "12%", alinear: "fin", celda: (f) => cifra(f.calculo.total_descuentos) },
     {
-      clave: "atrasos",
-      titulo: "Atrasos",
-      ancho: "10%",
+      clave: "liquido",
+      titulo: "Líquido pagable",
+      ancho: "14%",
       alinear: "fin",
-      celda: (f) => <span className="planilla-cifra">{f.atrasos.minutos ? `${f.atrasos.minutos} min` : "—"}</span>,
-    },
-    {
-      clave: "extra",
-      titulo: "Horas extra",
-      ancho: "10%",
-      alinear: "fin",
-      celda: (f) => <span className="planilla-cifra">{formatearHoras(minutosExtra(f.minutos))}</span>,
-    },
-    {
-      clave: "bonos",
-      titulo: "Bonos",
-      ancho: "7%",
-      alinear: "fin",
-      celda: (f) => <span className="planilla-cifra">{f.novedades.length || "—"}</span>,
+      celda: (f) => (
+        <strong className={`planilla-cifra${f.calculo.liquido_pagable < 0 ? " planilla-negativo" : ""}`}>
+          {formatearBs(f.calculo.liquido_pagable)}
+        </strong>
+      ),
     },
     {
       clave: "acciones",
@@ -122,23 +108,20 @@ function Resumen({ planilla }) {
         <dd>{totales.colaboradores}</dd>
       </div>
       <div>
-        <dt>Días a pagar</dt>
-        <dd>{totales.dias_pagados}</dd>
+        <dt>Total ganado</dt>
+        <dd className="planilla-cifra">{formatearBs(totales.total_ganado)}</dd>
       </div>
       <div>
-        <dt>Faltas injustificadas</dt>
-        <dd>{totales.faltas_injustificadas}</dd>
+        <dt>Descuentos</dt>
+        <dd className="planilla-cifra">{formatearBs(totales.total_descuentos)}</dd>
       </div>
       <div>
-        <dt>Horas extra</dt>
-        <dd>{formatearHoras(totales.minutos_extra)}</dd>
+        <dt>Líquido pagable</dt>
+        <dd className="planilla-cifra">{formatearBs(totales.liquido_pagable)}</dd>
       </div>
       <div>
-        <dt>Bonos</dt>
-        <dd>
-          {totales.bonos}
-          {totales.bonos_monto_fijo > 0 && <span className="conceptos-nota"> · {formatearBs(totales.bonos_monto_fijo)}</span>}
-        </dd>
+        <dt>Aportes patronales</dt>
+        <dd className="planilla-cifra">{formatearBs(totales.total_aportes)}</dd>
       </div>
     </dl>
   );
@@ -157,6 +140,7 @@ export default function PlanillaMensualPage() {
   const [descartando, setDescartando] = useState(false);
   const [detalle, setDetalle] = useState(null);
   const [busqueda, setBusqueda] = useState("");
+  const [soloAlertas, setSoloAlertas] = useState(false);
   const valido = PERIODO_RE.test(periodo) && periodo <= mesActual();
 
   useEffect(() => {
@@ -180,16 +164,18 @@ export default function PlanillaMensualPage() {
 
   const filas = useMemo(() => {
     const texto = normalizar(busqueda.trim());
-    const empleados = planilla?.empleados ?? [];
-    if (!texto) return empleados;
-    return empleados.filter((f) =>
-      normalizar([f.empleado.nombre_completo, f.empleado.cargo, f.empleado.area].join(" ")).includes(texto)
+    return (planilla?.empleados ?? []).filter(
+      (f) =>
+        (!soloAlertas || f.alertas.length > 0) &&
+        (!texto || normalizar([f.empleado.nombre_completo, f.empleado.cargo, f.empleado.area].join(" ")).includes(texto))
     );
-  }, [planilla, busqueda]);
+  }, [planilla, busqueda, soloAlertas]);
+  const filtrando = Boolean(busqueda.trim()) || soloAlertas;
 
   const cambiarPeriodo = (valor) => {
     setPeriodo(valor);
     setBusqueda("");
+    setSoloAlertas(false);
   };
 
   const reintentar = () => {
@@ -350,6 +336,13 @@ export default function PlanillaMensualPage() {
                   </Alerta>
                 )}
 
+                {planilla.totales.con_alertas > 0 && (
+                  <Alerta tono="peligro" titulo="Hay inconsistencias en el cálculo">
+                    {plural(planilla.totales.con_alertas, "colaborador tiene", "colaboradores tienen")} alertas de
+                    inconsistencia. La planilla no se puede aprobar hasta corregirlas y volver a generarla.
+                  </Alerta>
+                )}
+
                 <Resumen planilla={planilla} />
 
                 <div className="conceptos-filtros planilla-filtros">
@@ -361,8 +354,16 @@ export default function PlanillaMensualPage() {
                     onChange={(evento) => setBusqueda(evento.target.value)}
                     placeholder="Nombre, cargo o área"
                   />
+                  {planilla.totales.con_alertas > 0 && (
+                    <Casilla
+                      id="planilla-solo-alertas"
+                      etiqueta="Solo con inconsistencias"
+                      checked={soloAlertas}
+                      onChange={(evento) => setSoloAlertas(evento.target.checked)}
+                    />
+                  )}
                   <p className="conceptos-total" role="status">
-                    {busqueda.trim()
+                    {filtrando
                       ? `${filas.length} de ${plural(planilla.empleados.length, "colaborador", "colaboradores")}`
                       : plural(planilla.empleados.length, "colaborador", "colaboradores")}
                   </p>
@@ -381,9 +382,9 @@ export default function PlanillaMensualPage() {
               vacio={
                 <EstadoVacio
                   icono={Search}
-                  titulo={busqueda.trim() ? "Nadie coincide con la búsqueda" : "La planilla no tiene colaboradores"}
+                  titulo={filtrando ? "Nadie coincide con la búsqueda" : "La planilla no tiene colaboradores"}
                   mensaje={
-                    busqueda.trim()
+                    filtrando
                       ? "Pruebe con otro nombre, cargo o área."
                       : "Ningún colaborador tiene contrato en el mes. Revise los contratos y vuelva a generarla."
                   }
