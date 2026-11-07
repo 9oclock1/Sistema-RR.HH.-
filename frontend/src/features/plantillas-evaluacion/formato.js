@@ -72,3 +72,5 @@ export const resumirSecciones = (competencias) => {
     .filter(Boolean)
     .join(" · ");
 };
+
+export const hoyLaPaz = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/La_Paz" }).format(new Date());

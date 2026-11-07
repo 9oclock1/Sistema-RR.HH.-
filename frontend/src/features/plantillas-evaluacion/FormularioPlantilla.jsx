@@ -1,5 +1,6 @@
 import { Boton, CampoAreaTexto, CampoTexto, Modal, Selector } from "../../components/ui";
 import useFormularioPlantilla from "./useFormularioPlantilla";
+import { validarDatosPlantilla } from "./validacionPlantilla";
 
 const ETIQUETAS = {
   nombre: "Nombre",
@@ -27,6 +28,8 @@ export default function FormularioPlantilla({ plantilla, departamentos, errorAre
     etiquetas: ETIQUETAS,
     prefijo: "plantilla",
     onGuardar,
+    validar: validarDatosPlantilla,
+    tituloConflicto: "Ya existe una plantilla igual",
   });
 
   const opcionesArea = departamentos.map((d) => ({ valor: d.id_departamento, etiqueta: d.nombre }));

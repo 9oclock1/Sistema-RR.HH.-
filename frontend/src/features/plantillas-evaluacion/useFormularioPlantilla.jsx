@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Alerta } from "../../components/ui";
 
-// Estado de un formulario con los errores por campo que devuelve el backend y un resumen que recibe el foco
-// tras un envío fallido.
-export default function useFormularioPlantilla({ inicial, etiquetas, prefijo, onGuardar }) {
+export default function useFormularioPlantilla({ inicial, etiquetas, prefijo, onGuardar, validar, tituloConflicto }) {
   const [valores, setValores] = useState(inicial);
   const [error, setError] = useState(null);
   const [enviando, setEnviando] = useState(false);
@@ -29,6 +27,12 @@ export default function useFormularioPlantilla({ inicial, etiquetas, prefijo, on
 
   const enviar = async (evento) => {
     evento.preventDefault();
+    const camposInvalidos = validar?.(valores) ?? {};
+    if (Object.keys(camposInvalidos).length > 0) {
+      setError({ general: null, campos: camposInvalidos });
+      setEnviosFallidos((total) => total + 1);
+      return;
+    }
     setEnviando(true);
     setError(null);
     try {
@@ -36,7 +40,12 @@ export default function useFormularioPlantilla({ inicial, etiquetas, prefijo, on
       setEnviando(false);
     } catch (errorGuardado) {
       const campos = Object.fromEntries((errorGuardado.detalles ?? []).map((d) => [d.campo, d.mensaje]));
-      setError({ general: Object.keys(campos).length ? null : errorGuardado.message, campos });
+      setError({
+        general: Object.keys(campos).length ? null : errorGuardado.message,
+        campos,
+        estado: errorGuardado.estado,
+        mensaje: errorGuardado.message,
+      });
       setEnviosFallidos((total) => total + 1);
       setEnviando(false);
     }
@@ -59,8 +68,16 @@ export default function useFormularioPlantilla({ inicial, etiquetas, prefijo, on
   // En el orden del formulario, no en el que llegan del backend.
   const orden = Object.keys(etiquetas);
   const erroresCampos = Object.entries(error?.campos ?? {}).sort(([a], [b]) => orden.indexOf(a) - orden.indexOf(b));
+  const hayConflicto = error?.estado === 409 && Boolean(tituloConflicto);
   const resumen = (Boolean(error?.general) || erroresCampos.length > 0) && (
-    <Alerta ref={refResumen} tabIndex={-1} tono="peligro" role="alert" titulo={error.general ?? "Revise los campos marcados."}>
+    <Alerta
+      ref={refResumen}
+      tabIndex={-1}
+      tono={hayConflicto ? "aviso" : "peligro"}
+      role="alert"
+      titulo={hayConflicto ? tituloConflicto : (error.general ?? "Revise los campos marcados.")}
+    >
+      {hayConflicto && <p className="pl-alerta-texto">{error.mensaje}</p>}
       {erroresCampos.length > 0 && (
         <ul>
           {erroresCampos.map(([campo, mensaje]) => (

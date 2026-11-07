@@ -39,7 +39,10 @@ const COLUMNAS = ({ onEditar, onEliminar }) => [
       return (
         <div className="pl-celda">
           <Etiqueta tono={estado.tono}>{estado.texto}</Etiqueta>
-          <span className="pl-sutil">Versión {p.version_actual.numero_version}</span>
+          <span className="pl-sutil">
+            Versión {p.version_actual.numero_version}
+            {p.fue_publicada && p.estado_codigo === "BORRADOR" && " · hay una publicada"}
+          </span>
         </div>
       );
     },

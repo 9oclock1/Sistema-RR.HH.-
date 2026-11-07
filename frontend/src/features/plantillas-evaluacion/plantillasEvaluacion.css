@@ -280,3 +280,7 @@
     flex-basis: calc(var(--size-sidebar) * 0.5);
   }
 }
+
+.pl-alerta-texto {
+  margin: 0 0 var(--space-2);
+}

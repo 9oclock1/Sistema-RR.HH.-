@@ -1,6 +1,7 @@
 import { Boton, CampoAreaTexto, CampoTexto, Modal, Selector } from "../../components/ui";
 import { OPCIONES_TIPO_COMPETENCIA } from "./formato";
 import useFormularioPlantilla from "./useFormularioPlantilla";
+import { validarDatosCompetencia } from "./validacionPlantilla";
 
 const ETIQUETAS = {
   nombre: "Nombre",
@@ -17,6 +18,8 @@ export default function ModalCompetencia({ onGuardar, onCancelar }) {
     etiquetas: ETIQUETAS,
     prefijo: "competencia",
     onGuardar,
+    validar: validarDatosCompetencia,
+    tituloConflicto: "Ya existe esa competencia",
   });
 
   return (

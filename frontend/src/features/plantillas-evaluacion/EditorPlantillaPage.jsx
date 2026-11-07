@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useBlocker } from "react-router";
-import { ClipboardList, Pencil, UserRound } from "lucide-react";
+import { ClipboardList, Pencil, Plus, Send, UserRound } from "lucide-react";
 import {
   actualizarPlantilla,
   crearCompetencia,
+  crearVersion,
   guardarSecciones,
   listarCompetencias,
   obtenerPlantilla,
   obtenerVersion,
+  publicarVersion,
 } from "../../api/plantillasEvaluacion";
 import {
   Alerta,
@@ -26,14 +28,32 @@ import { useDepartamentosActivos } from "../../hooks/useDepartamentosActivos";
 import FormularioPlantilla from "./FormularioPlantilla";
 import ModalCompetencia from "./ModalCompetencia";
 import SeccionesPlantilla from "./SeccionesPlantilla";
-import { ESTADOS_PLANTILLA, esEditable, formatearVigencia, resumirSecciones } from "./formato";
+import { ESTADOS_PLANTILLA, esEditable, formatearVigencia, hoyLaPaz, resumirSecciones } from "./formato";
 import { RUTA_PLANTILLAS } from "./ruta";
+import { pendientesPublicacion } from "./validacionPlantilla";
 import "./plantillasEvaluacion.css";
 
 const AVISO_SOLO_LECTURA = {
-  PUBLICADA: "Esta versión ya está publicada: su estructura no se puede modificar.",
+  PUBLICADA: "Esta versión ya está publicada: su estructura base no se puede modificar.",
   ARCHIVADA: "Esta versión fue reemplazada por una más reciente y quedó archivada: solo se puede consultar.",
 };
+
+// Error del servidor como alerta: el mensaje, o la lista de motivos cuando responde con detalles (p. ej. 422).
+function AlertaError({ titulo, error, onCerrar }) {
+  return (
+    <Alerta tono="peligro" role="alert" titulo={titulo} onCerrar={onCerrar}>
+      {error.detalles?.length > 0 ? (
+        <ul>
+          {error.detalles.map((d) => (
+            <li key={`${d.campo}${d.mensaje}`}>{d.mensaje}</li>
+          ))}
+        </ul>
+      ) : (
+        error.message
+      )}
+    </Alerta>
+  );
+}
 
 function Datos({ plantilla, onEditar }) {
   const estado = ESTADOS_PLANTILLA[plantilla.estado_codigo];
@@ -98,6 +118,10 @@ function Editor({ idEmpleado, idPlantilla }) {
   const [errorGuardado, setErrorGuardado] = useState(null);
   const [confirmando, setConfirmando] = useState(false);
   const [modal, setModal] = useState(null);
+  const [confirmandoPublicacion, setConfirmandoPublicacion] = useState(false);
+  const [publicando, setPublicando] = useState(false);
+  const [creandoVersion, setCreandoVersion] = useState(false);
+  const [errorEstado, setErrorEstado] = useState(null);
 
   const plantilla = resPlantilla.datos;
   const idVersion = idElegida ?? plantilla?.version_actual.id_version;
@@ -147,6 +171,11 @@ function Editor({ idEmpleado, idPlantilla }) {
   const sinGuardar = edicion !== null && ids.join() !== guardadas.map((c) => c.id_competencia).join();
   const quitadas = guardadas.filter((c) => !ids.includes(c.id_competencia));
   const disponibles = (catalogo ?? []).filter((c) => !ids.includes(c.id_competencia));
+  const pendientes = editable && plantilla ? pendientesPublicacion({ plantilla, secciones, hoy: hoyLaPaz() }) : [];
+  // Solo la versión más reciente publicada puede dar origen a un borrador nuevo.
+  const puedeCrearVersion =
+    version?.estado_codigo === "PUBLICADA" && plantilla?.version_actual.id_version === version.id_version;
+  const versionPublicada = plantilla?.versiones.find((v) => v.estado_codigo === "PUBLICADA");
 
   // Si hay cambios sin guardar, salir de la página (menú, atrás o cerrar la pestaña) pide confirmación.
   const bloqueo = useBlocker(sinGuardar);
@@ -189,6 +218,47 @@ function Editor({ idEmpleado, idPlantilla }) {
 
   // Quitar una sección ya guardada borra también sus criterios y preguntas: antes se pide confirmar.
   const pedirGuardado = () => (quitadas.length > 0 ? setConfirmando(true) : guardar());
+
+  // Publicar bloquea la estructura base: el servidor vuelve a validar y, si falta algo, responde con la lista.
+  const publicar = async () => {
+    setPublicando(true);
+    setErrorEstado(null);
+    try {
+      const publicada = await publicarVersion(idEmpleado, idPlantilla, version.id_version);
+      setResVersion({ idVersion, datos: publicada });
+      setEdicion(null);
+      setRecarga((n) => n + 1);
+      avisar({
+        tono: "exito",
+        titulo: "Plantilla publicada",
+        mensaje: `La versión ${publicada.numero_version} ya está disponible para futuras asignaciones.`,
+      });
+    } catch (error) {
+      setErrorEstado({ titulo: "No se pudo publicar la plantilla", error });
+    } finally {
+      setPublicando(false);
+      setConfirmandoPublicacion(false);
+    }
+  };
+
+  const crearNuevaVersion = async () => {
+    setCreandoVersion(true);
+    setErrorEstado(null);
+    try {
+      const creada = await crearVersion(idEmpleado, idPlantilla);
+      setIdElegida(creada.id_version);
+      setRecarga((n) => n + 1);
+      avisar({
+        tono: "exito",
+        titulo: "Nueva versión en borrador",
+        mensaje: `La versión ${creada.numero_version} parte de la estructura publicada.`,
+      });
+    } catch (error) {
+      setErrorEstado({ titulo: "No se pudo crear la nueva versión", error });
+    } finally {
+      setCreandoVersion(false);
+    }
+  };
 
   const crearYAgregar = async (datos) => {
     const nueva = await crearCompetencia(idEmpleado, datos);
@@ -310,7 +380,31 @@ function Editor({ idEmpleado, idPlantilla }) {
             )}
 
             {!editable && (
-              <Alerta tono="info" titulo={AVISO_SOLO_LECTURA[version.estado_codigo] ?? "Esta versión no se puede modificar."} />
+              <Alerta
+                tono="info"
+                titulo={AVISO_SOLO_LECTURA[version.estado_codigo] ?? "Esta versión no se puede modificar."}
+                acciones={
+                  puedeCrearVersion && (
+                    <Boton tamano="sm" icono={Plus} onClick={crearNuevaVersion} cargando={creandoVersion}>
+                      Crear nueva versión
+                    </Boton>
+                  )
+                }
+              >
+                {puedeCrearVersion &&
+                  "Para cambiarla, cree una nueva versión: parte de esta estructura y la actual sigue vigente hasta que publique la nueva."}
+              </Alerta>
+            )}
+
+            {editable && versionPublicada && (
+              <Alerta tono="info" titulo={`Nueva versión en borrador (versión ${version.numero_version})`}>
+                La versión {versionPublicada.numero_version} sigue publicada y vigente hasta que usted publique este
+                borrador.
+              </Alerta>
+            )}
+
+            {errorEstado && (
+              <AlertaError titulo={errorEstado.titulo} error={errorEstado.error} onCerrar={() => setErrorEstado(null)} />
             )}
 
             {errorCatalogo && (
@@ -328,17 +422,11 @@ function Editor({ idEmpleado, idPlantilla }) {
             )}
 
             {errorGuardado && (
-              <Alerta tono="peligro" role="alert" titulo="No se pudieron guardar las secciones" onCerrar={() => setErrorGuardado(null)}>
-                {errorGuardado.detalles?.length > 0 ? (
-                  <ul>
-                    {errorGuardado.detalles.map((d) => (
-                      <li key={`${d.campo}${d.mensaje}`}>{d.mensaje}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  errorGuardado.message
-                )}
-              </Alerta>
+              <AlertaError
+                titulo="No se pudieron guardar las secciones"
+                error={errorGuardado}
+                onCerrar={() => setErrorGuardado(null)}
+              />
             )}
 
             <SeccionesPlantilla
@@ -351,6 +439,16 @@ function Editor({ idEmpleado, idPlantilla }) {
               onNuevaCompetencia={() => setModal("competencia")}
             />
 
+            {editable && pendientes.length > 0 && (
+              <Alerta id="pl-pendientes" tono="aviso" titulo="Antes de publicar esta versión">
+                <ul>
+                  {pendientes.map((pendiente) => (
+                    <li key={pendiente}>{pendiente}</li>
+                  ))}
+                </ul>
+              </Alerta>
+            )}
+
             {editable && (
               <div className="pl-guardado">
                 <span className="pl-sutil" role="status">
@@ -359,9 +457,21 @@ function Editor({ idEmpleado, idPlantilla }) {
                 <Boton variante="sutil" onClick={() => setEdicion(null)} disabled={!sinGuardar || guardando}>
                   Descartar
                 </Boton>
-                <Boton variante="primario" onClick={pedirGuardado} disabled={!sinGuardar} cargando={guardando}>
+                <Boton variante={sinGuardar ? "primario" : "predeterminado"} onClick={pedirGuardado} disabled={!sinGuardar} cargando={guardando}>
                   {guardando ? "Guardando…" : "Guardar secciones"}
                 </Boton>
+                <Boton
+                  variante={sinGuardar ? "predeterminado" : "primario"}
+                  icono={Send}
+                  onClick={() => setConfirmandoPublicacion(true)}
+                  disabled={sinGuardar || guardando || pendientes.length > 0}
+                  aria-describedby={sinGuardar || pendientes.length > 0 ? "pl-motivo-publicar" : undefined}
+                >
+                  Publicar
+                </Boton>
+                <span id="pl-motivo-publicar" className="ds-solo-lector">
+                  {sinGuardar ? "Guarde los cambios antes de publicar." : "Resuelva los pendientes antes de publicar."}
+                </span>
               </div>
             )}
           </div>
@@ -388,6 +498,20 @@ function Editor({ idEmpleado, idPlantilla }) {
       >
         Se quitará{quitadas.length === 1 ? "" : "n"}: <strong>{quitadas.map((c) => c.nombre).join(", ")}</strong>. Si
         tenían criterios y preguntas, también se eliminarán.
+      </ModalConfirmacion>
+
+      <ModalConfirmacion
+        abierto={confirmandoPublicacion}
+        titulo="¿Publicar la plantilla?"
+        textoConfirmar="Publicar"
+        variante="primario"
+        procesando={publicando}
+        onConfirmar={publicar}
+        onCancelar={() => setConfirmandoPublicacion(false)}
+      >
+        La versión {version?.numero_version} de <strong>{plantilla.nombre}</strong> quedará disponible para futuras
+        asignaciones periódicas y su estructura base se bloqueará: para cambiarla tendrá que crear una nueva versión.
+        {versionPublicada && ` La versión ${versionPublicada.numero_version} pasará a archivada.`}
       </ModalConfirmacion>
 
       <ModalConfirmacion

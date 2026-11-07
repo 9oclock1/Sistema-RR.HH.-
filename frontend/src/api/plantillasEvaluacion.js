@@ -48,3 +48,15 @@ export const listarCompetencias = (idEmpleado) =>
 // tipo: COMPETENCIA_LABORAL o FACTOR_OPERATIVO. Si el nombre ya existe responde 409.
 export const crearCompetencia = (idEmpleado, competencia) =>
   solicitar("/perf/competencias", { metodo: "POST", cuerpo: competencia, cabeceras: comoEmpleado(idEmpleado) });
+
+// Publica la versión en borrador: queda disponible para futuras asignaciones y su estructura se bloquea.
+// Si falta algo responde 422 con la lista de pendientes en detalles.
+export const publicarVersion = (idEmpleado, idPlantilla, idVersion) =>
+  solicitar(`${RUTA}/${idPlantilla}/versiones/${idVersion}/publicacion`, {
+    metodo: "POST",
+    cabeceras: comoEmpleado(idEmpleado),
+  });
+
+// Nuevo borrador con la estructura de la versión más reciente. Si ya hay un borrador abierto responde 409.
+export const crearVersion = (idEmpleado, idPlantilla) =>
+  solicitar(`${RUTA}/${idPlantilla}/versiones`, { metodo: "POST", cabeceras: comoEmpleado(idEmpleado) });
