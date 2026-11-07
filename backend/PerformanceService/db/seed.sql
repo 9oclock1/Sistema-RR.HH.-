@@ -97,6 +97,12 @@ VALUES (1, 'REGISTRADA', 'Registrada', FALSE),
     (4, 'RESUELTA', 'Resuelta', TRUE),
     (5, 'DESESTIMADA', 'Desestimada', TRUE)
 ON CONFLICT DO NOTHING;
+INSERT INTO CATALOGOS_PRIORIDAD_QUEJA (id_prioridad_queja, codigo, nombre)
+VALUES (1, 'BAJA', 'Baja'),
+    (2, 'MEDIA', 'Media'),
+    (3, 'ALTA', 'Alta'),
+    (4, 'CRITICA', 'Crítica')
+ON CONFLICT DO NOTHING;
 INSERT INTO CATALOGOS_TIPO_ACCION_QUEJA (id_tipo_accion_queja, codigo, nombre)
 VALUES (1, 'PREVENTIVA', 'Preventiva'),
     (2, 'CORRECTIVA', 'Correctiva')
