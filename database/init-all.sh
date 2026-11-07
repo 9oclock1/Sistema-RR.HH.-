@@ -14,6 +14,13 @@ EOSQL
         echo "Ejecutando $sql_file en $db_name..."
         psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$db_name" -f "$sql_file"
     fi
+
+    local catalogos_file
+    catalogos_file="$(dirname "$sql_file")/catalogos.sql"
+    if [ -f "$catalogos_file" ]; then
+        echo "Ejecutando $catalogos_file en $db_name..."
+        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$db_name" -f "$catalogos_file"
+    fi
 }
 
 setup_service_db "AuthDB" "/init-scripts/auth/init.sql"
