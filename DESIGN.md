@@ -113,6 +113,7 @@ import { Boton, CampoTexto, Tabla, useAvisos } from "../../components/ui";
 | `ModalConfirmacion` | Confirmación de acciones destructivas: `titulo`, `textoConfirmar`, `procesando`, `onConfirmar`, `onCancelar` |
 | `ProveedorAvisos` + `useAvisos` | Avisos flotantes que se cierran solos, para confirmar una acción; lo que el usuario debe leer o resolver va en `Alerta`. Ya envuelve la app en `main.jsx`. `const avisar = useAvisos(); avisar({ tono, titulo, mensaje })` |
 | `Tabla` | `columnas` `[{ clave, titulo, ancho, alinear, celda }]`, `filas`, `cargando`, `vacio` |
+| `Paginacion` | Debajo de una tabla paginada en el servidor: `pagina`, `limite`, `total`, `onCambiar(pagina)`, `etiqueta`, `disabled`. Muestra «21–40 de 57» y los botones Anterior / Siguiente; sin resultados no se pinta |
 | `Pestanas` | `pestanas` `[{ id, etiqueta, contador, contenido }]`, `activa`, `onCambiar`, `etiqueta` |
 | `EncabezadoPagina` | Migas → título con `acciones` → `descripcion` → pestañas (`children`). `migas` `[{ etiqueta, href? }]`; `enlace={Link}` para usar el router |
 | `ElementoNavegacion` | Elemento de la barra lateral: `as={NavLink}` + `to` (marca el activo solo), o `href`, o `onClick` + `activo`; `icono`, `etiqueta`, `contador` |
