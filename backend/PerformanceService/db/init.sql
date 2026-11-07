@@ -1,5 +1,5 @@
 -- Created by Redgate Data Modeler (https://datamodeler.redgate-platform.com)
--- Last modification date: 2026-11-07 14:00:00.000
+-- Last modification date: 2026-11-07 18:00:00.000
 -- extensions
 -- btree_gist: permite combinar el nombre, el área y el rango de vigencia en la restricción EXCLUDE de PLANTILLAS_EVALUACION.
 CREATE EXTENSION IF NOT EXISTS btree_gist;
@@ -10,12 +10,12 @@ CREATE TABLE ACCIONES_QUEJA (
     id_queja UUID NOT NULL,
     id_tipo_accion_queja SMALLINT NOT NULL,
     id_empleado_registrador UUID NOT NULL,
-    descripcion text NOT NULL,
-    fecha_compromiso date NULL,
-    fecha_cumplimiento date NULL,
+    descripcion bytea NOT NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT ACCIONES_QUEJA_pk PRIMARY KEY (id_accion)
+    CONSTRAINT ACCIONES_QUEJA_pk PRIMARY KEY (id_accion),
+    CONSTRAINT chk_accion_queja_cifrado CHECK (octet_length(descripcion) > 28)
 );
+CREATE INDEX idx_acciones_queja ON ACCIONES_QUEJA (id_queja, creado_en);
 -- Table: ADJUNTOS_QUEJA
 CREATE TABLE ADJUNTOS_QUEJA (
     id_adjunto UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -390,13 +390,19 @@ CREATE TABLE QUEJAS (
     codigo_seguimiento varchar(12) NOT NULL,
     asunto bytea NOT NULL,
     descripcion bytea NOT NULL,
+    resolucion bytea NULL,
+    id_estado_aviso_resolucion SMALLINT NULL,
+    aviso_resolucion_en TIMESTAMPTZ NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT QUEJAS_pk PRIMARY KEY (id_queja),
     CONSTRAINT uq_queja_codigo_seguimiento UNIQUE (codigo_seguimiento),
     CONSTRAINT chk_queja_codigo_seguimiento CHECK (codigo_seguimiento ~ '^QJ-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$'),
     CONSTRAINT chk_queja_anonimato CHECK (es_anonima = (id_empleado_denunciante IS NULL)),
-    CONSTRAINT chk_queja_cifrado CHECK (octet_length(asunto) > 28 AND octet_length(descripcion) > 28)
+    CONSTRAINT chk_queja_cifrado CHECK (octet_length(asunto) > 28 AND octet_length(descripcion) > 28 AND (resolucion IS NULL OR octet_length(resolucion) > 28)),
+    CONSTRAINT chk_queja_resolucion CHECK ((id_estado_queja = 5) = (resolucion IS NOT NULL)),
+    CONSTRAINT chk_queja_aviso_resolucion CHECK (id_estado_aviso_resolucion IS NULL OR (resolucion IS NOT NULL AND NOT es_anonima)),
+    CONSTRAINT chk_queja_aviso_resolucion_entregado CHECK (COALESCE(id_estado_aviso_resolucion = 2, FALSE) = (aviso_resolucion_en IS NOT NULL))
 );
 CREATE INDEX idx_quejas_estado ON QUEJAS (id_estado_queja, creado_en);
 CREATE INDEX idx_quejas_categoria ON QUEJAS (id_categoria_queja, creado_en);
@@ -576,6 +582,9 @@ ADD CONSTRAINT PREGUNTAS_EVALUACION_ESCALAS_VALORACION FOREIGN KEY (id_escala) R
 -- Reference: QUEJAS_CATALOGOS_CATEGORIA_QUEJA (table: QUEJAS)
 ALTER TABLE QUEJAS
 ADD CONSTRAINT QUEJAS_CATALOGOS_CATEGORIA_QUEJA FOREIGN KEY (id_categoria_queja) REFERENCES CATALOGOS_CATEGORIA_QUEJA (id_categoria_queja) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: QUEJAS_CATALOGOS_ESTADO_EVENTO (table: QUEJAS)
+ALTER TABLE QUEJAS
+ADD CONSTRAINT QUEJAS_CATALOGOS_ESTADO_EVENTO FOREIGN KEY (id_estado_aviso_resolucion) REFERENCES CATALOGOS_ESTADO_EVENTO (id_estado_evento) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- Reference: QUEJAS_CATALOGOS_ESTADO_QUEJA (table: QUEJAS)
 ALTER TABLE QUEJAS
 ADD CONSTRAINT QUEJAS_CATALOGOS_ESTADO_QUEJA FOREIGN KEY (id_estado_queja) REFERENCES CATALOGOS_ESTADO_QUEJA (id_estado_queja) NOT DEFERRABLE INITIALLY IMMEDIATE;

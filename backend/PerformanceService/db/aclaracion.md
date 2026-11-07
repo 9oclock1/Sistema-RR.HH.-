@@ -82,3 +82,15 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 - Aviso al responsable: se envía después de confirmar la derivación, así que la derivación no falla si el aviso falla. `id_estado_notificacion` usa `CATALOGOS_ESTADO_EVENTO` (`PENDIENTE`, `ENTREGADO`, `FALLIDO`) y `notificada_en` se llena solo al entregarse (`chk_asignacion_notificacion`). Un aviso fallido se puede reintentar.
 - El aviso lleva solo el código de seguimiento, la categoría, la prioridad y la fecha de derivación: nunca el asunto, la descripción, los adjuntos ni datos del denunciante.
 - Las tablas de esta parte salen de los RF-68 a RF-71; pueden ampliarse cuando existan las historias de usuario de la épica 12.
+
+### Acciones y avance del caso (KAN-90, RF-70)
+
+- Estados de la queja (en `seed.sql`): `REGISTRADA`, `ASIGNADA`, `EN_ANALISIS`, `EN_ACCION`, `RESUELTA` (final) y `DESESTIMADA` (final). `chk_queja_resolucion` usa el id 5 de `RESUELTA`, igual que `chk_asignacion_notificacion` usa el id 2 de `ENTREGADO`.
+- Backend: solo el responsable vigente (última fila de `ASIGNACIONES_QUEJA`) registra acciones y cambia el estado. El Administrador de RRHH consulta el caso, pero no actúa en nombre del responsable.
+- Backend (transiciones válidas): `ASIGNADA` → `EN_ANALISIS` → `EN_ACCION` → `RESUELTA`, con retroceso de `EN_ACCION` a `EN_ANALISIS`. `RESUELTA` no admite cambios. Cualquier otra transición se rechaza con 409.
+- Cada transición agrega una fila en `HISTORIALES_ESTADO_QUEJA` con el estado anterior, el nuevo, el responsable que la hizo (`id_empleado_responsable`) y `fecha_cambio`. No hay otra tabla de estados: el historial de KAN-88 ya guarda todo eso.
+- `ACCIONES_QUEJA` es la bitácora de acciones preventivas o correctivas (`CATALOGOS_TIPO_ACCION_QUEJA`). Es de solo agregar: no hay endpoints para editarla ni borrarla. `id_empleado_registrador` y `creado_en` los pone el servicio, nunca el cliente. `descripcion` va cifrada igual que la queja (`chk_accion_queja_cifrado`).
+- `QUEJAS.resolucion` es la descripción de la resolución, cifrada igual que la queja. `chk_queja_resolucion` obliga a que exista si y solo si la queja está `RESUELTA`. El autor y la fecha de la resolución son los de la fila `RESUELTA` del historial.
+- Aviso de resolución al denunciante: se envía después de confirmar la resolución, así que la resolución no falla si el aviso falla, igual que en KAN-89. `id_estado_aviso_resolucion` usa `CATALOGOS_ESTADO_EVENTO` y `aviso_resolucion_en` se llena solo al entregarse (`chk_queja_aviso_resolucion_entregado`). Un aviso fallido se puede reintentar.
+- En una queja anónima no se avisa a nadie: `chk_queja_aviso_resolucion` deja `id_estado_aviso_resolucion` en NULL. El aviso lleva solo el código de seguimiento y que el caso se resolvió, nunca las acciones ni la resolución.
+- La consulta pública por código muestra solo los estados y sus fechas, no las acciones ni la resolución.

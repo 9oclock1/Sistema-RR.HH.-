@@ -93,9 +93,10 @@ ON CONFLICT DO NOTHING;
 INSERT INTO CATALOGOS_ESTADO_QUEJA (id_estado_queja, codigo, nombre, es_final)
 VALUES (1, 'REGISTRADA', 'Registrada', FALSE),
     (2, 'ASIGNADA', 'Asignada', FALSE),
-    (3, 'EN_ATENCION', 'En atención', FALSE),
-    (4, 'RESUELTA', 'Resuelta', TRUE),
-    (5, 'DESESTIMADA', 'Desestimada', TRUE)
+    (3, 'EN_ANALISIS', 'En análisis', FALSE),
+    (4, 'EN_ACCION', 'En acción', FALSE),
+    (5, 'RESUELTA', 'Resuelta', TRUE),
+    (6, 'DESESTIMADA', 'Desestimada', TRUE)
 ON CONFLICT DO NOTHING;
 INSERT INTO CATALOGOS_PRIORIDAD_QUEJA (id_prioridad_queja, codigo, nombre)
 VALUES (1, 'BAJA', 'Baja'),
