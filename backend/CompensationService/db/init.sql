@@ -144,6 +144,205 @@ CREATE TABLE BONOS_CONDICION (
 );
 CREATE INDEX idx_bonos_condicion_proceso ON BONOS_CONDICION (id_proceso);
 CREATE INDEX idx_bonos_condicion_empleado ON BONOS_CONDICION (id_empleado);
+-- Tabla: PLANILLAS
+-- Planilla mensual (periodo AAAA-MM): BORRADOR → APROBADA → CERRADA. Fuera de borrador no se edita.
+-- datos_hasta: último día consolidado; en el mes en curso llega hasta ayer y solo se aprueba el mes completo.
+-- Contabilidad y Pagos confirman por separado; con ambas confirmaciones la planilla se cierra.
+CREATE TABLE PLANILLAS (
+    id_planilla UUID NOT NULL DEFAULT gen_random_uuid(),
+    periodo char(7) NOT NULL,
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    datos_hasta date NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'BORRADOR',
+    advertencias text[] NOT NULL DEFAULT '{}',
+    generada_por UUID NOT NULL,
+    generada_por_nombre varchar(150) NOT NULL,
+    generada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    aprobada_por UUID NULL,
+    aprobada_por_nombre varchar(150) NULL,
+    aprobada_en TIMESTAMPTZ NULL,
+    estado_contabilidad varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    estado_pagos varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    cerrada_en TIMESTAMPTZ NULL,
+    CONSTRAINT PLANILLAS_pk PRIMARY KEY (id_planilla),
+    CONSTRAINT uq_planilla_periodo UNIQUE (periodo),
+    CONSTRAINT chk_planilla_estado CHECK (estado IN ('BORRADOR', 'APROBADA', 'CERRADA')),
+    CONSTRAINT chk_planilla_fechas CHECK (fecha_fin >= fecha_inicio AND datos_hasta BETWEEN fecha_inicio AND fecha_fin),
+    CONSTRAINT chk_planilla_aprobacion CHECK (
+        (estado = 'BORRADOR') = (aprobada_en IS NULL)
+        AND (aprobada_en IS NULL) = (aprobada_por IS NULL)
+        AND (aprobada_por IS NULL) = (aprobada_por_nombre IS NULL)
+    ),
+    CONSTRAINT chk_planilla_mes_completo CHECK (estado = 'BORRADOR' OR datos_hasta = fecha_fin),
+    CONSTRAINT chk_planilla_integraciones CHECK (
+        estado_contabilidad IN ('PENDIENTE', 'CONFIRMADA', 'RECHAZADA')
+        AND estado_pagos IN ('PENDIENTE', 'CONFIRMADA', 'RECHAZADA')
+    ),
+    CONSTRAINT chk_planilla_cierre CHECK (
+        (estado = 'CERRADA') = (cerrada_en IS NOT NULL)
+        AND (estado <> 'CERRADA' OR (estado_contabilidad = 'CONFIRMADA' AND estado_pagos = 'CONFIRMADA'))
+    )
+);
+-- Tabla: PLANILLA_EMPLEADOS
+-- Novedades del mes consolidadas por colaborador. Nombre, cargo, área y haber son copia al generar.
+-- haber_mensual: haber del contrato (promedio por días si cambió en el mes). dias_contrato: 30 si el contrato
+-- cubre el mes; si no, los días cubiertos. dias_pagados descuenta faltas injustificadas y licencias sin goce.
+CREATE TABLE PLANILLA_EMPLEADOS (
+    id_planilla_empleado UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    nombre_empleado varchar(150) NOT NULL,
+    numero_documento varchar(20) NULL,
+    cargo varchar(100) NULL,
+    area varchar(100) NULL,
+    sucursal varchar(100) NULL,
+    id_contrato UUID NOT NULL,
+    numero_contrato varchar(40) NOT NULL,
+    haber_mensual numeric(12,2) NOT NULL,
+    contrato_desde date NOT NULL,
+    contrato_hasta date NOT NULL,
+    dias_contrato smallint NOT NULL,
+    faltas_injustificadas smallint NOT NULL DEFAULT 0,
+    dias_licencia_sin_goce smallint NOT NULL DEFAULT 0,
+    dias_licencia_con_goce smallint NOT NULL DEFAULT 0,
+    dias_pagados smallint NOT NULL,
+    atrasos smallint NOT NULL DEFAULT 0,
+    minutos_atraso int NOT NULL DEFAULT 0,
+    minutos_extra_habil int NOT NULL DEFAULT 0,
+    minutos_extra_domingo int NOT NULL DEFAULT 0,
+    minutos_extra_feriado int NOT NULL DEFAULT 0,
+    minutos_extra_nocturnos int NOT NULL DEFAULT 0,
+    minutos_domingo int NOT NULL DEFAULT 0,
+    minutos_feriado int NOT NULL DEFAULT 0,
+    minutos_descanso int NOT NULL DEFAULT 0,
+    minutos_nocturnos int NOT NULL DEFAULT 0,
+    observaciones text[] NOT NULL DEFAULT '{}',
+    CONSTRAINT PLANILLA_EMPLEADOS_pk PRIMARY KEY (id_planilla_empleado),
+    CONSTRAINT uq_planilla_empleado UNIQUE (id_planilla, id_empleado),
+    CONSTRAINT fk_planilla_empleado_planilla FOREIGN KEY (id_planilla)
+        REFERENCES PLANILLAS (id_planilla) ON DELETE CASCADE,
+    CONSTRAINT chk_planilla_empleado_haber CHECK (haber_mensual > 0),
+    CONSTRAINT chk_planilla_empleado_contrato CHECK (contrato_hasta >= contrato_desde),
+    CONSTRAINT chk_planilla_empleado_dias CHECK (
+        dias_contrato BETWEEN 1 AND 30 AND dias_pagados BETWEEN 0 AND dias_contrato
+        AND faltas_injustificadas >= 0 AND dias_licencia_sin_goce >= 0 AND dias_licencia_con_goce >= 0
+    ),
+    CONSTRAINT chk_planilla_empleado_minutos CHECK (
+        atrasos >= 0 AND minutos_atraso >= 0 AND minutos_extra_habil >= 0 AND minutos_extra_domingo >= 0
+        AND minutos_extra_feriado >= 0 AND minutos_extra_nocturnos >= 0 AND minutos_domingo >= 0
+        AND minutos_feriado >= 0 AND minutos_descanso >= 0 AND minutos_nocturnos >= 0
+    )
+);
+-- Tabla: NOVEDADES_PLANILLA
+-- Rubros variables de un colaborador en la planilla (bonos por condiciones especiales), con la vigencia del
+-- concepto que les dio el valor. monto NULL: porcentaje que se calcula sobre el haber básico.
+CREATE TABLE NOVEDADES_PLANILLA (
+    id_novedad UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla_empleado UUID NOT NULL,
+    origen varchar(15) NOT NULL,
+    id_vigencia UUID NOT NULL,
+    codigo varchar(20) NOT NULL,
+    nombre varchar(80) NOT NULL,
+    forma_calculo varchar(12) NOT NULL,
+    cantidad smallint NOT NULL,
+    factor numeric(10,6) NOT NULL,
+    valor numeric(12,4) NOT NULL,
+    monto numeric(12,2) NULL,
+    detalle varchar(400) NULL,
+    CONSTRAINT NOVEDADES_PLANILLA_pk PRIMARY KEY (id_novedad),
+    CONSTRAINT fk_novedad_planilla_empleado FOREIGN KEY (id_planilla_empleado)
+        REFERENCES PLANILLA_EMPLEADOS (id_planilla_empleado) ON DELETE CASCADE,
+    -- Un concepto usado en una planilla no se puede eliminar, solo inactivar.
+    CONSTRAINT fk_novedad_planilla_vigencia FOREIGN KEY (id_vigencia) REFERENCES VIGENCIAS_CONCEPTO (id_vigencia),
+    CONSTRAINT chk_novedad_planilla_origen CHECK (origen IN ('BONO_CONDICION')),
+    CONSTRAINT chk_novedad_planilla_forma CHECK (forma_calculo IN ('MONTO_FIJO', 'PORCENTAJE')),
+    CONSTRAINT chk_novedad_planilla_valores CHECK (cantidad > 0 AND factor > 0 AND valor > 0 AND (monto IS NULL OR monto >= 0)),
+    CONSTRAINT chk_novedad_planilla_monto CHECK ((forma_calculo = 'MONTO_FIJO') = (monto IS NOT NULL))
+);
+CREATE INDEX idx_novedades_planilla_empleado ON NOVEDADES_PLANILLA (id_planilla_empleado);
+-- Tabla: EVENTOS_SALIENTES
+-- Bandeja de salida (outbox): el evento se guarda en la misma transacción que la aprobación y se envía
+-- después al broker, con reintentos, hasta que se entrega.
+CREATE TABLE EVENTOS_SALIENTES (
+    id_evento UUID NOT NULL DEFAULT gen_random_uuid(),
+    topico varchar(60) NOT NULL,
+    tipo_evento varchar(60) NOT NULL,
+    id_planilla UUID NULL,
+    carga JSONB NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    intentos smallint NOT NULL DEFAULT 0,
+    ultimo_error varchar(255) NULL,
+    proximo_intento_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    entregado_en TIMESTAMPTZ NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT EVENTOS_SALIENTES_pk PRIMARY KEY (id_evento),
+    CONSTRAINT fk_evento_planilla FOREIGN KEY (id_planilla) REFERENCES PLANILLAS (id_planilla),
+    CONSTRAINT chk_evento_estado CHECK (estado IN ('PENDIENTE', 'ENTREGADO', 'FALLIDO')),
+    CONSTRAINT chk_evento_intentos CHECK (intentos >= 0),
+    CONSTRAINT chk_evento_entrega CHECK ((estado = 'ENTREGADO') = (entregado_en IS NOT NULL))
+);
+CREATE INDEX idx_eventos_salientes_pendientes ON EVENTOS_SALIENTES (estado, proximo_intento_en);
+CREATE INDEX idx_eventos_salientes_planilla ON EVENTOS_SALIENTES (id_planilla);
+-- funciones
+-- Una planilla aprobada o cerrada queda bloqueada: no se edita ni se elimina. Solo avanza de estado
+-- (BORRADOR → APROBADA → CERRADA) y registra las confirmaciones de Contabilidad y Pagos.
+CREATE FUNCTION fn_planilla_bloqueada() RETURNS trigger AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        IF OLD.estado <> 'BORRADOR' THEN
+            RAISE EXCEPTION 'La planilla % ya fue aprobada: no se puede eliminar.', OLD.periodo USING ERRCODE = 'PL001';
+        END IF;
+        RETURN OLD;
+    END IF;
+    IF OLD.estado <> 'BORRADOR' AND (
+        NEW.periodo, NEW.fecha_inicio, NEW.fecha_fin, NEW.datos_hasta, NEW.advertencias, NEW.generada_por,
+        NEW.generada_por_nombre, NEW.generada_en, NEW.aprobada_por, NEW.aprobada_por_nombre, NEW.aprobada_en
+    ) IS DISTINCT FROM (
+        OLD.periodo, OLD.fecha_inicio, OLD.fecha_fin, OLD.datos_hasta, OLD.advertencias, OLD.generada_por,
+        OLD.generada_por_nombre, OLD.generada_en, OLD.aprobada_por, OLD.aprobada_por_nombre, OLD.aprobada_en
+    ) THEN
+        RAISE EXCEPTION 'La planilla % ya fue aprobada: no se puede modificar.', OLD.periodo USING ERRCODE = 'PL001';
+    END IF;
+    IF NEW.estado <> OLD.estado AND NOT (
+        (OLD.estado = 'BORRADOR' AND NEW.estado = 'APROBADA') OR (OLD.estado = 'APROBADA' AND NEW.estado = 'CERRADA')
+    ) THEN
+        RAISE EXCEPTION 'La planilla % no puede pasar de % a %.', OLD.periodo, OLD.estado, NEW.estado USING ERRCODE = 'PL001';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+-- El detalle de una planilla aprobada no cambia. Al eliminar un borrador, su detalle se borra en cascada.
+CREATE FUNCTION fn_detalle_planilla_bloqueado() RETURNS trigger AS $$
+DECLARE
+    v_fila record;
+    v_planilla UUID;
+    v_estado varchar(10);
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        v_fila := OLD;
+    ELSE
+        v_fila := NEW;
+    END IF;
+    IF TG_TABLE_NAME = 'planilla_empleados' THEN
+        v_planilla := v_fila.id_planilla;
+    ELSE
+        SELECT pe.id_planilla INTO v_planilla FROM planilla_empleados pe
+        WHERE pe.id_planilla_empleado = v_fila.id_planilla_empleado;
+    END IF;
+    SELECT estado INTO v_estado FROM planillas WHERE id_planilla = v_planilla;
+    IF v_estado IS NOT NULL AND v_estado <> 'BORRADOR' THEN
+        RAISE EXCEPTION 'La planilla ya fue aprobada: su detalle no se puede modificar.' USING ERRCODE = 'PL001';
+    END IF;
+    RETURN v_fila;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER trg_planilla_bloqueada BEFORE UPDATE OR DELETE ON PLANILLAS
+    FOR EACH ROW EXECUTE FUNCTION fn_planilla_bloqueada();
+CREATE TRIGGER trg_planilla_empleados_bloqueado BEFORE INSERT OR UPDATE OR DELETE ON PLANILLA_EMPLEADOS
+    FOR EACH ROW EXECUTE FUNCTION fn_detalle_planilla_bloqueado();
+CREATE TRIGGER trg_novedades_planilla_bloqueado BEFORE INSERT OR UPDATE OR DELETE ON NOVEDADES_PLANILLA
+    FOR EACH ROW EXECUTE FUNCTION fn_detalle_planilla_bloqueado();
 -- datos iniciales
 -- Aportes de ley sobre el total ganado (Ley 065 de Pensiones y seguridad social de corto plazo).
 -- Cuentas contables referenciales: ajustar al plan de cuentas de Contabilidad.
