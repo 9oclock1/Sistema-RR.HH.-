@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { CON_VIGENCIA } = require("./conceptos.model");
 
 const COLUMNAS_PLANILLA = `p.id_planilla, p.periodo, p.fecha_inicio, p.fecha_fin, p.datos_hasta, p.estado, p.advertencias,
   p.generada_por, p.generada_por_nombre, p.generada_en, p.aprobada_por, p.aprobada_por_nombre, p.aprobada_en,
@@ -33,9 +34,28 @@ const COLUMNAS_EMPLEADO = [
   "minutos_descanso",
   "minutos_nocturnos",
   "observaciones",
+  "total_ganado",
+  "total_descuentos",
+  "liquido_pagable",
+  "total_aportes",
+  "alertas",
 ];
 
 const COLUMNAS_NOVEDAD = ["origen", "id_vigencia", "codigo", "nombre", "forma_calculo", "cantidad", "factor", "valor", "monto", "detalle"];
+const COLUMNAS_CALCULO = ["id_vigencia", "orden", "tipo", "codigo", "nombre", "forma_calculo", "base", "cantidad", "valor", "resultado", "detalle"];
+
+// Conceptos activos con valor el día indicado; es_condicion marca los de condiciones especiales (llegan como bonos).
+async function conceptosVigentes(fecha) {
+  const { rows } = await pool.query(
+    `SELECT x.id_concepto, x.codigo, x.nombre, x.tipo, x.forma_calculo, x.base_calculo, x.id_vigencia, x.valor,
+            EXISTS (SELECT 1 FROM condiciones_especiales ce WHERE ce.id_concepto = x.id_concepto) AS es_condicion
+     FROM (${CON_VIGENCIA}) x
+     WHERE x.esta_activo AND x.id_vigencia IS NOT NULL
+     ORDER BY x.codigo`,
+    [fecha]
+  );
+  return rows;
+}
 
 const marcadores = (cantidad, desde = 1) => Array.from({ length: cantidad }, (_, i) => `$${i + desde}`).join(", ");
 
@@ -103,21 +123,27 @@ async function guardarEmpleados(cliente, idPlanilla, empleados) {
         [rows[0].id_planilla_empleado, ...COLUMNAS_NOVEDAD.map((c) => n[c])]
       );
     }
+    for (const r of e.renglones) {
+      await cliente.query(
+        `INSERT INTO calculos_planilla (id_planilla_empleado, ${COLUMNAS_CALCULO.join(", ")})
+         VALUES ($1, ${marcadores(COLUMNAS_CALCULO.length, 2)})`,
+        [rows[0].id_planilla_empleado, ...COLUMNAS_CALCULO.map((c) => r[c])]
+      );
+    }
   }
 }
+
+const comoJson = (alias, columnas) => `json_build_object(${columnas.map((c) => `'${c}', ${alias}.${c}`).join(", ")})`;
 
 async function listarEmpleados(id) {
   const { rows } = await pool.query(
     `SELECT pe.id_planilla_empleado, ${COLUMNAS_EMPLEADO.map((c) => `pe.${c}`).join(", ")},
-            COALESCE(
-              json_agg(json_build_object(${COLUMNAS_NOVEDAD.map((c) => `'${c}', n.${c}`).join(", ")}, 'id_novedad', n.id_novedad)
-                       ORDER BY n.codigo) FILTER (WHERE n.id_novedad IS NOT NULL),
-              '[]'
-            ) AS novedades
+            COALESCE((SELECT json_agg(${comoJson("n", ["id_novedad", ...COLUMNAS_NOVEDAD])} ORDER BY n.codigo)
+                      FROM novedades_planilla n WHERE n.id_planilla_empleado = pe.id_planilla_empleado), '[]') AS novedades,
+            COALESCE((SELECT json_agg(${comoJson("k", COLUMNAS_CALCULO)} ORDER BY k.orden)
+                      FROM calculos_planilla k WHERE k.id_planilla_empleado = pe.id_planilla_empleado), '[]') AS renglones
      FROM planilla_empleados pe
-     LEFT JOIN novedades_planilla n ON n.id_planilla_empleado = pe.id_planilla_empleado
      WHERE pe.id_planilla = $1
-     GROUP BY pe.id_planilla_empleado
      ORDER BY pe.nombre_empleado`,
     [id]
   );
@@ -145,6 +171,7 @@ async function contarEmpleados(cliente, id) {
 
 module.exports = {
   listar,
+  conceptosVigentes,
   obtener,
   bloquearPeriodo,
   bloquear,

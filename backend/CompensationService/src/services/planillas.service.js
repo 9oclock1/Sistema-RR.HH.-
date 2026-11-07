@@ -7,6 +7,7 @@ const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const { hoyLaPaz } = require("../utils/fechas");
 const { CAMPOS_MINUTOS, rangoPlanilla, tramoSinConsolidar, validarResponsable, consolidarPlanilla } = require("../utils/planillas");
+const { calcularEmpleado } = require("../utils/calculo");
 
 const PERIODO_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -62,14 +63,31 @@ const formatearEmpleado = (e) => ({
   minutos: Object.fromEntries(CAMPOS_MINUTOS.map((c) => [c.replace("minutos_", ""), e[c]])),
   novedades: e.novedades,
   observaciones: e.observaciones,
+  // KAN-64: desglose de cada concepto con su base y su resultado.
+  calculo: {
+    ingresos: e.renglones.filter((r) => r.tipo === "INGRESO"),
+    descuentos: e.renglones.filter((r) => r.tipo === "DESCUENTO"),
+    aportes: e.renglones.filter((r) => r.tipo === "APORTE"),
+    total_ganado: e.total_ganado,
+    total_descuentos: e.total_descuentos,
+    liquido_pagable: e.liquido_pagable,
+    total_aportes: e.total_aportes,
+  },
+  alertas: e.alertas,
 });
 
 const sumar = (filas, valor) => filas.reduce((total, f) => total + valor(f), 0);
+const sumarBs = (filas, valor) => Math.round(sumar(filas, (f) => Math.round(valor(f) * 100))) / 100;
 const MINUTOS_EXTRA = ["extra_habil", "extra_domingo", "extra_feriado"];
 
 function totalizar(empleados) {
   const novedades = empleados.flatMap((e) => e.novedades);
   return {
+    total_ganado: sumarBs(empleados, (e) => e.calculo.total_ganado),
+    total_descuentos: sumarBs(empleados, (e) => e.calculo.total_descuentos),
+    liquido_pagable: sumarBs(empleados, (e) => e.calculo.liquido_pagable),
+    total_aportes: sumarBs(empleados, (e) => e.calculo.total_aportes),
+    con_alertas: empleados.filter((e) => e.alertas.length > 0).length,
     colaboradores: empleados.length,
     dias_pagados: sumar(empleados, (e) => e.dias.pagados),
     faltas_injustificadas: sumar(empleados, (e) => e.dias.faltas_injustificadas),
@@ -132,7 +150,11 @@ async function generar(datos = {}, identidad = {}) {
   // Los bonos por condiciones especiales se vuelven a procesar para reflejar las jornadas y asignaciones actuales.
   const { bonos } = await condiciones.procesar({ periodo });
 
-  const { empleados, advertencias } = consolidarPlanilla({ personal, contratos, asistencia, horasExtra, licencias, bonos }, rango);
+  const consolidado = consolidarPlanilla({ personal, contratos, asistencia, horasExtra, licencias, bonos }, rango);
+  const { advertencias } = consolidado;
+  // KAN-64: haberes, descuentos y líquido de cada colaborador con los conceptos vigentes al cierre del mes.
+  const conceptos = await modelo.conceptosVigentes(rango.hasta);
+  const empleados = consolidado.empleados.map((e) => ({ ...e, ...calcularEmpleado(e, conceptos) }));
   const cabecera = {
     periodo,
     fecha_inicio: rango.desde,
