@@ -1,14 +1,17 @@
 import { useCallback, useMemo } from "react";
 import { Link } from "react-router";
-import { ArrowLeft, FileText, SearchX, ShieldCheck } from "lucide-react";
+import { ArrowLeft, FileText, Lock, SearchX, ShieldCheck } from "lucide-react";
 import {
   listarCatalogosCasos,
   listarEmpleadosQueja,
   listarResponsablesQueja,
+  obtenerCasoAsignado,
   obtenerCasoQueja,
+  obtenerSeguimientoQueja,
 } from "../../../api/casosQueja";
 import {
   Alerta,
+  Avatar,
   Boton,
   EncabezadoPagina,
   Esqueleto,
@@ -20,8 +23,10 @@ import { useRol, useUsuario } from "../../../context/sesion";
 import { formatearFechaHora, tonoEstado } from "../formato";
 import DerivacionesQueja from "./DerivacionesQueja";
 import FormularioDerivacion from "./FormularioDerivacion";
+import GestionCasoQueja from "./GestionCasoQueja";
 import InvolucradosQueja from "./InvolucradosQueja";
-import { nombreDe, RUTA_CASOS_QUEJA, tonoPrioridad } from "./casos";
+import LineaTiempoCaso from "./LineaTiempoCaso";
+import { formatearFechaCorta, nombreDe, RUTA_CASOS_QUEJA, RUTA_MIS_CASOS_QUEJA, tonoPrioridad } from "./casos";
 import useRecurso from "./useRecurso";
 import "../quejas.css";
 import "./casos.css";
@@ -29,7 +34,13 @@ import "./casos.css";
 const tamanoLegible = (bytes) =>
   bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
-function ResumenCaso({ caso }) {
+const presentadaPor = (caso, responsable) => {
+  if (caso.es_anonima) return "Anónimo, sin datos de quien la presentó";
+  if (responsable) return "Identificada; sus datos solo los ve RRHH";
+  return nombreDe(caso.denunciante);
+};
+
+function ResumenCaso({ caso, responsable = false }) {
   return (
     <Tarjeta nivelTitulo={2} titulo="Queja" className="qc-tarjeta">
       <div className="qc-etiquetas">
@@ -53,7 +64,7 @@ function ResumenCaso({ caso }) {
         </div>
         <div>
           <dt>Presentada por</dt>
-          <dd>{caso.es_anonima ? "Anónimo, sin datos de quien la presentó" : nombreDe(caso.denunciante)}</dd>
+          <dd>{presentadaPor(caso, responsable)}</dd>
         </div>
         <div>
           <dt>Responsable</dt>
@@ -87,29 +98,35 @@ function ResumenCaso({ caso }) {
 
       <p className="qj-nota qj-nota--privacidad">
         <ShieldCheck className="ds-icono" aria-hidden="true" />
-        La descripción solo la ve el Administrador de RRHH; el aviso al responsable no la incluye.
+        La descripción solo la ven el Administrador de RRHH y el responsable asignado; los avisos no la incluyen.
       </p>
     </Tarjeta>
   );
 }
 
-function HistorialCaso({ caso }) {
+function InvolucradosLectura({ caso }) {
   return (
-    <Tarjeta nivelTitulo={2} titulo="Historial de estados" className="qc-tarjeta">
-      <ol className="qj-historial">
-        {caso.historial.map((paso) => (
-          <li key={`${paso.estado.codigo}-${paso.fecha}`} className="qj-historial__paso">
-            <span className="qj-historial__estado">
-              {paso.estado.nombre}
-              {paso.registrado_por && <span className="qc-sutil"> · por {nombreDe(paso.registrado_por)}</span>}
-            </span>
-            <span className="qj-historial__fecha">{formatearFechaHora(paso.fecha)}</span>
-          </li>
-        ))}
-      </ol>
+    <Tarjeta nivelTitulo={2} titulo="Involucrados" className="qc-tarjeta">
+      {caso.involucrados.length === 0 ? (
+        <p className="qc-ayuda">RRHH no registró involucrados en esta queja.</p>
+      ) : (
+        <ul className="qc-lista">
+          {caso.involucrados.map((persona) => (
+            <li key={persona.id_empleado} className="qc-lista__item">
+              <span className="qc-persona">
+                <Avatar nombre={nombreDe(persona)} decorativo />
+                <span>{nombreDe(persona)}</span>
+              </span>
+              <span className="qc-sutil">{formatearFechaCorta(persona.registrado_en)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </Tarjeta>
   );
 }
+
+const cargarSeguimiento = (sesion, idQueja) => Promise.resolve().then(() => obtenerSeguimientoQueja(sesion, idQueja));
 
 function Cargando() {
   return (
@@ -124,12 +141,9 @@ function Cargando() {
   );
 }
 
-export default function DetalleCasoQuejaPage({ idQueja }) {
-  const rol = useRol();
-  const idEmpleado = useUsuario();
-  const sesion = useMemo(() => ({ rol, idEmpleado }), [rol, idEmpleado]);
-
+function DetalleAdministrador({ idQueja, sesion, idEmpleado }) {
   const caso = useRecurso(useCallback(() => obtenerCasoQueja(sesion, idQueja), [sesion, idQueja]));
+  const seguimiento = useRecurso(useCallback(() => cargarSeguimiento(sesion, idQueja), [sesion, idQueja]));
   const catalogos = useRecurso(useCallback(() => listarCatalogosCasos(sesion), [sesion]));
   const responsables = useRecurso(useCallback(() => listarResponsablesQueja(sesion), [sesion]));
   const empleados = useRecurso(useCallback(() => listarEmpleadosQueja(), []));
@@ -153,32 +167,7 @@ export default function DetalleCasoQuejaPage({ idQueja }) {
 
   let contenido;
   if (caso.error && !datos) {
-    contenido =
-      caso.error.estado === 404 ? (
-        <EstadoVacio
-          icono={SearchX}
-          titulo="No se encontró la queja"
-          mensaje="Puede que el enlace esté incompleto. Vuelva a la bandeja y ábrala desde la lista."
-          accion={
-            <Boton as={Link} to={RUTA_CASOS_QUEJA}>
-              Volver a la bandeja
-            </Boton>
-          }
-        />
-      ) : (
-        <Alerta
-          tono="peligro"
-          role="alert"
-          titulo="No se pudo cargar la queja"
-          acciones={
-            <Boton tamano="sm" onClick={caso.reintentar}>
-              Reintentar
-            </Boton>
-          }
-        >
-          {caso.error.message}
-        </Alerta>
-      );
+    contenido = <ErrorCaso error={caso.error} ruta={RUTA_CASOS_QUEJA} reintentar={caso.reintentar} />;
   } else if (catalogos.error && !catalogos.datos) {
     contenido = (
       <Alerta
@@ -213,9 +202,20 @@ export default function DetalleCasoQuejaPage({ idQueja }) {
         <div className="qc-detalle">
           <div className="qc-columna">
             <ResumenCaso caso={datos} />
-            <HistorialCaso caso={datos} />
+            <LineaTiempoCaso caso={datos} seguimiento={seguimiento} />
           </div>
           <div className="qc-columna">
+            {seguimiento.datos && (
+              <GestionCasoQueja
+                caso={datos}
+                seguimiento={seguimiento.datos}
+                sesion={sesion}
+                onActualizado={() => {
+                  caso.reintentar();
+                  seguimiento.reintentar();
+                }}
+              />
+            )}
             {editable && (
               <FormularioDerivacion
                 key={datos.actualizada_en}
@@ -247,23 +247,137 @@ export default function DetalleCasoQuejaPage({ idQueja }) {
   }
 
   return (
+    <PaginaDetalle datos={datos} etiqueta="Casos de quejas" ruta={RUTA_CASOS_QUEJA}>
+      {contenido}
+    </PaginaDetalle>
+  );
+}
+
+function PaginaDetalle({ datos, etiqueta, ruta, children }) {
+  return (
     <section className="qc-pagina" aria-labelledby="qc-detalle-titulo">
       <EncabezadoPagina
-        migas={[
-          { etiqueta: "Inicio", href: "/" },
-          { etiqueta: "Desempeño" },
-          { etiqueta: "Casos de quejas", href: RUTA_CASOS_QUEJA },
-        ]}
+        migas={[{ etiqueta: "Inicio", href: "/" }, { etiqueta: "Desempeño" }, { etiqueta, href: ruta }]}
         enlace={Link}
         titulo={datos ? `Queja ${datos.codigo_seguimiento}` : "Caso de queja"}
         idTitulo="qc-detalle-titulo"
         acciones={
-          <Boton as={Link} to={RUTA_CASOS_QUEJA} icono={ArrowLeft}>
+          <Boton as={Link} to={ruta} icono={ArrowLeft}>
             Volver a la bandeja
           </Boton>
         }
       />
-      {contenido}
+      {children}
     </section>
   );
+}
+
+function ErrorCaso({ error, ruta, reintentar }) {
+  if (error.estado === 404) {
+    return (
+      <EstadoVacio
+        icono={SearchX}
+        titulo="No se encontró la queja"
+        mensaje="Puede que el enlace esté incompleto. Vuelva a la bandeja y ábrala desde la lista."
+        accion={
+          <Boton as={Link} to={ruta}>
+            Volver a la bandeja
+          </Boton>
+        }
+      />
+    );
+  }
+  if (error.estado === 403) {
+    return (
+      <EstadoVacio
+        icono={Lock}
+        titulo="Este caso no está asignado a usted"
+        mensaje="Puede que RRHH lo haya derivado a otra persona. Vuelva a la bandeja."
+        accion={
+          <Boton as={Link} to={ruta}>
+            Volver a la bandeja
+          </Boton>
+        }
+      />
+    );
+  }
+  return (
+    <Alerta
+      tono="peligro"
+      role="alert"
+      titulo="No se pudo cargar la queja"
+      acciones={
+        <Boton tamano="sm" onClick={reintentar}>
+          Reintentar
+        </Boton>
+      }
+    >
+      {error.message}
+    </Alerta>
+  );
+}
+
+const sinCaso = () => Promise.resolve(null);
+
+function DetalleResponsable({ idQueja, sesion, idEmpleado }) {
+  const caso = useRecurso(
+    useCallback(() => (idEmpleado ? obtenerCasoAsignado(sesion, idQueja) : sinCaso()), [sesion, idQueja, idEmpleado]),
+  );
+  const seguimiento = useRecurso(
+    useCallback(() => (idEmpleado ? cargarSeguimiento(sesion, idQueja) : sinCaso()), [sesion, idQueja, idEmpleado]),
+  );
+  const datos = caso.datos;
+  const recargar = () => {
+    caso.reintentar();
+    seguimiento.reintentar();
+  };
+
+  let contenido;
+  if (!idEmpleado) {
+    contenido = (
+      <Alerta tono="aviso" titulo="Elija su usuario de prueba">
+        Para atender el caso, seleccione quién es en «Usuario de prueba», al pie de la barra lateral.
+      </Alerta>
+    );
+  } else if (caso.error && !datos) {
+    contenido = <ErrorCaso error={caso.error} ruta={RUTA_MIS_CASOS_QUEJA} reintentar={caso.reintentar} />;
+  } else if (!datos) {
+    contenido = <Cargando />;
+  } else {
+    contenido = (
+      <>
+        {datos.estado.es_final && (
+          <Alerta tono="info" titulo="Caso cerrado">
+            La queja está en estado «{datos.estado.nombre}» y ya no admite acciones ni cambios de estado.
+          </Alerta>
+        )}
+        <div className="qc-detalle">
+          <div className="qc-columna">
+            <ResumenCaso caso={datos} responsable />
+            <LineaTiempoCaso caso={datos} seguimiento={seguimiento} />
+          </div>
+          <div className="qc-columna">
+            {seguimiento.datos && (
+              <GestionCasoQueja caso={datos} seguimiento={seguimiento.datos} sesion={sesion} onActualizado={recargar} />
+            )}
+            <InvolucradosLectura caso={datos} />
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <PaginaDetalle datos={datos} etiqueta="Mis casos de quejas" ruta={RUTA_MIS_CASOS_QUEJA}>
+      {contenido}
+    </PaginaDetalle>
+  );
+}
+
+export default function DetalleCasoQuejaPage({ idQueja, alcance = "administrador" }) {
+  const rol = useRol();
+  const idEmpleado = useUsuario();
+  const sesion = useMemo(() => ({ rol, idEmpleado }), [rol, idEmpleado]);
+  const Detalle = alcance === "responsable" ? DetalleResponsable : DetalleAdministrador;
+  return <Detalle idQueja={idQueja} sesion={sesion} idEmpleado={idEmpleado} />;
 }

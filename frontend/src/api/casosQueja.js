@@ -60,3 +60,45 @@ export const quitarInvolucradoQueja = (sesion, idQueja, idEmpleado) =>
   });
 
 export const listarEmpleadosQueja = () => solicitar("/empl/empleados");
+
+const comoEmpleado = ({ rol, idEmpleado }) => ({ ...(rol && { "X-Rol": rol }), ...(idEmpleado && { "X-Empleado-Id": idEmpleado }) });
+
+export const listarCatalogosAsignados = (sesion) =>
+  solicitar(`${RUTA}/asignados/catalogos`, { cabeceras: comoEmpleado(sesion) });
+
+export function listarCasosAsignados(sesion, { estado, categoria, prioridad, pagina, limite } = {}) {
+  const parametros = new URLSearchParams();
+  Object.entries({ estado, categoria, prioridad, pagina, limite }).forEach(([clave, valor]) => {
+    if (valor !== undefined && valor !== null && valor !== "") parametros.set(clave, valor);
+  });
+  const consulta = parametros.toString();
+  return solicitar(consulta ? `${RUTA}/asignados?${consulta}` : `${RUTA}/asignados`, {
+    cabeceras: comoEmpleado(sesion),
+  });
+}
+
+export const obtenerCasoAsignado = (sesion, idQueja) =>
+  solicitar(`${RUTA}/asignados/${idQueja}`, { cabeceras: comoEmpleado(sesion) });
+
+export const obtenerSeguimientoQueja = (sesion, idQueja) =>
+  solicitar(`${RUTA}/casos/${idQueja}/seguimiento`, { cabeceras: comoEmpleado(sesion) });
+
+export const registrarAccionQueja = (sesion, idQueja, { idTipo, descripcion }) =>
+  solicitar(`${RUTA}/casos/${idQueja}/acciones`, {
+    metodo: "POST",
+    cuerpo: { id_tipo_accion_queja: idTipo, descripcion },
+    cabeceras: comoEmpleado(sesion),
+  });
+
+export const cambiarEstadoQueja = (sesion, idQueja, { idEstado, resolucion }) =>
+  solicitar(`${RUTA}/casos/${idQueja}/estado`, {
+    metodo: "POST",
+    cuerpo: { id_estado_queja: idEstado, ...(resolucion !== undefined && { resolucion }) },
+    cabeceras: comoEmpleado(sesion),
+  });
+
+export const reintentarAvisoResolucionQueja = (sesion, idQueja) =>
+  solicitar(`${RUTA}/casos/${idQueja}/resolucion/notificacion`, {
+    metodo: "POST",
+    cabeceras: comoEmpleado(sesion),
+  });
