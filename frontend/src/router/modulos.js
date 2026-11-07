@@ -3,7 +3,7 @@ import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsisten
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
 import { RUTA_EVALUACIONES } from "../features/evaluaciones/ruta";
-import PlantillasPage from "../features/plantillas-evaluacion/PlantillasPage";
+import PlantillasEvaluacionPage from "../features/plantillas-evaluacion/PlantillasEvaluacionPage";
 import { RUTA_PLANTILLAS } from "../features/plantillas-evaluacion/ruta";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
@@ -337,11 +337,12 @@ export const SECCIONES = [
       },
       {
         ruta: RUTA_PLANTILLAS,
+        parametroOpcional: "idPlantilla",
         etiqueta: "Plantillas de evaluación",
         descripcion: "Diseño de plantillas estandarizadas por área y vigencia, en borrador hasta su publicación.",
         icono: ClipboardList,
         roles: ["admin"],
-        pagina: PlantillasPage,
+        pagina: PlantillasEvaluacionPage,
       },
     ],
   },

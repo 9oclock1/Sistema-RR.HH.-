@@ -24,3 +24,27 @@ export const actualizarPlantilla = (idEmpleado, idPlantilla, plantilla) =>
 
 export const eliminarPlantilla = (idEmpleado, idPlantilla) =>
   solicitar(`${RUTA}/${idPlantilla}`, { metodo: "DELETE", cabeceras: comoEmpleado(idEmpleado) });
+
+// Detalle de la plantilla con sus versiones (la más reciente define su estado).
+export const obtenerPlantilla = (idEmpleado, idPlantilla) =>
+  solicitar(`${RUTA}/${idPlantilla}`, { cabeceras: comoEmpleado(idEmpleado) });
+
+// Una versión con sus secciones. `editable` indica si todavía es un borrador.
+export const obtenerVersion = (idEmpleado, idPlantilla, idVersion) =>
+  solicitar(`${RUTA}/${idPlantilla}/versiones/${idVersion}`, { cabeceras: comoEmpleado(idEmpleado) });
+
+// Deja las secciones de la versión como la lista de competencias, en ese orden. Solo funciona en borradores (409 si no).
+export const guardarSecciones = (idEmpleado, idPlantilla, idVersion, idsCompetencia) =>
+  solicitar(`${RUTA}/${idPlantilla}/versiones/${idVersion}/secciones`, {
+    metodo: "PUT",
+    cuerpo: { secciones: idsCompetencia.map((id) => ({ id_competencia: id })) },
+    cabeceras: comoEmpleado(idEmpleado),
+  });
+
+// Catálogo de competencias laborales y factores operativos activos.
+export const listarCompetencias = (idEmpleado) =>
+  solicitar("/perf/competencias", { cabeceras: comoEmpleado(idEmpleado) });
+
+// tipo: COMPETENCIA_LABORAL o FACTOR_OPERATIVO. Si el nombre ya existe responde 409.
+export const crearCompetencia = (idEmpleado, competencia) =>
+  solicitar("/perf/competencias", { metodo: "POST", cuerpo: competencia, cabeceras: comoEmpleado(idEmpleado) });

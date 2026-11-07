@@ -1,6 +1,8 @@
-import { ClipboardList, Pencil, Trash2 } from "lucide-react";
+import { Link } from "react-router";
+import { ClipboardList, ListTree, Pencil, Trash2 } from "lucide-react";
 import { Boton, EstadoVacio, Etiqueta, Tabla, TextoTruncado } from "../../components/ui";
 import { ESTADOS_PLANTILLA, esEditable, formatearVigencia } from "./formato";
+import { rutaPlantilla } from "./ruta";
 
 const COLUMNAS = ({ onEditar, onEliminar }) => [
   {
@@ -9,7 +11,9 @@ const COLUMNAS = ({ onEditar, onEliminar }) => [
     ancho: "34%",
     celda: (p) => (
       <div className="pl-celda">
-        <TextoTruncado className="pl-celda__principal">{p.nombre}</TextoTruncado>
+        <Link to={rutaPlantilla(p.id_plantilla)} className="pl-enlace ds-foco">
+          <TextoTruncado className="pl-celda__principal">{p.nombre}</TextoTruncado>
+        </Link>
         <TextoTruncado className="pl-sutil">{p.objetivo}</TextoTruncado>
       </div>
     ),
@@ -50,27 +54,42 @@ const COLUMNAS = ({ onEditar, onEliminar }) => [
   {
     clave: "acciones",
     titulo: <span className="ds-solo-lector">Acciones</span>,
-    celda: (p) =>
-      esEditable(p) && (
+    celda: (p) => {
+      const accion = esEditable(p) ? "Configurar secciones" : "Ver estructura";
+      return (
         <div className="pl-acciones">
           <Boton
+            as={Link}
+            to={rutaPlantilla(p.id_plantilla)}
             variante="sutil"
             soloIcono
-            icono={Pencil}
-            aria-label={`Editar ${p.nombre}`}
-            title="Editar datos"
-            onClick={() => onEditar(p)}
+            icono={ListTree}
+            aria-label={`${accion} de ${p.nombre}`}
+            title={accion}
           />
-          <Boton
-            variante="sutil"
-            soloIcono
-            icono={Trash2}
-            aria-label={`Eliminar ${p.nombre}`}
-            title="Eliminar"
-            onClick={() => onEliminar(p)}
-          />
+          {esEditable(p) && (
+            <>
+              <Boton
+                variante="sutil"
+                soloIcono
+                icono={Pencil}
+                aria-label={`Editar ${p.nombre}`}
+                title="Editar datos"
+                onClick={() => onEditar(p)}
+              />
+              <Boton
+                variante="sutil"
+                soloIcono
+                icono={Trash2}
+                aria-label={`Eliminar ${p.nombre}`}
+                title="Eliminar"
+                onClick={() => onEliminar(p)}
+              />
+            </>
+          )}
         </div>
-      ),
+      );
+    },
   },
 ];
 
