@@ -155,6 +155,7 @@ services:
     volumes:
       - ./backend/PerformanceService:/app
       - /app/node_modules
+      - quejas_adjuntos:/app/uploads/quejas
     depends_on:
       - postgres
     networks:
@@ -178,6 +179,7 @@ services:
 
 volumes:
   postgres_data:
+  quejas_adjuntos:
 
 networks:
   rrhh-network:
