@@ -25,4 +25,8 @@ async function descartar(req, res) {
   res.status(204).end();
 }
 
-module.exports = { listar, obtener, generar, descartar };
+async function aprobar(req, res) {
+  res.json(await servicio.aprobar(req.params.id, identidad(req)));
+}
+
+module.exports = { listar, obtener, generar, descartar, aprobar };

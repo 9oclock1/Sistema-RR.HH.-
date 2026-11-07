@@ -176,4 +176,29 @@ async function descartar(id, identidad = {}) {
   }).catch(traducirBloqueo);
 }
 
-module.exports = { listar, obtener, generar, descartar };
+// Criterio 2: el Administrador aprueba el borrador y la planilla queda bloqueada para edición.
+// Solo se aprueba un mes completo, con datos hasta su último día y al menos un colaborador.
+async function aprobar(id, identidad = {}) {
+  const idResponsable = validarResponsable(identidad);
+  if (!UUID_RE.test(id ?? "")) throw noEncontrada();
+  const nombre = responsableEn(await externos.listarPersonal(), idResponsable);
+  await enTransaccion(async (cliente) => {
+    const planilla = await modelo.bloquear(cliente, id);
+    if (!planilla) throw noEncontrada();
+    const mes = nombreMes(planilla.periodo);
+    if (planilla.estado !== "BORRADOR") throw new ErrorApp(409, `La planilla de ${mes} ya fue aprobada.`);
+    if (planilla.datos_hasta < planilla.fecha_fin) {
+      throw new ErrorApp(
+        409,
+        `La planilla de ${mes} tiene datos hasta el ${fechaCorta(planilla.datos_hasta)}: vuelva a generarla cuando termine el mes para aprobarla.`
+      );
+    }
+    if ((await modelo.contarEmpleados(cliente, id)) === 0) {
+      throw new ErrorApp(409, `La planilla de ${mes} no tiene colaboradores: no se puede aprobar.`);
+    }
+    await modelo.aprobar(cliente, id, { idEmpleado: idResponsable, nombre });
+  }).catch(traducirBloqueo);
+  return obtener(id);
+}
+
+module.exports = { listar, obtener, generar, descartar, aprobar };

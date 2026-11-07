@@ -7,5 +7,6 @@ router.get("/planillas", controlador.listar);
 router.post("/planillas", controlador.generar);
 router.get("/planillas/:id", controlador.obtener);
 router.delete("/planillas/:id", controlador.descartar);
+router.post("/planillas/:id/aprobar", controlador.aprobar);
 
 module.exports = router;

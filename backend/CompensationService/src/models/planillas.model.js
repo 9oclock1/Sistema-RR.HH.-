@@ -125,4 +125,29 @@ async function eliminar(cliente, id) {
   await cliente.query("DELETE FROM planillas WHERE id_planilla = $1", [id]);
 }
 
-module.exports = { listar, obtener, bloquearPeriodo, bloquear, crear, reemplazar, guardarEmpleados, listarEmpleados, eliminar };
+async function aprobar(cliente, id, { idEmpleado, nombre }) {
+  await cliente.query(
+    `UPDATE planillas SET estado = 'APROBADA', aprobada_por = $2, aprobada_por_nombre = $3, aprobada_en = CURRENT_TIMESTAMP
+     WHERE id_planilla = $1`,
+    [id, idEmpleado, nombre]
+  );
+}
+
+async function contarEmpleados(cliente, id) {
+  const { rows } = await cliente.query("SELECT COUNT(*)::int AS cantidad FROM planilla_empleados WHERE id_planilla = $1", [id]);
+  return rows[0].cantidad;
+}
+
+module.exports = {
+  listar,
+  obtener,
+  bloquearPeriodo,
+  bloquear,
+  crear,
+  reemplazar,
+  guardarEmpleados,
+  listarEmpleados,
+  eliminar,
+  aprobar,
+  contarEmpleados,
+};
