@@ -1,5 +1,5 @@
 -- Created by Redgate Data Modeler (https://datamodeler.redgate-platform.com)
--- Last modification date: 2026-11-04 12:41:33.000
+-- Last modification date: 2026-11-07 10:00:00.000
 -- extensions
 -- btree_gist: permite combinar el nombre, el área y el rango de vigencia en la restricción EXCLUDE de PLANTILLAS_EVALUACION.
 CREATE EXTENSION IF NOT EXISTS btree_gist;
@@ -15,6 +15,22 @@ CREATE TABLE ACCIONES_QUEJA (
     fecha_cumplimiento date NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT ACCIONES_QUEJA_pk PRIMARY KEY (id_accion)
+);
+-- Table: ADJUNTOS_QUEJA
+CREATE TABLE ADJUNTOS_QUEJA (
+    id_adjunto UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_queja UUID NOT NULL,
+    orden SMALLINT NOT NULL,
+    nombre_original bytea NULL,
+    tipo_mime varchar(50) NOT NULL,
+    tamano_bytes int NOT NULL,
+    clave_almacenamiento varchar(64) NOT NULL,
+    CONSTRAINT ADJUNTOS_QUEJA_pk PRIMARY KEY (id_adjunto),
+    CONSTRAINT uq_adjunto_queja_orden UNIQUE (id_queja, orden),
+    CONSTRAINT uq_adjunto_queja_clave UNIQUE (clave_almacenamiento),
+    CONSTRAINT chk_adjunto_queja_orden CHECK (orden BETWEEN 1 AND 3),
+    CONSTRAINT chk_adjunto_queja_tipo CHECK (tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png')),
+    CONSTRAINT chk_adjunto_queja_tamano CHECK (tamano_bytes > 0 AND tamano_bytes <= 5242880)
 );
 -- Table: ASIGNACIONES_QUEJA
 CREATE TABLE ASIGNACIONES_QUEJA (
@@ -180,8 +196,8 @@ CREATE TABLE DEPARTAMENTOS (
 CREATE TABLE EMPLEADOS (
     id_empleado UUID NOT NULL,
     id_usuario UUID NULL,
-    nombres varchar(70) NOT NULL,
-    apellidos varchar(100) NOT NULL,
+    nombres varchar(70) NULL,
+    apellidos varchar(100) NULL,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT EMPLEADOS_pk PRIMARY KEY (id_empleado),
     CONSTRAINT uq_empleado_usuario UNIQUE (id_usuario)
@@ -319,7 +335,12 @@ CREATE TABLE PLANTILLAS_EVALUACION (
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT PLANTILLAS_EVALUACION_pk PRIMARY KEY (id_plantilla),
-    CONSTRAINT chk_plantilla_vigencia CHECK (vigencia_hasta >= vigencia_desde)
+    CONSTRAINT chk_plantilla_vigencia CHECK (vigencia_hasta >= vigencia_desde),
+    CONSTRAINT ex_plantilla_nombre_area_vigencia EXCLUDE USING gist (
+        nombre WITH =,
+        id_departamento_destino WITH =,
+        daterange(vigencia_desde, vigencia_hasta, '[]') WITH &&
+    )
 );
 -- Table: PREGUNTAS_EVALUACION
 CREATE TABLE PREGUNTAS_EVALUACION (
@@ -338,17 +359,21 @@ CREATE TABLE PREGUNTAS_EVALUACION (
 CREATE TABLE QUEJAS (
     id_queja UUID NOT NULL DEFAULT gen_random_uuid(),
     id_empleado_denunciante UUID NULL,
-    id_categoria_queja SMALLINT NULL,
+    id_categoria_queja SMALLINT NOT NULL,
     id_estado_queja SMALLINT NOT NULL DEFAULT 1,
     id_departamento UUID NULL,
     id_sucursal UUID NULL,
-    codigo_seguimiento varchar(20) NOT NULL,
-    asunto varchar(150) NOT NULL,
-    descripcion text NOT NULL,
+    es_anonima boolean NOT NULL DEFAULT FALSE,
+    codigo_seguimiento varchar(12) NOT NULL,
+    asunto bytea NOT NULL,
+    descripcion bytea NOT NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT QUEJAS_pk PRIMARY KEY (id_queja),
-    CONSTRAINT uq_queja_codigo_seguimiento UNIQUE (codigo_seguimiento)
+    CONSTRAINT uq_queja_codigo_seguimiento UNIQUE (codigo_seguimiento),
+    CONSTRAINT chk_queja_codigo_seguimiento CHECK (codigo_seguimiento ~ '^QJ-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$'),
+    CONSTRAINT chk_queja_anonimato CHECK (es_anonima = (id_empleado_denunciante IS NULL)),
+    CONSTRAINT chk_queja_cifrado CHECK (octet_length(asunto) > 28 AND octet_length(descripcion) > 28)
 );
 CREATE INDEX idx_quejas_estado ON QUEJAS (id_estado_queja, creado_en);
 CREATE INDEX idx_quejas_denunciante ON QUEJAS (id_empleado_denunciante);
@@ -406,6 +431,9 @@ ADD CONSTRAINT ACCIONES_QUEJA_EMPLEADOS FOREIGN KEY (id_empleado_registrador) RE
 -- Reference: ACCIONES_QUEJA_QUEJAS (table: ACCIONES_QUEJA)
 ALTER TABLE ACCIONES_QUEJA
 ADD CONSTRAINT ACCIONES_QUEJA_QUEJAS FOREIGN KEY (id_queja) REFERENCES QUEJAS (id_queja) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: ADJUNTOS_QUEJA_QUEJAS (table: ADJUNTOS_QUEJA)
+ALTER TABLE ADJUNTOS_QUEJA
+ADD CONSTRAINT ADJUNTOS_QUEJA_QUEJAS FOREIGN KEY (id_queja) REFERENCES QUEJAS (id_queja) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- Reference: ASIGNACIONES_QUEJA_EMPLEADOS_ASIGNADOR (table: ASIGNACIONES_QUEJA)
 ALTER TABLE ASIGNACIONES_QUEJA
 ADD CONSTRAINT ASIGNACIONES_QUEJA_EMPLEADOS_ASIGNADOR FOREIGN KEY (id_empleado_asignador) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
@@ -547,80 +575,4 @@ ADD CONSTRAINT VERSIONES_PLANTILLA_EMPLEADOS FOREIGN KEY (id_empleado_publicador
 -- Reference: VERSIONES_PLANTILLA_PLANTILLAS_EVALUACION (table: VERSIONES_PLANTILLA)
 ALTER TABLE VERSIONES_PLANTILLA
 ADD CONSTRAINT VERSIONES_PLANTILLA_PLANTILLAS_EVALUACION FOREIGN KEY (id_plantilla) REFERENCES PLANTILLAS_EVALUACION (id_plantilla) NOT DEFERRABLE INITIALLY IMMEDIATE;
--- additional constraints
--- KAN-9: no puede haber dos plantillas con el mismo nombre y área si sus vigencias se cruzan.
-ALTER TABLE PLANTILLAS_EVALUACION
-ADD CONSTRAINT ex_plantilla_nombre_area_vigencia EXCLUDE USING gist (
-    nombre WITH =,
-    id_departamento_destino WITH =,
-    daterange(vigencia_desde, vigencia_hasta, '[]') WITH &&
-);
--- seed
-INSERT INTO CATALOGOS_ESTADO_VERSION (id_estado_version, codigo, nombre)
-VALUES (1, 'BORRADOR', 'Borrador'),
-    (2, 'PUBLICADA', 'Publicada'),
-    (3, 'ARCHIVADA', 'Archivada');
-INSERT INTO CATALOGOS_TIPO_COMPETENCIA (id_tipo_competencia, codigo, nombre)
-VALUES (1, 'COMPETENCIA_LABORAL', 'Competencia laboral'),
-    (2, 'FACTOR_OPERATIVO', 'Factor operativo');
-INSERT INTO CATALOGOS_TIPO_ESCALA (id_tipo_escala, codigo, nombre)
-VALUES (1, 'CUANTITATIVA', 'Cuantitativa'),
-    (2, 'CUALITATIVA', 'Cualitativa');
-INSERT INTO CATALOGOS_ESTADO_CICLO (id_estado_ciclo, codigo, nombre)
-VALUES (1, 'PROGRAMADO', 'Programado'),
-    (2, 'ACTIVO', 'Activo'),
-    (3, 'CERRADO', 'Cerrado');
-INSERT INTO CATALOGOS_ESTADO_EVALUACION (id_estado_evaluacion, codigo, nombre)
-VALUES (1, 'PENDIENTE', 'Pendiente'),
-    (2, 'BORRADOR', 'Borrador'),
-    (3, 'ENVIADA', 'Enviada'),
-    (4, 'VENCIDA', 'Vencida');
-INSERT INTO CATALOGOS_ESTADO_EVENTO (id_estado_evento, codigo, nombre)
-VALUES (1, 'PENDIENTE', 'Pendiente'),
-    (2, 'ENTREGADO', 'Entregado'),
-    (3, 'FALLIDO', 'Fallido');
-INSERT INTO CATALOGOS_ESTADO_MENSAJE (id_estado_mensaje, codigo, nombre)
-VALUES (1, 'RECIBIDO', 'Recibido'),
-    (2, 'PROCESADO', 'Procesado'),
-    (3, 'EN_DLQ', 'En cola de errores');
-INSERT INTO CATALOGOS_MODULO_EXTERNO (id_modulo_externo, codigo, nombre, grupo)
-VALUES (1, 'CRM', 'CRM', 'B');
-INSERT INTO CATALOGOS_CATEGORIA_QUEJA (id_categoria_queja, codigo, nombre)
-VALUES (1, 'CLIMA_LABORAL', 'Clima laboral'),
-    (2, 'ACOSO', 'Acoso'),
-    (3, 'CONDICIONES_TRABAJO', 'Condiciones de trabajo'),
-    (4, 'OTRO', 'Otro');
-INSERT INTO CATALOGOS_ESTADO_QUEJA (id_estado_queja, codigo, nombre, es_final)
-VALUES (1, 'REGISTRADA', 'Registrada', FALSE),
-    (2, 'ASIGNADA', 'Asignada', FALSE),
-    (3, 'EN_ATENCION', 'En atención', FALSE),
-    (4, 'RESUELTA', 'Resuelta', TRUE),
-    (5, 'DESESTIMADA', 'Desestimada', TRUE);
-INSERT INTO CATALOGOS_TIPO_ACCION_QUEJA (id_tipo_accion_queja, codigo, nombre)
-VALUES (1, 'PREVENTIVA', 'Preventiva'),
-    (2, 'CORRECTIVA', 'Correctiva');
--- Escalas de partida: KAN-22 pide la etiqueta de cada nivel de la escala Likert de 1 a 5.
-INSERT INTO ESCALAS_VALORACION (id_escala, id_tipo_escala, nombre, descripcion)
-VALUES (
-        '00000000-0000-4000-8000-000000000001',
-        1,
-        'Likert de 1 a 5',
-        'Escala cuantitativa de cinco niveles'
-    ),
-    (
-        '00000000-0000-4000-8000-000000000002',
-        2,
-        'Nivel de cumplimiento',
-        'Escala cualitativa de cuatro niveles'
-    );
-INSERT INTO NIVELES_ESCALA (id_escala, valor, etiqueta)
-VALUES ('00000000-0000-4000-8000-000000000001', 1, 'Muy deficiente'),
-    ('00000000-0000-4000-8000-000000000001', 2, 'Deficiente'),
-    ('00000000-0000-4000-8000-000000000001', 3, 'Aceptable'),
-    ('00000000-0000-4000-8000-000000000001', 4, 'Bueno'),
-    ('00000000-0000-4000-8000-000000000001', 5, 'Excelente'),
-    ('00000000-0000-4000-8000-000000000002', 1, 'No cumple'),
-    ('00000000-0000-4000-8000-000000000002', 2, 'Cumple parcialmente'),
-    ('00000000-0000-4000-8000-000000000002', 3, 'Cumple'),
-    ('00000000-0000-4000-8000-000000000002', 4, 'Supera lo esperado');
 -- End of file.

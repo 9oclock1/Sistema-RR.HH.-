@@ -1,5 +1,5 @@
 -- Datos de prueba de PerformanceDB
--- Requiere que init.sql ya se haya ejecutado.
+-- Requiere init.sql y catalogos.sql, que se cargan solos al crear la base.
 -- NO formatear con un formateador de SQL: los comandos de psql (\set, \if, \else, \endif) deben ir
 -- cada uno en su propia línea y el formateador los une y rompe el archivo.
 -- Uso (PowerShell):

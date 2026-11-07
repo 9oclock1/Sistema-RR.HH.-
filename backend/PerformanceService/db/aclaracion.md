@@ -2,12 +2,15 @@
 
 Dentro de la base de datos se encuentran las siguientes observaciones que deben ser tomadas a consideración al momento de llenar los datos y saber a que conectar y a qué no. La base no usa procedimientos almacenados, triggers ni vistas, así que las reglas marcadas como "backend" las valida el servicio.
 
+`init.sql` solo crea el esquema (sin datos). Los catálogos y las escalas de partida están en `catalogos.sql`, que `init-all.sh` carga solo justo después de `init.sql` al crear la base. Los datos de prueba están en `seed.sql`, que se corre a mano después.
+
 ## Réplica mínima de EmployeeDB
 
 - `EMPLEADOS`, `DEPARTAMENTOS` y `SUCURSALES` solo copian lo necesario para conectar las tablas con FK y mostrar nombres sin consultar otro servicio. Sus id son los mismos de EmployeeDB, por eso no tienen valor por defecto.
 - Lo demás (cargo, jerarquía, fecha de ingreso, estado) se consulta a EmployeeService cuando se necesita.
 - `id_usuario` debería hacer referencia a id_usuario de AuthDB; queda NULL mientras no exista inicio de sesión.
 - Backend: la fila se crea o actualiza antes de usarla, por ejemplo al generar las evaluaciones de un ciclo o al registrar una queja identificada.
+- `nombres` y `apellidos` quedan en NULL si EmployeeService no respondió al crear la fila (por ejemplo, al registrar una queja identificada); se completan en la siguiente sincronización.
 
 ## Plantillas y versiones
 
@@ -21,7 +24,7 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 
 - `COMPETENCIAS` es un catálogo común a todas las plantillas: permite comparar una misma competencia entre versiones y ciclos. Cada sección de una versión usa una competencia, que es de tipo competencia laboral o factor operativo.
 - Toda escala se define por sus niveles (`NIVELES_ESCALA`): `etiqueta` es lo que ve el evaluador y `valor` es lo que se usa para calcular, también en las escalas cualitativas.
-- Se cargan dos escalas de partida: Likert de 1 a 5 (cuantitativa) y Nivel de cumplimiento (cualitativa).
+- `catalogos.sql` carga dos escalas de partida: Likert de 1 a 5 (cuantitativa) y Nivel de cumplimiento (cualitativa).
 - Backend: no se modifican los niveles de una escala usada en una versión publicada.
 
 ## Ciclos y evaluaciones
@@ -45,7 +48,7 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 
 ## Datos de prueba
 
-- `seed.sql` carga datos ficticios para probar KAN-24: una plantilla publicada con 6 preguntas (pesos que suman 100 y una opcional), tres ciclos y seis evaluaciones en distintos estados. No se ejecuta al crear la base ni está montado en `docker-compose.yml`; se corre a mano después de `init.sql` y se puede repetir sin duplicar filas.
+- `seed.sql` carga datos ficticios para probar KAN-24: una plantilla publicada con 6 preguntas (pesos que suman 100 y una opcional), tres ciclos y seis evaluaciones en distintos estados. No se ejecuta al crear la base ni está montado en `docker-compose.yml`; se corre a mano después de que `init.sql` y `catalogos.sql` crearon la base, y se puede repetir sin duplicar filas.
 - Los empleados del seed son réplicas con id de demostración. Para ver la bandeja con el "Usuario de prueba" del portal, pasa su `id_empleado` de EmployeeService como `-v id_evaluador=<uuid>`; las demás variables (`id_evaluador_2`, `id_creador`, `id_evaluado_1` a `id_evaluado_4`) son opcionales. El encabezado del archivo trae el comando completo.
 
 ## Integración con CRM
@@ -59,9 +62,12 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 
 ## Quejas internas
 
-- Una queja anónima tiene `id_empleado_denunciante` en NULL y no se guarda ningún dato que identifique a quien la presenta. Por eso `id_empleado_responsable` del primer registro de `HISTORIALES_ESTADO_QUEJA` también queda en NULL.
-- `codigo_seguimiento` permite consultar el avance sin identificarse. Backend: debe generarse al azar.
-- `id_categoria_queja` queda en NULL hasta que RRHH clasifica el caso.
+- Una queja anónima tiene `es_anonima` en TRUE e `id_empleado_denunciante` en NULL (`chk_queja_anonimato` obliga a que vayan juntos), y no se guarda ningún dato que identifique a quien la presenta. Por eso `id_empleado_responsable` del primer registro de `HISTORIALES_ESTADO_QUEJA` también queda en NULL.
+- `codigo_seguimiento` permite consultar el avance sin identificarse. Tiene el formato `QJ-XXXX-XXXX` con el alfabeto Crockford (sin I, L, O ni U). Backend: debe generarse al azar con `crypto`, nunca de forma secuencial.
+- `asunto`, `descripcion` y `ADJUNTOS_QUEJA.nombre_original` se guardan cifrados con AES-256-GCM en ambos modos: cada valor es `iv (12 bytes) + authTag (16 bytes) + texto cifrado` en un solo `bytea`. `chk_queja_cifrado` rechaza valores que no alcanzan ese tamaño mínimo.
+- `id_categoria_queja` la elige el empleado al registrar; RRHH puede reclasificarla al atender el caso.
+- `ADJUNTOS_QUEJA` guarda solo los metadatos; el archivo va cifrado en disco (`uploads/quejas/`) con el nombre `clave_almacenamiento`. Se aceptan hasta 3 archivos PDF, JPG o PNG de 5 MB cada uno, numerados por `orden`.
+- Backend: en una queja anónima, `nombre_original` queda en NULL (se muestra un nombre genérico como `adjunto-1.pdf`) y el archivo se guarda sin metadatos (EXIF, XMP, autor del PDF).
 - `id_departamento` e `id_sucursal` indican dónde ocurre el problema, no a quién pertenece la queja.
 - El responsable vigente es la fila más reciente de `ASIGNACIONES_QUEJA`, y el tiempo de atención se calcula con `HISTORIALES_ESTADO_QUEJA`.
 - Las tablas de esta parte salen de los RF-68 a RF-71; pueden ampliarse cuando existan las historias de usuario de la épica 12.
