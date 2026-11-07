@@ -117,7 +117,7 @@ function armarAviso({ codigoSeguimiento, categoria, prioridadCodigo, prioridadNo
       `Prioridad: ${prioridadNombre}`,
       `Fecha de derivación: ${formatoFecha().format(new Date(derivadaEn))}`,
       "",
-      "Por confidencialidad, el detalle del caso se revisa con el Administrador de RRHH.",
+      "El detalle del caso está en «Mis casos de quejas» del portal; por confidencialidad no va en este aviso.",
     ].join("\n"),
     prioridad: PRIORIDADES_URGENTES.includes(prioridadCodigo) ? "ALTA" : "NORMAL",
   };
