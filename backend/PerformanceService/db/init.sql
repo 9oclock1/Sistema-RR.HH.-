@@ -319,7 +319,9 @@ CREATE TABLE PLANTILLAS_EVALUACION (
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT PLANTILLAS_EVALUACION_pk PRIMARY KEY (id_plantilla),
-    CONSTRAINT chk_plantilla_vigencia CHECK (vigencia_hasta >= vigencia_desde)
+    CONSTRAINT chk_plantilla_vigencia CHECK (vigencia_hasta >= vigencia_desde),
+    CONSTRAINT chk_plantilla_nombre CHECK (btrim(nombre) <> ''),
+    CONSTRAINT chk_plantilla_objetivo CHECK (btrim(objetivo) <> '')
 );
 -- Table: PREGUNTAS_EVALUACION
 CREATE TABLE PREGUNTAS_EVALUACION (
@@ -548,10 +550,9 @@ ADD CONSTRAINT VERSIONES_PLANTILLA_EMPLEADOS FOREIGN KEY (id_empleado_publicador
 ALTER TABLE VERSIONES_PLANTILLA
 ADD CONSTRAINT VERSIONES_PLANTILLA_PLANTILLAS_EVALUACION FOREIGN KEY (id_plantilla) REFERENCES PLANTILLAS_EVALUACION (id_plantilla) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- additional constraints
--- KAN-9: no puede haber dos plantillas con el mismo nombre y área si sus vigencias se cruzan.
 ALTER TABLE PLANTILLAS_EVALUACION
 ADD CONSTRAINT ex_plantilla_nombre_area_vigencia EXCLUDE USING gist (
-    nombre WITH =,
+    lower(btrim(nombre)) WITH =,
     id_departamento_destino WITH =,
     daterange(vigencia_desde, vigencia_hasta, '[]') WITH &&
 );
