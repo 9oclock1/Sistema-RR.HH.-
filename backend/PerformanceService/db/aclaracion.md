@@ -8,6 +8,7 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 - Lo demás (cargo, jerarquía, fecha de ingreso, estado) se consulta a EmployeeService cuando se necesita.
 - `id_usuario` debería hacer referencia a id_usuario de AuthDB; queda NULL mientras no exista inicio de sesión.
 - Backend: la fila se crea o actualiza antes de usarla, por ejemplo al generar las evaluaciones de un ciclo o al registrar una queja identificada.
+- `nombres` y `apellidos` quedan en NULL si EmployeeService no respondió al crear la fila (por ejemplo, al registrar una queja identificada); se completan en la siguiente sincronización.
 
 ## Plantillas y versiones
 
@@ -59,9 +60,12 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 
 ## Quejas internas
 
-- Una queja anónima tiene `id_empleado_denunciante` en NULL y no se guarda ningún dato que identifique a quien la presenta. Por eso `id_empleado_responsable` del primer registro de `HISTORIALES_ESTADO_QUEJA` también queda en NULL.
-- `codigo_seguimiento` permite consultar el avance sin identificarse. Backend: debe generarse al azar.
-- `id_categoria_queja` queda en NULL hasta que RRHH clasifica el caso.
+- Una queja anónima tiene `es_anonima` en TRUE e `id_empleado_denunciante` en NULL (`chk_queja_anonimato` obliga a que vayan juntos), y no se guarda ningún dato que identifique a quien la presenta. Por eso `id_empleado_responsable` del primer registro de `HISTORIALES_ESTADO_QUEJA` también queda en NULL.
+- `codigo_seguimiento` permite consultar el avance sin identificarse. Tiene el formato `QJ-XXXX-XXXX` con el alfabeto Crockford (sin I, L, O ni U). Backend: debe generarse al azar con `crypto`, nunca de forma secuencial.
+- `asunto`, `descripcion` y `ADJUNTOS_QUEJA.nombre_original` se guardan cifrados con AES-256-GCM en ambos modos: cada valor es `iv (12 bytes) + authTag (16 bytes) + texto cifrado` en un solo `bytea`. `chk_queja_cifrado` rechaza valores que no alcanzan ese tamaño mínimo.
+- `id_categoria_queja` la elige el empleado al registrar; RRHH puede reclasificarla al atender el caso.
+- `ADJUNTOS_QUEJA` guarda solo los metadatos; el archivo va cifrado en disco (`uploads/quejas/`) con el nombre `clave_almacenamiento`. Se aceptan hasta 3 archivos PDF, JPG o PNG de 5 MB cada uno, numerados por `orden`.
+- Backend: en una queja anónima, `nombre_original` queda en NULL (se muestra un nombre genérico como `adjunto-1.pdf`) y el archivo se guarda sin metadatos (EXIF, XMP, autor del PDF).
 - `id_departamento` e `id_sucursal` indican dónde ocurre el problema, no a quién pertenece la queja.
 - El responsable vigente es la fila más reciente de `ASIGNACIONES_QUEJA`, y el tiempo de atención se calcula con `HISTORIALES_ESTADO_QUEJA`.
 - Las tablas de esta parte salen de los RF-68 a RF-71; pueden ampliarse cuando existan las historias de usuario de la épica 12.

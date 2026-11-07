@@ -1,5 +1,5 @@
 -- Created by Redgate Data Modeler (https://datamodeler.redgate-platform.com)
--- Last modification date: 2026-11-04 12:41:33.000
+-- Last modification date: 2026-11-07 10:00:00.000
 -- extensions
 -- btree_gist: permite combinar el nombre, el área y el rango de vigencia en la restricción EXCLUDE de PLANTILLAS_EVALUACION.
 CREATE EXTENSION IF NOT EXISTS btree_gist;
@@ -15,6 +15,22 @@ CREATE TABLE ACCIONES_QUEJA (
     fecha_cumplimiento date NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT ACCIONES_QUEJA_pk PRIMARY KEY (id_accion)
+);
+-- Table: ADJUNTOS_QUEJA
+CREATE TABLE ADJUNTOS_QUEJA (
+    id_adjunto UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_queja UUID NOT NULL,
+    orden SMALLINT NOT NULL,
+    nombre_original bytea NULL,
+    tipo_mime varchar(50) NOT NULL,
+    tamano_bytes int NOT NULL,
+    clave_almacenamiento varchar(64) NOT NULL,
+    CONSTRAINT ADJUNTOS_QUEJA_pk PRIMARY KEY (id_adjunto),
+    CONSTRAINT uq_adjunto_queja_orden UNIQUE (id_queja, orden),
+    CONSTRAINT uq_adjunto_queja_clave UNIQUE (clave_almacenamiento),
+    CONSTRAINT chk_adjunto_queja_orden CHECK (orden BETWEEN 1 AND 3),
+    CONSTRAINT chk_adjunto_queja_tipo CHECK (tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png')),
+    CONSTRAINT chk_adjunto_queja_tamano CHECK (tamano_bytes > 0 AND tamano_bytes <= 5242880)
 );
 -- Table: ASIGNACIONES_QUEJA
 CREATE TABLE ASIGNACIONES_QUEJA (
@@ -180,8 +196,8 @@ CREATE TABLE DEPARTAMENTOS (
 CREATE TABLE EMPLEADOS (
     id_empleado UUID NOT NULL,
     id_usuario UUID NULL,
-    nombres varchar(70) NOT NULL,
-    apellidos varchar(100) NOT NULL,
+    nombres varchar(70) NULL,
+    apellidos varchar(100) NULL,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT EMPLEADOS_pk PRIMARY KEY (id_empleado),
     CONSTRAINT uq_empleado_usuario UNIQUE (id_usuario)
@@ -338,17 +354,21 @@ CREATE TABLE PREGUNTAS_EVALUACION (
 CREATE TABLE QUEJAS (
     id_queja UUID NOT NULL DEFAULT gen_random_uuid(),
     id_empleado_denunciante UUID NULL,
-    id_categoria_queja SMALLINT NULL,
+    id_categoria_queja SMALLINT NOT NULL,
     id_estado_queja SMALLINT NOT NULL DEFAULT 1,
     id_departamento UUID NULL,
     id_sucursal UUID NULL,
-    codigo_seguimiento varchar(20) NOT NULL,
-    asunto varchar(150) NOT NULL,
-    descripcion text NOT NULL,
+    es_anonima boolean NOT NULL DEFAULT FALSE,
+    codigo_seguimiento varchar(12) NOT NULL,
+    asunto bytea NOT NULL,
+    descripcion bytea NOT NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT QUEJAS_pk PRIMARY KEY (id_queja),
-    CONSTRAINT uq_queja_codigo_seguimiento UNIQUE (codigo_seguimiento)
+    CONSTRAINT uq_queja_codigo_seguimiento UNIQUE (codigo_seguimiento),
+    CONSTRAINT chk_queja_codigo_seguimiento CHECK (codigo_seguimiento ~ '^QJ-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$'),
+    CONSTRAINT chk_queja_anonimato CHECK (es_anonima = (id_empleado_denunciante IS NULL)),
+    CONSTRAINT chk_queja_cifrado CHECK (octet_length(asunto) > 28 AND octet_length(descripcion) > 28)
 );
 CREATE INDEX idx_quejas_estado ON QUEJAS (id_estado_queja, creado_en);
 CREATE INDEX idx_quejas_denunciante ON QUEJAS (id_empleado_denunciante);
@@ -406,6 +426,9 @@ ADD CONSTRAINT ACCIONES_QUEJA_EMPLEADOS FOREIGN KEY (id_empleado_registrador) RE
 -- Reference: ACCIONES_QUEJA_QUEJAS (table: ACCIONES_QUEJA)
 ALTER TABLE ACCIONES_QUEJA
 ADD CONSTRAINT ACCIONES_QUEJA_QUEJAS FOREIGN KEY (id_queja) REFERENCES QUEJAS (id_queja) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: ADJUNTOS_QUEJA_QUEJAS (table: ADJUNTOS_QUEJA)
+ALTER TABLE ADJUNTOS_QUEJA
+ADD CONSTRAINT ADJUNTOS_QUEJA_QUEJAS FOREIGN KEY (id_queja) REFERENCES QUEJAS (id_queja) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- Reference: ASIGNACIONES_QUEJA_EMPLEADOS_ASIGNADOR (table: ASIGNACIONES_QUEJA)
 ALTER TABLE ASIGNACIONES_QUEJA
 ADD CONSTRAINT ASIGNACIONES_QUEJA_EMPLEADOS_ASIGNADOR FOREIGN KEY (id_empleado_asignador) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
