@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, SquareKanban, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, SquareKanban, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
@@ -6,6 +6,8 @@ import { RUTA_EVALUACIONES } from "../features/evaluaciones/ruta";
 import BuzonQuejasPage from "../features/quejas/BuzonQuejasPage";
 import ConsultarQuejaPage from "../features/quejas/ConsultarQuejaPage";
 import { RUTA_BUZON_QUEJAS, RUTA_CONSULTAR_QUEJA } from "../features/quejas/reglas";
+import CasosQuejaPage from "../features/quejas/casos/CasosQuejaPage";
+import { RUTA_CASOS_QUEJA } from "../features/quejas/casos/casos";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
@@ -370,6 +372,15 @@ export const SECCIONES = [
         roles: [],
         publica: true,
         pagina: ConsultarQuejaPage,
+      },
+      {
+        ruta: RUTA_CASOS_QUEJA,
+        parametroOpcional: "idQueja",
+        etiqueta: "Casos de quejas",
+        descripcion: "Clasificación de las quejas recibidas y derivación a la persona responsable de atenderlas.",
+        icono: Inbox,
+        roles: ["admin"],
+        pagina: CasosQuejaPage,
       },
     ],
   },

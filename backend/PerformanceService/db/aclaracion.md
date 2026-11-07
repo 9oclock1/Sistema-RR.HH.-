@@ -70,4 +70,15 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 - Backend: en una queja anónima, `nombre_original` queda en NULL (se muestra un nombre genérico como `adjunto-1.pdf`) y el archivo se guarda sin metadatos (EXIF, XMP, autor del PDF).
 - `id_departamento` e `id_sucursal` indican dónde ocurre el problema, no a quién pertenece la queja.
 - El responsable vigente es la fila más reciente de `ASIGNACIONES_QUEJA`, y el tiempo de atención se calcula con `HISTORIALES_ESTADO_QUEJA`.
+
+### Clasificación y derivación (KAN-89, RF-69)
+
+- Solo el Administrador de RRHH (rol `admin`) clasifica y deriva. `id_prioridad_queja` queda en NULL hasta que RRHH clasifica la queja; prioridades: `BAJA`, `MEDIA`, `ALTA` y `CRITICA` (en `catalogos.sql`).
+- Backend: derivar exige que la queja esté clasificada (con prioridad) y no esté en un estado final. Cada derivación agrega una fila en `ASIGNACIONES_QUEJA` con quién derivó (`id_empleado_asignador`) y cuándo.
+- La primera derivación pasa la queja de `REGISTRADA` a `ASIGNADA` y escribe la fila de `HISTORIALES_ESTADO_QUEJA` con el administrador en `id_empleado_responsable`. Una reasignación solo agrega la fila en `ASIGNACIONES_QUEJA`: el historial guarda cambios de estado y no repite `ASIGNADA` en la consulta pública.
+- `INVOLUCRADOS_QUEJA` son los empleados a los que se refiere la queja, registrados por RRHH al revisarla (`id_empleado_registrador`). No toca los datos del denunciante ni rompe el anonimato.
+- Backend (conflicto de interés): no se deriva a un empleado de `INVOLUCRADOS_QUEJA` de esa queja ni, en una queja identificada, a su propio denunciante. Se responde 409 con el código `CONFLICTO_INTERES`.
+- Los responsables candidatos son empleados activos del área de RRHH o con un cargo que es jefe directo de otro cargo activo; se consultan a EmployeeService y la fila espejo de `EMPLEADOS` se crea o actualiza al derivar o registrar un involucrado.
+- Aviso al responsable: se envía después de confirmar la derivación, así que la derivación no falla si el aviso falla. `id_estado_notificacion` usa `CATALOGOS_ESTADO_EVENTO` (`PENDIENTE`, `ENTREGADO`, `FALLIDO`) y `notificada_en` se llena solo al entregarse (`chk_asignacion_notificacion`). Un aviso fallido se puede reintentar.
+- El aviso lleva solo el código de seguimiento, la categoría, la prioridad y la fecha de derivación: nunca el asunto, la descripción, los adjuntos ni datos del denunciante.
 - Las tablas de esta parte salen de los RF-68 a RF-71; pueden ampliarse cuando existan las historias de usuario de la épica 12.
