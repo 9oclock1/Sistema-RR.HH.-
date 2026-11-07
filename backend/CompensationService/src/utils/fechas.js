@@ -7,10 +7,13 @@ const esFecha = (valor) =>
   !isNaN(Date.parse(`${valor}T00:00:00Z`)) &&
   new Date(`${valor}T00:00:00Z`).toISOString().startsWith(valor);
 
-const diaAnterior = (fecha) => new Date(Date.parse(`${fecha}T00:00:00Z`) - DIA_MS).toISOString().slice(0, 10);
+const sumarDias = (fecha, dias) =>
+  new Date(Date.parse(`${fecha}T00:00:00Z`) + dias * DIA_MS).toISOString().slice(0, 10);
+
+const diaAnterior = (fecha) => sumarDias(fecha, -1);
 
 // Fecha de hoy en Bolivia (UTC-4), en formato AAAA-MM-DD.
 const hoyLaPaz = (ahora = new Date()) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "America/La_Paz" }).format(ahora);
 
-module.exports = { esFecha, diaAnterior, hoyLaPaz };
+module.exports = { esFecha, sumarDias, diaAnterior, hoyLaPaz };
