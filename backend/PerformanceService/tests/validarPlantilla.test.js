@@ -1,9 +1,16 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { validarPlantilla } = require("../src/utils/validarPlantilla");
+const { validarEscala, validarCompetencia } = require("../src/utils/validarCatalogos");
 const { balancePesos, describirDesbalance } = require("../src/utils/ponderacion");
 
-const LIKERT = [
+const LIKERT = "00000000-0000-4000-8000-000000000001";
+const CUMPLIMIENTO = "00000000-0000-4000-8000-000000000002";
+const COMPETENCIA = "c0000000-0000-4000-8000-000000000001";
+const COMPETENCIA_2 = "c0000000-0000-4000-8000-000000000002";
+const AREA = "d0000000-0000-4000-8000-000000000001";
+
+const NIVELES_LIKERT = [
   { valor: 1, etiqueta: "Muy deficiente" },
   { valor: 2, etiqueta: "Deficiente" },
   { valor: 3, etiqueta: "Aceptable" },
@@ -11,98 +18,135 @@ const LIKERT = [
   { valor: 5, etiqueta: "Excelente" },
 ];
 
-const pregunta = (extra = {}) => ({ enunciado: "Cumple sus metas", peso: 50, tipo_escala: "LIKERT", niveles: LIKERT, ...extra });
+const pregunta = (extra = {}) => ({ texto: "Cumple sus metas", peso_porcentual: 50, id_escala: LIKERT, ...extra });
 
-const plantilla = (preguntas = [pregunta()]) => ({
+const plantilla = (preguntas = [pregunta()], extra = {}) => ({
   nombre: "Desempeño de cajeros",
-  criterios: [{ nombre: "Productividad", preguntas }],
+  objetivo: "Medir el desempeño semestral de los cajeros.",
+  id_departamento_destino: AREA,
+  vigencia_desde: "2026-01-01",
+  vigencia_hasta: "2026-12-31",
+  secciones: [{ id_competencia: COMPETENCIA, criterios: [{ nombre: "Productividad", preguntas }] }],
+  ...extra,
 });
 
-const rechaza = (datos, campo) =>
+const rechaza = (validar, datos, campo) =>
   assert.throws(
-    () => validarPlantilla(datos),
+    () => validar(datos),
     (error) => error.estado === 400 && error.detalles.some((detalle) => detalle.campo === campo)
   );
 
-test("criterio 1: acepta preguntas con peso y escala cuantitativa o cualitativa", () => {
+const RUTA = "secciones[0].criterios[0].preguntas[0]";
+
+test("criterio 1: acepta secciones por competencia con criterios y preguntas ponderadas", () => {
   const resultado = validarPlantilla(
-    plantilla([
-      pregunta({ peso: 40 }),
-      pregunta({ peso: 30, tipo_escala: "NUMERICA", valor_minimo: 0, valor_maximo: 100, niveles: undefined }),
-      pregunta({
-        peso: 30,
-        tipo_escala: "CUALITATIVA",
-        niveles: [
-          { valor: 3, etiqueta: "Supera" },
-          { valor: 1, etiqueta: "No cumple" },
-          { valor: 2, etiqueta: "Cumple" },
-        ],
-      }),
-    ])
+    plantilla([pregunta({ peso_porcentual: 40 }), pregunta({ peso_porcentual: 60, id_escala: CUMPLIMIENTO, es_obligatoria: false })])
   );
-  const [likert, numerica, cualitativa] = resultado.criterios[0].preguntas;
-  assert.equal(likert.peso, 40);
-  assert.deepEqual([numerica.valor_minimo, numerica.valor_maximo, numerica.niveles], [0, 100, []]);
-  assert.deepEqual(
-    cualitativa.niveles.map((nivel) => nivel.etiqueta),
-    ["No cumple", "Cumple", "Supera"]
-  );
-  assert.deepEqual([cualitativa.valor_minimo, cualitativa.valor_maximo], [1, 3]);
+  assert.equal(resultado.nombre, "Desempeño de cajeros");
+  assert.equal(resultado.id_departamento_destino, AREA);
+  const [likert, cualitativa] = resultado.secciones[0].criterios[0].preguntas;
+  assert.deepEqual(likert, { texto: "Cumple sus metas", peso_porcentual: 40, es_obligatoria: true, id_escala: LIKERT });
+  assert.equal(cualitativa.id_escala, CUMPLIMIENTO);
+  assert.equal(cualitativa.es_obligatoria, false);
 });
 
-test("criterio 1: un borrador puede guardarse con pesos que aún no suman 100", () => {
-  assert.doesNotThrow(() => validarPlantilla(plantilla([pregunta({ peso: 10 })])));
-  assert.doesNotThrow(() => validarPlantilla({ nombre: "Vacía" }));
+test("criterio 1: un borrador puede guardarse con pesos que aún no suman 100 o sin secciones", () => {
+  assert.doesNotThrow(() => validarPlantilla(plantilla([pregunta({ peso_porcentual: 10 })])));
+  assert.doesNotThrow(() => validarPlantilla(plantilla([], { secciones: [] })));
 });
 
-test("criterio 3: la escala Likert registra la etiqueta de cada nivel del 1 al 5", () => {
-  const { niveles, valor_minimo, valor_maximo } = validarPlantilla(plantilla()).criterios[0].preguntas[0];
-  assert.deepEqual(niveles, LIKERT);
-  assert.deepEqual([valor_minimo, valor_maximo], [1, 5]);
+test("valida los datos base: nombre, objetivo, área y vigencia", () => {
+  rechaza(validarPlantilla, plantilla(undefined, { nombre: " " }), "nombre");
+  rechaza(validarPlantilla, plantilla(undefined, { objetivo: "" }), "objetivo");
+  rechaza(validarPlantilla, plantilla(undefined, { id_departamento_destino: "área" }), "id_departamento_destino");
+  rechaza(validarPlantilla, plantilla(undefined, { vigencia_desde: "2026-02-30" }), "vigencia_desde");
+  rechaza(validarPlantilla, plantilla(undefined, { vigencia_hasta: "2025-12-31" }), "vigencia_hasta");
 });
 
-test("criterio 3: rechaza una escala Likert con niveles o etiquetas faltantes", () => {
-  rechaza(plantilla([pregunta({ niveles: LIKERT.slice(0, 4) })]), "criterios[0].preguntas[0].niveles");
-  rechaza(plantilla([pregunta({ niveles: LIKERT.map((n) => ({ ...n, valor: n.valor + 1 })) })]), "criterios[0].preguntas[0].niveles");
-  const sinEtiqueta = LIKERT.map((nivel) => (nivel.valor === 3 ? { ...nivel, etiqueta: "  " } : nivel));
-  rechaza(plantilla([pregunta({ niveles: sinEtiqueta })]), "criterios[0].preguntas[0].niveles[2].etiqueta");
+test("sin datos base solo valida la estructura", () => {
+  const resultado = validarPlantilla({ secciones: plantilla().secciones }, { conDatosBase: false });
+  assert.equal(resultado.nombre, undefined);
+  assert.equal(resultado.secciones.length, 1);
 });
 
 test("rechaza pesos fuera de rango o con más de dos decimales", () => {
-  rechaza(plantilla([pregunta({ peso: 0 })]), "criterios[0].preguntas[0].peso");
-  rechaza(plantilla([pregunta({ peso: 100.5 })]), "criterios[0].preguntas[0].peso");
-  rechaza(plantilla([pregunta({ peso: 12.345 })]), "criterios[0].preguntas[0].peso");
-  rechaza(plantilla([pregunta({ peso: "50" })]), "criterios[0].preguntas[0].peso");
+  rechaza(validarPlantilla, plantilla([pregunta({ peso_porcentual: 0 })]), `${RUTA}.peso_porcentual`);
+  rechaza(validarPlantilla, plantilla([pregunta({ peso_porcentual: 100.5 })]), `${RUTA}.peso_porcentual`);
+  rechaza(validarPlantilla, plantilla([pregunta({ peso_porcentual: 12.345 })]), `${RUTA}.peso_porcentual`);
+  rechaza(validarPlantilla, plantilla([pregunta({ peso_porcentual: "50" })]), `${RUTA}.peso_porcentual`);
 });
 
-test("rechaza escalas mal definidas", () => {
-  const ruta = "criterios[0].preguntas[0]";
-  rechaza(plantilla([pregunta({ tipo_escala: "ESTRELLAS" })]), `${ruta}.tipo_escala`);
-  rechaza(plantilla([pregunta({ tipo_escala: "NUMERICA", valor_minimo: 10, valor_maximo: 10 })]), `${ruta}.valor_maximo`);
-  rechaza(plantilla([pregunta({ tipo_escala: "CUALITATIVA", niveles: [{ valor: 1, etiqueta: "Único" }] })]), `${ruta}.niveles`);
+test("rechaza preguntas sin texto, sin escala u obligatoriedad inválida", () => {
+  rechaza(validarPlantilla, plantilla([pregunta({ texto: "" })]), `${RUTA}.texto`);
+  rechaza(validarPlantilla, plantilla([pregunta({ id_escala: null })]), `${RUTA}.id_escala`);
+  rechaza(validarPlantilla, plantilla([pregunta({ es_obligatoria: "sí" })]), `${RUTA}.es_obligatoria`);
+});
+
+test("rechaza competencias repetidas y criterios repetidos dentro de una sección", () => {
+  const seccion = plantilla().secciones[0];
+  rechaza(validarPlantilla, plantilla(undefined, { secciones: [seccion, seccion] }), "secciones[1].id_competencia");
+  assert.doesNotThrow(() =>
+    validarPlantilla(plantilla(undefined, { secciones: [seccion, { ...seccion, id_competencia: COMPETENCIA_2 }] }))
+  );
   rechaza(
-    plantilla([pregunta({ tipo_escala: "CUALITATIVA", niveles: [{ valor: 1, etiqueta: "A" }, { valor: 1, etiqueta: "B" }] })]),
-    `${ruta}.niveles[1].valor`
+    validarPlantilla,
+    plantilla(undefined, {
+      secciones: [{ id_competencia: COMPETENCIA, criterios: [{ nombre: "Actitud" }, { nombre: "actitud " }] }],
+    }),
+    "secciones[0].criterios[1].nombre"
   );
 });
 
-test("rechaza datos requeridos faltantes y criterios repetidos", () => {
-  rechaza({}, "nombre");
-  rechaza(plantilla([pregunta({ enunciado: "" })]), "criterios[0].preguntas[0].enunciado");
-  rechaza(
-    { nombre: "X", criterios: [{ nombre: "Actitud" }, { nombre: "actitud " }] },
-    "criterios[1].nombre"
+test("criterio 3: una escala Likert registra la etiqueta de cada nivel, ordenados por valor", () => {
+  const escala = validarEscala({ nombre: "Likert 1-5", tipo: "cuantitativa", niveles: [...NIVELES_LIKERT].reverse() });
+  assert.equal(escala.id_tipo_escala, 1);
+  assert.deepEqual(escala.niveles, NIVELES_LIKERT);
+});
+
+test("criterio 3: acepta escalas cualitativas con valor para el cálculo", () => {
+  const escala = validarEscala({
+    nombre: "Cumplimiento",
+    tipo: "CUALITATIVA",
+    niveles: [
+      { valor: 2, etiqueta: "Cumple" },
+      { valor: 1, etiqueta: "No cumple" },
+    ],
+  });
+  assert.equal(escala.id_tipo_escala, 2);
+  assert.deepEqual(
+    escala.niveles.map((n) => n.etiqueta),
+    ["No cumple", "Cumple"]
   );
+});
+
+test("criterio 3: rechaza escalas mal definidas", () => {
+  const base = { nombre: "Escala", tipo: "CUANTITATIVA", niveles: NIVELES_LIKERT };
+  rechaza(validarEscala, { ...base, tipo: "ESTRELLAS" }, "tipo");
+  rechaza(validarEscala, { ...base, nombre: "" }, "nombre");
+  rechaza(validarEscala, { ...base, niveles: [{ valor: 1, etiqueta: "Único" }] }, "niveles");
+  rechaza(validarEscala, { ...base, niveles: [{ valor: 1, etiqueta: "A" }, { valor: 1, etiqueta: "B" }] }, "niveles[1].valor");
+  rechaza(validarEscala, { ...base, niveles: [{ valor: 1, etiqueta: "A" }, { valor: 2, etiqueta: "a" }] }, "niveles[1].etiqueta");
+  rechaza(validarEscala, { ...base, niveles: [{ valor: -1, etiqueta: "A" }, { valor: 2, etiqueta: "B" }] }, "niveles[0].valor");
+  rechaza(validarEscala, { ...base, niveles: [{ valor: 1, etiqueta: "A" }, { valor: 1000, etiqueta: "B" }] }, "niveles[1].valor");
+});
+
+test("valida las competencias del catálogo", () => {
+  assert.deepEqual(validarCompetencia({ nombre: " Trabajo en equipo ", tipo: "competencia_laboral" }), {
+    nombre: "Trabajo en equipo",
+    descripcion: null,
+    id_tipo_competencia: 1,
+  });
+  rechaza(validarCompetencia, { nombre: "Puntualidad", tipo: "OTRO" }, "tipo");
+  rechaza(validarCompetencia, { tipo: "FACTOR_OPERATIVO" }, "nombre");
 });
 
 test("criterio 2: el balance suma en centésimas y describe el desbalance", () => {
-  const criterios = [{ preguntas: [{ peso: 33.33 }, { peso: 33.33 }] }, { preguntas: [{ peso: 33.34 }] }];
-  assert.deepEqual(balancePesos(criterios), { suma: 100, diferencia: 0, balanceado: true });
+  const seccion = (...pesos) => ({ criterios: [{ preguntas: pesos.map((peso_porcentual) => ({ peso_porcentual })) }] });
+  assert.deepEqual(balancePesos([seccion(33.33, 33.33), seccion(33.34)]), { suma: 100, diferencia: 0, balanceado: true });
 
-  const falta = balancePesos([{ preguntas: [{ peso: 60 }, { peso: 25.5 }] }]);
+  const falta = balancePesos([seccion(60, 25.5)]);
   assert.deepEqual(falta, { suma: 85.5, diferencia: 14.5, balanceado: false });
   assert.match(describirDesbalance(falta), /85\.5 %: faltan 14\.5 %/);
 
-  const sobra = balancePesos([{ preguntas: [{ peso: 70 }, { peso: 40 }] }]);
-  assert.match(describirDesbalance(sobra), /110 %: sobran 10 %/);
+  assert.match(describirDesbalance(balancePesos([seccion(70, 40)])), /110 %: sobran 10 %/);
 });

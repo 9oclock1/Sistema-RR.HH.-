@@ -84,18 +84,112 @@
   grid-column: 1 / -1;
 }
 
+/* Los datos base van en un fieldset para poder bloquearlos cuando ya hay una versión publicada. */
+.plantilla-campos--grilla {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.plantilla-seccion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.plantilla-seccion__competencia {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-3);
+}
+
+.plantilla-seccion__competencia > .ds-campo {
+  flex: 1 1 calc(var(--size-sidebar) * 1.2);
+}
+
 .plantilla-criterio {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
 }
 
 .plantilla-criterio > .ds-boton {
   align-self: flex-start;
 }
 
-.plantilla-agregar-criterio {
+.plantilla-criterio__cabecera {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.plantilla-criterio__titulo {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.plantilla-agregar {
   align-self: flex-start;
+}
+
+/* Niveles de la escala elegida, tal como los verá el evaluador. */
+.plantilla-escala-vista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.plantilla-escala-vista__niveles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plantilla-escala-vista__niveles li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-right: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.plantilla-escala-vista__niveles .plantilla-nivel__valor {
+  min-width: var(--size-control-sm);
+  height: var(--size-control-sm);
+}
+
+/* Barra sobre la tabla: texto de ayuda y acción principal. */
+.plantillas-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.plantillas-barra--fin {
+  justify-content: flex-end;
+}
+
+.plantillas-niveles-resumen {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
 }
 
 .plantilla-preguntas {

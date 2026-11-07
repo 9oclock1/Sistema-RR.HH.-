@@ -5,28 +5,28 @@ async function listar(req, res) {
 }
 
 async function obtener(req, res) {
-  res.json(await servicio.obtener(req.params.id));
+  res.json(await servicio.obtener(req.params.idVersion));
 }
 
 async function crear(req, res) {
-  res.status(201).json(await servicio.crear(req.body));
+  res.status(201).json(await servicio.crear(req.idEmpleado, req.body));
 }
 
 async function actualizar(req, res) {
-  res.json(await servicio.actualizar(req.params.id, req.body));
+  res.json(await servicio.actualizar(req.params.idVersion, req.body));
 }
 
 async function eliminar(req, res) {
-  await servicio.eliminar(req.params.id);
+  await servicio.eliminar(req.params.idVersion);
   res.status(204).end();
 }
 
 async function publicar(req, res) {
-  res.json(await servicio.publicar(req.params.id));
+  res.json(await servicio.publicar(req.idEmpleado, req.params.idVersion));
 }
 
 async function crearVersion(req, res) {
-  const { plantilla, creada } = await servicio.crearVersion(req.params.id);
+  const { plantilla, creada } = await servicio.crearVersion(req.params.idVersion);
   res.status(creada ? 201 : 200).json(plantilla);
 }
 

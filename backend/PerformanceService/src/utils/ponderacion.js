@@ -3,10 +3,14 @@ const aCentesimas = (valor) => Math.round(valor * 100);
 
 const PESO_TOTAL = 100;
 
-function balancePesos(criterios) {
-  const centesimas = criterios
-    .flatMap((criterio) => criterio.preguntas)
-    .reduce((total, pregunta) => total + aCentesimas(pregunta.peso), 0);
+const preguntasDe = (secciones) =>
+  secciones.flatMap((seccion) => seccion.criterios).flatMap((criterio) => criterio.preguntas);
+
+const sumar = (preguntas) =>
+  preguntas.reduce((total, pregunta) => total + aCentesimas(pregunta.peso_porcentual), 0) / 100;
+
+function balancePesos(secciones) {
+  const centesimas = aCentesimas(sumar(preguntasDe(secciones)));
   return {
     suma: centesimas / 100,
     diferencia: (aCentesimas(PESO_TOTAL) - centesimas) / 100,
@@ -14,8 +18,9 @@ function balancePesos(criterios) {
   };
 }
 
-const pesoCriterio = (criterio) =>
-  criterio.preguntas.reduce((total, pregunta) => total + aCentesimas(pregunta.peso), 0) / 100;
+const pesoCriterio = (criterio) => sumar(criterio.preguntas);
+
+const pesoSeccion = (seccion) => sumar(seccion.criterios.flatMap((criterio) => criterio.preguntas));
 
 function describirDesbalance({ suma, diferencia }) {
   const porcentaje = (valor) => `${Number(valor.toFixed(2))} %`;
@@ -24,4 +29,4 @@ function describirDesbalance({ suma, diferencia }) {
     : `La suma de pesos es ${porcentaje(suma)}: sobran ${porcentaje(-diferencia)} sobre 100 %.`;
 }
 
-module.exports = { PESO_TOTAL, aCentesimas, balancePesos, pesoCriterio, describirDesbalance };
+module.exports = { PESO_TOTAL, aCentesimas, balancePesos, pesoCriterio, pesoSeccion, describirDesbalance };

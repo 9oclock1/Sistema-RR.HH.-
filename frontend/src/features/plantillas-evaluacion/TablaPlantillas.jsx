@@ -1,46 +1,53 @@
 import { ClipboardList, CopyPlus, Eye, Pencil, Trash2 } from "lucide-react";
 import { Boton, EstadoVacio, Etiqueta, Tabla, TextoTruncado } from "../../components/ui";
-import { ESTADOS, formatearPorcentaje } from "./plantilla";
+import { ESTADOS, formatearFecha, formatearPorcentaje } from "./plantilla";
 
+// Cada fila es una versión de una plantilla.
 const COLUMNAS = ({ onAbrir, onNuevaVersion, onEliminar }) => [
   {
     clave: "nombre",
     titulo: "Nombre",
-    celda: (plantilla) => (
-      <button type="button" className="plantillas-enlace ds-foco" onClick={() => onAbrir(plantilla)}>
-        <TextoTruncado>{plantilla.nombre}</TextoTruncado>
+    celda: (version) => (
+      <button type="button" className="plantillas-enlace ds-foco" onClick={() => onAbrir(version)}>
+        <TextoTruncado>{version.nombre}</TextoTruncado>
       </button>
     ),
   },
-  { clave: "version", titulo: "Versión", ancho: "8%", alinear: "fin", celda: (plantilla) => `v${plantilla.version}` },
+  { clave: "departamento", titulo: "Área", ancho: "14%", celda: (version) => <TextoTruncado>{version.departamento}</TextoTruncado> },
+  {
+    clave: "vigencia",
+    titulo: "Vigencia",
+    ancho: "17%",
+    celda: (version) => `${formatearFecha(version.vigencia_desde)} – ${formatearFecha(version.vigencia_hasta)}`,
+  },
+  { clave: "numero_version", titulo: "Versión", ancho: "8%", alinear: "fin", celda: (version) => `v${version.numero_version}` },
   {
     clave: "estado",
     titulo: "Estado",
-    ancho: "12%",
-    celda: (plantilla) => <Etiqueta tono={ESTADOS[plantilla.estado].tono}>{ESTADOS[plantilla.estado].etiqueta}</Etiqueta>,
+    ancho: "11%",
+    celda: (version) => <Etiqueta tono={ESTADOS[version.estado].tono}>{ESTADOS[version.estado].etiqueta}</Etiqueta>,
   },
-  { clave: "total_criterios", titulo: "Criterios", ancho: "9%", alinear: "fin" },
   { clave: "total_preguntas", titulo: "Preguntas", ancho: "9%", alinear: "fin" },
   {
     clave: "suma_pesos",
     titulo: "Suma de pesos",
-    ancho: "14%",
+    ancho: "11%",
     alinear: "fin",
-    celda: (plantilla) =>
-      plantilla.balanceado ? (
-        formatearPorcentaje(plantilla.suma_pesos)
+    celda: (version) =>
+      version.balanceado ? (
+        formatearPorcentaje(version.suma_pesos)
       ) : (
         <Etiqueta tono="aviso" title="Debe sumar 100 % para publicar">
-          {formatearPorcentaje(plantilla.suma_pesos)}
+          {formatearPorcentaje(version.suma_pesos)}
         </Etiqueta>
       ),
   },
   {
     clave: "acciones",
     titulo: <span className="ds-solo-lector">Acciones</span>,
-    celda: (plantilla) => {
-      const esBorrador = plantilla.estado === "BORRADOR";
-      const nombre = `${plantilla.nombre} v${plantilla.version}`;
+    celda: (version) => {
+      const esBorrador = version.estado === "BORRADOR";
+      const nombre = `${version.nombre} v${version.numero_version}`;
       return (
         <div className="plantillas-acciones">
           <Boton
@@ -49,7 +56,7 @@ const COLUMNAS = ({ onAbrir, onNuevaVersion, onEliminar }) => [
             icono={esBorrador ? Pencil : Eye}
             aria-label={`${esBorrador ? "Editar" : "Ver"} ${nombre}`}
             title={esBorrador ? "Editar" : "Ver"}
-            onClick={() => onAbrir(plantilla)}
+            onClick={() => onAbrir(version)}
           />
           {esBorrador ? (
             <Boton
@@ -58,7 +65,7 @@ const COLUMNAS = ({ onAbrir, onNuevaVersion, onEliminar }) => [
               icono={Trash2}
               aria-label={`Eliminar ${nombre}`}
               title="Eliminar borrador"
-              onClick={() => onEliminar(plantilla)}
+              onClick={() => onEliminar(version)}
             />
           ) : (
             <Boton
@@ -67,7 +74,7 @@ const COLUMNAS = ({ onAbrir, onNuevaVersion, onEliminar }) => [
               icono={CopyPlus}
               aria-label={`Crear nueva versión de ${nombre}`}
               title="Crear nueva versión"
-              onClick={() => onNuevaVersion(plantilla)}
+              onClick={() => onNuevaVersion(version)}
             />
           )}
         </div>
@@ -83,14 +90,14 @@ export default function TablaPlantillas({ plantillas, cargando, accionVacia, ...
       descripcion="Plantillas de evaluación"
       columnas={COLUMNAS(acciones)}
       filas={plantillas}
-      claveFila="id_plantilla"
+      claveFila="id_version"
       cargando={cargando}
       filasCargando={3}
       vacio={
         <EstadoVacio
           icono={ClipboardList}
           titulo="Aún no hay plantillas de evaluación"
-          mensaje="Cree una plantilla con sus criterios, preguntas ponderadas y escalas de valoración."
+          mensaje="Cree una plantilla con sus secciones por competencia, criterios, preguntas ponderadas y escalas de valoración."
           accion={accionVacia}
         />
       }

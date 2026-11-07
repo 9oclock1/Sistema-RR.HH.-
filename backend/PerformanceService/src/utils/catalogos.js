@@ -1,0 +1,6 @@
+// Ids fijos de los catálogos que carga init.sql.
+const ESTADO_VERSION = { BORRADOR: 1, PUBLICADA: 2, ARCHIVADA: 3 };
+const TIPO_ESCALA = { CUANTITATIVA: 1, CUALITATIVA: 2 };
+const TIPO_COMPETENCIA = { COMPETENCIA_LABORAL: 1, FACTOR_OPERATIVO: 2 };
+
+module.exports = { ESTADO_VERSION, TIPO_ESCALA, TIPO_COMPETENCIA };

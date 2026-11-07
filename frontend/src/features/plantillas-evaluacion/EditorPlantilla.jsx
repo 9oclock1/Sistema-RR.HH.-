@@ -5,6 +5,9 @@ import {
   actualizarPlantilla,
   crearPlantilla,
   crearVersionPlantilla,
+  listarAreas,
+  listarCompetencias,
+  listarEscalas,
   obtenerPlantilla,
   publicarPlantilla,
 } from "../../api/plantillasEvaluacion";
@@ -18,10 +21,12 @@ import {
   Esqueleto,
   Etiqueta,
   ModalConfirmacion,
+  Selector,
   Tarjeta,
   useAvisos,
 } from "../../components/ui";
 import BalancePesos from "./BalancePesos";
+import ModalCompetencia from "./ModalCompetencia";
 import PreguntaEditor from "./PreguntaEditor";
 import {
   aDatos,
@@ -30,8 +35,10 @@ import {
   ESTADOS,
   formatearPorcentaje,
   nuevaPregunta,
+  nuevaSeccion,
   nuevoCriterio,
   pesoCriterio,
+  pesoSeccion,
 } from "./plantilla";
 
 const dentroDe = (campo, prefijo) =>
@@ -40,18 +47,25 @@ const dentroDe = (campo, prefijo) =>
 const sinPrefijo = (errores, prefijo) =>
   Object.fromEntries(Object.entries(errores).filter(([campo]) => !dentroDe(campo, prefijo)));
 
-// idInicial: plantilla a abrir, o null para crear una nueva.
-export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
+const reemplazar = (lista, indice, cambio) => lista.map((item, i) => (i === indice ? cambio(item) : item));
+const quitar = (lista, indice) => lista.filter((_, i) => i !== indice);
+
+// idInicial: versión a abrir, o null para crear una plantilla nueva.
+// idEmpleado: usuario de prueba; queda como creador o publicador.
+export default function EditorPlantilla({ idInicial, idEmpleado, onVolver, onAbrir }) {
   const avisar = useAvisos();
   const [plantilla, setPlantilla] = useState(null);
   const [formulario, setFormulario] = useState(() => aFormulario(null));
-  const [cargando, setCargando] = useState(Boolean(idInicial));
+  const [catalogos, setCatalogos] = useState({ escalas: [], competencias: [], areas: [] });
+  const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
   const [errores, setErrores] = useState({});
   const [alerta, setAlerta] = useState(null);
   const [procesando, setProcesando] = useState(null);
   const [modificado, setModificado] = useState(false);
   const [confirmar, setConfirmar] = useState(null);
+  // Índice de la sección que recibe la competencia creada en el modal.
+  const [nuevaCompetenciaPara, setNuevaCompetenciaPara] = useState(null);
   const refAlerta = useRef(null);
 
   const mostrar = useCallback((datos) => {
@@ -61,9 +75,16 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
   }, []);
 
   useEffect(() => {
-    if (!idInicial) return;
-    obtenerPlantilla(idInicial)
-      .then(mostrar)
+    Promise.all([
+      idInicial ? obtenerPlantilla(idInicial) : null,
+      listarEscalas(),
+      listarCompetencias(),
+      listarAreas(),
+    ])
+      .then(([datos, escalas, competencias, areas]) => {
+        setCatalogos({ escalas, competencias, areas });
+        if (datos) mostrar(datos);
+      })
       .catch((error) => setErrorCarga(error.message))
       .finally(() => setCargando(false));
   }, [idInicial, mostrar]);
@@ -73,7 +94,10 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
   }, [alerta]);
 
   const soloLectura = Boolean(plantilla) && plantilla.estado !== "BORRADOR";
-  const balance = useMemo(() => balancePesos(formulario.criterios), [formulario.criterios]);
+  const datosEditables = !plantilla || plantilla.datos_editables;
+  const balance = useMemo(() => balancePesos(formulario.secciones), [formulario.secciones]);
+  // Las preguntas nuevas empiezan con la primera escala del catálogo (Likert de 1 a 5).
+  const escalaInicial = catalogos.escalas[0]?.id_escala ?? "";
 
   // limpiar: campos (relativos a ruta) cuyo error se borra; null borra todos los de ruta.
   const editar = (cambio, ruta, limpiar) => {
@@ -90,50 +114,73 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
   const cambiarCampo = (campo) => (evento) =>
     editar((actual) => ({ ...actual, [campo]: evento.target.value }), "", [campo]);
 
-  const cambiarCriterio = (indice, cambios, limpiar) =>
+  const cambiarSeccion = (i, cambios, limpiar) =>
+    editar(
+      (actual) => ({ ...actual, secciones: reemplazar(actual.secciones, i, (s) => ({ ...s, ...cambios })) }),
+      `secciones[${i}]`,
+      limpiar
+    );
+
+  const cambiarCriterio = (i, j, cambios, limpiar) =>
     editar(
       (actual) => ({
         ...actual,
-        criterios: actual.criterios.map((c, i) => (i === indice ? { ...c, ...cambios(c) } : c)),
+        secciones: reemplazar(actual.secciones, i, (s) => ({
+          ...s,
+          criterios: reemplazar(s.criterios, j, (c) => ({ ...c, ...cambios })),
+        })),
       }),
-      `criterios[${indice}]`,
+      `secciones[${i}].criterios[${j}]`,
+      limpiar
+    );
+
+  const cambiarPregunta = (i, j, k) => (pregunta, limpiar) =>
+    editar(
+      (actual) => ({
+        ...actual,
+        secciones: reemplazar(actual.secciones, i, (s) => ({
+          ...s,
+          criterios: reemplazar(s.criterios, j, (c) => ({ ...c, preguntas: reemplazar(c.preguntas, k, () => pregunta) })),
+        })),
+      }),
+      `secciones[${i}].criterios[${j}].preguntas[${k}]`,
       limpiar
     );
 
   // Agregar o quitar elementos desplaza los índices con los que el servidor reportó los errores.
-  const cambiarEstructura = (cambio) => editar(cambio, "criterios", null);
+  const cambiarEstructura = (cambio) => editar((actual) => ({ ...actual, secciones: cambio(actual.secciones) }), "secciones", null);
 
-  const agregarCriterio = () =>
-    cambiarEstructura((actual) => ({ ...actual, criterios: [...actual.criterios, nuevoCriterio()] }));
-
-  const quitarCriterio = (indice) =>
-    cambiarEstructura((actual) => ({ ...actual, criterios: actual.criterios.filter((_, i) => i !== indice) }));
-
-  const agregarPregunta = (indice) =>
-    cambiarEstructura((actual) => ({
-      ...actual,
-      criterios: actual.criterios.map((c, i) => (i === indice ? { ...c, preguntas: [...c.preguntas, nuevaPregunta()] } : c)),
-    }));
-
-  const quitarPregunta = (indiceCriterio, indicePregunta) =>
-    cambiarEstructura((actual) => ({
-      ...actual,
-      criterios: actual.criterios.map((c, i) =>
-        i === indiceCriterio ? { ...c, preguntas: c.preguntas.filter((_, j) => j !== indicePregunta) } : c
-      ),
-    }));
-
-  const cambiarPregunta = (indiceCriterio, indicePregunta) => (pregunta, limpiar) =>
-    editar(
-      (actual) => ({
-        ...actual,
-        criterios: actual.criterios.map((c, i) =>
-          i === indiceCriterio ? { ...c, preguntas: c.preguntas.map((p, j) => (j === indicePregunta ? pregunta : p)) } : c
-        ),
-      }),
-      `criterios[${indiceCriterio}].preguntas[${indicePregunta}]`,
-      limpiar
+  const agregarSeccion = () => cambiarEstructura((secciones) => [...secciones, nuevaSeccion(escalaInicial)]);
+  const quitarSeccion = (i) => cambiarEstructura((secciones) => quitar(secciones, i));
+  const agregarCriterio = (i) =>
+    cambiarEstructura((secciones) =>
+      reemplazar(secciones, i, (s) => ({ ...s, criterios: [...s.criterios, nuevoCriterio(escalaInicial)] }))
     );
+  const quitarCriterio = (i, j) =>
+    cambiarEstructura((secciones) => reemplazar(secciones, i, (s) => ({ ...s, criterios: quitar(s.criterios, j) })));
+  const agregarPregunta = (i, j) =>
+    cambiarEstructura((secciones) =>
+      reemplazar(secciones, i, (s) => ({
+        ...s,
+        criterios: reemplazar(s.criterios, j, (c) => ({ ...c, preguntas: [...c.preguntas, nuevaPregunta(escalaInicial)] })),
+      }))
+    );
+  const quitarPregunta = (i, j, k) =>
+    cambiarEstructura((secciones) =>
+      reemplazar(secciones, i, (s) => ({
+        ...s,
+        criterios: reemplazar(s.criterios, j, (c) => ({ ...c, preguntas: quitar(c.preguntas, k) })),
+      }))
+    );
+
+  const competenciaCreada = (competencia) => {
+    setCatalogos((actual) => ({ ...actual, competencias: [...actual.competencias, competencia] }));
+    if (nuevaCompetenciaPara !== null) {
+      cambiarSeccion(nuevaCompetenciaPara, { id_competencia: competencia.id_competencia }, ["id_competencia"]);
+    }
+    setNuevaCompetenciaPara(null);
+    avisar({ tono: "exito", titulo: "Competencia creada", mensaje: competencia.nombre });
+  };
 
   const fallo = (titulo, error) => {
     const porCampo = Object.fromEntries(
@@ -148,12 +195,14 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
     });
   };
 
-  // Guarda el formulario y devuelve la plantilla guardada; si falla, muestra los errores y devuelve null.
+  // Guarda el formulario y devuelve la versión guardada; si falla, muestra los errores y devuelve null.
   const guardarFormulario = async () => {
     setAlerta(null);
     try {
-      const datos = aDatos(formulario);
-      const guardada = plantilla ? await actualizarPlantilla(plantilla.id_plantilla, datos) : await crearPlantilla(datos);
+      const datos = aDatos(formulario, { conDatosBase: datosEditables });
+      const guardada = plantilla
+        ? await actualizarPlantilla(plantilla.id_version, datos)
+        : await crearPlantilla(idEmpleado, datos);
       setErrores({});
       mostrar(guardada);
       return guardada;
@@ -176,8 +225,12 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
     const guardada = await guardarFormulario();
     if (guardada) {
       try {
-        mostrar(await publicarPlantilla(guardada.id_plantilla));
-        avisar({ tono: "exito", titulo: "Plantilla publicada", mensaje: `${guardada.nombre} · versión ${guardada.version}` });
+        mostrar(await publicarPlantilla(idEmpleado, guardada.id_version));
+        avisar({
+          tono: "exito",
+          titulo: "Plantilla publicada",
+          mensaje: `${guardada.nombre} · versión ${guardada.numero_version}`,
+        });
       } catch (error) {
         fallo("No se puede publicar la plantilla", error);
       }
@@ -189,9 +242,9 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
     setAlerta(null);
     setProcesando("version");
     try {
-      const borrador = await crearVersionPlantilla(plantilla.id_plantilla);
-      onAbrir(borrador.id_plantilla);
-      avisar({ tono: "exito", titulo: `Versión ${borrador.version} en borrador`, mensaje: borrador.nombre });
+      const borrador = await crearVersionPlantilla(plantilla.id_version);
+      onAbrir(borrador.id_version);
+      avisar({ tono: "exito", titulo: `Versión ${borrador.numero_version} en borrador`, mensaje: borrador.nombre });
     } catch (error) {
       fallo("No se pudo crear la nueva versión", error);
       setProcesando(null);
@@ -203,6 +256,16 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
   const estado = ESTADOS[plantilla?.estado ?? "BORRADOR"];
   const ocupado = Boolean(procesando);
   const titulo = plantilla ? plantilla.nombre : "Nueva plantilla";
+  const sinUsuario = !idEmpleado;
+  const opcionesCompetencia = catalogos.competencias.map((c) => ({
+    valor: c.id_competencia,
+    etiqueta: `${c.nombre} (${c.tipo_nombre.toLowerCase()})`,
+  }));
+  const opcionesArea = catalogos.areas.map((a) => ({ valor: a.id_departamento, etiqueta: a.nombre }));
+  // Si el área fue dada de baja, la plantilla la conserva: se agrega para que el selector la muestre.
+  if (plantilla && !opcionesArea.some((a) => a.valor === plantilla.id_departamento_destino)) {
+    opcionesArea.push({ valor: plantilla.id_departamento_destino, etiqueta: plantilla.departamento });
+  }
 
   const acciones = soloLectura ? (
     <Boton variante="primario" icono={CopyPlus} onClick={crearVersion} cargando={procesando === "version"}>
@@ -210,7 +273,12 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
     </Boton>
   ) : (
     <>
-      <Boton icono={Save} onClick={guardar} cargando={procesando === "guardar"} disabled={ocupado}>
+      <Boton
+        icono={Save}
+        onClick={guardar}
+        cargando={procesando === "guardar"}
+        disabled={ocupado || (!plantilla && sinUsuario)}
+      >
         Guardar borrador
       </Boton>
       <Boton
@@ -218,7 +286,7 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
         icono={Send}
         onClick={() => setConfirmar("publicar")}
         cargando={procesando === "publicar"}
-        disabled={ocupado}
+        disabled={ocupado || sinUsuario}
       >
         Publicar
       </Boton>
@@ -258,16 +326,24 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
         descripcion={
           <span className="plantilla-meta">
             <Etiqueta tono={estado.tono}>{estado.etiqueta}</Etiqueta>
-            {plantilla && <span>Versión {plantilla.version}</span>}
+            {plantilla && <span>Versión {plantilla.numero_version}</span>}
+            {plantilla?.publicador && <span>Publicada por {plantilla.publicador}</span>}
           </span>
         }
         acciones={acciones}
       />
 
+      {sinUsuario && !soloLectura && (
+        <Alerta tono="aviso" titulo="Elija su usuario de prueba">
+          Seleccione quién es en «Usuario de prueba», al pie de la barra lateral: se registra como creador y como quien
+          publica la plantilla.
+        </Alerta>
+      )}
+
       {soloLectura && (
         <Alerta tono="info" titulo={`Esta versión está ${estado.etiqueta.toLowerCase()} y no se puede modificar.`}>
-          Para cambiar preguntas o pesos, cree una nueva versión. Las evaluaciones en curso conservan la versión con la que
-          empezaron.
+          Para cambiar preguntas o pesos, cree una nueva versión. Los ciclos de evaluación en curso conservan la versión
+          con la que empezaron.
         </Alerta>
       )}
 
@@ -288,10 +364,17 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
         <fieldset className="plantilla-formulario" disabled={soloLectura || ocupado}>
           <legend className="ds-solo-lector">Contenido de la plantilla</legend>
           <Tarjeta titulo="Datos generales" nivelTitulo={2}>
-            <div className="plantilla-campos">
+            {!datosEditables && !soloLectura && (
+              <p className="plantilla-nota">
+                Los datos generales son comunes a todas las versiones y quedaron fijos al publicar la primera.
+              </p>
+            )}
+            <fieldset className="plantilla-campos plantilla-campos--grilla" disabled={!datosEditables}>
+              <legend className="ds-solo-lector">Datos generales</legend>
               <CampoTexto
                 id="nombre"
                 etiqueta="Nombre"
+                className="plantilla-ancho"
                 requerido
                 maxLength={120}
                 autoComplete="off"
@@ -300,88 +383,176 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
                 error={errores.nombre}
               />
               <CampoAreaTexto
-                id="descripcion"
-                etiqueta="Descripción"
+                id="objetivo"
+                etiqueta="Objetivo"
+                className="plantilla-ancho"
+                requerido
                 filas={2}
-                maxLength={500}
-                value={formulario.descripcion}
-                onChange={cambiarCampo("descripcion")}
-                error={errores.descripcion}
+                maxLength={2000}
+                value={formulario.objetivo}
+                onChange={cambiarCampo("objetivo")}
+                error={errores.objetivo}
               />
-            </div>
+              <Selector
+                id="id_departamento_destino"
+                etiqueta="Área destino"
+                className="plantilla-ancho"
+                requerido
+                textoVacio="Seleccione un área"
+                opciones={opcionesArea}
+                value={formulario.id_departamento_destino}
+                onChange={cambiarCampo("id_departamento_destino")}
+                error={errores.id_departamento_destino}
+              />
+              <CampoTexto
+                id="vigencia_desde"
+                etiqueta="Vigente desde"
+                requerido
+                type="date"
+                value={formulario.vigencia_desde}
+                onChange={cambiarCampo("vigencia_desde")}
+                error={errores.vigencia_desde}
+              />
+              <CampoTexto
+                id="vigencia_hasta"
+                etiqueta="Vigente hasta"
+                requerido
+                type="date"
+                min={formulario.vigencia_desde || undefined}
+                value={formulario.vigencia_hasta}
+                onChange={cambiarCampo("vigencia_hasta")}
+                error={errores.vigencia_hasta}
+              />
+            </fieldset>
           </Tarjeta>
 
-          {errores.criterios && (
+          {errores.secciones && (
             <p className="plantilla-error" role="alert">
-              {errores.criterios}
+              {errores.secciones}
             </p>
           )}
 
-          {formulario.criterios.map((criterio, indice) => {
-            const ruta = `criterios[${indice}]`;
+          {formulario.secciones.map((seccion, i) => {
+            const ruta = `secciones[${i}]`;
+            const competencia = catalogos.competencias.find((c) => c.id_competencia === seccion.id_competencia);
+            const usadas = new Set(formulario.secciones.filter((_, x) => x !== i).map((s) => s.id_competencia));
             return (
               <Tarjeta
-                key={criterio.clave}
-                className="plantilla-criterio"
-                titulo={`Criterio ${indice + 1}${criterio.nombre ? `: ${criterio.nombre}` : ""}`}
+                key={seccion.clave}
+                className="plantilla-seccion"
+                titulo={`Sección ${i + 1}${competencia ? `: ${competencia.nombre}` : ""}`}
                 nivelTitulo={2}
                 acciones={
                   <>
-                    <Contador aria-label={`Peso del criterio: ${formatearPorcentaje(pesoCriterio(criterio))}`}>
-                      {formatearPorcentaje(pesoCriterio(criterio))}
+                    <Contador aria-label={`Peso de la sección: ${formatearPorcentaje(pesoSeccion(seccion))}`}>
+                      {formatearPorcentaje(pesoSeccion(seccion))}
                     </Contador>
                     {!soloLectura && (
                       <Boton
                         variante="sutil"
                         soloIcono
                         icono={Trash2}
-                        aria-label={`Eliminar criterio ${indice + 1}`}
-                        title="Eliminar criterio"
-                        onClick={() => quitarCriterio(indice)}
+                        aria-label={`Eliminar sección ${i + 1}`}
+                        title="Eliminar sección"
+                        onClick={() => quitarSeccion(i)}
                       />
                     )}
                   </>
                 }
               >
-                <div className="plantilla-campos">
-                  <CampoTexto
-                    id={`${ruta}.nombre`}
-                    etiqueta="Nombre del criterio"
+                <div className="plantilla-seccion__competencia">
+                  <Selector
+                    id={`${ruta}.id_competencia`}
+                    etiqueta="Competencia que evalúa"
                     requerido
-                    maxLength={120}
-                    autoComplete="off"
-                    value={criterio.nombre}
-                    onChange={(e) => cambiarCriterio(indice, () => ({ nombre: e.target.value }), ["nombre"])}
-                    error={errores[`${ruta}.nombre`]}
+                    textoVacio="Seleccione una competencia"
+                    opciones={opcionesCompetencia.map((o) => ({ ...o, deshabilitada: usadas.has(o.valor) }))}
+                    value={seccion.id_competencia}
+                    onChange={(e) => cambiarSeccion(i, { id_competencia: e.target.value }, ["id_competencia"])}
+                    error={errores[`${ruta}.id_competencia`]}
                   />
-                  <CampoTexto
-                    id={`${ruta}.descripcion`}
-                    etiqueta="Descripción"
-                    maxLength={500}
-                    value={criterio.descripcion}
-                    onChange={(e) => cambiarCriterio(indice, () => ({ descripcion: e.target.value }), ["descripcion"])}
-                    error={errores[`${ruta}.descripcion`]}
-                  />
+                  {!soloLectura && (
+                    <Boton variante="sutil" icono={Plus} onClick={() => setNuevaCompetenciaPara(i)}>
+                      Nueva competencia
+                    </Boton>
+                  )}
                 </div>
 
-                <ol className="plantilla-preguntas">
-                  {criterio.preguntas.map((pregunta, indicePregunta) => (
-                    <PreguntaEditor
-                      key={pregunta.clave}
-                      pregunta={pregunta}
-                      numero={`${indice + 1}.${indicePregunta + 1}`}
-                      ruta={`${ruta}.preguntas[${indicePregunta}]`}
-                      errores={errores}
-                      soloLectura={soloLectura}
-                      onCambiar={cambiarPregunta(indice, indicePregunta)}
-                      onEliminar={() => quitarPregunta(indice, indicePregunta)}
-                    />
-                  ))}
-                </ol>
-                {criterio.preguntas.length === 0 && <p className="plantilla-nota">Este criterio aún no tiene preguntas.</p>}
+                {seccion.criterios.map((criterio, j) => {
+                  const rutaCriterio = `${ruta}.criterios[${j}]`;
+                  return (
+                    <div key={criterio.clave} className="plantilla-criterio">
+                      <div className="plantilla-criterio__cabecera">
+                        <h3 className="plantilla-criterio__titulo">
+                          Criterio {i + 1}.{j + 1}
+                          {criterio.nombre ? `: ${criterio.nombre}` : ""}
+                        </h3>
+                        <Contador aria-label={`Peso del criterio: ${formatearPorcentaje(pesoCriterio(criterio))}`}>
+                          {formatearPorcentaje(pesoCriterio(criterio))}
+                        </Contador>
+                        {!soloLectura && (
+                          <Boton
+                            variante="sutil"
+                            tamano="sm"
+                            soloIcono
+                            icono={Trash2}
+                            aria-label={`Eliminar criterio ${i + 1}.${j + 1}`}
+                            title="Eliminar criterio"
+                            onClick={() => quitarCriterio(i, j)}
+                          />
+                        )}
+                      </div>
+                      <div className="plantilla-campos">
+                        <CampoTexto
+                          id={`${rutaCriterio}.nombre`}
+                          etiqueta="Nombre del criterio"
+                          requerido
+                          maxLength={120}
+                          autoComplete="off"
+                          value={criterio.nombre}
+                          onChange={(e) => cambiarCriterio(i, j, { nombre: e.target.value }, ["nombre"])}
+                          error={errores[`${rutaCriterio}.nombre`]}
+                        />
+                        <CampoTexto
+                          id={`${rutaCriterio}.descripcion`}
+                          etiqueta="Descripción"
+                          maxLength={255}
+                          value={criterio.descripcion}
+                          onChange={(e) => cambiarCriterio(i, j, { descripcion: e.target.value }, ["descripcion"])}
+                          error={errores[`${rutaCriterio}.descripcion`]}
+                        />
+                      </div>
+
+                      <ol className="plantilla-preguntas">
+                        {criterio.preguntas.map((pregunta, k) => (
+                          <PreguntaEditor
+                            key={pregunta.clave}
+                            pregunta={pregunta}
+                            numero={`${i + 1}.${j + 1}.${k + 1}`}
+                            ruta={`${rutaCriterio}.preguntas[${k}]`}
+                            errores={errores}
+                            escalas={catalogos.escalas}
+                            soloLectura={soloLectura}
+                            onCambiar={cambiarPregunta(i, j, k)}
+                            onEliminar={() => quitarPregunta(i, j, k)}
+                          />
+                        ))}
+                      </ol>
+                      {criterio.preguntas.length === 0 && (
+                        <p className="plantilla-nota">Este criterio aún no tiene preguntas.</p>
+                      )}
+                      {!soloLectura && (
+                        <Boton variante="sutil" icono={Plus} onClick={() => agregarPregunta(i, j)}>
+                          Agregar pregunta
+                        </Boton>
+                      )}
+                    </div>
+                  );
+                })}
+                {seccion.criterios.length === 0 && <p className="plantilla-nota">Esta sección aún no tiene criterios.</p>}
                 {!soloLectura && (
-                  <Boton variante="sutil" icono={Plus} onClick={() => agregarPregunta(indice)}>
-                    Agregar pregunta
+                  <Boton icono={Plus} onClick={() => agregarCriterio(i)} className="plantilla-agregar">
+                    Agregar criterio
                   </Boton>
                 )}
               </Tarjeta>
@@ -389,8 +560,8 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
           })}
 
           {!soloLectura && (
-            <Boton icono={Plus} onClick={agregarCriterio} className="plantilla-agregar-criterio">
-              Agregar criterio
+            <Boton icono={Plus} onClick={agregarSeccion} className="plantilla-agregar">
+              Agregar sección
             </Boton>
           )}
         </fieldset>
@@ -398,17 +569,27 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
         <aside className="plantilla-lateral" aria-label="Balance de ponderaciones">
           <BalancePesos balance={balance} />
           <ul className="plantilla-resumen">
-            {formulario.criterios.map((criterio, indice) => (
-              <li key={criterio.clave}>
-                <span className="plantilla-resumen__nombre" title={criterio.nombre}>
-                  {criterio.nombre || `Criterio ${indice + 1}`}
-                </span>
-                <span>{formatearPorcentaje(pesoCriterio(criterio))}</span>
-              </li>
-            ))}
+            {formulario.secciones.map((seccion, i) => {
+              const competencia = catalogos.competencias.find((c) => c.id_competencia === seccion.id_competencia);
+              const nombre = competencia?.nombre || `Sección ${i + 1}`;
+              return (
+                <li key={seccion.clave}>
+                  <span className="plantilla-resumen__nombre" title={nombre}>
+                    {nombre}
+                  </span>
+                  <span>{formatearPorcentaje(pesoSeccion(seccion))}</span>
+                </li>
+              );
+            })}
           </ul>
         </aside>
       </div>
+
+      <ModalCompetencia
+        abierto={nuevaCompetenciaPara !== null}
+        onCreada={competenciaCreada}
+        onCerrar={() => setNuevaCompetenciaPara(null)}
+      />
 
       <ModalConfirmacion
         abierto={confirmar === "publicar"}
@@ -418,8 +599,9 @@ export default function EditorPlantilla({ idInicial, onVolver, onAbrir }) {
         onConfirmar={publicar}
         onCancelar={() => setConfirmar(null)}
       >
-        Se guardarán los cambios y la plantilla quedará disponible para evaluar. Después no podrá modificar sus preguntas ni
-        pesos: tendrá que crear una nueva versión.
+        Se guardarán los cambios y la versión quedará disponible para los ciclos de evaluación. Después no podrá
+        modificar sus preguntas ni pesos: tendrá que crear una nueva versión.
+        {plantilla?.numero_version > 1 && " La versión publicada anterior quedará archivada."}
         {!balance.balanceado && (
           <p className="plantilla-nota-aviso">
             Los pesos suman {formatearPorcentaje(balance.suma)}; deben sumar exactamente 100 % para publicar.

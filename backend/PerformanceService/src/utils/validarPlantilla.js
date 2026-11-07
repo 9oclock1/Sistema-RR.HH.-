@@ -1,92 +1,72 @@
 const { ErrorApp } = require("./errores");
+const { UUID_RE } = require("./formatos");
 const { aCentesimas } = require("./ponderacion");
 
-const TIPOS_ESCALA = ["LIKERT", "NUMERICA", "CUALITATIVA"];
-const VALORES_LIKERT = [1, 2, 3, 4, 5];
+const MAX_SECCIONES = 20;
 const MAX_CRITERIOS = 30;
 const MAX_PREGUNTAS = 50;
-const MIN_NIVELES = 2;
-const MAX_NIVELES = 10;
-const MAX_VALOR_ESCALA = 99999.99;
+const MAX_OBJETIVO = 2000;
+const MAX_TEXTO_PREGUNTA = 500;
 
 const texto = (valor) => (typeof valor === "string" ? valor.trim() : "");
 const esNumero = (valor) => typeof valor === "number" && Number.isFinite(valor);
 const conDosDecimales = (valor) => Math.abs(aCentesimas(valor) - valor * 100) < 1e-6;
-const esValorEscala = (valor) => esNumero(valor) && Math.abs(valor) <= MAX_VALOR_ESCALA && conDosDecimales(valor);
+const uuid = (valor) => (typeof valor === "string" && UUID_RE.test(valor) ? valor.toLowerCase() : null);
 
-function validarNiveles(niveles, ruta, agregar) {
-  if (!Array.isArray(niveles)) {
-    agregar(`${ruta}.niveles`, "Defina los niveles de la escala.");
-    return [];
-  }
-  const etiquetas = new Set();
-  const valores = new Set();
-  const validos = niveles.map((nivel = {}, indice) => {
-    const etiqueta = texto(nivel.etiqueta);
-    const campo = `${ruta}.niveles[${indice}]`;
-    if (!etiqueta || etiqueta.length > 80) agregar(`${campo}.etiqueta`, "Ingrese una etiqueta de hasta 80 caracteres.");
-    else if (etiquetas.has(etiqueta.toLowerCase())) agregar(`${campo}.etiqueta`, "Las etiquetas no pueden repetirse.");
-    if (!esValorEscala(nivel.valor)) agregar(`${campo}.valor`, "Ingrese un número con hasta dos decimales.");
-    else if (valores.has(nivel.valor)) agregar(`${campo}.valor`, "Los valores no pueden repetirse.");
-    etiquetas.add(etiqueta.toLowerCase());
-    valores.add(nivel.valor);
-    return { valor: nivel.valor, etiqueta };
-  });
-  return validos.sort((a, b) => a.valor - b.valor);
+// Fecha de calendario en formato AAAA-MM-DD.
+function fecha(valor) {
+  if (typeof valor !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return null;
+  const dia = new Date(`${valor}T00:00:00Z`);
+  return !Number.isNaN(dia.getTime()) && dia.toISOString().slice(0, 10) === valor ? valor : null;
 }
 
-// Devuelve la escala normalizada: rango y niveles con su etiqueta.
-function validarEscala(pregunta, ruta, agregar) {
-  const { tipo_escala } = pregunta;
-  if (!TIPOS_ESCALA.includes(tipo_escala)) {
-    agregar(`${ruta}.tipo_escala`, "Seleccione un tipo de escala.");
-    return {};
-  }
+// Datos base de PLANTILLAS_EVALUACION: nombre, área destino, objetivo y vigencia.
+function validarDatosBase(datos, agregar) {
+  const nombre = texto(datos.nombre);
+  const objetivo = texto(datos.objetivo);
+  const idDepartamento = uuid(datos.id_departamento_destino);
+  const desde = fecha(datos.vigencia_desde);
+  const hasta = fecha(datos.vigencia_hasta);
 
-  if (tipo_escala === "NUMERICA") {
-    const { valor_minimo, valor_maximo } = pregunta;
-    if (!esValorEscala(valor_minimo)) agregar(`${ruta}.valor_minimo`, "Ingrese un número con hasta dos decimales.");
-    if (!esValorEscala(valor_maximo)) agregar(`${ruta}.valor_maximo`, "Ingrese un número con hasta dos decimales.");
-    else if (esValorEscala(valor_minimo) && valor_maximo <= valor_minimo) {
-      agregar(`${ruta}.valor_maximo`, "Debe ser mayor al valor mínimo.");
-    }
-    return { tipo_escala, valor_minimo, valor_maximo, niveles: [] };
+  if (!nombre || nombre.length > 120) agregar("nombre", "Ingrese un nombre de hasta 120 caracteres.");
+  if (!objetivo || objetivo.length > MAX_OBJETIVO) {
+    agregar("objetivo", `Ingrese el objetivo de la evaluación, de hasta ${MAX_OBJETIVO} caracteres.`);
   }
+  if (!idDepartamento) agregar("id_departamento_destino", "Seleccione el área a la que va dirigida.");
+  if (!desde) agregar("vigencia_desde", "Ingrese una fecha válida.");
+  if (!hasta) agregar("vigencia_hasta", "Ingrese una fecha válida.");
+  else if (desde && hasta < desde) agregar("vigencia_hasta", "Debe ser igual o posterior al inicio de la vigencia.");
 
-  const niveles = validarNiveles(pregunta.niveles, ruta, agregar);
-  if (tipo_escala === "LIKERT") {
-    const completa =
-      niveles.length === VALORES_LIKERT.length && niveles.every((nivel, indice) => nivel.valor === VALORES_LIKERT[indice]);
-    if (!completa) agregar(`${ruta}.niveles`, "La escala Likert necesita una etiqueta para cada nivel del 1 al 5.");
-    return { tipo_escala, valor_minimo: 1, valor_maximo: 5, niveles };
-  }
-
-  if (niveles.length < MIN_NIVELES || niveles.length > MAX_NIVELES) {
-    agregar(`${ruta}.niveles`, `Defina entre ${MIN_NIVELES} y ${MAX_NIVELES} niveles.`);
-  }
   return {
-    tipo_escala,
-    valor_minimo: niveles[0]?.valor,
-    valor_maximo: niveles.at(-1)?.valor,
-    niveles,
+    nombre,
+    objetivo,
+    id_departamento_destino: idDepartamento,
+    vigencia_desde: desde,
+    vigencia_hasta: hasta,
   };
 }
 
 function validarPregunta(pregunta = {}, ruta, agregar) {
-  const enunciado = texto(pregunta.enunciado);
-  if (!enunciado || enunciado.length > 500) agregar(`${ruta}.enunciado`, "Ingrese un enunciado de hasta 500 caracteres.");
-  const { peso } = pregunta;
-  if (!esNumero(peso) || peso <= 0 || peso > 100 || !conDosDecimales(peso)) {
-    agregar(`${ruta}.peso`, "Ingrese un porcentaje mayor a 0 y hasta 100, con hasta dos decimales.");
+  const textoPregunta = texto(pregunta.texto);
+  if (!textoPregunta || textoPregunta.length > MAX_TEXTO_PREGUNTA) {
+    agregar(`${ruta}.texto`, `Ingrese el texto de la pregunta, de hasta ${MAX_TEXTO_PREGUNTA} caracteres.`);
   }
-  return { enunciado, peso, ...validarEscala(pregunta, ruta, agregar) };
+  const peso = pregunta.peso_porcentual;
+  if (!esNumero(peso) || peso <= 0 || peso > 100 || !conDosDecimales(peso)) {
+    agregar(`${ruta}.peso_porcentual`, "Ingrese un porcentaje mayor a 0 y hasta 100, con hasta dos decimales.");
+  }
+  const { es_obligatoria: obligatoria = true } = pregunta;
+  if (typeof obligatoria !== "boolean") agregar(`${ruta}.es_obligatoria`, "Indique si la pregunta es obligatoria.");
+  const idEscala = uuid(pregunta.id_escala);
+  if (!idEscala) agregar(`${ruta}.id_escala`, "Seleccione una escala de valoración.");
+  return { texto: textoPregunta, peso_porcentual: peso, es_obligatoria: obligatoria, id_escala: idEscala };
 }
 
 function validarCriterio(criterio = {}, ruta, agregar) {
   const nombre = texto(criterio.nombre);
   const descripcion = texto(criterio.descripcion) || null;
   if (!nombre || nombre.length > 120) agregar(`${ruta}.nombre`, "Ingrese un nombre de hasta 120 caracteres.");
-  if (descripcion?.length > 500) agregar(`${ruta}.descripcion`, "Use hasta 500 caracteres.");
+  if (descripcion?.length > 255) agregar(`${ruta}.descripcion`, "Use hasta 255 caracteres.");
 
   const { preguntas = [] } = criterio;
   if (!Array.isArray(preguntas)) {
@@ -101,34 +81,55 @@ function validarCriterio(criterio = {}, ruta, agregar) {
   };
 }
 
-// Valida la estructura de una plantilla. La suma de pesos no se exige aquí: un borrador puede
-// guardarse desbalanceado y el balance se controla al publicar.
-function validarPlantilla(datos = {}) {
-  const errores = [];
-  const agregar = (campo, mensaje) => errores.push({ campo, mensaje });
-  const nombre = texto(datos.nombre);
-  const descripcion = texto(datos.descripcion) || null;
-  const { criterios = [] } = datos;
+function validarSeccion(seccion = {}, ruta, agregar) {
+  const idCompetencia = uuid(seccion.id_competencia);
+  if (!idCompetencia) agregar(`${ruta}.id_competencia`, "Seleccione la competencia que evalúa la sección.");
 
-  if (!nombre || nombre.length > 120) agregar("nombre", "Ingrese un nombre de hasta 120 caracteres.");
-  if (descripcion?.length > 500) agregar("descripcion", "Use hasta 500 caracteres.");
-
-  let criteriosValidos = [];
-  if (!Array.isArray(criterios)) agregar("criterios", "Los criterios deben ser una lista.");
-  else {
-    if (criterios.length > MAX_CRITERIOS) agregar("criterios", `Use hasta ${MAX_CRITERIOS} criterios.`);
-    criteriosValidos = criterios.map((criterio, indice) => validarCriterio(criterio, `criterios[${indice}]`, agregar));
-    const nombres = new Set();
-    criteriosValidos.forEach(({ nombre: nombreCriterio }, indice) => {
-      const clave = nombreCriterio.toLowerCase();
-      if (clave && nombres.has(clave)) agregar(`criterios[${indice}].nombre`, "Ya existe un criterio con ese nombre.");
-      nombres.add(clave);
-    });
+  const { criterios = [] } = seccion;
+  if (!Array.isArray(criterios)) {
+    agregar(`${ruta}.criterios`, "Los criterios deben ser una lista.");
+    return { id_competencia: idCompetencia, criterios: [] };
   }
-
-  if (errores.length > 0) throw new ErrorApp(400, "Datos de plantilla inválidos", errores);
-
-  return { nombre, descripcion, criterios: criteriosValidos };
+  if (criterios.length > MAX_CRITERIOS) agregar(`${ruta}.criterios`, `Use hasta ${MAX_CRITERIOS} criterios por sección.`);
+  const validos = criterios.map((criterio, indice) => validarCriterio(criterio, `${ruta}.criterios[${indice}]`, agregar));
+  const nombres = new Set();
+  validos.forEach(({ nombre }, indice) => {
+    const clave = nombre.toLowerCase();
+    if (clave && nombres.has(clave)) {
+      agregar(`${ruta}.criterios[${indice}].nombre`, "Ya existe un criterio con ese nombre en la sección.");
+    }
+    nombres.add(clave);
+  });
+  return { id_competencia: idCompetencia, criterios: validos };
 }
 
-module.exports = { validarPlantilla, TIPOS_ESCALA };
+function validarSecciones(secciones, agregar) {
+  if (!Array.isArray(secciones)) {
+    agregar("secciones", "Las secciones deben ser una lista.");
+    return [];
+  }
+  if (secciones.length > MAX_SECCIONES) agregar("secciones", `Use hasta ${MAX_SECCIONES} secciones.`);
+  const validas = secciones.map((seccion, indice) => validarSeccion(seccion, `secciones[${indice}]`, agregar));
+  const competencias = new Set();
+  validas.forEach(({ id_competencia: id }, indice) => {
+    if (id && competencias.has(id)) {
+      agregar(`secciones[${indice}].id_competencia`, "Esa competencia ya tiene una sección en la plantilla.");
+    }
+    competencias.add(id);
+  });
+  return validas;
+}
+
+// Valida los datos base y la estructura de una versión. La suma de pesos no se exige aquí: un borrador
+// puede guardarse desbalanceado y el balance se controla al publicar.
+// Con conDatosBase = false solo valida la estructura (los datos base ya no se pueden cambiar).
+function validarPlantilla(datos = {}, { conDatosBase = true } = {}) {
+  const errores = [];
+  const agregar = (campo, mensaje) => errores.push({ campo, mensaje });
+  const base = conDatosBase ? validarDatosBase(datos, agregar) : {};
+  const secciones = validarSecciones(datos.secciones ?? [], agregar);
+  if (errores.length > 0) throw new ErrorApp(400, "Datos de plantilla inválidos", errores);
+  return { ...base, secciones };
+}
+
+module.exports = { validarPlantilla };
