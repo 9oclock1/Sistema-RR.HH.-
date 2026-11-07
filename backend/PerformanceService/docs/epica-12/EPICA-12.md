@@ -37,7 +37,7 @@ Las entidades de la épica con sus atributos clave y los servicios que las usan,
 
 ### 2.1 Modelo de dominio
 
-Las tablas de la épica con todos sus atributos, tal como están en `db/init.sql`, y los catálogos (en `db/seed.sql`) como enumeraciones. Los campos `bytea` marcados con AES-256-GCM guardan `iv + authTag + texto cifrado`.
+Las tablas de la épica con todos sus atributos, tal como están en `db/init.sql`, y los catálogos (en `db/catalogos.sql`) como enumeraciones. Los campos `bytea` marcados con AES-256-GCM guardan `iv + authTag + texto cifrado`.
 
 ![Modelo de dominio de la épica 12](detallados/clases-1-dominio.png)
 
@@ -109,7 +109,7 @@ Incluye el bloque opcional de la sucursal del caso, que KAN-91 agregó para pode
 
 | Elemento | Ubicación |
 |---|---|
-| Tablas y catálogos | `db/init.sql`, `db/seed.sql`, `db/aclaracion.md` |
+| Tablas y catálogos | `db/init.sql`, `db/catalogos.sql`, `db/aclaracion.md` |
 | Rutas | `src/routes/quejasRoutes.js` |
 | Registro y consulta por código | `src/services/quejasService.js`, `src/models/quejasModel.js` |
 | Clasificación y derivación | `src/services/casosQuejaService.js`, `src/models/casosQuejaModel.js`, `src/utils/casosQueja.js` |
