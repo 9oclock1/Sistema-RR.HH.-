@@ -174,14 +174,33 @@ function calcularEmpleado(fila, conceptos) {
     orden: i + 1,
   }));
   const totalDescuentos = deCentavos(sumaCentavos(descuentos));
-  return {
+  const resultado = {
     renglones,
     total_ganado: totalGanado,
     total_descuentos: totalDescuentos,
     liquido_pagable: deCentavos(aCentavos(totalGanado) - aCentavos(totalDescuentos)),
     total_aportes: deCentavos(sumaCentavos(aportes)),
-    alertas,
   };
+  return { ...resultado, alertas: [...alertas, ...validarConsistencia(resultado, fila)] };
 }
 
-module.exports = { HORAS_MES, CALCULADOS, TRAMOS_ANS, aCentavos, dosDecimales, calcularEmpleado };
+// Criterio 3: líquido negativo o totales que no cuadran con el detalle marcan al colaborador con una alerta.
+function validarConsistencia({ renglones, total_ganado, total_descuentos, liquido_pagable, total_aportes }, fila) {
+  const alertas = [];
+  if (liquido_pagable < 0) {
+    alertas.push(`El líquido pagable es negativo (${montoTexto(liquido_pagable)}): los descuentos superan el total ganado.`);
+  }
+  const suma = (tipo) => sumaCentavos(renglones.filter((r) => r.tipo === tipo));
+  const cuadra =
+    suma("INGRESO") === aCentavos(total_ganado) &&
+    suma("DESCUENTO") === aCentavos(total_descuentos) &&
+    suma("APORTE") === aCentavos(total_aportes) &&
+    aCentavos(total_ganado) - aCentavos(total_descuentos) === Math.round(liquido_pagable * 100);
+  if (!cuadra) alertas.push("Los totales no cuadran con el detalle del cálculo.");
+  if (fila.dias_pagados > 0 && total_ganado <= 0) {
+    alertas.push(`El total ganado es cero aunque tiene ${fila.dias_pagados} días pagados.`);
+  }
+  return alertas;
+}
+
+module.exports = { HORAS_MES, CALCULADOS, TRAMOS_ANS, aCentavos, dosDecimales, calcularEmpleado, validarConsistencia };

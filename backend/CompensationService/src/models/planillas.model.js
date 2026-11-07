@@ -169,6 +169,14 @@ async function contarEmpleados(cliente, id) {
   return rows[0].cantidad;
 }
 
+async function contarConAlertas(cliente, id) {
+  const { rows } = await cliente.query(
+    "SELECT COUNT(*)::int AS cantidad FROM planilla_empleados WHERE id_planilla = $1 AND cardinality(alertas) > 0",
+    [id]
+  );
+  return rows[0].cantidad;
+}
+
 module.exports = {
   listar,
   conceptosVigentes,
@@ -182,4 +190,5 @@ module.exports = {
   eliminar,
   aprobar,
   contarEmpleados,
+  contarConAlertas,
 };

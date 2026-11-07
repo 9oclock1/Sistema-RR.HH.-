@@ -211,6 +211,14 @@ async function aprobar(id, identidad = {}) {
     if ((await modelo.contarEmpleados(cliente, id)) === 0) {
       throw new ErrorApp(409, `La planilla de ${mes} no tiene colaboradores: no se puede aprobar.`);
     }
+    // KAN-64, criterio 3: con alertas de inconsistencia no se aprueba.
+    const conAlertas = await modelo.contarConAlertas(cliente, id);
+    if (conAlertas > 0) {
+      throw new ErrorApp(
+        409,
+        `La planilla de ${mes} tiene ${conAlertas === 1 ? "1 colaborador" : `${conAlertas} colaboradores`} con alertas de inconsistencia: corríjalas y vuelva a generarla.`
+      );
+    }
     if (!(await modelo.aprobar(cliente, id, { idEmpleado: idResponsable, nombre }))) {
       throw new ErrorApp(409, `La planilla de ${mes} ya fue aprobada.`);
     }
