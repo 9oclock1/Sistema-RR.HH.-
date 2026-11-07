@@ -7,7 +7,8 @@ import BuzonQuejasPage from "../features/quejas/BuzonQuejasPage";
 import ConsultarQuejaPage from "../features/quejas/ConsultarQuejaPage";
 import { RUTA_BUZON_QUEJAS, RUTA_CONSULTAR_QUEJA } from "../features/quejas/reglas";
 import CasosQuejaPage from "../features/quejas/casos/CasosQuejaPage";
-import { RUTA_CASOS_QUEJA } from "../features/quejas/casos/casos";
+import MisCasosQuejaPage from "../features/quejas/casos/MisCasosQuejaPage";
+import { RUTA_CASOS_QUEJA, RUTA_MIS_CASOS_QUEJA } from "../features/quejas/casos/casos";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
@@ -381,6 +382,15 @@ export const SECCIONES = [
         icono: Inbox,
         roles: ["admin"],
         pagina: CasosQuejaPage,
+      },
+      {
+        ruta: RUTA_MIS_CASOS_QUEJA,
+        parametroOpcional: "idQueja",
+        etiqueta: "Mis casos de quejas",
+        descripcion: "Quejas derivadas a usted: acciones preventivas o correctivas y avance hasta su resolución.",
+        icono: ClipboardList,
+        roles: ["supervisor", "reclutador"],
+        pagina: MisCasosQuejaPage,
       },
     ],
   },

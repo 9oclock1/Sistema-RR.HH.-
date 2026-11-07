@@ -57,8 +57,9 @@ async function listarCatalogos() {
   return { categorias, prioridades, estados };
 }
 
-async function listarCasos(consulta) {
+async function listarCasos(consulta, { idResponsable } = {}) {
   const filtros = leerFiltros(consulta);
+  if (idResponsable) filtros.idResponsable = idResponsable;
   const [filas, total] = await Promise.all([modelo.listarCasos(filtros), modelo.contarCasos(filtros)]);
   return {
     casos: filas.map((fila) => ({

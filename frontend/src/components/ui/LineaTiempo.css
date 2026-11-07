@@ -1,0 +1,109 @@
+.ds-linea-tiempo {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ds-linea-tiempo__paso {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--size-avatar) minmax(0, 1fr);
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+}
+
+.ds-linea-tiempo__paso:last-child {
+  padding-bottom: 0;
+}
+
+.ds-linea-tiempo__paso::before {
+  content: "";
+  position: absolute;
+  top: var(--size-avatar);
+  bottom: 0;
+  left: calc((var(--size-avatar) - var(--border-width)) / 2);
+  border-left: var(--border-width) solid var(--color-border);
+}
+
+.ds-linea-tiempo__paso:last-child::before {
+  display: none;
+}
+
+.ds-linea-tiempo__marca {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-avatar);
+  height: var(--size-avatar);
+  border: var(--border-width) solid var(--tono-borde);
+  border-radius: var(--radius-round);
+  background: var(--color-bg-surface);
+  color: var(--tono-texto);
+}
+
+.ds-linea-tiempo__marca .ds-icono {
+  width: var(--font-size-small);
+  height: var(--font-size-small);
+}
+
+.ds-linea-tiempo__cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding-top: calc((var(--size-avatar) - var(--line-height-body)) / 2);
+}
+
+.ds-linea-tiempo__titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.ds-linea-tiempo__meta {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-linea-tiempo__contenido {
+  color: var(--color-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ds-linea-tiempo__paso--neutral {
+  --tono-borde: var(--color-border-input);
+  --tono-texto: var(--color-text-secondary);
+}
+
+.ds-linea-tiempo__paso--exito {
+  --tono-borde: var(--color-success);
+  --tono-texto: var(--color-success-text);
+}
+
+.ds-linea-tiempo__paso--aviso {
+  --tono-borde: var(--color-warning);
+  --tono-texto: var(--color-warning-text);
+}
+
+.ds-linea-tiempo__paso--peligro {
+  --tono-borde: var(--color-danger);
+  --tono-texto: var(--color-danger-text);
+}
+
+.ds-linea-tiempo__paso--info {
+  --tono-borde: var(--color-info);
+  --tono-texto: var(--color-info-text);
+}
+
+.ds-linea-tiempo__paso--morado {
+  --tono-borde: var(--color-purple);
+  --tono-texto: var(--color-purple-text);
+}

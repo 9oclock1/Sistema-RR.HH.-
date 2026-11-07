@@ -13,7 +13,8 @@ export const formatearFechaHora = (valor) => fechaHora.format(new Date(valor));
 const TONOS_ESTADO = {
   REGISTRADA: "info",
   ASIGNADA: "morado",
-  EN_ATENCION: "aviso",
+  EN_ANALISIS: "info",
+  EN_ACCION: "aviso",
   RESUELTA: "exito",
   DESESTIMADA: "neutral",
 };

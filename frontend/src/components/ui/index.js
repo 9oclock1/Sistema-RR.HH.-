@@ -12,6 +12,7 @@ export { default as Esqueleto } from "./Esqueleto";
 export { default as EstadoVacio } from "./EstadoVacio";
 export { default as Etiqueta } from "./Etiqueta";
 export { default as GrupoRadios } from "./GrupoRadios";
+export { default as LineaTiempo } from "./LineaTiempo";
 export { default as Modal, ModalConfirmacion } from "./Modal";
 export { default as Paginacion } from "./Paginacion";
 export { default as Pestanas } from "./Pestanas";

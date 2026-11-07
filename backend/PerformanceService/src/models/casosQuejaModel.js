@@ -17,13 +17,20 @@ async function listarEstados(db = pool) {
 const FILTROS_BANDEJA = `($1::smallint IS NULL OR q.id_estado_queja = $1)
    AND ($2::smallint IS NULL OR q.id_categoria_queja = $2)
    AND ($3::smallint IS NULL OR q.id_prioridad_queja = $3)
-   AND ($4::boolean IS FALSE OR q.id_prioridad_queja IS NULL)`;
+   AND ($4::boolean IS FALSE OR q.id_prioridad_queja IS NULL)
+   AND ($5::uuid IS NULL OR $5 = (
+     SELECT id_empleado_responsable FROM asignaciones_queja
+     WHERE id_queja = q.id_queja
+     ORDER BY asignada_en DESC
+     LIMIT 1
+   ))`;
 
-const parametrosFiltro = ({ idEstado, idCategoria, idPrioridad, sinPrioridad }) => [
+const parametrosFiltro = ({ idEstado, idCategoria, idPrioridad, sinPrioridad, idResponsable = null }) => [
   idEstado,
   idCategoria,
   idPrioridad,
   sinPrioridad,
+  idResponsable,
 ];
 
 async function listarCasos(filtros, db = pool) {
@@ -46,7 +53,7 @@ async function listarCasos(filtros, db = pool) {
      LEFT JOIN empleados r ON r.id_empleado = a.id_empleado_responsable
      WHERE ${FILTROS_BANDEJA}
      ORDER BY q.creado_en DESC, q.id_queja
-     LIMIT $5 OFFSET $6`,
+     LIMIT $6 OFFSET $7`,
     [...parametrosFiltro(filtros), filtros.limite, (filtros.pagina - 1) * filtros.limite],
   );
   return rows;

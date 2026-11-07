@@ -1,6 +1,6 @@
 const { ErrorApp } = require("./errores");
 
-const ESTADO_QUEJA = { REGISTRADA: 1, ASIGNADA: 2 };
+const ESTADO_QUEJA = { REGISTRADA: 1, ASIGNADA: 2, EN_ANALISIS: 3, EN_ACCION: 4, RESUELTA: 5 };
 const ASUNTO = { MIN: 5, MAX: 150 };
 const DESCRIPCION = { MIN: 20, MAX: 5000 };
 const ADJUNTOS = {

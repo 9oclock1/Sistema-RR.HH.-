@@ -1,5 +1,7 @@
 export const RUTA_CASOS_QUEJA = "/desempeno/casos-quejas";
 export const rutaCasoQueja = (idQueja) => `${RUTA_CASOS_QUEJA}/${idQueja}`;
+export const RUTA_MIS_CASOS_QUEJA = "/desempeno/mis-casos-quejas";
+export const rutaMiCasoQueja = (idQueja) => `${RUTA_MIS_CASOS_QUEJA}/${idQueja}`;
 
 export const TAMANO_PAGINA = 20;
 export const SIN_PRIORIDAD = "sin";
@@ -43,4 +45,37 @@ export function validarDerivacion({ idCategoria, idPrioridad, idResponsable, com
     errores.comentario = `El comentario puede tener hasta ${COMENTARIO_MAX} caracteres.`;
   }
   return errores;
+}
+
+export const ACCION = { MIN: 10, MAX: 2000 };
+export const RESOLUCION = { MIN: 10, MAX: 2000 };
+export const ESTADO_RESUELTA = "RESUELTA";
+
+function validarTexto(valor, { MIN, MAX }, { vacio, nombre }) {
+  const limpio = valor.trim();
+  if (!limpio) return vacio;
+  if (limpio.length < MIN) return `${nombre} debe tener al menos ${MIN} caracteres.`;
+  if (limpio.length > MAX) return `${nombre} puede tener hasta ${MAX} caracteres.`;
+  return null;
+}
+
+export function validarAccion({ idTipo, descripcion }) {
+  const errores = {};
+  if (!idTipo) errores.id_tipo_accion_queja = "Indique si la acción es preventiva o correctiva.";
+  const descripcionInvalida = validarTexto(descripcion, ACCION, {
+    vacio: "Describa la acción realizada.",
+    nombre: "La descripción",
+  });
+  if (descripcionInvalida) errores.descripcion = descripcionInvalida;
+  return errores;
+}
+
+export function validarCambioEstado({ estado, resolucion }) {
+  if (!estado) return { id_estado_queja: "Seleccione el nuevo estado del caso." };
+  if (estado.codigo !== ESTADO_RESUELTA) return {};
+  const resolucionInvalida = validarTexto(resolucion, RESOLUCION, {
+    vacio: "Describa cómo se resolvió el caso: es obligatorio para marcarlo como resuelto.",
+    nombre: "La descripción de la resolución",
+  });
+  return resolucionInvalida ? { resolucion: resolucionInvalida } : {};
 }

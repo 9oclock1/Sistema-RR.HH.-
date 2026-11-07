@@ -1,10 +1,12 @@
 const { Router } = require("express");
 const controlador = require("../controllers/quejasController");
 const casos = require("../controllers/casosQuejaController");
+const seguimiento = require("../controllers/seguimientoQuejaController");
 const subirAdjuntosQueja = require("../middlewares/subirAdjuntosQueja");
 const identificarDenunciante = require("../middlewares/identificarDenunciante");
 const identificarEmpleado = require("../middlewares/identificarEmpleado");
 const exigirAdministrador = require("../middlewares/exigirAdministrador");
+const identificarLectorCaso = require("../middlewares/identificarLectorCaso");
 const erroresQuejas = require("../middlewares/erroresQuejas");
 const { crearLimitador } = require("../middlewares/limitarConsultas");
 
@@ -28,6 +30,14 @@ router.post("/quejas/casos/:idQueja/involucrados", administrador, casos.registra
 router.delete("/quejas/casos/:idQueja/involucrados/:idEmpleado", exigirAdministrador, casos.quitarInvolucrado);
 router.post("/quejas/casos/:idQueja/derivacion", administrador, casos.derivar);
 router.post("/quejas/casos/:idQueja/derivacion/notificacion", administrador, casos.reintentarAviso);
+
+router.get("/quejas/asignados/catalogos", identificarEmpleado, seguimiento.listarCatalogos);
+router.get("/quejas/asignados", identificarEmpleado, seguimiento.listarAsignados);
+router.get("/quejas/asignados/:idQueja", identificarEmpleado, seguimiento.obtenerAsignado);
+router.get("/quejas/casos/:idQueja/seguimiento", identificarLectorCaso, seguimiento.obtenerSeguimiento);
+router.post("/quejas/casos/:idQueja/acciones", identificarEmpleado, seguimiento.registrarAccion);
+router.post("/quejas/casos/:idQueja/estado", identificarEmpleado, seguimiento.cambiarEstado);
+router.post("/quejas/casos/:idQueja/resolucion/notificacion", identificarEmpleado, seguimiento.reintentarAvisoResolucion);
 router.use("/quejas", erroresQuejas);
 
 module.exports = router;

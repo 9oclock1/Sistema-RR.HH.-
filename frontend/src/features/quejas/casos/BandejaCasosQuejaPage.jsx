@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { FilterX, Inbox, RefreshCw } from "lucide-react";
-import { listarCasosQueja, listarCatalogosCasos } from "../../../api/casosQueja";
+import {
+  listarCasosAsignados,
+  listarCasosQueja,
+  listarCatalogosAsignados,
+  listarCatalogosCasos,
+} from "../../../api/casosQueja";
 import {
   Alerta,
   Avatar,
@@ -15,14 +20,50 @@ import {
   Tarjeta,
   TextoTruncado,
 } from "../../../components/ui";
-import { useRol } from "../../../context/sesion";
+import { useRol, useUsuario } from "../../../context/sesion";
 import { tonoEstado } from "../formato";
-import { formatearFechaCorta, nombreDe, rutaCasoQueja, SIN_PRIORIDAD, TAMANO_PAGINA, tonoPrioridad } from "./casos";
+import {
+  formatearFechaCorta,
+  nombreDe,
+  rutaCasoQueja,
+  rutaMiCasoQueja,
+  SIN_PRIORIDAD,
+  TAMANO_PAGINA,
+  tonoPrioridad,
+} from "./casos";
 import "./casos.css";
 
 const SIN_FILTROS = { estado: "", categoria: "", prioridad: "" };
 
-const COLUMNAS = [
+const ALCANCES = {
+  administrador: {
+    titulo: "Casos de quejas",
+    descripcion: "Quejas recibidas en el buzón: clasifíquelas y derívelas a la persona que debe atenderlas.",
+    catalogos: ({ rol }) => listarCatalogosCasos({ rol }),
+    listar: ({ rol }, filtros) => listarCasosQueja({ rol }, filtros),
+    ruta: rutaCasoQueja,
+    estadoNuevo: "REGISTRADA",
+    vacio: {
+      titulo: "No hay quejas registradas",
+      mensaje: "Cuando un empleado registre una queja en el buzón, aparecerá aquí.",
+    },
+  },
+  responsable: {
+    titulo: "Mis casos de quejas",
+    descripcion: "Quejas que RRHH le derivó: registre las acciones y actualice el estado de cada caso.",
+    catalogos: (sesion) => listarCatalogosAsignados(sesion),
+    listar: (sesion, filtros) => listarCasosAsignados(sesion, filtros),
+    ruta: rutaMiCasoQueja,
+    estadoNuevo: "ASIGNADA",
+    sinColumnas: ["responsable"],
+    vacio: {
+      titulo: "No tiene casos asignados",
+      mensaje: "Cuando RRHH le derive una queja, aparecerá aquí.",
+    },
+  },
+};
+
+const columnasPara = (config) => [
   {
     clave: "codigo",
     titulo: "Código",
@@ -83,11 +124,11 @@ const COLUMNAS = [
     ancho: "10%",
     alinear: "fin",
     celda: (c) => {
-      const nueva = c.estado.codigo === "REGISTRADA";
+      const nueva = c.estado.codigo === config.estadoNuevo;
       return (
         <Boton
           as={Link}
-          to={rutaCasoQueja(c.id_queja)}
+          to={config.ruta(c.id_queja)}
           tamano="sm"
           variante={nueva ? "primario" : "predeterminado"}
           aria-label={`${nueva ? "Revisar" : "Ver"} la queja ${c.codigo_seguimiento}`}
@@ -97,39 +138,49 @@ const COLUMNAS = [
       );
     },
   },
-];
+].filter((columna) => !config.sinColumnas?.includes(columna.clave));
 
 const opcionesDe = (lista, id) => (lista ?? []).map((item) => ({ valor: String(item[id]), etiqueta: item.nombre }));
 
-export default function BandejaCasosQuejaPage() {
+export default function BandejaCasosQuejaPage({ alcance = "administrador" }) {
+  const config = ALCANCES[alcance];
   const rol = useRol();
+  const idEmpleado = useUsuario();
+  const responsable = alcance === "responsable";
+  const sinUsuario = responsable && !idEmpleado;
+  const sesion = useMemo(() => (responsable ? { rol, idEmpleado } : { rol }), [responsable, rol, idEmpleado]);
+  const columnas = useMemo(() => columnasPara(config), [config]);
   const [catalogos, setCatalogos] = useState(null);
   const [filtros, setFiltros] = useState(SIN_FILTROS);
   const [pagina, setPagina] = useState(1);
   const [intento, setIntento] = useState(0);
   const [resultado, setResultado] = useState({ clave: null });
 
-  const clave = JSON.stringify({ rol, filtros, pagina, intento });
+  const clave = JSON.stringify({ sesion, filtros, pagina, intento });
 
   useEffect(() => {
+    if (sinUsuario) return undefined;
     let vigente = true;
-    listarCatalogosCasos({ rol })
+    config
+      .catalogos(sesion)
       .then((datos) => vigente && setCatalogos(datos))
       .catch(() => vigente && setCatalogos({ categorias: [], prioridades: [], estados: [] }));
     return () => {
       vigente = false;
     };
-  }, [rol, intento]);
+  }, [config, sesion, sinUsuario, intento]);
 
   useEffect(() => {
+    if (sinUsuario) return undefined;
     let vigente = true;
-    listarCasosQueja({ rol }, { ...filtros, pagina, limite: TAMANO_PAGINA })
+    config
+      .listar(sesion, { ...filtros, pagina, limite: TAMANO_PAGINA })
       .then((datos) => vigente && setResultado({ clave, datos }))
       .catch((error) => vigente && setResultado({ clave, error: error.message }));
     return () => {
       vigente = false;
     };
-  }, [clave, rol, filtros, pagina]);
+  }, [config, clave, sesion, sinUsuario, filtros, pagina]);
 
   const vista = resultado.clave === clave ? resultado : {};
   const hayFiltros = Object.values(filtros).some(Boolean);
@@ -163,9 +214,9 @@ export default function BandejaCasosQuejaPage() {
       <EncabezadoPagina
         migas={[{ etiqueta: "Inicio", href: "/" }, { etiqueta: "Desempeño" }]}
         enlace={Link}
-        titulo="Casos de quejas"
+        titulo={config.titulo}
         idTitulo="qc-bandeja-titulo"
-        descripcion="Quejas recibidas en el buzón: clasifíquelas y derívelas a la persona que debe atenderlas."
+        descripcion={config.descripcion}
         acciones={
           <Boton icono={RefreshCw} onClick={actualizar}>
             Actualizar
@@ -173,6 +224,11 @@ export default function BandejaCasosQuejaPage() {
         }
       />
 
+      {sinUsuario ? (
+        <Alerta tono="aviso" titulo="Elija su usuario de prueba">
+          Para ver los casos que le derivaron, seleccione quién es en «Usuario de prueba», al pie de la barra lateral.
+        </Alerta>
+      ) : (
       <Tarjeta nivelTitulo={2} titulo="Bandeja de casos">
         <div className="qc-filtros">
           <Selector
@@ -218,7 +274,7 @@ export default function BandejaCasosQuejaPage() {
           <>
             <Tabla
               className="qc-tabla"
-              columnas={COLUMNAS}
+              columnas={columnas}
               filas={vista.datos?.casos ?? []}
               claveFila="id_queja"
               descripcion="Quejas recibidas"
@@ -232,11 +288,7 @@ export default function BandejaCasosQuejaPage() {
                     accion={<Boton onClick={limpiarFiltros}>Quitar filtros</Boton>}
                   />
                 ) : (
-                  <EstadoVacio
-                    icono={Inbox}
-                    titulo="No hay quejas registradas"
-                    mensaje="Cuando un empleado registre una queja en el buzón, aparecerá aquí."
-                  />
+                  <EstadoVacio icono={Inbox} titulo={config.vacio.titulo} mensaje={config.vacio.mensaje} />
                 )
               }
             />
@@ -252,6 +304,7 @@ export default function BandejaCasosQuejaPage() {
           </>
         )}
       </Tarjeta>
+      )}
     </section>
   );
 }
