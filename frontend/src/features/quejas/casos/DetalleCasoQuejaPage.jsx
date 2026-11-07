@@ -26,6 +26,7 @@ import FormularioDerivacion from "./FormularioDerivacion";
 import GestionCasoQueja from "./GestionCasoQueja";
 import InvolucradosQueja from "./InvolucradosQueja";
 import LineaTiempoCaso from "./LineaTiempoCaso";
+import SucursalQueja from "./SucursalQueja";
 import { formatearFechaCorta, nombreDe, RUTA_CASOS_QUEJA, RUTA_MIS_CASOS_QUEJA, tonoPrioridad } from "./casos";
 import useRecurso from "./useRecurso";
 import "../quejas.css";
@@ -227,6 +228,7 @@ function DetalleAdministrador({ idQueja, sesion, idEmpleado }) {
                 onActualizado={caso.reintentar}
               />
             )}
+            <SucursalQueja idQueja={datos.id_queja} sesion={sesion} editable={editable} />
             <InvolucradosQueja
               caso={datos}
               sesion={sesion}

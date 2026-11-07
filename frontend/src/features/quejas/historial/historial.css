@@ -1,0 +1,3 @@
+.qh-filtros {
+  max-width: calc(var(--size-sidebar) * 4);
+}
