@@ -55,9 +55,37 @@ async function insertarAdjunto(db, { idQueja, orden, nombreOriginal, tipo, taman
   );
 }
 
+async function obtenerSeguimiento(codigo, db = pool) {
+  const { rows } = await db.query(
+    `SELECT q.id_queja, q.codigo_seguimiento, q.creado_en, q.actualizado_en,
+            eq.codigo AS estado_codigo, eq.nombre AS estado_nombre, eq.es_final,
+            cq.nombre AS categoria
+     FROM quejas q
+     JOIN catalogos_estado_queja eq ON eq.id_estado_queja = q.id_estado_queja
+     JOIN catalogos_categoria_queja cq ON cq.id_categoria_queja = q.id_categoria_queja
+     WHERE q.codigo_seguimiento = $1`,
+    [codigo],
+  );
+  return rows[0] ?? null;
+}
+
+async function listarHistorialPublico(idQueja, db = pool) {
+  const { rows } = await db.query(
+    `SELECT eq.codigo, eq.nombre, h.fecha_cambio
+     FROM historiales_estado_queja h
+     JOIN catalogos_estado_queja eq ON eq.id_estado_queja = h.id_estado_queja
+     WHERE h.id_queja = $1
+     ORDER BY h.fecha_cambio`,
+    [idQueja],
+  );
+  return rows;
+}
+
 module.exports = {
   listarCategorias,
   obtenerEstado,
+  obtenerSeguimiento,
+  listarHistorialPublico,
   sincronizarEmpleado,
   insertarQueja,
   insertarHistorialInicial,

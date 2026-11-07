@@ -13,4 +13,8 @@ async function registrar(req, res) {
   res.status(201).json(queja);
 }
 
-module.exports = { listarCategorias, registrar };
+async function consultarSeguimiento(req, res) {
+  res.json(await servicio.consultarSeguimiento(req.body ?? {}));
+}
+
+module.exports = { listarCategorias, registrar, consultarSeguimiento };

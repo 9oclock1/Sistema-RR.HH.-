@@ -6,7 +6,7 @@ const { enTransaccion } = require("../config/transaccion");
 const { consultarEmpleado } = require("./empleadosExternos");
 const { ErrorApp } = require("../utils/errores");
 const { cifrar, cifrarTexto } = require("../utils/cifrado");
-const { generarCodigo } = require("../utils/codigoSeguimiento");
+const { generarCodigo, normalizarCodigo } = require("../utils/codigoSeguimiento");
 const { limpiarAdjunto } = require("../utils/limpiarAdjunto");
 const { ESTADO_QUEJA, ADJUNTOS, validarQueja } = require("../utils/quejas");
 
@@ -111,4 +111,22 @@ async function registrarQueja({ cuerpo = {}, archivos = [], idEmpleado }) {
   };
 }
 
-module.exports = { listarCategorias, registrarQueja };
+const NO_ENCONTRADA = "No encontramos una queja con ese código. Revise que esté bien escrito.";
+
+async function consultarSeguimiento(cuerpo = {}) {
+  const codigo = normalizarCodigo(cuerpo.codigo);
+  const queja = codigo ? await modelo.obtenerSeguimiento(codigo) : null;
+  if (!queja) throw new ErrorApp(404, NO_ENCONTRADA);
+
+  const historial = await modelo.listarHistorialPublico(queja.id_queja);
+  return {
+    codigo_seguimiento: queja.codigo_seguimiento,
+    estado: { codigo: queja.estado_codigo, nombre: queja.estado_nombre, es_final: queja.es_final },
+    categoria: queja.categoria,
+    registrada_en: queja.creado_en,
+    actualizada_en: queja.actualizado_en,
+    historial: historial.map((paso) => ({ codigo: paso.codigo, estado: paso.nombre, fecha: paso.fecha_cambio })),
+  };
+}
+
+module.exports = { listarCategorias, registrarQueja, consultarSeguimiento };
