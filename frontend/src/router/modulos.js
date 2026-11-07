@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardPenLine, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, MoonStar, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardPenLine, FileChartColumn, FileCheck, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, MoonStar, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
@@ -13,6 +13,7 @@ import NotificacionesPage from "../features/notificaciones/NotificacionesPage";
 import CargosList from "../features/Cargos/CargosList";
 import ConceptosPage from "../features/conceptos/ConceptosPage";
 import CondicionesPage from "../features/condiciones/CondicionesPage";
+import PlanillaMensualPage from "../features/planillas/PlanillaMensualPage";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import ContratosView from "../features/Contratos/ContratosView";
 import { RUTA_CONTRATOS } from "../features/Contratos/utils/opciones";
@@ -248,6 +249,14 @@ export const SECCIONES = [
   {
     titulo: "Planillas",
     modulos: [
+      {
+        ruta: "/planillas/mensual",
+        etiqueta: "Planilla mensual",
+        descripcion: "Asistencia, horas extra, licencias y bonos del mes por colaborador, en un borrador para revisar y aprobar.",
+        icono: FileSpreadsheet,
+        roles: ["admin"],
+        pagina: PlanillaMensualPage,
+      },
       {
         ruta: "/planillas/conceptos",
         etiqueta: "Conceptos de pago",

@@ -1,0 +1,125 @@
+.planilla-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.planilla-barra .ds-campo {
+  width: calc(var(--size-sidebar) * 0.75);
+  max-width: 100%;
+}
+
+.planilla-barra__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.planilla-contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.planilla-estado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.planilla-advertencias {
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.planilla-advertencias li + li {
+  margin-top: var(--space-1);
+}
+
+.planilla-totales {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.planilla-filtros {
+  margin-bottom: 0;
+}
+
+.planilla-tabla .ds-tabla {
+  min-width: calc(var(--size-sidebar) * 3.75);
+}
+
+.planilla-cifra {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Detalle del colaborador (dentro del modal) */
+.planilla-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.planilla-detalle section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.planilla-detalle__titulo {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-semibold);
+}
+
+.planilla-detalle__datos dd {
+  font-variant-numeric: tabular-nums;
+}
+
+.planilla-detalle__observaciones {
+  margin: 0;
+  padding: var(--space-3) var(--space-3) var(--space-3) calc(var(--space-3) + var(--space-4));
+  border-radius: var(--radius-card);
+  background: var(--color-bg-page);
+}
+
+.planilla-detalle__bonos {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.planilla-detalle__bonos li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+@media (max-width: 1024px) {
+  .planilla-totales {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .planilla-barra .ds-campo,
+  .planilla-filtros .ds-campo {
+    flex: 1 1 100%;
+    width: auto;
+  }
+
+  .planilla-totales,
+  .planilla-detalle__datos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
