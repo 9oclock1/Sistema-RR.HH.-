@@ -1,6 +1,6 @@
 const { ErrorApp } = require("../utils/errores");
 
-const URL_EMPLEADOS = process.env.EMPLOYEE_SERVICE_URL || "http://employee-service:3002";
+const URL_EMPLEADOS = process.env.EMPLOYEE_SERVICE_URL || "http://nginx-gateway/api/empl";
 const TIEMPO_ESPERA_MS = 3000;
 
 const sinConexion = () =>
