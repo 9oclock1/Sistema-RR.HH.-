@@ -1,8 +1,11 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardPenLine, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, MoonStar, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
 import { RUTA_EVALUACIONES } from "../features/evaluaciones/ruta";
+import BuzonQuejasPage from "../features/quejas/BuzonQuejasPage";
+import ConsultarQuejaPage from "../features/quejas/ConsultarQuejaPage";
+import { RUTA_BUZON_QUEJAS, RUTA_CONSULTAR_QUEJA } from "../features/quejas/reglas";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
@@ -341,6 +344,23 @@ export const SECCIONES = [
         icono: ClipboardPenLine,
         roles: ["supervisor"],
         pagina: EvaluacionesPage,
+      },
+      {
+        ruta: RUTA_BUZON_QUEJAS,
+        etiqueta: "Buzón de quejas",
+        descripcion: "Quejas sobre clima laboral, acoso o condiciones de trabajo, con su nombre o de forma anónima.",
+        icono: MessageSquareWarning,
+        roles: ["empleado"],
+        pagina: BuzonQuejasPage,
+      },
+      {
+        ruta: RUTA_CONSULTAR_QUEJA,
+        etiqueta: "Consultar mi queja",
+        descripcion: "Estado de una queja con su código de seguimiento, sin identificarse.",
+        icono: FileSearch,
+        roles: [],
+        publica: true,
+        pagina: ConsultarQuejaPage,
       },
     ],
   },
