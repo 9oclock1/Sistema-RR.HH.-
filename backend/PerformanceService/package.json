@@ -5,13 +5,14 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "test": "node --test src/tests/puntajePonderadoTest.js src/tests/guardadoParcialTest.js src/tests/envioEvaluacionTest.js src/tests/bandejaEvaluacionesTest.js src/tests/cifradoQuejasTest.js src/tests/codigoSeguimientoTest.js src/tests/validacionQuejaTest.js src/tests/limitarConsultasTest.js src/tests/limpiarAdjuntoTest.js src/tests/registroQuejaTest.js src/tests/derivacionQuejaTest.js src/tests/bandejaQuejasTest.js src/tests/seguimientoQuejaTest.js && node test/acceptance_criteria.test.js",
+    "test": "node --test src/tests/puntajePonderadoTest.js src/tests/guardadoParcialTest.js src/tests/envioEvaluacionTest.js src/tests/bandejaEvaluacionesTest.js src/tests/cifradoQuejasTest.js src/tests/codigoSeguimientoTest.js src/tests/validacionQuejaTest.js src/tests/limitarConsultasTest.js src/tests/limpiarAdjuntoTest.js src/tests/registroQuejaTest.js src/tests/derivacionQuejaTest.js src/tests/bandejaQuejasTest.js src/tests/seguimientoQuejaTest.js src/tests/historialQuejasTest.js && node test/acceptance_criteria.test.js",
     "test:kan24": "node --test src/tests/puntajePonderadoTest.js src/tests/guardadoParcialTest.js src/tests/envioEvaluacionTest.js src/tests/bandejaEvaluacionesTest.js",
     "test:calculo": "node --test src/tests/puntajePonderadoTest.js",
-    "test:quejas": "node --test src/tests/cifradoQuejasTest.js src/tests/codigoSeguimientoTest.js src/tests/validacionQuejaTest.js src/tests/limitarConsultasTest.js src/tests/limpiarAdjuntoTest.js src/tests/registroQuejaTest.js src/tests/derivacionQuejaTest.js src/tests/bandejaQuejasTest.js src/tests/seguimientoQuejaTest.js test/quejas.test.js test/casosQueja.test.js test/seguimientoQueja.test.js",
-    "test:quejas:unitarias": "node --test src/tests/cifradoQuejasTest.js src/tests/codigoSeguimientoTest.js src/tests/validacionQuejaTest.js src/tests/limitarConsultasTest.js src/tests/limpiarAdjuntoTest.js src/tests/registroQuejaTest.js src/tests/derivacionQuejaTest.js src/tests/bandejaQuejasTest.js src/tests/seguimientoQuejaTest.js",
+    "test:quejas": "node --test src/tests/cifradoQuejasTest.js src/tests/codigoSeguimientoTest.js src/tests/validacionQuejaTest.js src/tests/limitarConsultasTest.js src/tests/limpiarAdjuntoTest.js src/tests/registroQuejaTest.js src/tests/derivacionQuejaTest.js src/tests/bandejaQuejasTest.js src/tests/seguimientoQuejaTest.js src/tests/historialQuejasTest.js test/quejas.test.js test/casosQueja.test.js test/seguimientoQueja.test.js test/historialQueja.test.js",
+    "test:quejas:unitarias": "node --test src/tests/cifradoQuejasTest.js src/tests/codigoSeguimientoTest.js src/tests/validacionQuejaTest.js src/tests/limitarConsultasTest.js src/tests/limpiarAdjuntoTest.js src/tests/registroQuejaTest.js src/tests/derivacionQuejaTest.js src/tests/bandejaQuejasTest.js src/tests/seguimientoQuejaTest.js src/tests/historialQuejasTest.js",
     "test:derivacion": "node --test src/tests/derivacionQuejaTest.js src/tests/bandejaQuejasTest.js test/casosQueja.test.js",
-    "test:seguimiento": "node --test src/tests/seguimientoQuejaTest.js test/seguimientoQueja.test.js"
+    "test:seguimiento": "node --test src/tests/seguimientoQuejaTest.js test/seguimientoQueja.test.js",
+    "test:historial": "node --test src/tests/historialQuejasTest.js test/historialQueja.test.js"
   },
   "keywords": [],
   "author": "",
