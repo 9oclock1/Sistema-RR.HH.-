@@ -29,15 +29,17 @@ export const eliminarPlantilla = (idEmpleado, idPlantilla) =>
 export const obtenerPlantilla = (idEmpleado, idPlantilla) =>
   solicitar(`${RUTA}/${idPlantilla}`, { cabeceras: comoEmpleado(idEmpleado) });
 
-// Una versión con sus secciones. `editable` indica si todavía es un borrador.
+// Una versión con sus secciones, criterios y preguntas, y el balance de pesos. `editable` indica si todavía es un borrador.
 export const obtenerVersion = (idEmpleado, idPlantilla, idVersion) =>
   solicitar(`${RUTA}/${idPlantilla}/versiones/${idVersion}`, { cabeceras: comoEmpleado(idEmpleado) });
 
-// Deja las secciones de la versión como la lista de competencias, en ese orden. Solo funciona en borradores (409 si no).
-export const guardarSecciones = (idEmpleado, idPlantilla, idVersion, idsCompetencia) =>
-  solicitar(`${RUTA}/${idPlantilla}/versiones/${idVersion}/secciones`, {
+// Deja la estructura de la versión como la lista: secciones (con su competencia), criterios y preguntas con su peso
+// y su escala, en ese orden. Un borrador puede guardarse con pesos que no suman 100 %; publicarlo exige que sumen 100 %.
+// Solo funciona en borradores (409 si no).
+export const guardarEstructura = (idEmpleado, idPlantilla, idVersion, secciones) =>
+  solicitar(`${RUTA}/${idPlantilla}/versiones/${idVersion}/estructura`, {
     metodo: "PUT",
-    cuerpo: { secciones: idsCompetencia.map((id) => ({ id_competencia: id })) },
+    cuerpo: { secciones },
     cabeceras: comoEmpleado(idEmpleado),
   });
 

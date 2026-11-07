@@ -1,31 +1,20 @@
-export const ESTADOS = {
-  BORRADOR: { etiqueta: "Borrador", tono: "aviso" },
-  PUBLICADA: { etiqueta: "Publicada", tono: "exito" },
-  ARCHIVADA: { etiqueta: "Archivada", tono: "neutral" },
-};
-
 export const TIPOS_ESCALA = [
   { valor: "CUANTITATIVA", etiqueta: "Cuantitativa" },
   { valor: "CUALITATIVA", etiqueta: "Cualitativa" },
 ];
-
-export const TIPOS_COMPETENCIA = [
-  { valor: "COMPETENCIA_LABORAL", etiqueta: "Competencia laboral" },
-  { valor: "FACTOR_OPERATIVO", etiqueta: "Factor operativo" },
-];
-
 const ETIQUETAS_LIKERT = ["Muy deficiente", "Deficiente", "Aceptable", "Bueno", "Excelente"];
 
 // Claves locales para las listas del formulario; no se envían al servidor.
 let siguienteClave = 0;
-const clave = () => `l${++siguienteClave}`;
+const clave = () => `n${++siguienteClave}`;
 
 const texto = (valor) => (valor === null || valor === undefined ? "" : String(valor));
 
 // Los campos numéricos vacíos viajan como null para que el servidor los marque como requeridos.
 const aNumero = (valor) => (String(valor).trim() === "" ? null : Number(valor));
 
-// --- Plantilla: datos base -> secciones (una competencia) -> criterios -> preguntas ---
+// --- Estructura de una versión: secciones (una competencia) -> criterios -> preguntas ---
+// En el formulario cada sección lleva la competencia completa (para mostrarla) y los pesos como texto.
 
 export const nuevaPregunta = (idEscala = "") => ({
   clave: clave(),
@@ -35,50 +24,37 @@ export const nuevaPregunta = (idEscala = "") => ({
   id_escala: idEscala,
 });
 
-export const nuevoCriterio = (idEscala) => ({
+export const nuevoCriterio = (idEscala = "") => ({
   clave: clave(),
   nombre: "",
   descripcion: "",
   preguntas: [nuevaPregunta(idEscala)],
 });
 
-export const nuevaSeccion = (idEscala) => ({ clave: clave(), id_competencia: "", criterios: [nuevoCriterio(idEscala)] });
+export const nuevaSeccion = (competencia) => ({ clave: clave(), competencia, criterios: [] });
 
-export const aFormulario = (plantilla) => ({
-  nombre: plantilla?.nombre ?? "",
-  objetivo: plantilla?.objetivo ?? "",
-  id_departamento_destino: plantilla?.id_departamento_destino ?? "",
-  vigencia_desde: plantilla?.vigencia_desde ?? "",
-  vigencia_hasta: plantilla?.vigencia_hasta ?? "",
-  secciones: (plantilla?.secciones ?? []).map((seccion) => ({
-    clave: clave(),
-    id_competencia: seccion.id_competencia,
+// Las claves de lo guardado salen de sus identificadores: así son iguales en cada lectura y React no remonta los campos.
+export const seccionesAFormulario = (secciones) =>
+  secciones.map((seccion) => ({
+    clave: `s-${seccion.id_seccion}`,
+    competencia: seccion.competencia,
     criterios: seccion.criterios.map((criterio) => ({
-      clave: clave(),
+      clave: `c-${criterio.id_criterio}`,
       nombre: criterio.nombre,
       descripcion: texto(criterio.descripcion),
       preguntas: criterio.preguntas.map((pregunta) => ({
-        clave: clave(),
+        clave: `q-${pregunta.id_pregunta}`,
         texto: pregunta.texto,
         peso_porcentual: texto(pregunta.peso_porcentual),
         es_obligatoria: pregunta.es_obligatoria,
         id_escala: pregunta.id_escala,
       })),
     })),
-  })),
-});
+  }));
 
-// conDatosBase = false cuando los datos base ya quedaron fijos (la plantilla tiene una versión publicada).
-export const aDatos = (formulario, { conDatosBase = true } = {}) => ({
-  ...(conDatosBase && {
-    nombre: formulario.nombre,
-    objetivo: formulario.objetivo,
-    id_departamento_destino: formulario.id_departamento_destino || null,
-    vigencia_desde: formulario.vigencia_desde || null,
-    vigencia_hasta: formulario.vigencia_hasta || null,
-  }),
-  secciones: formulario.secciones.map((seccion) => ({
-    id_competencia: seccion.id_competencia || null,
+export const seccionesADatos = (secciones) =>
+  secciones.map((seccion) => ({
+    id_competencia: seccion.competencia.id_competencia,
     criterios: seccion.criterios.map((criterio) => ({
       nombre: criterio.nombre,
       descripcion: criterio.descripcion,
@@ -89,8 +65,10 @@ export const aDatos = (formulario, { conDatosBase = true } = {}) => ({
         id_escala: pregunta.id_escala || null,
       })),
     })),
-  })),
-});
+  }));
+
+export const contarPreguntas = (secciones) =>
+  secciones.reduce((total, s) => total + s.criterios.reduce((n, c) => n + c.preguntas.length, 0), 0);
 
 // Misma regla que el servidor: se suma en centésimas para evitar errores de redondeo.
 const aCentesimas = (valor) => Math.round((Number(valor) || 0) * 100);
@@ -109,8 +87,10 @@ export function balancePesos(secciones) {
 export const formatearPorcentaje = (valor) =>
   `${Number(valor).toLocaleString("es-BO", { maximumFractionDigits: 2 })} %`;
 
-export const formatearFecha = (fecha) =>
-  fecha ? new Date(`${fecha}T00:00:00`).toLocaleDateString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
+export const describirDesbalance = ({ suma, diferencia }) =>
+  diferencia > 0
+    ? `La suma de pesos es ${formatearPorcentaje(suma)}: faltan ${formatearPorcentaje(diferencia)} para llegar a 100 %.`
+    : `La suma de pesos es ${formatearPorcentaje(suma)}: sobran ${formatearPorcentaje(-diferencia)} sobre 100 %.`;
 
 // --- Escalas de valoración ---
 

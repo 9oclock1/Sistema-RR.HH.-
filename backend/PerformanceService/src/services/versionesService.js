@@ -4,14 +4,33 @@ const empleados = require("./empleadosService");
 const { enTransaccion } = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { ESTADO_VERSION, validarId } = require("../utils/plantillas");
-const { validarSecciones, validarPublicacion } = require("../utils/versiones");
+const { validarSecciones, validarEstructura, validarPublicacion } = require("../utils/versiones");
+const { balancePesos } = require("../utils/ponderacion");
 
 const noEncontrada = () => new ErrorApp(404, "La plantilla de evaluación no existe.");
 const versionNoEncontrada = () => new ErrorApp(404, "La versión de la plantilla no existe.");
 
-const describirSeccion = (fila) => ({
+const describirPregunta = (fila) => ({
+  id_pregunta: fila.id_pregunta,
+  orden: fila.orden,
+  texto: fila.texto,
+  peso_porcentual: fila.peso_porcentual,
+  es_obligatoria: fila.es_obligatoria,
+  id_escala: fila.id_escala,
+});
+
+const describirCriterio = (fila, preguntas) => ({
+  id_criterio: fila.id_criterio,
+  orden: fila.orden,
+  nombre: fila.nombre,
+  descripcion: fila.descripcion,
+  preguntas: preguntas.filter((p) => p.id_criterio === fila.id_criterio).map(describirPregunta),
+});
+
+const describirSeccion = (fila, criterios = [], preguntas = []) => ({
   id_seccion: fila.id_seccion,
   orden: fila.orden,
+  criterios: criterios.filter((c) => c.id_seccion === fila.id_seccion).map((c) => describirCriterio(c, preguntas)),
   competencia: {
     id_competencia: fila.id_competencia,
     nombre: fila.nombre,
@@ -22,8 +41,16 @@ const describirSeccion = (fila) => ({
   },
 });
 
+// Secciones con sus criterios y preguntas. Las consultas van una tras otra: db puede ser el cliente de una transacción.
+async function cargarEstructura(idVersion, db) {
+  const secciones = await modelo.listarSecciones(idVersion, db);
+  const criterios = await modelo.listarCriterios(idVersion, db);
+  const preguntas = await modelo.listarPreguntas(idVersion, db);
+  return secciones.map((seccion) => describirSeccion(seccion, criterios, preguntas));
+}
+
 async function describirVersion(version, db) {
-  const secciones = await modelo.listarSecciones(version.id_version, db);
+  const secciones = await cargarEstructura(version.id_version, db);
   return {
     id_version: version.id_version,
     id_plantilla: version.id_plantilla,
@@ -33,7 +60,9 @@ async function describirVersion(version, db) {
     editable: version.id_estado_version === ESTADO_VERSION.BORRADOR,
     publicada_en: version.publicada_en,
     publicador: version.publicador,
-    secciones: secciones.map(describirSeccion),
+    secciones,
+    total_preguntas: secciones.reduce((n, s) => n + s.criterios.reduce((m, c) => m + c.preguntas.length, 0), 0),
+    balance: balancePesos(secciones),
   };
 }
 
@@ -84,6 +113,49 @@ async function reemplazarSecciones(idPlantilla, idVersion, cuerpo) {
   });
 }
 
+// Reemplaza secciones, criterios y preguntas del borrador en un solo paso.
+async function guardarEstructura(idPlantilla, idVersion, cuerpo) {
+  const plantilla = validarId(idPlantilla);
+  const idVersionValido = validarId(idVersion, "id_version");
+  const { secciones } = validarEstructura(cuerpo);
+
+  return enTransaccion(async (db) => {
+    const { version } = await bloquear(plantilla, idVersionValido, db);
+    if (version.id_estado_version !== ESTADO_VERSION.BORRADOR)
+      throw new ErrorApp(409, "La versión ya fue publicada: su estructura no se puede modificar. Cree una nueva versión.");
+
+    const competencias = new Map(
+      (await modelo.listarCompetencias(secciones.map((s) => s.id_competencia), db)).map((c) => [c.id_competencia, c]),
+    );
+    const yaEnLaVersion = new Set((await modelo.listarSecciones(idVersionValido, db)).map((s) => s.id_competencia));
+    const idsEscala = [...new Set(secciones.flatMap((s) => s.criterios.flatMap((c) => c.preguntas.map((p) => p.id_escala))))];
+    const escalas = await modelo.escalasExistentes(idsEscala, db);
+
+    const errores = [];
+    secciones.forEach((seccion, i) => {
+      const competencia = competencias.get(seccion.id_competencia);
+      const campo = `secciones[${i}].id_competencia`;
+      if (!competencia) errores.push({ campo, mensaje: "La competencia no existe." });
+      else if (!competencia.esta_activa && !yaEnLaVersion.has(seccion.id_competencia))
+        errores.push({ campo, mensaje: `La competencia "${competencia.nombre}" está desactivada.` });
+      seccion.criterios.forEach((criterio, j) =>
+        criterio.preguntas.forEach((pregunta, k) => {
+          if (!escalas.has(pregunta.id_escala))
+            errores.push({
+              campo: `secciones[${i}].criterios[${j}].preguntas[${k}].id_escala`,
+              mensaje: "La escala de valoración no existe.",
+            });
+        }),
+      );
+    });
+    if (errores.length > 0) throw new ErrorApp(422, "Datos inválidos", errores);
+
+    await modelo.reemplazarEstructura(idVersionValido, secciones, db);
+    await modelo.tocarPlantilla(plantilla, db);
+    return describirVersion(version, db);
+  });
+}
+
 // Publica la versión: queda disponible para los ciclos y su estructura ya no se modifica.
 async function publicar(idEmpleado, idPlantilla, idVersion) {
   const plantilla = validarId(idPlantilla);
@@ -96,7 +168,7 @@ async function publicar(idEmpleado, idPlantilla, idVersion) {
     if (version.id_estado_version !== ESTADO_VERSION.BORRADOR)
       throw new ErrorApp(409, "La versión ya fue publicada.");
 
-    const secciones = (await modelo.listarSecciones(idVersionValido, db)).map(describirSeccion);
+    const secciones = await cargarEstructura(idVersionValido, db);
     const problemas = validarPublicacion({ plantilla: cabecera, secciones, hoy: await modelo.hoy(db) });
     if (problemas.length > 0) throw new ErrorApp(422, "La plantilla no se puede publicar todavía.", problemas);
 
@@ -113,6 +185,12 @@ async function crearVersion(idPlantilla) {
 
   return enTransaccion(async (db) => {
     const { plantilla: cabecera } = await bloquear(plantilla, undefined, db);
+    // Los datos base no se pueden cambiar tras publicar: con la vigencia terminada, la versión nueva nunca podría publicarse.
+    if (cabecera.vigencia_hasta < (await modelo.hoy(db)))
+      throw new ErrorApp(
+        409,
+        `La vigencia de la plantilla terminó el ${cabecera.vigencia_hasta}: cree una plantilla nueva en lugar de otra versión.`,
+      );
     if (cabecera.id_estado_version === ESTADO_VERSION.BORRADOR)
       throw new ErrorApp(409, "La plantilla ya tiene una versión en borrador: edítela o publíquela antes de crear otra.");
 
@@ -123,4 +201,4 @@ async function crearVersion(idPlantilla) {
   });
 }
 
-module.exports = { obtener, reemplazarSecciones, publicar, crearVersion };
+module.exports = { obtener, reemplazarSecciones, guardarEstructura, publicar, crearVersion };

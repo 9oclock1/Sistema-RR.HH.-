@@ -284,8 +284,10 @@ describe("Reglas para publicar una versión", () => {
     vigencia_hasta: "2027-12-31",
     ...cambios,
   });
-  const competencia = (nombre, activa = true) => ({
+  // Sección con un criterio y una pregunta; por omisión la pregunta pesa todo (100 %).
+  const competencia = (nombre, activa = true, peso = 100) => ({
     competencia: { nombre, esta_activa: activa },
+    criterios: [{ nombre: `Criterio de ${nombre}`, preguntas: [{ peso_porcentual: peso }] }],
   });
   const HOY = "2027-06-15";
 
@@ -314,9 +316,9 @@ describe("Reglas para publicar una versión", () => {
     const problemas = validarPublicacion({
       plantilla: plantilla(),
       secciones: [
-        competencia("Atención"),
-        competencia("Orden", false),
-        competencia("Metas", false),
+        competencia("Atención", true, 33.33),
+        competencia("Orden", false, 33.33),
+        competencia("Metas", false, 33.34),
       ],
       hoy: HOY,
     });

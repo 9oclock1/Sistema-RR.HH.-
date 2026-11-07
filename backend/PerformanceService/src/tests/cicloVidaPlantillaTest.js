@@ -11,7 +11,7 @@ const empleados = require("../services/empleadosService");
 const servicioPlantillas = require("../services/plantillasService");
 const servicioVersiones = require("../services/versionesService");
 
-const { ID_PLANTILLA, ID_VERSION, ID_VERSION_2, EMPLEADO, AREA, PERSONA, idCompetencia, plantilla, version, seccion, datosPlantilla, error } = ayudas;
+const { ID_PLANTILLA, ID_VERSION, ID_VERSION_2, EMPLEADO, AREA, PERSONA, idCompetencia, plantilla, version, seccion, criterio, pregunta, datosPlantilla, error } = ayudas;
 
 describe("RF-01: ciclo de vida de la plantilla (base simulada)", () => {
   let bitacora;
@@ -19,7 +19,7 @@ describe("RF-01: ciclo de vida de la plantilla (base simulada)", () => {
 
   // `estado` es lo que «hay» en la base; las llamadas de escritura quedan anotadas en `bitacora` en orden.
   const simular = (inicial = {}) => {
-    estado = { area: AREA, persona: PERSONA, plantilla: plantilla(), version: version(), secciones: [], ...inicial };
+    estado = { area: AREA, persona: PERSONA, plantilla: plantilla(), version: version(), secciones: [], criterios: [], preguntas: [], ...inicial };
     bitacora = [];
     const anotar = (nombre, valor) => async (...argumentos) => {
       bitacora.push([nombre, argumentos]);
@@ -44,6 +44,8 @@ describe("RF-01: ciclo de vida de la plantilla (base simulada)", () => {
       return estado.version && idVersion === estado.version.id_version ? estado.version : null;
     });
     mock.method(versiones, "listarSecciones", async () => estado.secciones);
+    mock.method(versiones, "listarCriterios", async () => estado.criterios);
+    mock.method(versiones, "listarPreguntas", async () => estado.preguntas);
     mock.method(versiones, "listarCompetencias", async (ids) => (estado.catalogo ?? []).filter((c) => ids.includes(c.id_competencia)));
     mock.method(versiones, "reemplazarSecciones", anotar("reemplazarSecciones"));
     mock.method(versiones, "tocarPlantilla", anotar("tocarPlantilla"));
@@ -187,7 +189,12 @@ describe("RF-01: ciclo de vida de la plantilla (base simulada)", () => {
     });
 
     it("no publica una plantilla cuya vigencia ya terminó", async () => {
-      simular({ plantilla: plantilla({ vigencia_hasta: "2026-11-06" }), secciones: [seccion(1)] });
+      simular({
+        plantilla: plantilla({ vigencia_hasta: "2026-11-06" }),
+        secciones: [seccion(1)],
+        criterios: [criterio(1)],
+        preguntas: [pregunta(1, 100)],
+      });
       const fallo = await error(servicioVersiones.publicar(EMPLEADO, ID_PLANTILLA, ID_VERSION));
       assert.equal(fallo.estado, 422);
       assert.deepEqual(fallo.detalles.map((d) => d.campo), ["vigencia_hasta"]);
@@ -196,7 +203,11 @@ describe("RF-01: ciclo de vida de la plantilla (base simulada)", () => {
 
   describe("Criterio 3: al publicar queda disponible y se bloquea la estructura", () => {
     beforeEach(() => {
-      simular({ secciones: [seccion(1), seccion(2)] });
+      simular({
+        secciones: [seccion(1), seccion(2)],
+        criterios: [criterio(1), criterio(2)],
+        preguntas: [pregunta(1, 50), pregunta(2, 50)],
+      });
     });
 
     it("publica la versión a nombre de quien confirma y lo anota en la réplica de empleados", async () => {
@@ -290,6 +301,8 @@ describe("RF-01: ciclo de vida de la plantilla (base simulada)", () => {
         plantilla: plantilla({ id_version: ID_VERSION_2, numero_version: 2, fue_publicada: true }),
         version: version({ id_version: ID_VERSION_2, numero_version: 2 }),
         secciones: [seccion(1)],
+        criterios: [criterio(1)],
+        preguntas: [pregunta(1, 100)],
       });
 
       await servicioVersiones.publicar(EMPLEADO, ID_PLANTILLA, ID_VERSION_2);

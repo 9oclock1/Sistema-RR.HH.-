@@ -18,6 +18,11 @@ router.put(
   identificarEmpleado,
   versiones.reemplazarSecciones,
 );
+router.put(
+  "/plantillas/:idPlantilla/versiones/:idVersion/estructura",
+  identificarEmpleado,
+  versiones.guardarEstructura,
+);
 router.post(
   "/plantillas/:idPlantilla/versiones/:idVersion/publicacion",
   identificarEmpleado,

@@ -63,33 +63,66 @@ describe("validarDatosCompetencia", () => {
 });
 
 describe("pendientesPublicacion", () => {
-  const activa = { nombre: "Atención", esta_activa: true };
   const HOY = "2026-11-07";
+  const vigente = { vigencia_hasta: "2027-12-31" };
+  // Sección con un criterio y una pregunta; por omisión la pregunta pesa todo (100 %).
+  const seccion = (nombre, { activa = true, peso = "100" } = {}) => ({
+    competencia: { nombre, esta_activa: activa },
+    criterios: [{ nombre: `Criterio de ${nombre}`, preguntas: [{ peso_porcentual: peso }] }],
+  });
+  const pendientes = (cambios) => pendientesPublicacion({ plantilla: vigente, secciones: [seccion("Atención")], hoy: HOY, ...cambios });
 
-  it("no hay pendientes con secciones activas y una vigencia que no terminó", () => {
-    expect(pendientesPublicacion({ plantilla: { vigencia_hasta: "2027-12-31" }, secciones: [activa], hoy: HOY })).toEqual([]);
+  it("no hay pendientes con una estructura completa, pesos que suman 100 % y una vigencia que no terminó", () => {
+    expect(pendientes()).toEqual([]);
   });
 
   it("la vigencia que termina hoy todavía permite publicar, la de ayer no", () => {
-    expect(pendientesPublicacion({ plantilla: { vigencia_hasta: HOY }, secciones: [activa], hoy: HOY })).toEqual([]);
-    const pendientes = pendientesPublicacion({ plantilla: { vigencia_hasta: "2026-11-06" }, secciones: [activa], hoy: HOY });
-    expect(pendientes).toHaveLength(1);
-    expect(pendientes[0]).toMatch(/vigencia terminó/);
+    expect(pendientes({ plantilla: { vigencia_hasta: HOY } })).toEqual([]);
+    const lista = pendientes({ plantilla: { vigencia_hasta: "2026-11-06" } });
+    expect(lista).toHaveLength(1);
+    expect(lista[0]).toMatch(/vigencia terminó/);
+    expect(lista[0]).toMatch(/actualice las fechas/);
+  });
+
+  it("si la plantilla ya se publicó alguna vez, con la vigencia terminada ya no sirven las fechas: hay que crear otra", () => {
+    const [mensaje] = pendientes({ plantilla: { vigencia_hasta: "2026-11-06", fue_publicada: true } });
+    expect(mensaje).toMatch(/cree una plantilla nueva/);
   });
 
   it("pide al menos una sección", () => {
-    const pendientes = pendientesPublicacion({ plantilla: { vigencia_hasta: "2027-12-31" }, secciones: [], hoy: HOY });
-    expect(pendientes).toEqual(["Agregue al menos una sección de competencia o factor operativo."]);
+    expect(pendientes({ secciones: [] })).toEqual(["Agregue al menos una sección de competencia o factor operativo."]);
   });
 
   it("nombra cada competencia desactivada", () => {
-    const pendientes = pendientesPublicacion({
-      plantilla: { vigencia_hasta: "2027-12-31" },
-      secciones: [activa, { nombre: "Orden", esta_activa: false }, { nombre: "Metas", esta_activa: false }],
-      hoy: HOY,
+    const lista = pendientes({
+      secciones: [seccion("Atención", { peso: "33.33" }), seccion("Orden", { activa: false, peso: "33.33" }), seccion("Metas", { activa: false, peso: "33.34" })],
     });
-    expect(pendientes).toHaveLength(2);
-    expect(pendientes[0]).toContain("Orden");
-    expect(pendientes[1]).toContain("Metas");
+    expect(lista).toHaveLength(2);
+    expect(lista[0]).toContain("Orden");
+    expect(lista[1]).toContain("Metas");
+  });
+
+  it("pide criterios en cada sección y preguntas en cada criterio, por nombre", () => {
+    const lista = pendientes({
+      secciones: [
+        { competencia: { nombre: "Atención", esta_activa: true }, criterios: [] },
+        { competencia: { nombre: "Equipo", esta_activa: true }, criterios: [{ nombre: "Colaboración", preguntas: [] }, { nombre: " ", preguntas: [] }] },
+      ],
+    });
+    expect(lista).toEqual([
+      "La sección «Atención» no tiene criterios: agregue al menos uno.",
+      "El criterio «Colaboración» de la sección «Equipo» no tiene preguntas: agregue al menos una.",
+      "El criterio «sin nombre» de la sección «Equipo» no tiene preguntas: agregue al menos una.",
+    ]);
+  });
+
+  it("muestra cuánto falta o sobra cuando los pesos no suman 100 %", () => {
+    expect(pendientes({ secciones: [seccion("Atención", { peso: "80" })] })[0]).toMatch(/80 %.*faltan 20 %/);
+    expect(pendientes({ secciones: [seccion("Atención", { peso: "130" })] })[0]).toMatch(/130 %.*sobran 30 %/);
+  });
+
+  it("suma en centésimas: 33,33 + 33,33 + 33,34 es exactamente 100 %", () => {
+    const secciones = [seccion("A", { peso: "33.33" }), seccion("B", { peso: "33.33" }), seccion("C", { peso: "33.34" })];
+    expect(pendientes({ secciones })).toEqual([]);
   });
 });

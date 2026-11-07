@@ -6,6 +6,8 @@
  *  - Criterio 2: las secciones de competencias y factores operativos se validan antes de publicar
  *  - Criterio 3: al publicar queda disponible y se bloquea la modificación de su estructura base
  *  - Criterio 4: una plantilla con el mismo nombre, área y periodo se rechaza con una alerta de duplicidad
+ *  - KAN-22 dentro de la misma plantilla: criterios, preguntas ponderadas y escalas por versión; publicar exige
+ *    preguntas y pesos que sumen 100 %; la estructura publicada no cambia (se crea una nueva versión)
  *
  * El servicio consulta a EmployeeService (áreas y empleados). Para no depender de otro microservicio, esta suite levanta
  * su propia instancia de PerformanceService (otro puerto, misma base de datos) y le pone delante un EmployeeService
@@ -187,17 +189,54 @@ const editarPlantilla = (idPlantilla, cambios, empleado = CREADOR) =>
   });
 const rutaVersion = (idPlantilla, idVersion) =>
   `/plantillas/${idPlantilla}/versiones/${idVersion}`;
-const guardarSecciones = (
-  idPlantilla,
-  idVersion,
-  competencias,
-  empleado = CREADOR,
-) =>
-  llamarApi(`${rutaVersion(idPlantilla, idVersion)}/secciones`, {
+const guardarEstructura = (idPlantilla, idVersion, secciones, empleado = CREADOR) =>
+  llamarApi(`${rutaVersion(idPlantilla, idVersion)}/estructura`, {
     metodo: "PUT",
     empleado,
-    cuerpo: { secciones: competencias.map((c) => ({ id_competencia: c })) },
+    cuerpo: { secciones },
   });
+const pregunta = (peso, cambios = {}) => ({
+  texto: `${PREFIJO} pregunta`,
+  peso_porcentual: peso,
+  es_obligatoria: true,
+  id_escala: ESCALA_LIKERT,
+  ...cambios,
+});
+const criterio = (nombre, preguntas = []) => ({ nombre, descripcion: "", preguntas });
+const seccion = (idCompetencia, criterios = []) => ({ id_competencia: idCompetencia, criterios });
+// Reparte el 100 % entre las secciones (un criterio y una pregunta cada una; la última absorbe el resto de centésimas).
+const guardarSecciones = (idPlantilla, idVersion, competencias, empleado = CREADOR) => {
+  const base = Math.floor(10000 / Math.max(competencias.length, 1));
+  return guardarEstructura(
+    idPlantilla,
+    idVersion,
+    competencias.map((c, i) => {
+      const centesimas = i === competencias.length - 1 ? 10000 - base * i : base;
+      return seccion(c, [criterio(`${PREFIJO} criterio ${i + 1}`, [pregunta(centesimas / 100)])]);
+    }),
+    empleado,
+  );
+};
+const estructuraDe = async (idVersion) =>
+  (
+    await consultar(
+      `SELECT c.nombre AS criterio, q.texto, q.peso_porcentual::float AS peso, q.orden
+       FROM preguntas_evaluacion q
+       JOIN criterios_evaluacion c ON c.id_criterio = q.id_criterio
+       JOIN secciones_plantilla s ON s.id_seccion = c.id_seccion
+       WHERE s.id_version = $1 ORDER BY s.orden, c.orden, q.orden`,
+      [idVersion],
+    )
+  ).map((f) => `${f.criterio}|${f.texto}|${f.peso}|${f.orden}`);
+const totalesDe = async (idPlantilla) =>
+  (
+    await consultar(
+      `SELECT (SELECT count(*) FROM secciones_plantilla s JOIN versiones_plantilla v USING (id_version) WHERE v.id_plantilla = $1)::int AS secciones,
+              (SELECT count(*) FROM criterios_evaluacion c JOIN secciones_plantilla s USING (id_seccion) JOIN versiones_plantilla v USING (id_version) WHERE v.id_plantilla = $1)::int AS criterios,
+              (SELECT count(*) FROM preguntas_evaluacion p JOIN criterios_evaluacion c USING (id_criterio) JOIN secciones_plantilla s USING (id_seccion) JOIN versiones_plantilla v USING (id_version) WHERE v.id_plantilla = $1)::int AS preguntas`,
+      [idPlantilla],
+    )
+  )[0];
 const publicar = (idPlantilla, idVersion, empleado = PUBLICADOR) =>
   llamarApi(`${rutaVersion(idPlantilla, idVersion)}/publicacion`, {
     metodo: "POST",
@@ -746,20 +785,6 @@ async function ejecutarPruebas() {
       },
     );
 
-    // Para comprobar que la nueva versión copia también criterios y preguntas, se cuelgan directo en la base.
-    const [seccionConCriterio] = await consultar(
-      "SELECT id_seccion FROM secciones_plantilla WHERE id_version = $1 AND orden = 1",
-      [v2],
-    );
-    const [criterio] = await consultar(
-      "INSERT INTO criterios_evaluacion (id_seccion, nombre, orden) VALUES ($1, $2, 1) RETURNING id_criterio",
-      [seccionConCriterio.id_seccion, `${PREFIJO} criterio`],
-    );
-    await pool.query(
-      "INSERT INTO preguntas_evaluacion (id_criterio, id_escala, texto, peso_porcentual, es_obligatoria, orden) VALUES ($1, $2, $3, 100, TRUE, 1)",
-      [criterio.id_criterio, ESCALA_LIKERT, `${PREFIJO} pregunta`],
-    );
-
     const nuevaVersion = await llamarApi(
       `/plantillas/${c2.id_plantilla}/versiones`,
       { metodo: "POST", empleado: CREADOR },
@@ -779,8 +804,8 @@ async function ejecutarPruebas() {
         nuevaVersion.body.numero_version === 2 &&
         nuevaVersion.body.estado_codigo === "BORRADOR" &&
         Number(copia[0].secciones) === 3 &&
-        Number(copia[0].criterios) === 1 &&
-        Number(copia[0].preguntas) === 1 &&
+        Number(copia[0].criterios) === 3 &&
+        Number(copia[0].preguntas) === 3 &&
         Number(copia[0].secciones_origen) === 3 &&
         (await seccionesDe(v2b)).join() === (await seccionesDe(v2)).join(),
       { respuesta: nuevaVersion.body, copia: copia[0] },
@@ -850,11 +875,194 @@ async function ejecutarPruebas() {
     });
     registrarResultado(
       "Criterio 3",
-      "3.11 Un borrador que nunca se publicó se elimina junto con sus versiones y secciones",
+      "3.11 Un borrador que nunca se publicó se elimina junto con sus versiones, secciones, criterios y preguntas",
       eliminar.status === 200 &&
         !(await existe(borrable.id_plantilla)) &&
-        (await versionesDe(borrable.id_plantilla)).length === 0,
+        (await versionesDe(borrable.id_plantilla)).length === 0 &&
+        Object.values(await totalesDe(borrable.id_plantilla)).every((n) => n === 0),
       eliminar.body,
+    );
+
+    console.log("\n--- KAN-22 dentro de la plantilla: criterios, preguntas, pesos y escalas ---");
+
+    const e = (await crearPlantilla({ nombre: `${PREFIJO} Estructura` })).body;
+    const ve = e.version_actual.id_version;
+    const completa = [
+      seccion(A, [
+        criterio(`${PREFIJO} Trato`, [
+          pregunta(30, { texto: `${PREFIJO} ¿Saluda?` }),
+          pregunta(20, { texto: `${PREFIJO} ¿Resuelve dudas?`, es_obligatoria: false }),
+        ]),
+      ]),
+      seccion(M, [criterio(`${PREFIJO} Horario`, [pregunta(50, { texto: `${PREFIJO} ¿Cumple su horario?` })])]),
+    ];
+
+    const guardada = await guardarEstructura(e.id_plantilla, ve, completa);
+    const leida = await llamarApi(rutaVersion(e.id_plantilla, ve), { empleado: CREADOR });
+    registrarResultado(
+      "KAN-22",
+      "6.1 Guardar la estructura crea criterios y preguntas con su peso y escala; el detalle los devuelve en orden con el balance",
+      guardada.status === 200 &&
+        leida.body.secciones.length === 2 &&
+        leida.body.secciones[0].criterios[0].preguntas.map((p) => p.peso_porcentual).join() === "30,20" &&
+        leida.body.secciones[0].criterios[0].preguntas[1].es_obligatoria === false &&
+        leida.body.secciones[0].criterios[0].preguntas[0].id_escala === ESCALA_LIKERT &&
+        leida.body.total_preguntas === 3 &&
+        leida.body.balance.balanceado === true &&
+        (await estructuraDe(ve)).length === 3,
+      { guardada: guardada.body, base: await estructuraDe(ve) },
+    );
+
+    const desbalanceada = await guardarEstructura(e.id_plantilla, ve, [
+      seccion(A, [criterio(`${PREFIJO} Trato`, [pregunta(60)])]),
+      seccion(M, [criterio(`${PREFIJO} Horario`, [pregunta(30)])]),
+    ]);
+    const publicarDesbalanceada = await publicar(e.id_plantilla, ve);
+    registrarResultado(
+      "KAN-22",
+      "6.2 Con pesos que no suman 100 % se guarda el borrador, pero publicar responde 422 y muestra el desbalance",
+      desbalanceada.status === 200 &&
+        desbalanceada.body.balance.diferencia === 10 &&
+        publicarDesbalanceada.status === 422 &&
+        publicarDesbalanceada.body.detalles.some((d) => d.campo === "peso_porcentual" && /90 %.*faltan 10 %/.test(d.mensaje)) &&
+        (await versionesDe(e.id_plantilla))[0].id_estado_version === 1,
+      { guardada: desbalanceada.body?.balance, publicar: publicarDesbalanceada.body },
+    );
+
+    const sobran = await guardarEstructura(e.id_plantilla, ve, [seccion(A, [criterio(`${PREFIJO} Trato`, [pregunta(70), pregunta(50)])])]);
+    const publicarSobran = await publicar(e.id_plantilla, ve);
+    registrarResultado(
+      "KAN-22",
+      "6.3 Si los pesos pasan de 100 % tampoco se publica y el mensaje dice cuánto sobra",
+      sobran.status === 200 &&
+        publicarSobran.status === 422 &&
+        publicarSobran.body.detalles.some((d) => /120 %.*sobran 20 %/.test(d.mensaje)),
+      publicarSobran.body,
+    );
+
+    await guardarEstructura(e.id_plantilla, ve, [seccion(A), seccion(M, [criterio(`${PREFIJO} Vacío`)])]);
+    const publicarVacia = await publicar(e.id_plantilla, ve);
+    registrarResultado(
+      "KAN-22",
+      "6.4 Una sección sin criterios o un criterio sin preguntas impiden publicar y se señalan por nombre",
+      publicarVacia.status === 422 &&
+        publicarVacia.body.detalles.some((d) => d.campo === "criterios" && d.mensaje.includes("Atención al cliente")) &&
+        publicarVacia.body.detalles.some((d) => d.campo === "preguntas" && d.mensaje.includes(`${PREFIJO} Vacío`)),
+      publicarVacia.body,
+    );
+
+    const antesInvalidas = await estructuraDe(ve);
+    const malformada = await guardarEstructura(e.id_plantilla, ve, [
+      seccion(A, [criterio("", [pregunta(0), pregunta(10.123), pregunta(10, { id_escala: null, texto: " " })])]),
+    ]);
+    const escalaFalsa = await guardarEstructura(e.id_plantilla, ve, [
+      seccion(A, [criterio(`${PREFIJO} Trato`, [pregunta(100, { id_escala: id(777) })])]),
+    ]);
+    const sinListaEstructura = await llamarApi(`${rutaVersion(e.id_plantilla, ve)}/estructura`, { metodo: "PUT", empleado: CREADOR, cuerpo: {} });
+    const camposInvalidos = malformada.body?.detalles?.map((d) => d.campo) ?? [];
+    registrarResultado(
+      "KAN-22",
+      "6.5 Datos inválidos responden 400 con la ruta de cada campo (criterio, peso, escala, texto); una escala inexistente, 422; y no se guarda nada",
+      malformada.status === 400 &&
+        [
+          "secciones[0].criterios[0].nombre",
+          "secciones[0].criterios[0].preguntas[0].peso_porcentual",
+          "secciones[0].criterios[0].preguntas[1].peso_porcentual",
+          "secciones[0].criterios[0].preguntas[2].id_escala",
+          "secciones[0].criterios[0].preguntas[2].texto",
+        ].every((c) => camposInvalidos.includes(c)) &&
+        escalaFalsa.status === 422 &&
+        escalaFalsa.body.detalles[0].campo === "secciones[0].criterios[0].preguntas[0].id_escala" &&
+        sinListaEstructura.status === 400 &&
+        (await estructuraDe(ve)).join() === antesInvalidas.join(),
+      { malformada: malformada.body, escalaFalsa: escalaFalsa.body, sinListaEstructura: sinListaEstructura.body },
+    );
+
+    const catalogoEscalas = await llamarApi("/escalas", { empleado: CREADOR });
+    const likert = catalogoEscalas.body?.find((x) => x.id_escala === ESCALA_LIKERT);
+    registrarResultado(
+      "KAN-22",
+      "6.6 La escala Likert 1 a 5 guarda la etiqueta de cada nivel para mostrarla al evaluador",
+      catalogoEscalas.status === 200 &&
+        likert?.niveles.length === 5 &&
+        likert.niveles.every((n) => typeof n.etiqueta === "string" && n.etiqueta.length > 0),
+      likert,
+    );
+
+    await guardarEstructura(e.id_plantilla, ve, [
+      seccion(A, [criterio(`${PREFIJO} Trato`, [pregunta(33.33), pregunta(33.33), pregunta(33.34)])]),
+    ]);
+    const publicarTercios = await publicar(e.id_plantilla, ve);
+    registrarResultado(
+      "KAN-22",
+      "6.7 Tres pesos de 33,33 + 33,33 + 33,34 suman exactamente 100 % y se puede publicar",
+      publicarTercios.status === 200 && publicarTercios.body.estado_codigo === "PUBLICADA",
+      publicarTercios.body,
+    );
+
+    const estructuraPublicada = await estructuraDe(ve);
+    const editarPublicada = await guardarEstructura(e.id_plantilla, ve, completa);
+    registrarResultado(
+      "KAN-22",
+      "6.8 Con la plantilla publicada, modificar preguntas o pesos exige una nueva versión (409) y la estructura no cambia",
+      editarPublicada.status === 409 &&
+        /nueva versión/.test(editarPublicada.body.error) &&
+        (await estructuraDe(ve)).join() === estructuraPublicada.join(),
+      editarPublicada.body,
+    );
+
+    const nueva = await llamarApi(`/plantillas/${e.id_plantilla}/versiones`, { metodo: "POST", empleado: CREADOR });
+    const vn = nueva.body?.id_version;
+    const copiaFiel = (await estructuraDe(vn)).join() === estructuraPublicada.join();
+    const editarNueva = await guardarEstructura(e.id_plantilla, vn, completa);
+    registrarResultado(
+      "KAN-22",
+      "6.9 La nueva versión copia criterios, preguntas y pesos; se edita sin alterar la publicada, que sigue vigente",
+      nueva.status === 201 &&
+        copiaFiel &&
+        editarNueva.status === 200 &&
+        (await estructuraDe(ve)).join() === estructuraPublicada.join() &&
+        (await versionesDe(e.id_plantilla)).map((v) => v.id_estado_version).join() === "2,1",
+      { nueva: nueva.body, versiones: await versionesDe(e.id_plantilla) },
+    );
+
+    const publicarNuevaEstructura = await publicar(e.id_plantilla, vn);
+    registrarResultado(
+      "KAN-22",
+      "6.10 Al publicar la nueva versión (pesos 30 + 20 + 50) la anterior queda archivada con su estructura intacta",
+      publicarNuevaEstructura.status === 200 &&
+        (await versionesDe(e.id_plantilla)).map((v) => v.id_estado_version).join() === "3,2" &&
+        (await estructuraDe(ve)).join() === estructuraPublicada.join(),
+      publicarNuevaEstructura.body,
+    );
+
+    const conCriterios = (await crearPlantilla({ nombre: `${PREFIJO} Borrador con estructura` })).body;
+    await guardarEstructura(conCriterios.id_plantilla, conCriterios.version_actual.id_version, completa);
+    const eliminarConEstructura = await llamarApi(`/plantillas/${conCriterios.id_plantilla}`, { metodo: "DELETE", empleado: CREADOR });
+    registrarResultado(
+      "KAN-22",
+      "6.11 Un borrador con criterios y preguntas se elimina completo (antes respondía 500)",
+      eliminarConEstructura.status === 200 &&
+        !(await existe(conCriterios.id_plantilla)) &&
+        Object.values(await totalesDe(conCriterios.id_plantilla)).every((n) => n === 0),
+      eliminarConEstructura.body,
+    );
+
+    const porVencer = (await crearPlantilla({ nombre: `${PREFIJO} Por vencer`, vigencia_desde: "2092-01-01", vigencia_hasta: "2092-12-31" })).body;
+    await guardarSecciones(porVencer.id_plantilla, porVencer.version_actual.id_version, [A]);
+    await publicar(porVencer.id_plantilla, porVencer.version_actual.id_version);
+    await pool.query(
+      "UPDATE plantillas_evaluacion SET vigencia_desde = '2020-01-01', vigencia_hasta = '2020-12-31' WHERE id_plantilla = $1",
+      [porVencer.id_plantilla],
+    );
+    const versionVencida = await llamarApi(`/plantillas/${porVencer.id_plantilla}/versiones`, { metodo: "POST", empleado: CREADOR });
+    registrarResultado(
+      "KAN-22",
+      "6.12 No se crea otra versión de una plantilla con la vigencia terminada (409): esa versión nunca se podría publicar",
+      versionVencida.status === 409 &&
+        /vigencia/.test(versionVencida.body.error) &&
+        (await versionesDe(porVencer.id_plantilla)).length === 1,
+      versionVencida.body,
     );
 
     console.log("\n--- CRITERIO 4: Alerta de duplicidad ---");

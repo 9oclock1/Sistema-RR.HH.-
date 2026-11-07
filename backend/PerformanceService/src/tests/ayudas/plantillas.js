@@ -69,6 +69,29 @@ const seccion = (n, cambios = {}) => ({
   ...cambios,
 });
 
+const ID_ESCALA = uuid("9", 1);
+
+// Filas de versionesModel.listarCriterios y listarPreguntas: el criterio y la pregunta n pertenecen a la sección n.
+const criterio = (n, cambios = {}) => ({
+  id_criterio: uuid("1", n),
+  id_seccion: uuid("f", n),
+  nombre: `Criterio ${n}`,
+  descripcion: null,
+  orden: 1,
+  ...cambios,
+});
+
+const pregunta = (n, peso, cambios = {}) => ({
+  id_pregunta: uuid("2", n),
+  id_criterio: uuid("1", n),
+  id_escala: ID_ESCALA,
+  texto: `Pregunta ${n}`,
+  peso_porcentual: peso,
+  es_obligatoria: true,
+  orden: 1,
+  ...cambios,
+});
+
 const datosPlantilla = (cambios = {}) => ({
   nombre: "Evaluación de personal de tienda",
   id_departamento: DEPARTAMENTO,
@@ -118,6 +141,9 @@ module.exports = {
   plantilla,
   version,
   seccion,
+  ID_ESCALA,
+  criterio,
+  pregunta,
   datosPlantilla,
   simularTransaccion,
   error,

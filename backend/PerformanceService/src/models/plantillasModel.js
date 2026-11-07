@@ -133,10 +133,20 @@ async function actualizar(
 }
 
 async function eliminar(idPlantilla, db = pool) {
+  const versiones = `SELECT id_version FROM versiones_plantilla WHERE id_plantilla = $1`;
   await db.query(
-    `DELETE FROM secciones_plantilla WHERE id_version IN (SELECT id_version FROM versiones_plantilla WHERE id_plantilla = $1)`,
+    `DELETE FROM preguntas_evaluacion WHERE id_criterio IN (
+       SELECT c.id_criterio FROM criterios_evaluacion c
+       JOIN secciones_plantilla s ON s.id_seccion = c.id_seccion
+       WHERE s.id_version IN (${versiones}))`,
     [idPlantilla],
   );
+  await db.query(
+    `DELETE FROM criterios_evaluacion WHERE id_seccion IN (
+       SELECT id_seccion FROM secciones_plantilla WHERE id_version IN (${versiones}))`,
+    [idPlantilla],
+  );
+  await db.query(`DELETE FROM secciones_plantilla WHERE id_version IN (${versiones})`, [idPlantilla]);
   await db.query(`DELETE FROM versiones_plantilla WHERE id_plantilla = $1`, [
     idPlantilla,
   ]);

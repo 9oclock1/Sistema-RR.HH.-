@@ -37,6 +37,35 @@ async function listarSecciones(idVersion, db = pool) {
   return rows;
 }
 
+async function listarCriterios(idVersion, db = pool) {
+  const { rows } = await db.query(
+    `SELECT c.id_criterio, c.id_seccion, c.nombre, c.descripcion, c.orden
+     FROM criterios_evaluacion c JOIN secciones_plantilla s ON s.id_seccion = c.id_seccion
+     WHERE s.id_version = $1
+     ORDER BY c.orden`,
+    [idVersion],
+  );
+  return rows;
+}
+
+async function listarPreguntas(idVersion, db = pool) {
+  const { rows } = await db.query(
+    `SELECT q.id_pregunta, q.id_criterio, q.id_escala, q.texto, q.peso_porcentual, q.es_obligatoria, q.orden
+     FROM preguntas_evaluacion q
+     JOIN criterios_evaluacion c ON c.id_criterio = q.id_criterio
+     JOIN secciones_plantilla s ON s.id_seccion = c.id_seccion
+     WHERE s.id_version = $1
+     ORDER BY q.orden`,
+    [idVersion],
+  );
+  return rows;
+}
+
+async function escalasExistentes(ids, db = pool) {
+  const { rows } = await db.query(`SELECT id_escala FROM escalas_valoracion WHERE id_escala = ANY($1::uuid[])`, [ids]);
+  return new Set(rows.map((fila) => fila.id_escala));
+}
+
 async function listarCompetencias(ids, db = pool) {
   const { rows } = await db.query(
     `SELECT id_competencia, nombre, esta_activa FROM competencias WHERE id_competencia = ANY($1::uuid[])`,
@@ -78,6 +107,48 @@ async function reemplazarSecciones(idVersion, idsCompetencia, db = pool) {
         `INSERT INTO secciones_plantilla (id_version, id_competencia, orden) VALUES ($1, $2, $3)`,
         [idVersion, idCompetencia, orden],
       );
+    }
+  }
+}
+
+// Deja la estructura de la versión exactamente como la lista indica: secciones, criterios y preguntas, en ese orden.
+async function reemplazarEstructura(idVersion, secciones, db = pool) {
+  await db.query(
+    `DELETE FROM preguntas_evaluacion WHERE id_criterio IN (
+       SELECT c.id_criterio FROM criterios_evaluacion c
+       JOIN secciones_plantilla s ON s.id_seccion = c.id_seccion WHERE s.id_version = $1)`,
+    [idVersion],
+  );
+  await db.query(
+    `DELETE FROM criterios_evaluacion WHERE id_seccion IN (SELECT id_seccion FROM secciones_plantilla WHERE id_version = $1)`,
+    [idVersion],
+  );
+  await db.query(`DELETE FROM secciones_plantilla WHERE id_version = $1`, [idVersion]);
+
+  for (const [posicionSeccion, seccion] of secciones.entries()) {
+    const { rows: nuevaSeccion } = await db.query(
+      `INSERT INTO secciones_plantilla (id_version, id_competencia, orden) VALUES ($1, $2, $3) RETURNING id_seccion`,
+      [idVersion, seccion.id_competencia, posicionSeccion + 1],
+    );
+    for (const [posicionCriterio, criterio] of seccion.criterios.entries()) {
+      const { rows: nuevoCriterio } = await db.query(
+        `INSERT INTO criterios_evaluacion (id_seccion, nombre, descripcion, orden) VALUES ($1, $2, $3, $4) RETURNING id_criterio`,
+        [nuevaSeccion[0].id_seccion, criterio.nombre, criterio.descripcion, posicionCriterio + 1],
+      );
+      for (const [posicionPregunta, pregunta] of criterio.preguntas.entries()) {
+        await db.query(
+          `INSERT INTO preguntas_evaluacion (id_criterio, id_escala, texto, peso_porcentual, es_obligatoria, orden)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            nuevoCriterio[0].id_criterio,
+            pregunta.id_escala,
+            pregunta.texto,
+            pregunta.peso_porcentual,
+            pregunta.es_obligatoria,
+            posicionPregunta + 1,
+          ],
+        );
+      }
     }
   }
 }
@@ -144,8 +215,12 @@ module.exports = {
   hoy,
   obtener,
   listarSecciones,
+  listarCriterios,
+  listarPreguntas,
+  escalasExistentes,
   listarCompetencias,
   reemplazarSecciones,
+  reemplazarEstructura,
   ultimoNumero,
   crearBorrador,
   copiarEstructura,

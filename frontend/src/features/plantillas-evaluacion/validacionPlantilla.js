@@ -1,4 +1,5 @@
 import { formatearFecha } from "../solicitud-vacaciones/formato";
+import { balancePesos, contarPreguntas, describirDesbalance } from "./plantilla";
 
 export const LIMITES = {
   nombre: 120,
@@ -68,24 +69,43 @@ export function validarDatosCompetencia(valores) {
   return errores;
 }
 
-// Lo que todavía impide publicar una versión; vacío si ya se puede. Es el mismo criterio del servicio:
-// cabecera completa, vigencia vigente o futura, al menos una sección y todas con competencias activas.
+// Lo que todavía impide publicar una versión; vacío si ya se puede. Es el mismo criterio del servicio: cabecera completa,
+// vigencia vigente o futura, secciones con competencias activas, criterios y preguntas en cada una, y pesos que suman 100 %.
+// secciones es la estructura en pantalla (con su competencia, criterios y preguntas).
 export function pendientesPublicacion({ plantilla, secciones, hoy }) {
   const pendientes = [];
   if (plantilla.vigencia_hasta < hoy)
     pendientes.push(
-      `La vigencia terminó el ${formatearFecha(plantilla.vigencia_hasta)}: actualice las fechas de la plantilla.`,
+      `La vigencia terminó el ${formatearFecha(plantilla.vigencia_hasta)}: ${
+        plantilla.fue_publicada
+          ? "los datos base ya no se pueden cambiar, cree una plantilla nueva con una vigencia vigente."
+          : "actualice las fechas de la plantilla."
+      }`,
     );
   if (secciones.length === 0)
-    pendientes.push(
-      "Agregue al menos una sección de competencia o factor operativo.",
-    );
+    pendientes.push("Agregue al menos una sección de competencia o factor operativo.");
   secciones
-    .filter((competencia) => !competencia.esta_activa)
-    .forEach((competencia) =>
-      pendientes.push(
-        `La competencia «${competencia.nombre}» está desactivada: quítela o reemplácela.`,
-      ),
+    .filter((seccion) => !seccion.competencia.esta_activa)
+    .forEach((seccion) =>
+      pendientes.push(`La competencia «${seccion.competencia.nombre}» está desactivada: quítela o reemplácela.`),
     );
+  secciones.forEach((seccion) => {
+    const nombre = seccion.competencia.nombre;
+    if (seccion.criterios.length === 0) {
+      pendientes.push(`La sección «${nombre}» no tiene criterios: agregue al menos uno.`);
+      return;
+    }
+    seccion.criterios
+      .filter((criterio) => criterio.preguntas.length === 0)
+      .forEach((criterio) =>
+        pendientes.push(
+          `El criterio «${criterio.nombre.trim() || "sin nombre"}» de la sección «${nombre}» no tiene preguntas: agregue al menos una.`,
+        ),
+      );
+  });
+  if (contarPreguntas(secciones) > 0) {
+    const balance = balancePesos(secciones);
+    if (!balance.balanceado) pendientes.push(describirDesbalance(balance));
+  }
   return pendientes;
 }

@@ -5,8 +5,9 @@ import {
   actualizarPlantilla,
   crearCompetencia,
   crearVersion,
-  guardarSecciones,
+  guardarEstructura,
   listarCompetencias,
+  listarEscalas,
   obtenerPlantilla,
   obtenerVersion,
   publicarVersion,
@@ -26,9 +27,12 @@ import {
 import { useUsuario } from "../../context/sesion";
 import { useDepartamentosActivos } from "../../hooks/useDepartamentosActivos";
 import FormularioPlantilla from "./FormularioPlantilla";
+import BalancePesos from "./BalancePesos";
+import EstructuraPlantilla from "./EstructuraPlantilla";
 import ModalCompetencia from "./ModalCompetencia";
-import SeccionesPlantilla from "./SeccionesPlantilla";
 import { ESTADOS_PLANTILLA, esEditable, formatearVigencia, hoyLaPaz, resumirSecciones } from "./formato";
+import { formatearFecha } from "../solicitud-vacaciones/formato";
+import { balancePesos, contarPreguntas, nuevaSeccion, seccionesADatos, seccionesAFormulario } from "./plantilla";
 import { RUTA_PLANTILLAS } from "./ruta";
 import { pendientesPublicacion } from "./validacionPlantilla";
 import "./plantillasEvaluacion.css";
@@ -111,11 +115,16 @@ function Editor({ idEmpleado, idPlantilla }) {
   const [catalogo, setCatalogo] = useState(null);
   const [errorCatalogo, setErrorCatalogo] = useState(null);
   const [reintentoCatalogo, setReintentoCatalogo] = useState(0);
+  const [escalas, setEscalas] = useState(null);
+  const [errorEscalas, setErrorEscalas] = useState(null);
+  const [reintentoEscalas, setReintentoEscalas] = useState(0);
 
-  // Lista de competencias en edición; null mientras no se haya tocado nada de lo guardado.
+  // Estructura en edición (secciones con criterios y preguntas); null mientras no se haya tocado nada de lo guardado.
   const [edicion, setEdicion] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [errorGuardado, setErrorGuardado] = useState(null);
+  // Mensaje del servidor por campo (ruta del campo -> mensaje), para marcar cada pregunta o criterio inválido.
+  const [erroresCampo, setErroresCampo] = useState({});
   const [confirmando, setConfirmando] = useState(false);
   const [modal, setModal] = useState(null);
   const [confirmandoPublicacion, setConfirmandoPublicacion] = useState(false);
@@ -161,20 +170,40 @@ function Editor({ idEmpleado, idPlantilla }) {
     };
   }, [idEmpleado, reintentoCatalogo]);
 
+  useEffect(() => {
+    let vigente = true;
+    listarEscalas(idEmpleado)
+      .then((datos) => {
+        if (!vigente) return;
+        setEscalas(datos);
+        setErrorEscalas(null);
+      })
+      .catch((error) => vigente && setErrorEscalas(error.message));
+    return () => {
+      vigente = false;
+    };
+  }, [idEmpleado, reintentoEscalas]);
+
   const vistaVersion = resVersion.idVersion === idVersion ? resVersion : {};
   const version = vistaVersion.datos;
   const editable = version?.editable === true;
 
-  const guardadas = version ? version.secciones.map((s) => s.competencia) : [];
+  const guardadas = version ? seccionesAFormulario(version.secciones) : [];
   const secciones = edicion ?? guardadas;
-  const ids = secciones.map((c) => c.id_competencia);
-  const sinGuardar = edicion !== null && ids.join() !== guardadas.map((c) => c.id_competencia).join();
-  const quitadas = guardadas.filter((c) => !ids.includes(c.id_competencia));
+  const ids = secciones.map((s) => s.competencia.id_competencia);
+  const sinGuardar = edicion !== null && JSON.stringify(seccionesADatos(edicion)) !== JSON.stringify(seccionesADatos(guardadas));
+  // Quitar una sección ya guardada que tenía criterios borra también sus preguntas: antes se pide confirmar.
+  const quitadas = guardadas.filter((s) => !ids.includes(s.competencia.id_competencia));
+  const quitadasConContenido = quitadas.filter((s) => s.criterios.length > 0);
   const disponibles = (catalogo ?? []).filter((c) => !ids.includes(c.id_competencia));
+  const balance = balancePesos(secciones);
   const pendientes = editable && plantilla ? pendientesPublicacion({ plantilla, secciones, hoy: hoyLaPaz() }) : [];
-  // Solo la versión más reciente publicada puede dar origen a un borrador nuevo.
-  const puedeCrearVersion =
+  // Solo la versión más reciente publicada puede dar origen a un borrador nuevo, y mientras la vigencia no haya terminado:
+  // los datos base ya no se pueden cambiar, así que una versión nueva con la vigencia vencida nunca se podría publicar.
+  const esUltimaPublicada =
     version?.estado_codigo === "PUBLICADA" && plantilla?.version_actual.id_version === version.id_version;
+  const vigenciaTerminada = Boolean(plantilla) && plantilla.vigencia_hasta < hoyLaPaz();
+  const puedeCrearVersion = esUltimaPublicada && !vigenciaTerminada;
   const versionPublicada = plantilla?.versiones.find((v) => v.estado_codigo === "PUBLICADA");
 
   // Si hay cambios sin guardar, salir de la página (menú, atrás o cerrar la pestaña) pide confirmación.
@@ -186,38 +215,41 @@ function Editor({ idEmpleado, idPlantilla }) {
     return () => window.removeEventListener("beforeunload", avisarAlCerrar);
   }, [sinGuardar]);
 
-  const agregar = (idCompetencia) => {
-    const competencia = disponibles.find((c) => c.id_competencia === idCompetencia);
-    if (competencia) setEdicion([...secciones, competencia]);
-  };
-
-  const mover = (indice, desplazamiento) => {
-    const lista = [...secciones];
-    [lista[indice], lista[indice + desplazamiento]] = [lista[indice + desplazamiento], lista[indice]];
+  const cambiar = (lista) => {
     setEdicion(lista);
+    setErroresCampo({});
   };
 
-  const quitar = (idCompetencia) => setEdicion(secciones.filter((c) => c.id_competencia !== idCompetencia));
+  const descartar = () => {
+    setEdicion(null);
+    setErroresCampo({});
+    setErrorGuardado(null);
+  };
 
   const guardar = async () => {
     setConfirmando(false);
     setGuardando(true);
     setErrorGuardado(null);
+    setErroresCampo({});
     try {
-      const actualizada = await guardarSecciones(idEmpleado, idPlantilla, version.id_version, ids);
+      const actualizada = await guardarEstructura(idEmpleado, idPlantilla, version.id_version, seccionesADatos(secciones));
       setResVersion({ idVersion, datos: actualizada });
       setEdicion(null);
       setRecarga((n) => n + 1);
-      avisar({ tono: "exito", titulo: "Secciones guardadas", mensaje: resumirSecciones(actualizada.secciones.map((s) => s.competencia)) });
+      avisar({
+        tono: "exito",
+        titulo: "Estructura guardada",
+        mensaje: `${resumirSecciones(actualizada.secciones.map((s) => s.competencia))} · ${contarPreguntas(seccionesAFormulario(actualizada.secciones))} preguntas`,
+      });
     } catch (error) {
       setErrorGuardado(error);
+      setErroresCampo(Object.fromEntries((error.detalles ?? []).map((d) => [d.campo, d.mensaje])));
     } finally {
       setGuardando(false);
     }
   };
 
-  // Quitar una sección ya guardada borra también sus criterios y preguntas: antes se pide confirmar.
-  const pedirGuardado = () => (quitadas.length > 0 ? setConfirmando(true) : guardar());
+  const pedirGuardado = () => (quitadasConContenido.length > 0 ? setConfirmando(true) : guardar());
 
   // Publicar bloquea la estructura base: el servidor vuelve a validar y, si falta algo, responde con la lista.
   const publicar = async () => {
@@ -263,7 +295,7 @@ function Editor({ idEmpleado, idPlantilla }) {
   const crearYAgregar = async (datos) => {
     const nueva = await crearCompetencia(idEmpleado, datos);
     setCatalogo((actual) => [...(actual ?? []), nueva]);
-    setEdicion([...secciones, nueva]);
+    cambiar([...secciones, nuevaSeccion(nueva)]);
     setModal(null);
     avisar({ tono: "exito", titulo: "Competencia creada", mensaje: nueva.nombre });
   };
@@ -340,14 +372,14 @@ function Editor({ idEmpleado, idPlantilla }) {
 
   return (
     <>
-      {encabezado(plantilla.nombre, "Defina las secciones de competencias y factores operativos que se evaluarán.")}
+      {encabezado(plantilla.nombre, "Defina las secciones, los criterios y las preguntas ponderadas con que se evaluará, y publique la versión.")}
 
       <Datos plantilla={plantilla} onEditar={() => setModal("datos")} />
 
       <Tarjeta
         nivelTitulo={2}
-        titulo="Secciones"
-        acciones={version && <span className="pl-sutil">{resumirSecciones(secciones)}</span>}
+        titulo="Estructura de la evaluación"
+        acciones={version && <span className="pl-sutil">{resumirSecciones(secciones.map((s) => s.competencia))}</span>}
       >
         {vistaVersion.error ? (
           <Alerta
@@ -393,6 +425,9 @@ function Editor({ idEmpleado, idPlantilla }) {
               >
                 {puedeCrearVersion &&
                   "Para cambiarla, cree una nueva versión: parte de esta estructura y la actual sigue vigente hasta que publique la nueva."}
+                {esUltimaPublicada &&
+                  vigenciaTerminada &&
+                  `La vigencia de la plantilla terminó el ${formatearFecha(plantilla.vigencia_hasta)} y sus datos base ya no se pueden cambiar: para seguir evaluando, cree una plantilla nueva.`}
               </Alerta>
             )}
 
@@ -421,21 +456,47 @@ function Editor({ idEmpleado, idPlantilla }) {
               </Alerta>
             )}
 
+            {errorEscalas && (
+              <Alerta
+                tono="aviso"
+                titulo="No se pudo cargar el catálogo de escalas de valoración"
+                acciones={
+                  <Boton tamano="sm" onClick={() => setReintentoEscalas((n) => n + 1)}>
+                    Reintentar
+                  </Boton>
+                }
+              >
+                {errorEscalas}
+              </Alerta>
+            )}
+
+            {editable && escalas?.length === 0 && (
+              <Alerta tono="aviso" titulo="Todavía no hay escalas de valoración">
+                Cada pregunta usa una escala. Cree una en la pestaña «Escalas de valoración» del listado de plantillas.
+              </Alerta>
+            )}
+
             {errorGuardado && (
               <AlertaError
-                titulo="No se pudieron guardar las secciones"
+                titulo="No se pudo guardar la estructura"
                 error={errorGuardado}
                 onCerrar={() => setErrorGuardado(null)}
               />
             )}
 
-            <SeccionesPlantilla
+            {contarPreguntas(secciones) > 0 && (
+              <div className="pl-balance">
+                <BalancePesos balance={balance} />
+              </div>
+            )}
+
+            <EstructuraPlantilla
               secciones={secciones}
               disponibles={disponibles}
+              escalas={escalas ?? []}
               editable={editable}
-              onAgregar={agregar}
-              onMover={mover}
-              onQuitar={quitar}
+              errores={erroresCampo}
+              onCambiar={cambiar}
               onNuevaCompetencia={() => setModal("competencia")}
             />
 
@@ -454,11 +515,11 @@ function Editor({ idEmpleado, idPlantilla }) {
                 <span className="pl-sutil" role="status">
                   {sinGuardar ? "Hay cambios sin guardar." : "Todo guardado."}
                 </span>
-                <Boton variante="sutil" onClick={() => setEdicion(null)} disabled={!sinGuardar || guardando}>
+                <Boton variante="sutil" onClick={descartar} disabled={!sinGuardar || guardando}>
                   Descartar
                 </Boton>
                 <Boton variante={sinGuardar ? "primario" : "predeterminado"} onClick={pedirGuardado} disabled={!sinGuardar} cargando={guardando}>
-                  {guardando ? "Guardando…" : "Guardar secciones"}
+                  {guardando ? "Guardando…" : "Guardar estructura"}
                 </Boton>
                 <Boton
                   variante={sinGuardar ? "predeterminado" : "primario"}
@@ -496,8 +557,9 @@ function Editor({ idEmpleado, idPlantilla }) {
         onConfirmar={guardar}
         onCancelar={() => setConfirmando(false)}
       >
-        Se quitará{quitadas.length === 1 ? "" : "n"}: <strong>{quitadas.map((c) => c.nombre).join(", ")}</strong>. Si
-        tenían criterios y preguntas, también se eliminarán.
+        Se quitará{quitadas.length === 1 ? "" : "n"}: <strong>{quitadas.map((s) => s.competencia.nombre).join(", ")}</strong>.
+        {quitadasConContenido.length > 0 &&
+          ` Sus criterios y preguntas (${contarPreguntas(quitadasConContenido)} en total) también se eliminarán.`}
       </ModalConfirmacion>
 
       <ModalConfirmacion
@@ -521,7 +583,7 @@ function Editor({ idEmpleado, idPlantilla }) {
         onConfirmar={() => bloqueo.proceed()}
         onCancelar={() => bloqueo.reset()}
       >
-        Tiene cambios en las secciones que todavía no se guardaron. Si sale ahora, se perderán.
+        Tiene cambios en la estructura que todavía no se guardaron. Si sale ahora, se perderán.
       </ModalConfirmacion>
     </>
   );
