@@ -11,10 +11,12 @@ export class ApiError extends Error {
     this.status = status;
     // El backend devuelve [{ campo, mensaje }] en los errores de validación (400).
     this.errores = Array.isArray(data?.errores) ? data.errores : [];
+    // Cuerpo completo del error, para respuestas con datos extra (p. ej. las entrevistas que se solapan en un 409).
+    this.datos = data;
   }
 }
 
-export async function request(path, { method = 'GET', body, signal } = {}) {
+export async function request(path, { method = 'GET', body, signal, headers } = {}) {
   // Con FormData (archivos adjuntos) el navegador define el Content-Type con su boundary.
   const esFormData = body instanceof FormData;
   const enviaJson = body !== undefined && !esFormData;
@@ -24,7 +26,7 @@ export async function request(path, { method = 'GET', body, signal } = {}) {
     response = await fetch(`${API_URL}${path}`, {
       method,
       signal,
-      headers: enviaJson ? { 'Content-Type': 'application/json' } : undefined,
+      headers: { ...(enviaJson && { 'Content-Type': 'application/json' }), ...headers },
       body: enviaJson ? JSON.stringify(body) : body,
     });
   } catch (error) {
@@ -37,4 +39,20 @@ export async function request(path, { method = 'GET', body, signal } = {}) {
     throw new ApiError(data?.error || `Error inesperado (${response.status}).`, response.status, data);
   }
   return data;
+}
+
+export async function requestArchivo(path, { signal, headers } = {}) {
+  let response;
+  try {
+    response = await fetch(`${API_URL}${path}`, { signal, headers });
+  } catch (error) {
+    if (error.name === 'AbortError') throw error;
+    throw new ApiError('No se pudo conectar con el servidor.', 0);
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new ApiError(data?.error || `Error inesperado (${response.status}).`, response.status, data);
+  }
+  return response.blob();
 }

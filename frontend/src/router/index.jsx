@@ -7,7 +7,7 @@ import { SECCIONES } from "./modulos";
 
 const rutasModulos = SECCIONES.flatMap((seccion) =>
   seccion.modulos.map((modulo) => ({
-    path: modulo.ruta,
+    path: modulo.parametroOpcional ? `${modulo.ruta}/:${modulo.parametroOpcional}?` : modulo.ruta,
     element: <PaginaModulo key={modulo.ruta} seccion={seccion.titulo} modulo={modulo} />,
   })),
 );

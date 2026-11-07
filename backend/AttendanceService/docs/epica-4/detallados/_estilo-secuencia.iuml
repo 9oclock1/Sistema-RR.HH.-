@@ -1,0 +1,41 @@
+' Estilo común de los diagramas de secuencia detallados de la épica 4.
+' Colores: verde = pantalla · gris = gateway · naranja = middleware · azul = controlador o servicio
+' morado = modelo · amarillo = base de datos · rojo = job o sistema externo.
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam titleFontSize 18
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 300
+skinparam sequence {
+  LifeLineBorderColor #888888
+  ParticipantBorderColor #6C8EBF
+  ParticipantBackgroundColor #DAE8FC
+  ActorBorderColor #333333
+  ActorBackgroundColor #FFFFFF
+  GroupBorderColor #888888
+  GroupBackgroundColor #F5F5F5
+  DividerBackgroundColor #EEEEEE
+  DividerBorderColor #BBBBBB
+}
+skinparam BoundaryBackgroundColor #D5E8D4
+skinparam BoundaryBorderColor #82B366
+skinparam ControlBackgroundColor #DAE8FC
+skinparam ControlBorderColor #6C8EBF
+skinparam EntityBackgroundColor #E1D5E7
+skinparam EntityBorderColor #9673A6
+skinparam DatabaseBackgroundColor #FFF2CC
+skinparam DatabaseBorderColor #D6B656
+skinparam QueueBackgroundColor #F8CECC
+skinparam QueueBorderColor #B85450
+skinparam note {
+  BackgroundColor #FFFDE7
+  BorderColor #C9B458
+}
+autonumber "<b>00"
+
+!procedure $error($origen, $destino, $texto)
+$origen -[#B85450]-> $destino : <color:#B85450>$texto</color>
+!endprocedure

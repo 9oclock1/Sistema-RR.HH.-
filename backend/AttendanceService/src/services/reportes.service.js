@@ -54,6 +54,7 @@ async function resolverAlcance({ idEmpleado, rol } = {}) {
 
   const supervisor = await empleados.obtenerUbicacion(idEmpleado.toLowerCase());
   if (!supervisor) throw new ErrorApp(403, "El identificador no corresponde a un empleado registrado.");
+  if (supervisor.activo === false) throw new ErrorApp(403, "Su acceso está deshabilitado: no puede consultar los reportes.");
   if (!supervisor.id_sucursal || !supervisor.id_cargo) {
     throw new ErrorApp(403, "No tiene una sucursal y un cargo asignados: no hay personal bajo su dependencia.");
   }
@@ -89,6 +90,16 @@ function contarProgramados(turnos) {
   return dias;
 }
 
+// Días programados en que el empleado marcó entrada.
+function contarAsistidos(turnos, entradas) {
+  const programados = new Set(turnos.filter((t) => !t.descanso).map((t) => `${t.id_empleado}|${t.fecha}`));
+  const dias = new Map();
+  for (const { id_empleado, fecha } of entradas) {
+    if (programados.has(`${id_empleado}|${fecha}`)) dias.set(id_empleado, (dias.get(id_empleado) ?? 0) + 1);
+  }
+  return dias;
+}
+
 const SIN_NOVEDADES = {
   atrasos: 0,
   minutos_retraso: 0,
@@ -101,9 +112,10 @@ const SIN_NOVEDADES = {
 const SIN_EXTRA = { minutos_extra: 0, extra_por_revisar: 0 };
 
 // Indicadores de un empleado (criterio 3) a partir de sus días programados, novedades y horas extra.
-function indicadores(diasProgramados, novedades = SIN_NOVEDADES, extra = SIN_EXTRA) {
+// `asistidos` son los días con marcaje de entrada; sin ese dato se estiman restando las faltas registradas.
+function indicadores(diasProgramados, novedades = SIN_NOVEDADES, extra = SIN_EXTRA, asistidos = null) {
   const faltas = novedades.faltas_justificadas + novedades.faltas_injustificadas;
-  const diasAsistidos = Math.max(0, diasProgramados - faltas);
+  const diasAsistidos = asistidos ?? Math.max(0, diasProgramados - faltas);
   return {
     dias_programados: diasProgramados,
     dias_asistidos: diasAsistidos,
@@ -164,12 +176,14 @@ async function generar(filtros, identidad) {
       console.error("Reporte de asistencia con horas extra sin recalcular:", error.message);
     });
   }
-  const [turnos, novedades, extras] = await Promise.all([
+  const [turnos, novedades, extras, entradas] = await Promise.all([
     ids.length > 0 ? programacion.listarProgramacion(desde, hastaEfectiva, ids) : [],
     modelo.totalizarNovedades(ids, desde, hastaEfectiva),
     modelo.totalizarHorasExtra(ids, desde, hastaEfectiva),
+    modelo.listarDiasConEntrada(ids, desde, hastaEfectiva),
   ]);
   const programados = contarProgramados(turnos);
+  const asistidos = contarAsistidos(turnos, entradas);
   const novedadDe = new Map(novedades.map((n) => [n.id_empleado, n]));
   const extraDe = new Map(extras.map((h) => [h.id_empleado, h]));
 
@@ -185,7 +199,12 @@ async function generar(filtros, identidad) {
         sucursal: e.sucursal ?? null,
         activo: e.activo,
       },
-      ...indicadores(programados.get(e.id_empleado) ?? 0, novedadDe.get(e.id_empleado), extraDe.get(e.id_empleado)),
+      ...indicadores(
+        programados.get(e.id_empleado) ?? 0,
+        novedadDe.get(e.id_empleado),
+        extraDe.get(e.id_empleado),
+        asistidos.get(e.id_empleado) ?? 0
+      ),
     }))
     .sort((a, b) => a.empleado.nombre_completo.localeCompare(b.empleado.nombre_completo, "es"));
 
@@ -231,7 +250,7 @@ async function alcanceFiltros(identidad) {
     sucursal_fija: alcance.idSucursal,
     sucursales: [{ id_sucursal: alcance.idSucursal, nombre: sucursal?.nombre ?? "Su sucursal" }],
     areas: [...areas].map(([id_departamento, nombre]) => ({ id_departamento, nombre })),
-    personal_a_cargo: personal.length,
+    personal_a_cargo: personal.filter((e) => e.activo).length,
   };
 }
 

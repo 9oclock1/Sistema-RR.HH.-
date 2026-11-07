@@ -86,6 +86,7 @@ services:
     volumes:
       - ./backend/EmployeeService:/app
       - /app/node_modules
+      - ./credentials:/credentials:ro
     depends_on:
       - postgres
     networks:
@@ -104,6 +105,7 @@ services:
     volumes:
       - ./backend/RecruitmentService:/app
       - /app/node_modules
+      - ./credentials:/credentials:ro
     depends_on:
       - postgres
     networks:
@@ -120,6 +122,7 @@ services:
     volumes:
       - ./backend/AttendanceService:/app
       - /app/node_modules
+      - ./credentials:/credentials:ro
     depends_on:
       - postgres
     networks:

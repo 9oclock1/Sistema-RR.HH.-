@@ -5,7 +5,10 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "test": "node --test"
+    "test": "node --test \"tests/*.test.js\" src/tests/puntajePonderadoTest.js src/tests/guardadoParcialTest.js src/tests/envioEvaluacionTest.js src/tests/bandejaEvaluacionesTest.js && node test/acceptance_criteria.test.js",
+    "test:kan24": "node --test src/tests/puntajePonderadoTest.js src/tests/guardadoParcialTest.js src/tests/envioEvaluacionTest.js src/tests/bandejaEvaluacionesTest.js",
+    "test:calculo": "node --test src/tests/puntajePonderadoTest.js",
+    "test:kan22": "node --test \"tests/*.test.js\""
   },
   "keywords": [],
   "author": "",

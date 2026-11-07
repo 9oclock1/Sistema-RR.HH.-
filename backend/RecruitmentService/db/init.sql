@@ -24,6 +24,7 @@ CREATE TABLE CONVOCATORIAS (
     fecha_publicacion date NOT NULL,
     fecha_limite_postulacion date NOT NULL,
     esta_activa boolean NOT NULL DEFAULT TRUE,
+    pesos_afinidad JSONB NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT CONVOCATORIAS_pk PRIMARY KEY (id_convocatoria)
 );
@@ -110,4 +111,241 @@ VALUES (1, 'POSTULADO', 'Postulación Recibida', 1),
     (5, 'FINALISTA', 'Finalista / Oferta', 5),
     (6, 'CONTRATADO', 'Contratado', 6),
     (7, 'RECHAZADO', 'No Seleccionado', 7) ON CONFLICT (id_etapa) DO NOTHING;
+ALTER TABLE CATALOGOS_ETAPA_POSTULACION
+ADD COLUMN es_final boolean NOT NULL DEFAULT FALSE,
+    ADD COLUMN esta_activa boolean NOT NULL DEFAULT TRUE,
+    ADD CONSTRAINT uq_etapa_postulacion_codigo UNIQUE (codigo);
+UPDATE CATALOGOS_ETAPA_POSTULACION
+SET codigo = 'EN_REVISION',
+    nombre = 'En revisión'
+WHERE id_etapa = 2;
+UPDATE CATALOGOS_ETAPA_POSTULACION
+SET codigo = 'ENTREVISTA_TECNICA',
+    nombre = 'Entrevista técnica'
+WHERE id_etapa = 3;
+UPDATE CATALOGOS_ETAPA_POSTULACION
+SET codigo = 'APTO',
+    nombre = 'Apto'
+WHERE id_etapa = 4;
+UPDATE CATALOGOS_ETAPA_POSTULACION
+SET esta_activa = FALSE
+WHERE id_etapa = 5;
+UPDATE CATALOGOS_ETAPA_POSTULACION
+SET nombre = 'Rechazado'
+WHERE id_etapa = 7;
+UPDATE CATALOGOS_ETAPA_POSTULACION
+SET es_final = TRUE
+WHERE id_etapa IN (6, 7);
+CREATE TABLE TRANSICIONES_ETAPA_POSTULACION (
+    id_etapa_origen SMALLINT NOT NULL,
+    id_etapa_destino SMALLINT NOT NULL,
+    solicita_motivo boolean NOT NULL DEFAULT FALSE,
+    requiere_cargo boolean NOT NULL DEFAULT FALSE,
+    CONSTRAINT TRANSICIONES_ETAPA_POSTULACION_pk PRIMARY KEY (id_etapa_origen, id_etapa_destino),
+    CONSTRAINT chk_transicion_etapa_distinta CHECK (id_etapa_origen <> id_etapa_destino)
+);
+CREATE TABLE CATALOGOS_DESTINO_INTEGRACION (
+    id_destino SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    grupo char(1) NOT NULL,
+    nombre_modulo varchar(60) NOT NULL,
+    canal varchar(10) NOT NULL,
+    CONSTRAINT CATALOGOS_DESTINO_INTEGRACION_pk PRIMARY KEY (id_destino),
+    CONSTRAINT uq_destino_integracion_codigo UNIQUE (codigo),
+    CONSTRAINT chk_destino_integracion_canal CHECK (canal IN ('REST', 'PUBSUB'))
+);
+CREATE TABLE CATALOGOS_CARGO_OPERATIVO (
+    id_cargo_operativo SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    id_destino SMALLINT NOT NULL,
+    CONSTRAINT CATALOGOS_CARGO_OPERATIVO_pk PRIMARY KEY (id_cargo_operativo),
+    CONSTRAINT uq_cargo_operativo_codigo UNIQUE (codigo)
+);
+CREATE TABLE CATALOGOS_ESTADO_EVENTO (
+    id_estado_evento SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_ESTADO_EVENTO_pk PRIMARY KEY (id_estado_evento),
+    CONSTRAINT uq_estado_evento_codigo UNIQUE (codigo)
+);
+ALTER TABLE HISTORIALES_ETAPA_POSTULACION
+ALTER COLUMN id_historial
+SET DEFAULT gen_random_uuid(),
+    ADD COLUMN id_etapa_anterior SMALLINT NULL,
+    ADD COLUMN nombre_usuario_evaluador varchar(120) NULL;
+CREATE INDEX idx_historiales_etapa_postulacion ON HISTORIALES_ETAPA_POSTULACION (id_postulacion, fecha_cambio DESC);
+ALTER TABLE POSTULACIONES
+ADD COLUMN id_cargo_operativo SMALLINT NULL,
+    ADD COLUMN contratado_en TIMESTAMPTZ NULL,
+    ADD COLUMN esta_archivada boolean NOT NULL DEFAULT FALSE,
+    ADD COLUMN archivada_en TIMESTAMPTZ NULL,
+    ADD COLUMN alta_contabilidad_enviada boolean NOT NULL DEFAULT FALSE,
+    ADD COLUMN alta_operativa_enviada boolean NOT NULL DEFAULT FALSE,
+    ADD CONSTRAINT chk_postulacion_archivada CHECK (
+        esta_archivada = FALSE
+        OR archivada_en IS NOT NULL
+    );
+CREATE INDEX idx_postulaciones_id_etapa ON POSTULACIONES (id_convocatoria, id_etapa);
+CREATE TABLE EVENTOS_SALIENTES (
+    id_evento UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_mensaje UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_postulacion UUID NOT NULL,
+    id_destino SMALLINT NOT NULL,
+    tipo_evento varchar(60) NOT NULL,
+    carga JSONB NOT NULL,
+    id_estado_evento SMALLINT NOT NULL DEFAULT 1,
+    intentos SMALLINT NOT NULL DEFAULT 0,
+    ultimo_error varchar(255) NULL,
+    proximo_intento_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    entregado_en TIMESTAMPTZ NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT EVENTOS_SALIENTES_pk PRIMARY KEY (id_evento),
+    CONSTRAINT uq_evento_saliente_mensaje UNIQUE (id_mensaje),
+    CONSTRAINT uq_evento_saliente_postulacion_destino UNIQUE (id_postulacion, id_destino, tipo_evento),
+    CONSTRAINT chk_evento_intentos CHECK (intentos >= 0)
+);
+CREATE INDEX idx_eventos_salientes_pendientes ON EVENTOS_SALIENTES (id_estado_evento, proximo_intento_en);
+-- foreign keys
+ALTER TABLE TRANSICIONES_ETAPA_POSTULACION
+ADD CONSTRAINT TRANSICIONES_ETAPA_ORIGEN FOREIGN KEY (id_etapa_origen) REFERENCES CATALOGOS_ETAPA_POSTULACION (id_etapa) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE TRANSICIONES_ETAPA_POSTULACION
+ADD CONSTRAINT TRANSICIONES_ETAPA_DESTINO FOREIGN KEY (id_etapa_destino) REFERENCES CATALOGOS_ETAPA_POSTULACION (id_etapa) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE CATALOGOS_CARGO_OPERATIVO
+ADD CONSTRAINT CATALOGOS_CARGO_OPERATIVO_DESTINO FOREIGN KEY (id_destino) REFERENCES CATALOGOS_DESTINO_INTEGRACION (id_destino) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE HISTORIALES_ETAPA_POSTULACION
+ADD CONSTRAINT HISTORIALES_ETAPA_POSTULACION_ETAPA_ANTERIOR FOREIGN KEY (id_etapa_anterior) REFERENCES CATALOGOS_ETAPA_POSTULACION (id_etapa) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE POSTULACIONES
+ADD CONSTRAINT POSTULACIONES_CATALOGOS_CARGO_OPERATIVO FOREIGN KEY (id_cargo_operativo) REFERENCES CATALOGOS_CARGO_OPERATIVO (id_cargo_operativo) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE EVENTOS_SALIENTES
+ADD CONSTRAINT EVENTOS_SALIENTES_POSTULACIONES FOREIGN KEY (id_postulacion) REFERENCES POSTULACIONES (id_postulacion) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE EVENTOS_SALIENTES
+ADD CONSTRAINT EVENTOS_SALIENTES_CATALOGOS_DESTINO_INTEGRACION FOREIGN KEY (id_destino) REFERENCES CATALOGOS_DESTINO_INTEGRACION (id_destino) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE EVENTOS_SALIENTES
+ADD CONSTRAINT EVENTOS_SALIENTES_CATALOGOS_ESTADO_EVENTO FOREIGN KEY (id_estado_evento) REFERENCES CATALOGOS_ESTADO_EVENTO (id_estado_evento) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- seed
+-- Flujo: Postulado → En revisión → Entrevista técnica → Apto → Contratado; se puede rechazar desde cualquier
+INSERT INTO TRANSICIONES_ETAPA_POSTULACION (
+        id_etapa_origen,
+        id_etapa_destino,
+        solicita_motivo,
+        requiere_cargo
+    )
+VALUES (1, 2, FALSE, FALSE),
+    (1, 7, TRUE, FALSE),
+    (2, 3, FALSE, FALSE),
+    (2, 7, TRUE, FALSE),
+    (3, 2, FALSE, FALSE),
+    (3, 4, FALSE, FALSE),
+    (3, 7, TRUE, FALSE),
+    (4, 3, FALSE, FALSE),
+    (4, 6, FALSE, TRUE),
+    (4, 7, TRUE, FALSE),
+    (5, 6, FALSE, TRUE),
+    (5, 7, TRUE, FALSE);
+INSERT INTO CATALOGOS_DESTINO_INTEGRACION (
+        id_destino,
+        codigo,
+        grupo,
+        nombre_modulo,
+        canal
+    )
+VALUES (1, 'CONTABILIDAD', 'D', 'Contabilidad', 'REST'),
+    (2, 'MARKETPLACE_POS', 'E', 'Marketplace / POS', 'PUBSUB'),
+    (3, 'INVENTARIOS', 'I', 'Inventarios', 'PUBSUB'),
+    (4, 'ENTREGAS', 'H', 'Entregas y Despachos', 'PUBSUB');
+INSERT INTO CATALOGOS_CARGO_OPERATIVO (id_cargo_operativo, codigo, nombre, id_destino)
+VALUES (1, 'CAJERO', 'Cajero', 2),
+    (2, 'VENDEDOR', 'Vendedor', 2),
+    (3, 'ALMACENERO', 'Almacenero', 3),
+    (4, 'CHOFER', 'Chofer', 4);
+INSERT INTO CATALOGOS_ESTADO_EVENTO (id_estado_evento, codigo, nombre)
+VALUES (1, 'PENDIENTE', 'Pendiente'),
+    (2, 'ENTREGADO', 'Entregado'),
+    (3, 'FALLIDO', 'Fallido');
+-- RF-15: programación y notificación de entrevistas
+CREATE TABLE CATALOGOS_ESTADO_ENTREVISTA (
+    id_estado_entrevista SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    es_activa boolean NOT NULL DEFAULT TRUE,
+    CONSTRAINT CATALOGOS_ESTADO_ENTREVISTA_pk PRIMARY KEY (id_estado_entrevista),
+    CONSTRAINT uq_estado_entrevista_codigo UNIQUE (codigo)
+);
+-- La agenda: el evaluador es un empleado de EmployeeDB; su nombre se guarda para mostrar la agenda sin consultarlo.
+ALTER TABLE ENTREVISTAS
+ALTER COLUMN id_entrevista
+SET DEFAULT gen_random_uuid(),
+    DROP COLUMN estado_entrevista,
+    ADD COLUMN id_estado_entrevista SMALLINT NOT NULL DEFAULT 1,
+    ADD COLUMN duracion_minutos SMALLINT NOT NULL DEFAULT 60,
+    ADD COLUMN nombre_entrevistador varchar(120) NOT NULL,
+    ADD COLUMN id_usuario_reclutador UUID NOT NULL,
+    ADD COLUMN nombre_usuario_reclutador varchar(120) NULL,
+    ADD COLUMN creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ADD COLUMN actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ADD CONSTRAINT chk_entrevista_modalidad CHECK (modalidad IN ('PRESENCIAL', 'VIRTUAL')),
+    ADD CONSTRAINT chk_entrevista_duracion CHECK (duracion_minutos BETWEEN 15 AND 480);
+CREATE INDEX idx_entrevistas_postulacion ON ENTREVISTAS (id_postulacion, fecha_hora_programada);
+CREATE INDEX idx_entrevistas_agenda_entrevistador ON ENTREVISTAS (id_entrevistador_empleado, fecha_hora_programada);
+-- Registro de estados: cada programación, reprogramación o cancelación con lo que cambió y quién lo hizo.
+CREATE TABLE HISTORIALES_ENTREVISTA (
+    id_historial UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_entrevista UUID NOT NULL,
+    id_estado_anterior SMALLINT NULL,
+    id_estado SMALLINT NOT NULL,
+    fecha_hora_anterior TIMESTAMPTZ NULL,
+    fecha_hora_nueva TIMESTAMPTZ NOT NULL,
+    motivo TEXT NULL,
+    id_usuario UUID NOT NULL,
+    nombre_usuario varchar(120) NULL,
+    fecha_cambio TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT HISTORIALES_ENTREVISTA_pk PRIMARY KEY (id_historial)
+);
+CREATE INDEX idx_historiales_entrevista ON HISTORIALES_ENTREVISTA (id_entrevista, fecha_cambio DESC);
+-- Correos al candidato pendientes de envío; usa los estados de CATALOGOS_ESTADO_EVENTO (pendiente, entregado, fallido,
+-- descartado). carga guarda los datos de la cita al momento del aviso, que es lo que dice el correo.
+CREATE TABLE NOTIFICACIONES_ENTREVISTA (
+    id_notificacion UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_entrevista UUID NOT NULL,
+    tipo_notificacion varchar(20) NOT NULL,
+    correo_destino varchar(120) NOT NULL,
+    carga JSONB NOT NULL,
+    id_estado_evento SMALLINT NOT NULL DEFAULT 1,
+    intentos SMALLINT NOT NULL DEFAULT 0,
+    ultimo_error varchar(255) NULL,
+    proximo_intento_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    enviado_en TIMESTAMPTZ NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT NOTIFICACIONES_ENTREVISTA_pk PRIMARY KEY (id_notificacion),
+    CONSTRAINT chk_notificacion_entrevista_tipo CHECK (
+        tipo_notificacion IN ('PROGRAMACION', 'REPROGRAMACION', 'CANCELACION')
+    ),
+    CONSTRAINT chk_notificacion_entrevista_intentos CHECK (intentos >= 0)
+);
+CREATE INDEX idx_notificaciones_entrevista_pendientes ON NOTIFICACIONES_ENTREVISTA (id_estado_evento, proximo_intento_en);
+CREATE INDEX idx_notificaciones_entrevista_entrevista ON NOTIFICACIONES_ENTREVISTA (id_entrevista, creado_en DESC);
+-- foreign keys
+ALTER TABLE ENTREVISTAS
+ADD CONSTRAINT ENTREVISTAS_CATALOGOS_ESTADO_ENTREVISTA FOREIGN KEY (id_estado_entrevista) REFERENCES CATALOGOS_ESTADO_ENTREVISTA (id_estado_entrevista) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE HISTORIALES_ENTREVISTA
+ADD CONSTRAINT HISTORIALES_ENTREVISTA_ENTREVISTAS FOREIGN KEY (id_entrevista) REFERENCES ENTREVISTAS (id_entrevista) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE HISTORIALES_ENTREVISTA
+ADD CONSTRAINT HISTORIALES_ENTREVISTA_ESTADO FOREIGN KEY (id_estado) REFERENCES CATALOGOS_ESTADO_ENTREVISTA (id_estado_entrevista) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE HISTORIALES_ENTREVISTA
+ADD CONSTRAINT HISTORIALES_ENTREVISTA_ESTADO_ANTERIOR FOREIGN KEY (id_estado_anterior) REFERENCES CATALOGOS_ESTADO_ENTREVISTA (id_estado_entrevista) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE NOTIFICACIONES_ENTREVISTA
+ADD CONSTRAINT NOTIFICACIONES_ENTREVISTA_ENTREVISTAS FOREIGN KEY (id_entrevista) REFERENCES ENTREVISTAS (id_entrevista) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE NOTIFICACIONES_ENTREVISTA
+ADD CONSTRAINT NOTIFICACIONES_ENTREVISTA_CATALOGOS_ESTADO_EVENTO FOREIGN KEY (id_estado_evento) REFERENCES CATALOGOS_ESTADO_EVENTO (id_estado_evento) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- seed
+-- Programada y reprogramada ocupan la agenda del evaluador; cancelada y realizada no.
+INSERT INTO CATALOGOS_ESTADO_ENTREVISTA (id_estado_entrevista, codigo, nombre, es_activa)
+VALUES (1, 'PROGRAMADA', 'Programada', TRUE),
+    (2, 'REPROGRAMADA', 'Reprogramada', TRUE),
+    (3, 'CANCELADA', 'Cancelada', FALSE),
+    (4, 'REALIZADA', 'Realizada', FALSE);
+-- Un aviso que no llegó a salir y fue reemplazado por otro más reciente de la misma entrevista.
+INSERT INTO CATALOGOS_ESTADO_EVENTO (id_estado_evento, codigo, nombre)
+VALUES (4, 'DESCARTADO', 'Descartado');
 -- End of file.

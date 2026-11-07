@@ -64,7 +64,7 @@ export default function CvViewer({
       </Boton>
 
       <Boton
-        variante="sutil"
+        variante="enlace"
         tamano="sm"
         icono={Download}
         soloIcono

@@ -85,6 +85,13 @@ beforeEach(() => {
       omisiones_salida: 0,
     },
   ]);
+  // Ana marcó entrada 8 de sus 10 días programados; Luis, sus 4.
+  mock.method(modelo, "listarDiasConEntrada", async () => [
+    ...Array.from({ length: 8 }, (_, i) => ({ id_empleado: ANA, fecha: `2026-10-${String(i + 1).padStart(2, "0")}` })),
+    ...["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04"].map((fecha) => ({ id_empleado: LUIS, fecha })),
+    // Un marcaje en un día sin turno (descanso) no es un día asistido.
+    { id_empleado: ANA, fecha: "2026-10-11" },
+  ]);
   mock.method(modelo, "totalizarHorasExtra", async () => [{ id_empleado: LUIS, minutos_extra: 150, extra_por_revisar: 1 }]);
 });
 
@@ -291,6 +298,27 @@ test("el supervisor debe identificarse y existir en el registro de personal", as
   await assert.rejects(servicio.generar({}, { idEmpleado: ANA, rol: "supervisor" }), { estado: 403 });
 });
 
+test("un supervisor desvinculado no accede a los reportes", async () => {
+  mock.method(empleados, "obtenerUbicacion", async () => ({
+    id_empleado: SUPERVISOR,
+    nombre_completo: "Sofía Supervisora",
+    activo: false,
+    id_cargo: CARGO_SUPERVISOR,
+    id_sucursal: SUCURSAL,
+  }));
+  await assert.rejects(servicio.generar({}, COMO_SUPERVISOR), { estado: 403 });
+});
+
+test("los días asistidos salen de los marcajes de entrada, no de restar las faltas registradas", async () => {
+  mock.method(modelo, "totalizarNovedades", async () => []);
+  const reporte = await servicio.generar({ id_sucursal: SUCURSAL, desde: "2026-10-01", hasta: "2026-10-15" }, RRHH);
+  const ana = reporte.empleados.find((f) => f.empleado.id_empleado === ANA);
+
+  // Sin falta registrada, 2 días sin marcajes igual no cuentan como asistidos.
+  assert.equal(ana.dias_programados, 10);
+  assert.equal(ana.dias_asistidos, 8);
+});
+
 test("los demás roles no acceden a los reportes", async () => {
   await assert.rejects(servicio.generar({}, { idEmpleado: ANA, rol: "empleado" }), { estado: 403 });
   await assert.rejects(servicio.generar({}, { idEmpleado: null, rol: null }), { estado: 403 });
@@ -307,6 +335,12 @@ test("los filtros del supervisor se limitan a su sucursal y a las áreas de su p
     areas: [{ id_departamento: AREA, nombre: "Cajas" }],
     personal_a_cargo: 2,
   });
+});
+
+test("el personal a cargo cuenta solo a los activos", async () => {
+  listarPorArea.mock.mockImplementation(async () => [...PERSONAL, persona("e0000000-0000-4000-8000-000000000008", "Jorge Baja", { activo: false })]);
+  const alcance = await servicio.alcanceFiltros(COMO_SUPERVISOR);
+  assert.equal(alcance.personal_a_cargo, 2);
 });
 
 test("RRHH recibe todas las sucursales y áreas como filtros", async () => {

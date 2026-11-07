@@ -1,0 +1,76 @@
+classDiagram
+  direction LR
+
+  class SolicitudesVacacionService {
+    +consultarSaldo()
+    +calcular()
+    +registrarSolicitud()
+    +resolverSolicitud()
+  }
+  class LicenciasService {
+    +listarTipos()
+    +radicar()
+    +resolver()
+    +reintentarAvisosPendientes()
+  }
+  class VacacionesService {
+    +consultarMiSaldo()
+    +consultarSaldo()
+  }
+  class AprobacionesService {
+    +listarBandeja()
+    +obtenerDetalle()
+    +resolver()
+    +iniciarReintentoDeAvisos()
+  }
+  class IndisponibilidadService {
+    +prepararEvento()
+  }
+  class EventosService {
+    +registrarIndisponibilidad()
+    +despachar()
+    +reintentar()
+  }
+  class CalendarioAusenciasService {
+    +alcance()
+    +consultar()
+    +listarUmbrales()
+    +guardarUmbral()
+    +eliminarUmbral()
+  }
+  class EmpleadosService {
+    <<cliente HTTP>>
+    +obtener()
+    +listarPorArea()
+    +obtenerUbicacionConArea()
+  }
+  class NotificacionesService {
+    <<cliente HTTP>>
+    +avisarSolicitudVacaciones()
+    +notificarResolucion()
+  }
+  class UtilsDominio {
+    <<funciones puras>>
+    contarDiasHabiles()
+    calcularSaldo()
+    evaluarLimite()
+    calcularPrioridad()
+    calcularCobertura()
+    calcularDias()
+    resolverUmbral()
+  }
+
+  SolicitudesVacacionService --> EmpleadosService
+  SolicitudesVacacionService --> NotificacionesService
+  SolicitudesVacacionService --> IndisponibilidadService
+  SolicitudesVacacionService --> UtilsDominio
+  LicenciasService --> NotificacionesService
+  LicenciasService --> IndisponibilidadService
+  VacacionesService --> UtilsDominio
+  AprobacionesService --> LicenciasService
+  AprobacionesService --> SolicitudesVacacionService
+  AprobacionesService --> UtilsDominio
+  IndisponibilidadService --> EventosService
+  IndisponibilidadService --> EmpleadosService
+  CalendarioAusenciasService --> EmpleadosService
+  CalendarioAusenciasService --> UtilsDominio

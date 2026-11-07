@@ -1,0 +1,34 @@
+@startuml sec-08-kan48-historial
+!include _estilo-secuencia.iuml
+title KAN-48 · Historial de asistencia individual (RF-28) · BORRADOR\n<size:12><color:#555555>Armado con los criterios de aceptación; ajustar nombres y rutas con la implementación.</color></size>
+
+actor "Colaborador" as COL
+boundary "Mi asistencia" as P #D5E8D4
+participant "API Gateway\n(NGINX)" as GW #F5F5F5
+control "IdentificarEmpleado" as MW #FFE6CC
+control "HistorialController" as C
+control "HistorialService" as S
+entity "Modelos de marcajes,\nnovedades y justificaciones" as M #E1D5E7
+database "AttendanceDB\n(PostgreSQL)" as DB #FFF2CC
+
+COL -> P : abre «Mi asistencia» y elige un mes o un rango
+P -> GW : GET historial del colaborador autenticado
+GW -> MW : IdentificarEmpleado
+MW -> C : historial(req, res)
+C -> S : historial(idEmpleado, desde, hasta)
+alt pide los datos de otro colaborador
+  $error(S, P, "403 Solo puede consultar su propio historial")
+else propio
+  S -> M : marcajes, novedades y solicitudes de justificación del rango
+  M -> DB : SELECT MARCAJES · NOVEDADES_ASISTENCIA\n· SOLICITUDES_JUSTIFICACION · HORAS_JORNADA
+  S -> S : totales: días laborados, minutos de atraso y faltas
+  C --> P : 200 jornadas y resumen
+  P --> COL : calendario con entrada y salida, atrasos acumulados\ny estado del justificativo (pendiente, aprobado o rechazado)
+end
+
+note over S
+  AttendanceService ya expone GET /empleados/{id}/historial-asistencia
+  (KAN-56, consumido por el Kardex de EmployeeService): jornadas
+  con marcajes, horas y novedades, y su resumen.
+end note
+@enduml

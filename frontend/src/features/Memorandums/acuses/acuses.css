@@ -1,0 +1,108 @@
+/* RF-39: portal del colaborador y seguimiento de acuses. Valores solo desde styles/tokens.css (ver DESIGN.md). */
+
+.acuses {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.acuses-columna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: calc(var(--size-sidebar) * 4);
+}
+
+.acuses-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.acuses .ds-tabla {
+  min-width: calc(var(--size-sidebar) * 3);
+}
+
+/* ---------- Celdas ---------- */
+.acuse-celda {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+  padding-block: var(--space-2);
+}
+
+.acuse-celda__sub {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.acuse-codigo {
+  font-family: var(--font-family-mono);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Lectura y detalle del acuse ---------- */
+.acuse-lectura {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.acuse-lectura__datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.acuse-lectura__datos dt {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-small);
+}
+
+.acuse-lectura__datos dd {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text);
+}
+
+.acuse-lectura__asunto,
+.acuse-lectura__subtitulo {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-section);
+}
+
+.acuse-lectura__subtitulo {
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.acuse-lectura__contenido {
+  margin: 0;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-page);
+  color: var(--color-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.acuse-lectura__pdf {
+  align-self: flex-start;
+}
+
+.acuse-lectura__descargo {
+  margin-top: var(--space-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

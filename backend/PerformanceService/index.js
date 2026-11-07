@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const pool = require("./src/config/db");
+const evaluacionesRoutes = require("./src/routes/evaluacionesRoutes");
 const plantillasRoutes = require("./src/routes/plantillas.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 
@@ -33,17 +34,7 @@ app.get("/health", async (req, res) => {
   }
 });
 
-app.get("/reviews", (req, res) => {
-  res.json([
-    {
-      employeeId: 1,
-      score: 92,
-      period: "Q3-2026",
-      feedback: "Excelente trabajo Cortez en el Sprint",
-    },
-  ]);
-});
-
+app.use(evaluacionesRoutes);
 app.use(plantillasRoutes);
 app.use(manejadorErrores);
 

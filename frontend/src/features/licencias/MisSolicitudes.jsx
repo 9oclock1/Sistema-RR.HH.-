@@ -1,10 +1,8 @@
-import { Download, FileX } from "lucide-react";
+import { Download, Eye, FileX } from "lucide-react";
 import { Boton, Etiqueta, EstadoVacio, Tabla, Tarjeta } from "../../components/ui";
-import { formatearFecha } from "./reglas";
+import { formatearFecha, TONO_ESTADO } from "./reglas";
 
-const TONO_ESTADO = { PENDIENTE: "aviso", APROBADA: "exito", RECHAZADA: "peligro", CANCELADA: "neutral" };
-
-export default function MisSolicitudes({ solicitudes, cargando, onDescargar }) {
+export default function MisSolicitudes({ solicitudes, cargando, onDescargar, onVerDetalle }) {
   const columnas = [
     {
       clave: "tipo_nombre",
@@ -62,6 +60,21 @@ export default function MisSolicitudes({ solicitudes, cargando, onDescargar }) {
             ))}
           </span>
         ),
+    },
+    {
+      clave: "detalle",
+      titulo: "Detalle",
+      celda: (s) => (
+        <Boton
+          variante="sutil"
+          tamano="sm"
+          icono={Eye}
+          aria-label={`Ver detalle de ${s.tipo_nombre} del ${formatearFecha(s.fecha_inicio)}`}
+          onClick={() => onVerDetalle(s)}
+        >
+          Ver
+        </Boton>
+      ),
     },
   ];
 

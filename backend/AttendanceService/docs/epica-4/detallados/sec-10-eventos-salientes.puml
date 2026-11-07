@@ -1,0 +1,52 @@
+@startuml sec-10-eventos-salientes
+!include _estilo-secuencia.iuml
+title Eventos salientes hacia otros módulos (KAN-44 a KAN-47)\n<size:12><color:#555555>Patrón outbox: el evento se guarda en la misma transacción que la operación y un despachador lo envía con reintentos.</color></size>
+
+control "Temporizador\n(iniciarDespachador)" as T #F8CECC
+control "EventosService" as EV
+entity "EventosModel" as M #E1D5E7
+database "AttendanceDB\n(PostgreSQL)" as DB #FFF2CC
+queue "Google Pub/Sub\nucb-sis323-sub-g · -h" as PS
+participant "Producción y Logística (G)\nEntregas y Despachos (H)" as GH #F8CECC
+participant "CompensationService\n(planillas)" as CS #F8CECC
+
+loop cada INTERVALO_EVENTOS_MS (5 s)
+  T -> EV : despachar()
+  EV -> M : reservarPendientes(tópicos, lote 10, 60 s)
+  M -> DB : SELECT ... FOR UPDATE SKIP LOCKED\n(PENDIENTE y proximo_intento_en vencido)
+
+  group ROL_TURNOS_PUBLICADO (KAN-44)
+    EV -> PS : topic(ucb-sis323-sub-<grupo>).publishMessage(\n{ json: carga, attributes })
+    alt publicado
+      PS --> EV : id de mensaje
+      EV -> M : marcarEntregado(id)
+      PS ->> GH : suscripción del grupo
+    else el tópico no existe o Pub/Sub rechaza el mensaje
+      EV -> M : marcarError(id, FALLIDO)
+    else sin conexión o credenciales rechazadas
+      EV -> M : marcarError(id, esperaReintento: 30 s, 1 min, 2 min… hasta 1 h)
+    end
+  end
+
+  group JORNADA_CONSOLIDADA · JORNADA_RECALCULADA · HORAS_EXTRA_CONSOLIDADAS (KAN-45 a KAN-47)
+    alt URL_COMPENSACIONES configurada
+      EV -> CS : POST carga [X-Evento-Id, X-Topico]
+      alt 2xx
+        EV -> M : marcarEntregado(id)
+      else error o sin respuesta
+        EV -> M : marcarError(id) · FALLIDO tras 8 intentos
+      end
+    else sin URL
+      CS -> EV : GET /api/att/eventos?topico=compensaciones&estado=PENDIENTE
+      CS -> EV : POST /api/att/eventos/{id}/confirmar
+      EV -> M : marcarEntregado(id)
+    end
+  end
+end
+
+note over PS, CS
+  Sin credenciales de Pub/Sub (GOOGLE_APPLICATION_CREDENTIALS
+  o PUBSUB_EMULATOR_HOST) los eventos quedan PENDIENTES en la base.
+  Los consumidores ignoran un id de evento ya procesado.
+end note
+@enduml

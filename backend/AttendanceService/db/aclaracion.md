@@ -64,7 +64,7 @@
 ### Aviso a compensaciones
 
 - Al cerrar la jornada, sus novedades se consolidan y se registra un evento `JORNADA_CONSOLIDADA` con tópico `compensaciones` en `EVENTOS_SALIENTES`: empleado, fecha, turno, horas efectivas del turno (`minutos_programados`), minutos de penalización (de las novedades registradas, no justificadas), minutos justificados, horas efectivas reconocidas (`minutos_efectivos`) y el detalle de cada novedad.
-- Se envía igual que los demás eventos: con `URL_COMPENSACIONES` el despachador hace `POST`; sin URL, CompensationService lo lee con `GET /eventos?topico=compensaciones`.
+- Se envía por REST (Compensaciones es del mismo proyecto): con `URL_COMPENSACIONES` el despachador hace `POST`; sin URL, CompensationService lo lee con `GET /eventos?topico=compensaciones`.
 - Cada novedad se consolida una sola vez. Si una novedad aparece después del cierre, llega en otro evento de la misma jornada: el consumidor debe sumar por `id_novedad`.
 
 ## Justificaciones
@@ -126,5 +126,43 @@
   - `AREAS_PRODUCCION` (panadería, fraccionamiento…) → tópico `produccion-logistica` (Producción y Logística).
   - `AREAS_REPARTO` (choferes de reparto) → tópico `entregas-despachos` (Gestión de Entregas y Despachos).
 - La carga trae el periodo, la sucursal, el área, la disponibilidad por día (cuántos en mañana, tarde, noche y descanso) y el turno de cada colaborador. Cada nueva publicación del rol genera eventos nuevos con la versión.
-- Si el tópico tiene URL (`URL_PRODUCCION_LOGISTICA`, `URL_ENTREGAS_DESPACHOS`), el despachador hace `POST` con la carga y las cabeceras `X-Evento-Id` y `X-Topico`; una respuesta 2xx lo marca como entregado. Reintenta con espera creciente (30 s, 1 min, 2 min… hasta 1 h) y tras 8 intentos queda fallido.
-- Sin URL, el módulo puede leer los eventos con `GET /eventos?topico=&estado=PENDIENTE` y confirmarlos con `POST /eventos/:id/confirmar`. Los consumidores deben ignorar un `X-Evento-Id` ya procesado (un evento puede llegar más de una vez).
+- Producción y Logística y Entregas y Despachos son módulos externos: sus eventos salen por Google Pub/Sub. Todo lo que sale de RRHH se publica en el tópico de RRHH (`PUBSUB_PREFIJO_TOPICO` + la letra del grupo, `f`); a qué módulo va cada mensaje se indica en el `encabezado` (`origen` y `destino`), y el cuerpo va en `datos`. El `id_mensaje` del encabezado es el `id_evento` guardado, y se conserva en los reintentos. Sin credenciales (`GOOGLE_APPLICATION_CREDENTIALS`) o emulador (`PUBSUB_EMULATOR_HOST`), los eventos quedan `PENDIENTE` hasta que haya. Si Pub/Sub falla, reintenta con espera creciente (30 s, 1 min, 2 min… hasta 1 h); solo un tópico inexistente o un mensaje inválido lo dejan `FALLIDO`.
+- Compensaciones es del mismo proyecto y va por REST. Con `URL_COMPENSACIONES`, el despachador hace `POST` con la carga y las cabeceras `X-Evento-Id` y `X-Topico`; una respuesta 2xx lo marca como entregado. Reintenta con la misma espera creciente y tras 8 intentos queda fallido. Sin URL, CompensationService puede leer los eventos con `GET /eventos?topico=compensaciones&estado=PENDIENTE` y confirmarlos con `POST /eventos/:id/confirmar`. Los consumidores deben ignorar un `X-Evento-Id` ya procesado (un evento puede llegar más de una vez).
+## Vacaciones (RF-30)
+
+- El campo id_empleado e id_supervisor deberían hacer referencia a id_empleado de EmployeeDB.
+- Días hábiles: sin los feriados de la tabla `FERIADOS`. Si el colaborador tiene turno publicado ese día (`TURNOS_PUBLICADOS`), el día es hábil cuando es de trabajo y de descanso cuando es descanso; sin turno publicado, el sábado y el domingo son descansos obligatorios.
+- Antigüedad suficiente: un año cumplido desde `fecha_ingreso` (EmployeeService). Antes de eso no se puede solicitar.
+- Los días ganados y el saldo los calcula KAN-52 (`utils/vacaciones.js`, 15 días hábiles por año del 1.º al 5.º, 20 del 6.º al 10.º y 30 desde el 11.º), a partir de `MOVIMIENTOS_VACACION`. Al registrar una solicitud se crea en la misma sentencia su movimiento `EN_PROCESO`, que es lo que descuenta el saldo; aprobarla o cancelarla (KAN-53) cambia el estado de ese movimiento.
+- Saldo disponible = días ganados − días gozados − días en proceso.
+- Anticipación mínima: la fecha de inicio debe ser al menos 7 días calendario después de hoy (hora de Bolivia). Un periodo no puede superar 90 días calendario.
+- No se aceptan fechas que se crucen con otra solicitud `PENDIENTE` o `APROBADA` del mismo empleado. El registro bloquea al empleado (`pg_advisory_xact_lock`) para que dos envíos simultáneos no superen el saldo ni se solapen.
+- `dias_habiles` lo calcula el servidor; no se acepta el valor del cliente.
+- El estado de la solicitud usa `CATALOGOS_ESTADO_SOLICITUD`, el mismo catálogo de las licencias.
+- Endpoints: `GET /vacaciones/solicitudes/resumen` (saldo y datos para el formulario), `GET /vacaciones/solicitudes/calculo`, `GET` y `POST /vacaciones/solicitudes`. `GET /vacaciones/saldo` es el saldo con historial de KAN-52.
+- Supervisor directo: quien ocupa el cargo `id_cargo_jefe_directo` del cargo del colaborador (EmployeeService lo devuelve en `GET /empleados/:id/supervisor`). Si hay varios, el de mayor antigüedad. La fecha de ingreso sale de `GET /empleados/:id`.
+- Al registrar, se envía un mensaje directo al supervisor por NotificationService (`NOTIFICATION_SERVICE_URL`, `POST /comunicaciones/directa`). Si falla o no hay supervisor, la solicitud igual queda guardada con `supervisor_notificado = false` y se avisa al colaborador.
+
+## Vacaciones (KAN-52)
+
+- Los días ganados no se guardan: se calculan en cada consulta con `fecha_ingreso` (EmployeeService, `GET /empleados/:id`) y la escala legal (Ley General del Trabajo, art. 44).
+- Cada aniversario cumplido acredita un período: años 1 a 5 = 15 días, 6 a 10 = 20 días, 11 o más = 30 días (hábiles). Antes del primer año no se gana ningún día. Un ingreso el 29 de febrero cumple el 28 en los años no bisiestos.
+- `MOVIMIENTOS_VACACION` guarda solo los días consumidos o reservados, en estado `EN_PROCESO`, `GOZADO` o `CANCELADO`. `id_empleado` e `id_solicitud_origen` no tienen FK (otro servicio / historia KAN-50). Una solicitud origina un solo movimiento.
+- Saldo disponible = acumulados − gozados − en proceso. Los cancelados no cuentan ni aparecen en el historial. Las historias KAN-50 y KAN-53 crean el movimiento al solicitar y lo pasan a `GOZADO` o `CANCELADO` al resolver; el saldo se actualiza solo porque se calcula al consultar.
+- La fecha de consulta es la de Bolivia (UTC-4). No se modela la caducidad de vacaciones no gozadas.
+
+## Aprobación de ausencias (KAN-53)
+
+- La bandeja (`GET /aprobaciones/solicitudes`) reúne vacaciones y licencias del personal de una sucursal (y área). La prioridad es `ALTA` si la ausencia empieza en 7 días o menos (o ya empezó) o si es una licencia sobre su tope, `MEDIA` hasta 30 días y `BAJA` después. Solo `supervisor`, `gerente` y `admin` (cabecera `X-Rol`) acceden.
+- Resolver (`POST /aprobaciones/solicitudes/:categoria/:id/resolucion`, categoría `VACACIONES` o `LICENCIA`) solo actúa sobre una solicitud `PENDIENTE` y nadie resuelve la suya. Es una sola transacción: el estado, el movimiento de saldo y el evento de indisponibilidad quedan juntos o no queda nada.
+- Aprobar una vacación pasa su movimiento de `EN_PROCESO` a `GOZADO` (débito definitivo); rechazarla exige un motivo y lo pasa a `CANCELADO` (libera los días). Una licencia sobre su tope solo la aprueba `gerente` o `admin`.
+- Al aprobar se guarda un evento `PERSONAL_NO_DISPONIBLE` por módulo del ERP (Producción y Logística o Entregas y Despachos, según el código del área: `AREAS_PRODUCCION`, `AREAS_REPARTO`). Si no se puede saber el área del empleado, no se aprueba (503). Con `URL_PRODUCCION_LOGISTICA` o `URL_ENTREGAS_DESPACHOS` el despachador usa REST y, si falla y hay Pub/Sub, publica por ahí; un evento fallido se reenvía con `POST /eventos/:id/reintentar`.
+- El aviso al colaborador (KAN-54) sale después de confirmar la transacción; si NotificationService no responde, `resolucion_notificada_en` queda vacío y un reintento periódico lo completa.
+
+## Calendario de ausencias (KAN-55)
+
+- `GET /calendario/ausencias?id_sucursal&id_departamento&desde&hasta` devuelve las vacaciones y licencias `APROBADA` del personal activo que se cruzan con el rango (máximo 92 días; por defecto, el mes en curso). Pendientes y rechazadas no aparecen. RRHH (`gerente`, `admin`) elige cualquier sucursal; el supervisor (con `X-Empleado-Id`) solo la suya.
+- Tipos y colores: `VACACIONES` y los códigos de `CATALOGOS_TIPO_LICENCIA` (`MEDICA`, `MATERNIDAD`, `PATERNIDAD`, `DUELO`, `ACADEMICA`, `PERSONAL`).
+- Baja cobertura, por día y por área: se cuenta a quienes deben trabajar ese día (`programados`) y cuántos están ausentes con una ausencia aprobada. Debe trabajar quien tiene un turno publicado de trabajo; sin turno publicado, de lunes a viernes salvo feriados. Hay alerta si el porcentaje de ausentes **supera** el máximo tolerado o si quedan menos presentes que el mínimo. Un día de descanso no resta cobertura.
+- `UMBRALES_COBERTURA` guarda el máximo de ausentes (%) y el mínimo de presentes por sucursal y área; `NULL` en sucursal o área es comodín. Rige el más específico (sucursal y área, área, sucursal, general) y, sin ninguno, el predeterminado: 30 % de ausentes y al menos 1 presente. Solo RRHH los crea (`PUT /calendario/umbrales`) o elimina (`DELETE /calendario/umbrales/:id`); todos pueden consultarlos.
+- La consulta es una sola lectura con los índices de ausencias aprobadas y la respuesta no se guarda en cachés compartidos (`Cache-Control: private, no-store`).

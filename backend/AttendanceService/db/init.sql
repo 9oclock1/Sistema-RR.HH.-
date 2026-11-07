@@ -566,6 +566,7 @@ CREATE TABLE IF NOT EXISTS SOLICITUDES_LICENCIA (
     id_empleado_resolutor UUID NULL,
     resuelto_en TIMESTAMPTZ NULL,
     motivo_resolucion text NULL,
+    resolucion_notificada_en TIMESTAMPTZ NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT SOLICITUDES_LICENCIA_pk PRIMARY KEY (id_solicitud),
@@ -577,6 +578,8 @@ CREATE TABLE IF NOT EXISTS SOLICITUDES_LICENCIA (
         daterange(fecha_inicio, fecha_fin, '[]') WITH &&
     ) WHERE (id_estado_solicitud IN (1, 2))
 );
+-- KAN-54: fecha en que NotificationService aceptó el aviso de la resolución (sin ella, se reintenta).
+ALTER TABLE SOLICITUDES_LICENCIA ADD COLUMN IF NOT EXISTS resolucion_notificada_en TIMESTAMPTZ NULL;
 -- Tabla: ADJUNTOS_SOLICITUD_LICENCIA (respaldo digital: baja médica, certificado de defunción, etc.)
 CREATE TABLE IF NOT EXISTS ADJUNTOS_SOLICITUD_LICENCIA (
     id_adjunto UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -596,6 +599,8 @@ CREATE INDEX IF NOT EXISTS ix_solicitud_licencia_empleado ON SOLICITUDES_LICENCI
 CREATE INDEX IF NOT EXISTS ix_solicitud_licencia_estado ON SOLICITUDES_LICENCIA (id_estado_solicitud, creado_en);
 -- Cronograma de ausencias aprobadas por rango de fechas (KAN-55).
 CREATE INDEX IF NOT EXISTS ix_solicitud_licencia_aprobadas_fechas ON SOLICITUDES_LICENCIA (fecha_inicio, fecha_fin) WHERE id_estado_solicitud = 2;
+-- Resoluciones cuyo aviso al colaborador aún no se confirmó (KAN-54).
+CREATE INDEX IF NOT EXISTS ix_solicitud_licencia_sin_notificar ON SOLICITUDES_LICENCIA (resuelto_en) WHERE resuelto_en IS NOT NULL AND resolucion_notificada_en IS NULL;
 CREATE INDEX IF NOT EXISTS ix_adjunto_licencia_solicitud ON ADJUNTOS_SOLICITUD_LICENCIA (id_solicitud);
 -- llaves foráneas
 DO $$
@@ -690,4 +695,121 @@ INSERT INTO FERIADOS (fecha, nombre) VALUES
     ('2027-08-06', 'Día de la Independencia'),
     ('2027-11-02', 'Todos Santos'),
     ('2027-12-25', 'Navidad');
+-- Solicitudes de vacaciones (RF-30). Bloque idempotente, al final porque usa tablas definidas antes:
+-- CATALOGOS_ESTADO_SOLICITUD (estados de solicitud, compartidos con licencias), FERIADOS (días no hábiles)
+-- y TURNOS_PUBLICADOS (días de trabajo y descanso del rol). Al registrar una solicitud también se crea su
+-- movimiento «en proceso» en MOVIMIENTOS_VACACION (KAN-52), que es lo que descuenta el saldo.
+-- Tabla: SOLICITUDES_VACACION
+CREATE TABLE IF NOT EXISTS SOLICITUDES_VACACION (
+    id_solicitud UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    id_estado_solicitud SMALLINT NOT NULL DEFAULT 1,
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    dias_habiles SMALLINT NOT NULL,
+    id_supervisor UUID NULL,
+    supervisor_notificado boolean NOT NULL DEFAULT FALSE,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT SOLICITUDES_VACACION_pk PRIMARY KEY (id_solicitud),
+    CONSTRAINT chk_solicitud_vacacion_fechas CHECK (fecha_fin >= fecha_inicio),
+    CONSTRAINT chk_solicitud_vacacion_dias CHECK (dias_habiles > 0),
+    CONSTRAINT SOLICITUDES_VACACION_CATALOGOS_ESTADO_SOLICITUD FOREIGN KEY (id_estado_solicitud) REFERENCES CATALOGOS_ESTADO_SOLICITUD (id_estado_solicitud) NOT DEFERRABLE INITIALLY IMMEDIATE
+);
+CREATE INDEX IF NOT EXISTS idx_solicitudes_vacacion_empleado ON SOLICITUDES_VACACION (id_empleado, fecha_inicio);
+-- KAN-52 (RF-32): saldo de vacaciones.
+-- Bloque idempotente: se puede ejecutar a mano sobre una AttendanceDB ya creada.
+-- Los días ganados NO se guardan: se calculan con EMPLEADOS.fecha_ingreso (EmployeeDB) y la escala legal.
+-- Aquí solo se registran los días consumidos o reservados; las solicitudes (KAN-50) y su aprobación (KAN-53)
+-- insertan y cambian de estado estos movimientos. id_empleado e id_solicitud_origen no tienen FK por ser otro servicio o historia.
+-- Tabla: CATALOGOS_ESTADO_MOVIMIENTO_VACACION
+CREATE TABLE IF NOT EXISTS CATALOGOS_ESTADO_MOVIMIENTO_VACACION (
+    id_estado_movimiento SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_ESTADO_MOVIMIENTO_VACACION_pk PRIMARY KEY (id_estado_movimiento),
+    CONSTRAINT uq_estado_movimiento_vacacion_codigo UNIQUE (codigo)
+);
+-- Tabla: MOVIMIENTOS_VACACION
+CREATE TABLE IF NOT EXISTS MOVIMIENTOS_VACACION (
+    id_movimiento UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    id_estado_movimiento SMALLINT NOT NULL DEFAULT 1,
+    id_solicitud_origen UUID NULL,
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    dias SMALLINT NOT NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT MOVIMIENTOS_VACACION_pk PRIMARY KEY (id_movimiento),
+    CONSTRAINT chk_movimiento_vacacion_fechas CHECK (fecha_fin >= fecha_inicio),
+    CONSTRAINT chk_movimiento_vacacion_dias CHECK (dias > 0)
+);
+-- índices
+-- Saldo e historial de un empleado.
+CREATE INDEX IF NOT EXISTS ix_movimiento_vacacion_empleado ON MOVIMIENTOS_VACACION (id_empleado, fecha_inicio DESC);
+-- Una solicitud origina un solo movimiento: evita descontar dos veces los mismos días.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_movimiento_vacacion_solicitud ON MOVIMIENTOS_VACACION (id_solicitud_origen) WHERE id_solicitud_origen IS NOT NULL;
+-- llaves foráneas
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'movimientos_vacacion_catalogos_estado_movimiento_vacacion') THEN
+        ALTER TABLE MOVIMIENTOS_VACACION
+        ADD CONSTRAINT MOVIMIENTOS_VACACION_CATALOGOS_ESTADO_MOVIMIENTO_VACACION FOREIGN KEY (id_estado_movimiento) REFERENCES CATALOGOS_ESTADO_MOVIMIENTO_VACACION (id_estado_movimiento) NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+END $$;
+-- datos iniciales
+INSERT INTO CATALOGOS_ESTADO_MOVIMIENTO_VACACION (id_estado_movimiento, codigo, nombre) VALUES
+    (1, 'EN_PROCESO', 'En proceso de aprobación'),
+    (2, 'GOZADO', 'Gozado'),
+    (3, 'CANCELADO', 'Cancelado')
+ON CONFLICT DO NOTHING;
+-- KAN-53 (RF-33): aprobación o rechazo de solicitudes de vacaciones y licencias.
+-- Bloque idempotente: se puede ejecutar a mano sobre una AttendanceDB ya creada.
+-- Las solicitudes de licencia ya guardan su resolución desde KAN-54; aquí las de vacaciones guardan lo mismo.
+-- Al aprobar, el movimiento «en proceso» del saldo (KAN-52) pasa a «gozado» (débito definitivo); al rechazar, a «cancelado» (libera los días).
+-- id_empleado_resolutor referencia EMPLEADOS (EmployeeDB): sin FK por ser otro servicio.
+ALTER TABLE SOLICITUDES_VACACION ADD COLUMN IF NOT EXISTS id_empleado_resolutor UUID NULL;
+ALTER TABLE SOLICITUDES_VACACION ADD COLUMN IF NOT EXISTS resuelto_en TIMESTAMPTZ NULL;
+ALTER TABLE SOLICITUDES_VACACION ADD COLUMN IF NOT EXISTS motivo_resolucion text NULL;
+-- Fecha en que NotificationService aceptó el aviso de la resolución (KAN-54); sin ella, se reintenta.
+ALTER TABLE SOLICITUDES_VACACION ADD COLUMN IF NOT EXISTS resolucion_notificada_en TIMESTAMPTZ NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_solicitud_vacacion_resolucion') THEN
+        ALTER TABLE SOLICITUDES_VACACION
+        ADD CONSTRAINT chk_solicitud_vacacion_resolucion CHECK ((id_empleado_resolutor IS NULL) = (resuelto_en IS NULL));
+    END IF;
+END $$;
+-- Bandeja de pendientes del aprobador.
+CREATE INDEX IF NOT EXISTS ix_solicitud_vacacion_estado ON SOLICITUDES_VACACION (id_estado_solicitud, creado_en);
+-- Resoluciones cuyo aviso al colaborador aún no se confirmó.
+CREATE INDEX IF NOT EXISTS ix_solicitud_vacacion_sin_notificar ON SOLICITUDES_VACACION (resuelto_en) WHERE resuelto_en IS NOT NULL AND resolucion_notificada_en IS NULL;
+-- Cobertura del equipo: ausencias aprobadas o pendientes que se cruzan con un rango de fechas.
+CREATE INDEX IF NOT EXISTS ix_solicitud_vacacion_fechas ON SOLICITUDES_VACACION (fecha_inicio, fecha_fin) WHERE id_estado_solicitud IN (1, 2);
+-- KAN-55 (RF-35): umbrales de cobertura del calendario consolidado de ausencias.
+-- Bloque idempotente: se puede ejecutar a mano sobre una AttendanceDB ya creada. Es una tabla nueva: no modifica las existentes.
+-- Cada fila fija cuánta ausencia tolera un área: sucursal y área NULL son comodines. Gana el alcance más específico
+-- y, sin ninguna fila, rige el predeterminado (30 % de ausentes y al menos 1 persona presente).
+-- id_sucursal, id_departamento y actualizado_por referencian EmployeeDB: sin FK por ser otro servicio.
+-- Tabla: UMBRALES_COBERTURA
+CREATE TABLE IF NOT EXISTS UMBRALES_COBERTURA (
+    id_umbral UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_sucursal UUID NULL,
+    id_departamento UUID NULL,
+    max_ausentes_porcentaje SMALLINT NOT NULL,
+    min_presentes SMALLINT NOT NULL DEFAULT 1,
+    actualizado_por UUID NULL,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT UMBRALES_COBERTURA_pk PRIMARY KEY (id_umbral),
+    CONSTRAINT chk_umbral_cobertura_porcentaje CHECK (max_ausentes_porcentaje BETWEEN 1 AND 100),
+    CONSTRAINT chk_umbral_cobertura_minimo CHECK (min_presentes >= 0)
+);
+-- Un umbral por alcance; NULL se trata como un valor más para que el comodín tampoco se repita.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_umbral_cobertura_alcance ON UMBRALES_COBERTURA (
+    COALESCE(id_sucursal, '00000000-0000-0000-0000-000000000000'::uuid),
+    COALESCE(id_departamento, '00000000-0000-0000-0000-000000000000'::uuid)
+);
+-- Calendario de ausencias aprobadas por rango de fechas.
+CREATE INDEX IF NOT EXISTS ix_solicitud_vacacion_aprobadas_fechas ON SOLICITUDES_VACACION (fecha_inicio, fecha_fin) WHERE id_estado_solicitud = 2;
 -- Fin del archivo.

@@ -94,3 +94,27 @@
   align-items: flex-start;
   gap: var(--space-1);
 }
+
+/* Detalle de una solicitud (destino de las alertas de resultado) */
+.licencias-detalle__datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+}
+
+.licencias-detalle__datos dt {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.licencias-detalle__datos dd {
+  margin: 0;
+}
+
+.licencias-detalle__texto {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}

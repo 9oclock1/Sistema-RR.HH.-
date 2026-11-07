@@ -34,10 +34,14 @@ async function listarNovedades(idEmpleado, desde, hasta) {
   return rows;
 }
 
-// Horas computadas de cada jornada cerrada (entrada y salida). Las extra cuentan solo si se aprobaron.
+// Horas computadas de cada jornada cerrada: el tiempo ordinario del turno (sin refrigerio) más las horas extra aprobadas.
+// Sin turno (descanso o día libre) cuenta lo aprobado como jornada del día más sus extra; no el tiempo bruto entre marcajes.
 async function listarHoras(idEmpleado, desde, hasta) {
   const { rows } = await pool.query(
-    `SELECT h.fecha_jornada, h.minutos_trabajados, h.minutos_ordinarios,
+    `SELECT h.fecha_jornada, h.minutos_ordinarios,
+            (h.minutos_ordinarios + h.minutos_extra_habil + h.minutos_extra_domingo + h.minutos_extra_feriado
+             + CASE WHEN h.inicio_programado IS NULL THEN h.minutos_descanso + h.minutos_domingo + h.minutos_feriado ELSE 0 END
+            )::int AS minutos_computados,
             (h.minutos_extra_habil + h.minutos_extra_domingo + h.minutos_extra_feriado)::int AS minutos_extra_aprobados,
             e.codigo AS estado_extra_codigo, e.nombre AS estado_extra_nombre
      FROM horas_jornada h

@@ -1,25 +1,43 @@
-import { AlarmClock, Award, Briefcase, Building2, CalendarClock, CalendarRange, ClipboardList, FileChartColumn, FileCheck, FileText, FileUser, FileWarning, Fingerprint, History, ListTree, Mail, Megaphone, Network, Send, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
+import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
+import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
+import { RUTA_EVALUACIONES } from "../features/evaluaciones/ruta";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
+import CapacitacionesView from "../features/Capacitaciones/CapacitacionesView";
+import { RUTA_CAPACITACIONES } from "../features/Capacitaciones/utils/opciones";
+import NotificacionesPage from "../features/notificaciones/NotificacionesPage";
 import CargosList from "../features/Cargos/CargosList";
+import ConceptosPage from "../features/conceptos/ConceptosPage";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
+import ContratosView from "../features/Contratos/ContratosView";
+import { RUTA_CONTRATOS } from "../features/Contratos/utils/opciones";
 import GestionComunicacionesPage from "../features/comunicaciones/GestionComunicacionesPage";
 import LicenciasPage from "../features/licencias/LicenciasPage";
 import JerarquiaView from "../features/Jerarquia/JerarquiaView";
+import KardexView from "../features/Kardex/KardexView";
+import { RUTA_KARDEX } from "../features/Kardex/ruta";
 import MarcajePage from "../features/marcaje/MarcajePage";
 import MemorandumsView from "../features/Memorandums/MemorandumsView";
+import MisMemorandumsPage from "../features/Memorandums/acuses/MisMemorandumsPage";
 import MiAsistenciaPage from "../features/mi-asistencia/MiAsistenciaPage";
 import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
 import PlantillasEvaluacionPage from "../features/plantillas-evaluacion/PlantillasEvaluacionPage";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
+import PipelineSeleccionPage from "../features/recruitment/pipeline/PipelineSeleccionPage";
+import AgendaEntrevistasPage from "../features/recruitment/entrevistas/AgendaEntrevistasPage";
 import ReconocimientosView from "../features/Reconocimientos/ReconocimientosView";
+import CalendarioAusenciasPage from "../features/calendario-ausencias/CalendarioAusenciasPage";
 import ReportesAsistenciaPage from "../features/reportes-asistencia/ReportesAsistenciaPage";
 import RolTurnosPage from "../features/rol-turnos/RolTurnosPage";
+import SeguimientoAcusesPage from "../features/Memorandums/acuses/SeguimientoAcusesPage";
 import TurnosPage from "../features/turnos/TurnosPage";
+import SolicitudVacacionesPage from "../features/solicitud-vacaciones/SolicitudVacacionesPage";
+import VacacionesPage from "../features/vacaciones/VacacionesPage";
 import VacantesView from "../features/Vacantes/VacantesView";
 import { puedeAcceder } from "../utils/permisos";
 
@@ -100,6 +118,22 @@ export const SECCIONES = [
         roles: ["reclutador"],
         pagina: PostulacionesPage,
       },
+      {
+        ruta: "/reclutamiento/pipeline",
+        etiqueta: "Pipeline de selección",
+        descripcion: "Etapas de cada postulante, trazabilidad de los cambios y alta de los contratados.",
+        icono: SquareKanban,
+        roles: ["reclutador"],
+        pagina: PipelineSeleccionPage,
+      },
+      {
+        ruta: "/reclutamiento/entrevistas",
+        etiqueta: "Agenda de entrevistas",
+        descripcion: "Calendario semanal de entrevistas por evaluador, con reprogramación y cancelación.",
+        icono: CalendarClock,
+        roles: ["reclutador"],
+        pagina: AgendaEntrevistasPage,
+      },
     ],
   },
   {
@@ -130,12 +164,28 @@ export const SECCIONES = [
         pagina: LicenciasPage,
       },
       {
+        ruta: "/asistencia/vacaciones",
+        etiqueta: "Vacaciones",
+        descripcion: "Saldo de días ganados, gozados y disponibles según su antigüedad.",
+        icono: CalendarDays,
+        roles: ["empleado"],
+        pagina: VacacionesPage,
+      },
+      {
         ruta: "/asistencia/turnos",
         etiqueta: "Turnos",
         descripcion: "Horarios de trabajo, refrigerios y márgenes de tolerancia.",
         icono: CalendarClock,
         roles: ["admin"],
         pagina: TurnosPage,
+      },
+      {
+        ruta: "/asistencia/solicitud-vacaciones",
+        etiqueta: "Solicitud de vacaciones",
+        descripcion: "Envío de solicitudes de vacaciones al supervisor, con el cálculo de días hábiles.",
+        icono: TreePalm,
+        roles: ["empleado"],
+        pagina: SolicitudVacacionesPage,
       },
       {
         ruta: "/asistencia/rol-turnos",
@@ -162,6 +212,14 @@ export const SECCIONES = [
         pagina: BandejaJustificacionesPage,
       },
       {
+        ruta: "/asistencia/aprobaciones",
+        etiqueta: "Aprobaciones",
+        descripcion: "Autorización o rechazo de vacaciones, permisos y licencias, con el impacto en la cobertura del equipo.",
+        icono: CalendarCheck,
+        roles: ["supervisor"],
+        pagina: BandejaAprobacionesPage,
+      },
+      {
         ruta: "/asistencia/horas-extra",
         etiqueta: "Horas extra",
         descripcion: "Horas ordinarias, nocturnas y extra de cada jornada, conciliadas para planillas.",
@@ -170,12 +228,63 @@ export const SECCIONES = [
         pagina: HorasExtraPage,
       },
       {
+        ruta: "/asistencia/calendario-ausencias",
+        etiqueta: "Calendario de ausencias",
+        descripcion: "Vacaciones, permisos y licencias aprobadas por sucursal y área, con aviso de baja cobertura.",
+        icono: CalendarSearch,
+        roles: ["supervisor"],
+        pagina: CalendarioAusenciasPage,
+      },
+      {
         ruta: "/asistencia/reportes",
         etiqueta: "Reportes de asistencia",
         descripcion: "Consolidado de asistencia, ausentismo y puntualidad por sucursal y área, exportable a PDF y Excel.",
         icono: FileChartColumn,
         roles: ["supervisor"],
         pagina: ReportesAsistenciaPage,
+      },
+    ],
+  },
+  {
+    titulo: "Planillas",
+    modulos: [
+      {
+        ruta: "/planillas/conceptos",
+        etiqueta: "Conceptos de pago",
+        descripcion: "Ingresos, descuentos y aportes de la planilla con su valor, vigencia y cuenta contable.",
+        icono: Calculator,
+        roles: ["admin"],
+        pagina: ConceptosPage,
+      },
+    ],
+  },
+  {
+    titulo: "Expediente",
+    modulos: [
+      {
+        ruta: RUTA_KARDEX,
+        parametroOpcional: "idEmpleado",
+        etiqueta: "Kardex laboral",
+        descripcion: "Ficha consolidada de cada colaborador: contratos, trayectoria, memorándums y capacitaciones.",
+        icono: IdCard,
+        roles: ["gerente"],
+        pagina: KardexView,
+      },
+      {
+        ruta: RUTA_CAPACITACIONES,
+        etiqueta: "Capacitaciones",
+        descripcion: "Registro de cursos, carnets y certificaciones del personal con su vigencia y certificado.",
+        icono: GraduationCap,
+        roles: ["gerente"],
+        pagina: CapacitacionesView,
+      },
+      {
+        ruta: RUTA_CONTRATOS,
+        etiqueta: "Modificaciones contractuales",
+        descripcion: "Renovaciones, cambios de jornada y adendas de contrato con su documento firmado.",
+        icono: FileSignature,
+        roles: ["gerente"],
+        pagina: ContratosView,
       },
     ],
   },
@@ -189,6 +298,14 @@ export const SECCIONES = [
         icono: FileWarning,
         roles: ["supervisor"],
         pagina: MemorandumsView,
+      },
+      {
+        ruta: "/disciplina/acuses",
+        etiqueta: "Acuses de memorándums",
+        descripcion: "Estado del acuse de recibo de cada memorándum y casos sin acuse para seguimiento presencial.",
+        icono: ClipboardCheck,
+        roles: ["supervisor"],
+        pagina: SeguimientoAcusesPage,
       },
     ],
   },
@@ -216,6 +333,15 @@ export const SECCIONES = [
         roles: ["admin"],
         pagina: PlantillasEvaluacionPage,
       },
+      {
+        ruta: RUTA_EVALUACIONES,
+        parametroOpcional: "idEvaluacion",
+        etiqueta: "Evaluaciones",
+        descripcion: "Evaluaciones de desempeño asignadas al evaluador: bandeja y formulario para responderlas.",
+        icono: ClipboardPenLine,
+        roles: ["supervisor"],
+        pagina: EvaluacionesPage,
+      },
     ],
   },
   {
@@ -228,6 +354,22 @@ export const SECCIONES = [
         icono: Mail,
         roles: ["empleado"],
         pagina: BandejaMensajesPage,
+      },
+      {
+        ruta: "/comunicaciones/notificaciones",
+        etiqueta: "Notificaciones",
+        descripcion: "Resultado de sus solicitudes de vacaciones, permisos y licencias, con su justificación.",
+        icono: Bell,
+        roles: ["empleado"],
+        pagina: NotificacionesPage,
+      },
+      {
+        ruta: "/comunicaciones/memorandums",
+        etiqueta: "Mis memorándums",
+        descripcion: "Felicitaciones y llamadas de atención emitidas a su nombre, con su acuse de recibo.",
+        icono: BookOpenCheck,
+        roles: ["empleado"],
+        pagina: MisMemorandumsPage,
       },
       {
         ruta: "/comunicaciones/gestion",

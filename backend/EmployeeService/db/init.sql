@@ -7,11 +7,31 @@ CREATE TABLE CAPACITACIONES_CERTIFICACION (
     id_empleado UUID NOT NULL,
     id_curso UUID NOT NULL,
     institucion_emisora varchar(120) NOT NULL,
+    fecha_inicio date NULL,
+    fecha_fin date NULL,
     fecha_emision date NOT NULL,
     fecha_vencimiento date NULL,
     certificado_adjunto_url varchar(255) NULL,
+    certificado_nombre_original varchar(255) NULL,
+    certificado_tipo_mime varchar(50) NULL,
+    certificado_tamano_bytes int NULL,
+    id_solicitud_servicio UUID NULL,
+    alerta_vencimiento_enviada_en TIMESTAMPTZ NULL,
     registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT CAPACITACIONES_CERTIFICACION_pk PRIMARY KEY (id_capacitacion)
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT CAPACITACIONES_CERTIFICACION_pk PRIMARY KEY (id_capacitacion),
+    CONSTRAINT uq_capacitacion_empleado_curso_emision UNIQUE (id_empleado, id_curso, fecha_emision),
+    CONSTRAINT ck_capacitacion_rango_realizacion CHECK (fecha_inicio IS NULL OR fecha_fin IS NULL OR fecha_fin >= fecha_inicio),
+    CONSTRAINT ck_capacitacion_vencimiento_posterior CHECK (fecha_vencimiento IS NULL OR fecha_vencimiento > fecha_emision),
+    CONSTRAINT ck_capacitacion_certificado_mime CHECK (
+        certificado_tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png', 'image/webp')
+    ),
+    CONSTRAINT ck_capacitacion_certificado_tamano CHECK (certificado_tamano_bytes > 0),
+    CONSTRAINT ck_capacitacion_certificado_completo CHECK (
+        (certificado_adjunto_url IS NULL) = (certificado_nombre_original IS NULL)
+        AND (certificado_adjunto_url IS NULL) = (certificado_tipo_mime IS NULL)
+        AND (certificado_adjunto_url IS NULL) = (certificado_tamano_bytes IS NULL)
+    )
 );
 -- Table: CARGOS
 CREATE TABLE CARGOS (
@@ -38,10 +58,41 @@ CREATE TABLE CONTRATOS (
     periodo_vigencia daterange NOT NULL,
     haber_mensual_pactado numeric(12, 2) NOT NULL,
     documento_adjunto_url varchar(255) NULL,
+    documento_nombre_original varchar(255) NULL,
+    documento_tipo_mime varchar(50) NULL,
+    documento_tamano_bytes int NULL,
+    documento_hash_sha256 char(64) NULL,
     es_adenda boolean NOT NULL DEFAULT FALSE,
     motivo_adenda text NULL,
+    tipo_modificacion varchar(20) NOT NULL DEFAULT 'CONTRATO_INICIAL',
+    id_contrato_anterior UUID NULL,
+    registrado_por UUID NULL,
+    registrado_rol varchar(20) NULL,
     registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT CONTRATOS_pk PRIMARY KEY (id_contrato)
+    CONSTRAINT CONTRATOS_pk PRIMARY KEY (id_contrato),
+    CONSTRAINT uq_contrato_numero UNIQUE (numero_contrato),
+    CONSTRAINT uq_contrato_version_anterior UNIQUE (id_contrato_anterior),
+    CONSTRAINT ck_contrato_tipo_modificacion CHECK (
+        tipo_modificacion IN ('CONTRATO_INICIAL', 'RENOVACION', 'CAMBIO_JORNADA', 'AJUSTE_SALARIAL', 'AJUSTE_CONDICIONES')
+    ),
+    CONSTRAINT ck_contrato_adenda_segun_tipo CHECK (
+        es_adenda = (tipo_modificacion NOT IN ('CONTRATO_INICIAL', 'RENOVACION'))
+    ),
+    CONSTRAINT ck_contrato_version_encadenada CHECK (
+        (tipo_modificacion = 'CONTRATO_INICIAL') = (id_contrato_anterior IS NULL)
+    ),
+    CONSTRAINT ck_contrato_no_se_reemplaza CHECK (id_contrato_anterior <> id_contrato),
+    CONSTRAINT ck_contrato_fecha_vigencia CHECK (NOT isempty(periodo_vigencia) AND NOT lower_inf(periodo_vigencia)),
+    CONSTRAINT ck_contrato_haber_positivo CHECK (haber_mensual_pactado > 0),
+    CONSTRAINT ck_contrato_documento_mime CHECK (documento_tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png')),
+    CONSTRAINT ck_contrato_documento_tamano CHECK (documento_tamano_bytes > 0),
+    CONSTRAINT ck_contrato_documento_hash CHECK (documento_hash_sha256 ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT ck_contrato_documento_completo CHECK (
+        (documento_adjunto_url IS NULL) = (documento_nombre_original IS NULL)
+        AND (documento_adjunto_url IS NULL) = (documento_tipo_mime IS NULL)
+        AND (documento_adjunto_url IS NULL) = (documento_tamano_bytes IS NULL)
+        AND (documento_adjunto_url IS NULL) = (documento_hash_sha256 IS NULL)
+    )
 );
 -- Table: CONVOCATORIAS_ASCENSO
 CREATE TABLE CONVOCATORIAS_ASCENSO (
@@ -60,12 +111,20 @@ CREATE TABLE CONVOCATORIAS_ASCENSO (
 -- Table: CURSOS_CAPACITACION
 CREATE TABLE CURSOS_CAPACITACION (
     id_curso UUID NOT NULL,
-    codigo varchar(30) NOT NULL DEFAULT true,
+    codigo varchar(30) NOT NULL,
     nombre varchar(150) NOT NULL,
     descripcion text NULL,
     horas_academicas int NOT NULL,
+    tipo_capacitacion varchar(20) NOT NULL DEFAULT 'TECNICA',
+    requiere_vencimiento boolean NOT NULL DEFAULT FALSE,
+    meses_vigencia int NULL,
     esta_activo boolean NOT NULL DEFAULT TRUE,
-    CONSTRAINT CURSOS_CAPACITACION_pk PRIMARY KEY (id_curso)
+    CONSTRAINT CURSOS_CAPACITACION_pk PRIMARY KEY (id_curso),
+    CONSTRAINT uq_curso_capacitacion_codigo UNIQUE (codigo),
+    CONSTRAINT ck_curso_tipo_capacitacion CHECK (tipo_capacitacion IN ('INDUCCION', 'CARNET_SANITARIO', 'TECNICA', 'CERTIFICACION')),
+    CONSTRAINT ck_curso_horas_positivas CHECK (horas_academicas > 0),
+    CONSTRAINT ck_curso_carnet_con_vencimiento CHECK (tipo_capacitacion <> 'CARNET_SANITARIO' OR requiere_vencimiento),
+    CONSTRAINT ck_curso_meses_vigencia CHECK (meses_vigencia IS NULL OR (requiere_vencimiento AND meses_vigencia > 0))
 );
 -- Table: DEPARTAMENTOS
 CREATE TABLE DEPARTAMENTOS (
@@ -106,6 +165,26 @@ CREATE TABLE ESTADOS_EMPLEADO (
     permite_acceso boolean NOT NULL,
     CONSTRAINT ESTADOS_EMPLEADO_pk PRIMARY KEY (id_estado_empleado)
 );
+CREATE TABLE HISTORIAL_SOLICITUD_SERVICIO (
+    id_evento UUID NOT NULL,
+    id_solicitud_servicio UUID NOT NULL,
+    estado_anterior varchar(20) NULL,
+    estado_nuevo varchar(20) NOT NULL,
+    origen varchar(10) NOT NULL,
+    id_mensaje_externo varchar(64) NULL,
+    detalle text NULL,
+    carga_mensaje jsonb NULL,
+    registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT HISTORIAL_SOLICITUD_SERVICIO_pk PRIMARY KEY (id_evento),
+    CONSTRAINT uq_historial_solicitud_mensaje_externo UNIQUE (id_mensaje_externo),
+    CONSTRAINT ck_historial_solicitud_origen CHECK (origen IN ('RRHH', 'COMPRAS')),
+    CONSTRAINT ck_historial_solicitud_estado_nuevo CHECK (
+        estado_nuevo IN ('PENDIENTE_ENVIO', 'ENVIADA', 'EN_PROCESO', 'ORDEN_EMITIDA', 'RECHAZADA', 'CANCELADA')
+    ),
+    CONSTRAINT ck_historial_solicitud_estado_anterior CHECK (
+        estado_anterior IN ('PENDIENTE_ENVIO', 'ENVIADA', 'EN_PROCESO', 'ORDEN_EMITIDA', 'RECHAZADA', 'CANCELADA')
+    )
+);
 -- Table: MEMORANDUMS
 CREATE TABLE MEMORANDUMS (
     id_memorandum UUID NOT NULL,
@@ -145,6 +224,42 @@ CREATE TABLE REQUISITOS_CAPACITACION_CARGO (
     meses_validez_requerida int NULL,
     CONSTRAINT REQUISITOS_CAPACITACION_CARGO_pk PRIMARY KEY (id_requisito_cargo),
     CONSTRAINT uq_requisito_cargo_curso UNIQUE (id_cargo, id_curso)
+);
+CREATE TABLE SOLICITUDES_SERVICIO_CAPACITACION (
+    id_solicitud_servicio UUID NOT NULL,
+    id_mensaje UUID NOT NULL,
+    id_curso UUID NOT NULL,
+    id_empleado_solicitante UUID NOT NULL,
+    descripcion_requerimiento text NOT NULL,
+    cantidad_participantes int NOT NULL,
+    fecha_requerida date NULL,
+    monto_estimado numeric(12, 2) NULL,
+    estado varchar(20) NOT NULL DEFAULT 'PENDIENTE_ENVIO',
+    numero_orden_servicio varchar(40) NULL,
+    proveedor_nombre varchar(150) NULL,
+    proveedor_nit varchar(20) NULL,
+    monto_adjudicado numeric(12, 2) NULL,
+    intentos_envio int NOT NULL DEFAULT 0,
+    proximo_intento_en TIMESTAMPTZ NULL,
+    ultimo_error text NULL,
+    enviada_en TIMESTAMPTZ NULL,
+    registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT SOLICITUDES_SERVICIO_CAPACITACION_pk PRIMARY KEY (id_solicitud_servicio),
+    CONSTRAINT uq_solicitud_servicio_id_mensaje UNIQUE (id_mensaje),
+    CONSTRAINT uq_solicitud_servicio_numero_orden UNIQUE (numero_orden_servicio),
+    CONSTRAINT ck_solicitud_servicio_estado CHECK (
+        estado IN ('PENDIENTE_ENVIO', 'ENVIADA', 'EN_PROCESO', 'ORDEN_EMITIDA', 'RECHAZADA', 'CANCELADA')
+    ),
+    CONSTRAINT ck_solicitud_servicio_participantes CHECK (cantidad_participantes > 0),
+    CONSTRAINT ck_solicitud_servicio_montos CHECK (
+        (monto_estimado IS NULL OR monto_estimado >= 0) AND (monto_adjudicado IS NULL OR monto_adjudicado >= 0)
+    ),
+    CONSTRAINT ck_solicitud_servicio_intentos CHECK (intentos_envio >= 0),
+    CONSTRAINT ck_solicitud_servicio_enviada CHECK (estado IN ('PENDIENTE_ENVIO', 'CANCELADA') OR enviada_en IS NOT NULL),
+    CONSTRAINT ck_solicitud_servicio_orden_emitida CHECK (
+        estado <> 'ORDEN_EMITIDA' OR (numero_orden_servicio IS NOT NULL AND proveedor_nombre IS NOT NULL)
+    )
 );
 -- Table: SUCURSALES
 CREATE TABLE SUCURSALES (
@@ -202,6 +317,12 @@ ADD CONSTRAINT CONTRATOS_TIPOS_CONTRATO FOREIGN KEY (id_tipo_contrato) REFERENCE
 -- Reference: CONTRATOS_TIPOS_JORNADA (table: CONTRATOS)
 ALTER TABLE CONTRATOS
 ADD CONSTRAINT CONTRATOS_TIPOS_JORNADA FOREIGN KEY (id_tipo_jornada) REFERENCES TIPOS_JORNADA (id_tipo_jornada) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONTRATOS_CONTRATO_ANTERIOR (table: CONTRATOS)
+ALTER TABLE CONTRATOS
+ADD CONSTRAINT CONTRATOS_CONTRATO_ANTERIOR FOREIGN KEY (id_contrato_anterior) REFERENCES CONTRATOS (id_contrato) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONTRATOS_EMPLEADOS_REGISTRADOR (table: CONTRATOS)
+ALTER TABLE CONTRATOS
+ADD CONSTRAINT CONTRATOS_EMPLEADOS_REGISTRADOR FOREIGN KEY (registrado_por) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- Reference: CONVOCATORIAS_ASCENSO_CARGOS (table: CONVOCATORIAS_ASCENSO)
 ALTER TABLE CONVOCATORIAS_ASCENSO
 ADD CONSTRAINT CONVOCATORIAS_ASCENSO_CARGOS FOREIGN KEY (id_cargo) REFERENCES CARGOS (id_cargo) NOT DEFERRABLE INITIALLY IMMEDIATE;
@@ -241,6 +362,14 @@ ADD CONSTRAINT REQUISITOS_CAPACITACION_CARGO_CARGOS FOREIGN KEY (id_cargo) REFER
 -- Reference: REQUISITOS_CAPACITACION_CARGO_CURSOS_CAPACITACION (table: REQUISITOS_CAPACITACION_CARGO)
 ALTER TABLE REQUISITOS_CAPACITACION_CARGO
 ADD CONSTRAINT REQUISITOS_CAPACITACION_CARGO_CURSOS_CAPACITACION FOREIGN KEY (id_curso) REFERENCES CURSOS_CAPACITACION (id_curso) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE CAPACITACIONES_CERTIFICACION
+ADD CONSTRAINT CAPACITACIONES_CERTIFICACION_SOLICITUDES_SERVICIO FOREIGN KEY (id_solicitud_servicio) REFERENCES SOLICITUDES_SERVICIO_CAPACITACION (id_solicitud_servicio) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE SOLICITUDES_SERVICIO_CAPACITACION
+ADD CONSTRAINT SOLICITUDES_SERVICIO_CAPACITACION_CURSOS_CAPACITACION FOREIGN KEY (id_curso) REFERENCES CURSOS_CAPACITACION (id_curso) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE SOLICITUDES_SERVICIO_CAPACITACION
+ADD CONSTRAINT SOLICITUDES_SERVICIO_CAPACITACION_EMPLEADOS FOREIGN KEY (id_empleado_solicitante) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE HISTORIAL_SOLICITUD_SERVICIO
+ADD CONSTRAINT HISTORIAL_SOLICITUD_SERVICIO_SOLICITUDES_SERVICIO FOREIGN KEY (id_solicitud_servicio) REFERENCES SOLICITUDES_SERVICIO_CAPACITACION (id_solicitud_servicio) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- End of file.
 -- KAN-125 (RF-19.1): historial de asignaciones cargo + sucursal por empleado.
 -- Table: ASIGNACIONES_EMPLEADO
@@ -350,4 +479,169 @@ VALUES (
         'RECONOCIMIENTO',
         'Rendimiento operativo',
         'Reconocimiento por rendimiento operativo destacado'
-    )
+    );
+-- KAN-278 (RF-39): notificación y acuse de recibo digital de memorándums.
+-- fue_notificado / fecha_hora_notificacion: el aviso llegó al portal del colaborador; el plazo de acuse corre desde ahí.
+-- acuse_recibo_firmado / fecha_hora_acuse: acuse del colaborador, con la IP y el usuario que lo registraron.
+-- estado_acuse: PENDIENTE (esperando acuse), RECIBIDO ('Notificado y Recibido') o VENCIDO (plazo cumplido sin acuse; RRHH ya fue alertado).
+ALTER TABLE MEMORANDUMS
+ADD COLUMN estado_acuse varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    ADD COLUMN fecha_limite_acuse TIMESTAMPTZ NULL,
+    ADD COLUMN fecha_hora_apertura TIMESTAMPTZ NULL,
+    ADD COLUMN ip_acuse varchar(45) NULL,
+    ADD COLUMN id_usuario_acuse UUID NULL,
+    ADD COLUMN comentario_descargo text NULL,
+    ADD COLUMN fecha_hora_alerta_rrhh TIMESTAMPTZ NULL;
+ALTER TABLE MEMORANDUMS
+ADD CONSTRAINT ck_memorandum_estado_acuse CHECK (estado_acuse IN ('PENDIENTE', 'RECIBIDO', 'VENCIDO')),
+    ADD CONSTRAINT ck_memorandum_notificacion CHECK (
+        fue_notificado = (fecha_hora_notificacion IS NOT NULL)
+        AND fue_notificado = (fecha_limite_acuse IS NOT NULL)
+    ),
+    ADD CONSTRAINT ck_memorandum_acuse CHECK (
+        acuse_recibo_firmado = (estado_acuse = 'RECIBIDO')
+        AND acuse_recibo_firmado = (
+            fecha_hora_acuse IS NOT NULL
+            AND ip_acuse IS NOT NULL
+            AND id_usuario_acuse IS NOT NULL
+        )
+    ),
+    ADD CONSTRAINT ck_memorandum_acuse_vencido CHECK (
+        estado_acuse <> 'VENCIDO'
+        OR fecha_hora_alerta_rrhh IS NOT NULL
+    );
+-- Memorándums emitidos que esperan acuse: los recorre el job de vencimientos.
+CREATE INDEX ix_memorandum_acuse_pendiente ON MEMORANDUMS (fecha_limite_acuse)
+WHERE estado_acuse = 'PENDIENTE';
+
+-- KAN-263 (RF-36): Kardex laboral consolidado. Una fila por empleado con sus datos y totales.
+CREATE INDEX IF NOT EXISTS ix_contrato_empleado ON CONTRATOS (id_empleado);
+CREATE INDEX IF NOT EXISTS ix_capacitacion_empleado_fecha
+    ON CAPACITACIONES_CERTIFICACION (id_empleado, fecha_emision DESC);
+
+CREATE OR REPLACE VIEW vw_kardex_resumen AS
+SELECT e.id_empleado,
+       e.numero_documento,
+       e.complemento_documento,
+       e.nombres,
+       e.primer_apellido,
+       e.segundo_apellido,
+       concat_ws(' ', e.nombres, e.primer_apellido, e.segundo_apellido) AS nombre_completo,
+       e.fecha_nacimiento,
+       e.genero,
+       e.telefono_celular,
+       e.correo_personal,
+       e.direccion_domicilio,
+       e.fecha_ingreso,
+       extract(year FROM age(CURRENT_DATE, e.fecha_ingreso))::int AS antiguedad_anios,
+       extract(month FROM age(CURRENT_DATE, e.fecha_ingreso))::int AS antiguedad_meses,
+       ee.codigo AS estado_codigo,
+       ee.nombre AS estado_nombre,
+       c.id_cargo,
+       c.codigo AS cargo_codigo,
+       c.nombre AS cargo_nombre,
+       c.nivel_salarial AS cargo_nivel_salarial,
+       d.id_departamento,
+       d.nombre AS area_nombre,
+       s.id_sucursal,
+       s.nombre AS sucursal_nombre,
+       s.ciudad AS sucursal_ciudad,
+       asg.vigente_desde,
+       asg.total_asignaciones,
+       cv.id_contrato AS contrato_vigente_id,
+       cv.numero_contrato AS contrato_vigente_numero,
+       cv.tipo_contrato AS contrato_vigente_tipo,
+       cv.tipo_jornada AS contrato_vigente_jornada,
+       cv.fecha_inicio AS contrato_vigente_desde,
+       cv.fecha_fin AS contrato_vigente_hasta,
+       cv.haber_mensual_pactado AS contrato_vigente_haber,
+       ct.total_contratos,
+       ct.total_adendas,
+       mm.total_sanciones,
+       mm.sanciones_leves,
+       mm.sanciones_moderadas,
+       mm.sanciones_graves,
+       mm.total_reconocimientos,
+       mm.memorandums_sin_acuse,
+       mm.fecha_ultima_sancion,
+       cap.total_capacitaciones,
+       cap.capacitaciones_vencidas
+  FROM EMPLEADOS e
+  JOIN ESTADOS_EMPLEADO ee ON ee.id_estado_empleado = e.id_estado_empleado
+  JOIN CARGOS c            ON c.id_cargo = e.id_cargo_actual
+  JOIN DEPARTAMENTOS d     ON d.id_departamento = c.id_departamento
+  JOIN SUCURSALES s        ON s.id_sucursal = e.id_sucursal_actual
+  LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS total_asignaciones,
+              MAX(a.fecha_inicio) FILTER (WHERE a.es_vigente) AS vigente_desde
+         FROM ASIGNACIONES_EMPLEADO a
+        WHERE a.id_empleado = e.id_empleado
+  ) asg ON TRUE
+  LEFT JOIN LATERAL (
+       SELECT k.id_contrato,
+              k.numero_contrato,
+              tc.nombre AS tipo_contrato,
+              tj.nombre AS tipo_jornada,
+              lower(k.periodo_vigencia) AS fecha_inicio,
+              upper(k.periodo_vigencia) - 1 AS fecha_fin,
+              k.haber_mensual_pactado
+         FROM CONTRATOS k
+         JOIN TIPOS_CONTRATO tc ON tc.id_tipo_contrato = k.id_tipo_contrato
+         JOIN TIPOS_JORNADA tj  ON tj.id_tipo_jornada = k.id_tipo_jornada
+        WHERE k.id_empleado = e.id_empleado
+          AND k.periodo_vigencia @> CURRENT_DATE
+        ORDER BY lower(k.periodo_vigencia) DESC NULLS LAST, k.registrado_en DESC
+        LIMIT 1
+  ) cv ON TRUE
+  LEFT JOIN LATERAL (
+       SELECT COUNT(*) FILTER (WHERE NOT k.es_adenda)::int AS total_contratos,
+              COUNT(*) FILTER (WHERE k.es_adenda)::int AS total_adendas
+         FROM CONTRATOS k
+        WHERE k.id_empleado = e.id_empleado
+  ) ct ON TRUE
+  LEFT JOIN LATERAL (
+       SELECT COUNT(*) FILTER (WHERE NOT mt.es_reconocimiento)::int AS total_sanciones,
+              COUNT(*) FILTER (WHERE NOT mt.es_reconocimiento AND mt.gravedad_falta = 'LEVE')::int AS sanciones_leves,
+              COUNT(*) FILTER (WHERE NOT mt.es_reconocimiento AND mt.gravedad_falta = 'MODERADA')::int AS sanciones_moderadas,
+              COUNT(*) FILTER (WHERE NOT mt.es_reconocimiento AND mt.gravedad_falta = 'GRAVE')::int AS sanciones_graves,
+              COUNT(*) FILTER (WHERE mt.es_reconocimiento)::int AS total_reconocimientos,
+              COUNT(*) FILTER (WHERE NOT mt.acuse_recibo_firmado)::int AS memorandums_sin_acuse,
+              MAX(mt.fecha_emision) FILTER (WHERE NOT mt.es_reconocimiento) AS fecha_ultima_sancion
+         FROM (
+              SELECT m.gravedad_falta,
+                     m.acuse_recibo_firmado,
+                     m.fecha_emision,
+                     upper(trim(t.clasificacion)) = 'RECONOCIMIENTO' AS es_reconocimiento
+                FROM MEMORANDUMS m
+                JOIN TIPOS_MEMORANDUM t ON t.id_tipo_memo = m.id_tipo_memo
+               WHERE m.id_empleado_receptor = e.id_empleado
+                 AND m.estado_sancion = 'EMITIDO'
+         ) mt
+  ) mm ON TRUE
+  LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS total_capacitaciones,
+              COUNT(*) FILTER (WHERE cc.fecha_vencimiento < CURRENT_DATE)::int AS capacitaciones_vencidas
+         FROM CAPACITACIONES_CERTIFICACION cc
+        WHERE cc.id_empleado = e.id_empleado
+  ) cap ON TRUE;
+
+CREATE INDEX IF NOT EXISTS ix_capacitacion_vencimiento
+    ON CAPACITACIONES_CERTIFICACION (fecha_vencimiento)
+    WHERE fecha_vencimiento IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_capacitacion_alerta_pendiente
+    ON CAPACITACIONES_CERTIFICACION (fecha_vencimiento)
+    WHERE fecha_vencimiento IS NOT NULL AND alerta_vencimiento_enviada_en IS NULL;
+
+CREATE INDEX IF NOT EXISTS ix_capacitacion_solicitud_servicio
+    ON CAPACITACIONES_CERTIFICACION (id_solicitud_servicio)
+    WHERE id_solicitud_servicio IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_solicitud_servicio_pendiente_envio
+    ON SOLICITUDES_SERVICIO_CAPACITACION (proximo_intento_en)
+    WHERE estado = 'PENDIENTE_ENVIO';
+CREATE INDEX IF NOT EXISTS ix_solicitud_servicio_respuesta_simulada
+    ON SOLICITUDES_SERVICIO_CAPACITACION (actualizado_en)
+    WHERE estado IN ('ENVIADA', 'EN_PROCESO');
+CREATE INDEX IF NOT EXISTS ix_solicitud_servicio_curso_estado
+    ON SOLICITUDES_SERVICIO_CAPACITACION (id_curso, estado);
+CREATE INDEX IF NOT EXISTS ix_historial_solicitud_servicio_fecha
+    ON HISTORIAL_SOLICITUD_SERVICIO (id_solicitud_servicio, registrado_en DESC);

@@ -1,0 +1,23 @@
+sequenceDiagram
+  autonumber
+  actor U as Colaborador o RRHH
+  participant P as Vacaciones
+  participant GW as API Gateway
+  participant S as VacacionesService
+  participant E as EmployeeService
+  participant M as Modelo
+  participant DB as AttendanceDB
+
+  U->>P: abre su saldo, o el expediente de un empleado (RRHH)
+  P->>GW: GET /att/vacaciones/saldo
+  GW->>S: consultarMiSaldo(idEmpleado)
+  S->>E: GET /empleados/:id (fecha de ingreso)
+  alt el empleado no existe
+    S-->>P: 403 no corresponde a un empleado registrado
+  else existe
+    S->>M: listarMovimientos(idEmpleado)
+    M->>DB: MOVIMIENTOS_VACACION (sin cancelados)
+    S->>S: periodos acreditados por aniversario (15, 20 o 30 días)
+    S->>S: disponibles = acumulados - gozados - en proceso
+    S-->>P: saldo, períodos ganados e historial de consumo
+  end

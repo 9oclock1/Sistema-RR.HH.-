@@ -2,6 +2,7 @@ const { v7: uuidv7 } = require("uuid");
 const { PostulacionModel } = require("../models/postulacionModel");
 const { saveFile, getFileDetails } = require("./storageService");
 const { CvProcessingService } = require("./cvProcessingService");
+const { AffinityService } = require("./affinityService");
 
 const PostulacionService = {
   async registrarPostulacionConCv({ idConvocatoria, idPostulante, file }) {
@@ -58,6 +59,18 @@ const PostulacionService = {
       });
 
     nuevaPostulacion.datos_extraidos_cv = datosExtraidos;
+
+    try {
+      const afinidad =
+        await AffinityService.procesarAfinidadPostulacion(idPostulacion);
+      nuevaPostulacion.porcentaje_afinidad = afinidad.porcentajeTotal;
+      nuevaPostulacion.datos_extraidos_cv.afinidadDetalle = afinidad;
+    } catch (errAfinidad) {
+      console.warn(
+        "[PostulacionService] Error calculando afinidad inicial:",
+        errAfinidad.message,
+      );
+    }
 
     return {
       postulacion: nuevaPostulacion,
@@ -145,6 +158,18 @@ const PostulacionService = {
       });
 
     postulacionActualizada.datos_extraidos_cv = datosExtraidos;
+
+    try {
+      const afinidad =
+        await AffinityService.procesarAfinidadPostulacion(idPostulacion);
+      postulacionActualizada.porcentaje_afinidad = afinidad.porcentajeTotal;
+      postulacionActualizada.datos_extraidos_cv.afinidadDetalle = afinidad;
+    } catch (errAfinidad) {
+      console.warn(
+        "[PostulacionService] Error calculando afinidad tras vincular CV:",
+        errAfinidad.message,
+      );
+    }
 
     return {
       postulacion: postulacionActualizada,

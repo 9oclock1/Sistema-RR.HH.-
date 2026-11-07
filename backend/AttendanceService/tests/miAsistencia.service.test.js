@@ -87,8 +87,8 @@ beforeEach(() => {
     novedad("n4", "2026-10-05", "INASISTENCIA", 450),
   ]);
   mock.method(modelo, "listarHoras", async () => [
-    { fecha_jornada: "2026-10-01", minutos_trabajados: 405, minutos_extra_aprobados: 0, estado_extra_codigo: "SIN_EXTRA" },
-    { fecha_jornada: "2026-10-02", minutos_trabajados: 470, minutos_extra_aprobados: 30, estado_extra_codigo: "APROBADA", estado_extra_nombre: "Aprobada" },
+    { fecha_jornada: "2026-10-01", minutos_computados: 405, minutos_extra_aprobados: 0, estado_extra_codigo: "SIN_EXTRA" },
+    { fecha_jornada: "2026-10-02", minutos_computados: 470, minutos_extra_aprobados: 30, estado_extra_codigo: "APROBADA", estado_extra_nombre: "Aprobada" },
   ]);
   mock.method(modelo, "listarLicencias", async () => [
     {

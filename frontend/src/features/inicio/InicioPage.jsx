@@ -1,8 +1,10 @@
 import { Link } from "react-router";
 import { Contador, EncabezadoPagina, EstadoVacio, Tarjeta } from "../../components/ui";
 import { useRol } from "../../context/sesion";
+import AvisoMemorandumsPendientes from "../Memorandums/acuses/AvisoMemorandumsPendientes";
 import { seccionesPara } from "../../router/modulos";
 import { ROLES } from "../../utils/permisos";
+import VacacionesInicio from "../vacaciones/VacacionesInicio";
 import "./inicio.css";
 
 const ZONA_BOLIVIA = "America/La_Paz";
@@ -56,6 +58,9 @@ export default function InicioPage() {
         titulo={saludo(ahora)}
         descripcion={`${fechaHoy(ahora)}. Estos son los módulos disponibles para su rol, ${ROLES[rol].nombre}.`}
       />
+
+      <AvisoMemorandumsPendientes />
+      <VacacionesInicio />
 
       {secciones.length === 0 && (
         <Tarjeta>

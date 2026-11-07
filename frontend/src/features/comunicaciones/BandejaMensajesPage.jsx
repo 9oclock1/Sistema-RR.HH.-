@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { CheckCircle2, Clock, Inbox, Mail, MailOpen, Search, ShieldAlert } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, Inbox, Mail, MailOpen, Search, ShieldAlert, Siren } from "lucide-react";
 import { abrirMensaje, confirmarRecepcion, consultarBandeja, obtenerDestinatariosDisponibles } from "../../api/comunicaciones";
 import {
   Alerta,
@@ -33,6 +33,8 @@ export default function BandejaMensajesPage() {
   const [listaEmpleados, setListaEmpleados] = useState([]);
   const [mensajes, setMensajes] = useState([]);
   const [totalNoLeidos, setTotalNoLeidos] = useState(0);
+  // RF-39: avisos de prioridad alta sin abrir (p. ej. memorándums emitidos o acuses vencidos).
+  const [altaPrioridadNoLeidos, setAltaPrioridadNoLeidos] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
 
@@ -65,6 +67,7 @@ export default function BandejaMensajesPage() {
         if (cancelado) return;
         setMensajes(datos.mensajes || []);
         setTotalNoLeidos(datos.no_leidos || 0);
+        setAltaPrioridadNoLeidos(datos.alta_prioridad_no_leidos || 0);
         setErrorCarga(null);
       })
       .catch((err) => {
@@ -87,6 +90,7 @@ export default function BandejaMensajesPage() {
       .then((datos) => {
         setMensajes(datos.mensajes || []);
         setTotalNoLeidos(datos.no_leidos || 0);
+        setAltaPrioridadNoLeidos(datos.alta_prioridad_no_leidos || 0);
       })
       .catch((err) => {
         setErrorCarga(err.message || "No se pudo cargar la bandeja de mensajes.");
@@ -124,6 +128,7 @@ export default function BandejaMensajesPage() {
           )
         );
         setTotalNoLeidos((count) => Math.max(0, count - 1));
+        if (mensaje.prioridad === "ALTA") setAltaPrioridadNoLeidos((count) => Math.max(0, count - 1));
       }
     } catch (err) {
       avisar({ tono: "peligro", titulo: "Error al abrir mensaje", mensaje: err.message });
@@ -238,6 +243,15 @@ export default function BandejaMensajesPage() {
           />
         </div>
       </div>
+
+      {/* RF-39: los avisos de prioridad alta sin abrir se destacan arriba de la bandeja */}
+      {altaPrioridadNoLeidos > 0 && (
+        <Alerta tono="peligro" role="status" titulo="Avisos de prioridad alta sin leer">
+          {altaPrioridadNoLeidos === 1
+            ? "Tiene 1 aviso de prioridad alta sin leer. Ábralo para ver qué acción requiere."
+            : `Tiene ${altaPrioridadNoLeidos} avisos de prioridad alta sin leer. Ábralos para ver qué acción requieren.`}
+        </Alerta>
+      )}
 
       {/* Tarjeta principal con filtros y lista */}
       <Tarjeta>
@@ -361,6 +375,13 @@ export default function BandejaMensajesPage() {
                     </div>
 
                     <div className="mensaje-tarjeta__etiquetas">
+                      {/* Prioridad alta (RF-39) */}
+                      {mensaje.prioridad === "ALTA" && (
+                        <Etiqueta tono="peligro" icono={Siren}>
+                          Prioridad alta
+                        </Etiqueta>
+                      )}
+
                       {/* Tipo de comunicación */}
                       <Etiqueta tono={obtenerTonoTipo(mensaje.tipo_codigo)}>
                         {mensaje.tipo_nombre || mensaje.tipo_codigo}
@@ -413,6 +434,12 @@ export default function BandejaMensajesPage() {
         pie={
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)", width: "100%" }}>
             <Boton onClick={() => setMensajeSeleccionado(null)}>Cerrar</Boton>
+            {/* RF-39: el aviso lleva a la sección del portal donde se atiende (p. ej. acusar recibo de un memorándum) */}
+            {mensajeSeleccionado?.enlace && (
+              <Boton as={Link} to={mensajeSeleccionado.enlace} variante="primario" icono={ArrowRight}>
+                Ir a la sección
+              </Boton>
+            )}
           </div>
         }
       >

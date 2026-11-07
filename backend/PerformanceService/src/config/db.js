@@ -1,6 +1,15 @@
 const { Pool, types } = require("pg");
 
-// NUMERIC (pesos y valores de escala) como número: no superan dos decimales.
+types.setTypeParser(types.builtins.DATE, (valor) => valor);
 types.setTypeParser(types.builtins.NUMERIC, (valor) => Number(valor));
 
-module.exports = new Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+pool.on("error", (error) => {
+  console.error(
+    "Error inesperado en una conexión inactiva de PostgreSQL:",
+    error.message,
+  );
+});
+
+module.exports = pool;

@@ -1,12 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router";
-import { Briefcase, Calendar, Plus, RefreshCw, Users, X } from "lucide-react";
+import {
+  Briefcase,
+  Calendar,
+  Plus,
+  RefreshCw,
+  Users,
+  X,
+  Award,
+  ListFilter,
+} from "lucide-react";
 import {
   fetchActiveJobOpenings,
   registerApplicant,
   fetchApplicantsByJobOpening,
 } from "../../api/recruitmentApi";
 import { useApplicantForm } from "../../hooks/useApplicantForm";
+import { useCandidateRanking } from "../../hooks/useCandidateRanking";
 import {
   Alerta,
   Boton,
@@ -20,7 +30,11 @@ import {
 } from "../../components/ui";
 import ApplicantForm from "./ApplicantForm";
 import ApplicantList from "./ApplicantList";
+import CandidateRankingTable from "./CandidateRankingTable";
+import RankingFilters from "./RankingFilters";
 import "./ApplicantRegistration.css";
+import AffinityBreakdownModal from "./components/AffinityBreakdownModal";
+import AffinityRangeFilter from "./components/AffinityRangeFilter";
 
 function formatearFechaLimite(fecha) {
   if (!fecha) return "Abierta";
@@ -37,13 +51,7 @@ function formatearFechaLimite(fecha) {
 }
 
 /**
- * RF-09: Pantalla de Registro de Postulantes
- * Adaptada a la arquitectura y sistema de diseño Jira / Atlassian (DESIGN.md).
- * Orquesta:
- *  - Selección de convocatoria activa
- *  - Visualización del resumen de la convocatoria
- *  - Formulario accesible de postulación
- *  - Tabla densa de postulantes registrados
+ * RF-09 / RF-13: Pantalla de Registro y Ranking de Postulantes
  */
 export default function ApplicantRegistration() {
   const avisar = useAvisos();
@@ -54,10 +62,18 @@ export default function ApplicantRegistration() {
   const [selectedOpening, setSelectedOpening] = useState(null);
   const [errorCargaOpenings, setErrorCargaOpenings] = useState(null);
 
-  // Estado: postulantes
+  // Estado: postulantes (lista cronológica)
   const [applicants, setApplicants] = useState([]);
   const [loadingApplicants, setLoadingApplicants] = useState(false);
   const [errorApplicants, setErrorApplicants] = useState(null);
+
+  // Estado: modal de desglose comparativo de afinidad (RF-12)
+  const [postulanteAfinidad, setPostulanteAfinidad] = useState(null);
+  // Estado: filtros de rango de afinidad de la lista cronológica (RF-12)
+  const [filtroAfinidad, setFiltroAfinidad] = useState({ minAfinidad: "", maxAfinidad: "" });
+
+  // Estado: alternar vistas (ranking o lista cronológica)
+  const [vistaActiva, setVistaActiva] = useState("ranking");
 
   // Estado: envío y notificaciones en página
   const [submitting, setSubmitting] = useState(false);
@@ -73,7 +89,7 @@ export default function ApplicantRegistration() {
   // Estado: alternar visualización del formulario
   const [showForm, setShowForm] = useState(false);
 
-  // Hook del formulario
+  // Hook del formulario de registro
   const {
     formData,
     fieldErrors,
@@ -83,6 +99,19 @@ export default function ApplicantRegistration() {
     resetForm,
     setFormData,
   } = useApplicantForm();
+
+  // Hook de ranking de candidatos (RF-13)
+  const {
+    candidatos: rankingCandidatos,
+    paginacion: paginacionRanking,
+    cargando: cargandoRanking,
+    error: errorRanking,
+    filtros: filtrosRanking,
+    actualizarFiltro: actualizarFiltroRanking,
+    restablecerFiltros: restablecerFiltrosRanking,
+    cambiarPagina: cambiarPaginaRanking,
+    recargar: recargarRanking,
+  } = useCandidateRanking(selectedOpening?.id_convocatoria);
 
   // Cargar convocatorias activas al montar
   const cargarConvocatorias = useCallback(() => {
@@ -110,13 +139,13 @@ export default function ApplicantRegistration() {
   };
 
   // Cargar postulantes de la convocatoria seleccionada
-  const cargarPostulantes = useCallback((idConvocatoria) => {
+  const cargarPostulantes = useCallback((idConvocatoria, filtros = {}) => {
     if (!idConvocatoria) {
       setApplicants([]);
       return Promise.resolve();
     }
     setErrorApplicants(null);
-    return fetchApplicantsByJobOpening(idConvocatoria)
+    return fetchApplicantsByJobOpening(idConvocatoria, filtros)
       .then((data) => {
         setApplicants(Array.isArray(data?.postulantes) ? data.postulantes : []);
       })
@@ -128,6 +157,14 @@ export default function ApplicantRegistration() {
       });
   }, []);
 
+  const manejarCambioRangoAfinidad = (nuevosFiltros) => {
+    setFiltroAfinidad(nuevosFiltros);
+    if (selectedOpening) {
+      setLoadingApplicants(true);
+      cargarPostulantes(selectedOpening.id_convocatoria, nuevosFiltros);
+    }
+  };
+
   // Manejar cambio en el selector de convocatoria
   function handleOpeningChange(e) {
     const openingId = e.target.value;
@@ -135,6 +172,8 @@ export default function ApplicantRegistration() {
     setSelectedOpening(opening);
     setFormData((prev) => ({ ...prev, id_convocatoria: openingId }));
     setAlerta(null);
+    // Cada convocatoria arranca sin filtro de afinidad.
+    setFiltroAfinidad({ minAfinidad: "", maxAfinidad: "" });
     if (opening) {
       setLoadingApplicants(true);
       cargarPostulantes(opening.id_convocatoria);
@@ -161,8 +200,7 @@ export default function ApplicantRegistration() {
     setSubmitting(true);
     try {
       await registerApplicant(formData);
-      
-      // Notificación flotante del sistema de diseño
+
       avisar({
         tono: "exito",
         titulo: "Postulante registrado",
@@ -176,9 +214,9 @@ export default function ApplicantRegistration() {
           ...prev,
           id_convocatoria: selectedOpening.id_convocatoria,
         }));
-        await cargarPostulantes(selectedOpening.id_convocatoria);
+        await cargarPostulantes(selectedOpening.id_convocatoria, filtroAfinidad);
+        recargarRanking();
       }
-
     } catch (err) {
       const estado = err.status || err.estado;
       if (estado === 409) {
@@ -320,7 +358,7 @@ export default function ApplicantRegistration() {
         )}
       </Tarjeta>
 
-      {/* Formulario de registro (colapsable o visible a demanda) */}
+      {/* Formulario de registro */}
       {showForm && selectedOpening && (
         <Tarjeta
           titulo={`Nuevo postulante: ${selectedOpening.titulo_puesto}`}
@@ -339,7 +377,7 @@ export default function ApplicantRegistration() {
         </Tarjeta>
       )}
 
-      {/* Error de carga de postulantes */}
+      {/* Error de carga de postulantes en lista cronológica */}
       {errorApplicants && (
         <Alerta
           tono="peligro"
@@ -348,7 +386,7 @@ export default function ApplicantRegistration() {
           acciones={
             <Boton
               tamano="sm"
-              onClick={() => cargarPostulantes(selectedOpening?.id_convocatoria)}
+              onClick={() => cargarPostulantes(selectedOpening?.id_convocatoria, filtroAfinidad)}
               icono={RefreshCw}
             >
               Reintentar
@@ -359,24 +397,115 @@ export default function ApplicantRegistration() {
         </Alerta>
       )}
 
-      {/* Tabla de postulantes registrados */}
+      {/* Contenedor con pestañas (Ranking / Cronológico) */}
       {selectedOpening && (
         <Tarjeta
-          titulo="Postulantes registrados"
+          titulo={vistaActiva === "ranking" ? "Ranking de Idoneidad de Candidatos" : "Postulantes Registrados"}
           acciones={
-            <Contador aria-label={`${applicants.length} postulantes registrados`}>
-              {applicants.length}
-            </Contador>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+              <Contador
+                aria-label={`${
+                  vistaActiva === "ranking" ? paginacionRanking.total_registros : applicants.length
+                } registros`}
+              >
+                {vistaActiva === "ranking" ? paginacionRanking.total_registros : applicants.length}
+              </Contador>
+              <Boton
+                tamano="sm"
+                variante="sutil"
+                icono={RefreshCw}
+                onClick={
+                  vistaActiva === "ranking"
+                    ? recargarRanking
+                    : () => cargarPostulantes(selectedOpening.id_convocatoria, filtroAfinidad)
+                }
+                aria-label="Refrescar lista"
+              />
+            </div>
           }
         >
-          <ApplicantList
-            applicants={applicants}
-            loading={loadingApplicants}
-            openingTitle={selectedOpening.titulo_puesto}
-            onRegistrarPrimerPostulante={handleToggleForm}
-          />
+          <div className="postulantes-vistas-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={vistaActiva === "ranking"}
+              className={`postulantes-tab-btn ${
+                vistaActiva === "ranking" ? "postulantes-tab-btn--activo" : ""
+              }`}
+              onClick={() => setVistaActiva("ranking")}
+            >
+              <Award className="ds-icono" aria-hidden="true" />
+              Ranking de Afinidad (RF-13)
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={vistaActiva === "lista"}
+              className={`postulantes-tab-btn ${
+                vistaActiva === "lista" ? "postulantes-tab-btn--activo" : ""
+              }`}
+              onClick={() => setVistaActiva("lista")}
+            >
+              <ListFilter className="ds-icono" aria-hidden="true" />
+              Recepción cronológica
+            </button>
+          </div>
+
+          {errorRanking && vistaActiva === "ranking" && (
+            <Alerta tono="peligro" role="alert" titulo="Error al consultar el ranking">
+              {errorRanking}
+            </Alerta>
+          )}
+
+          {vistaActiva === "ranking" ? (
+            <>
+              <RankingFilters
+                filtros={filtrosRanking}
+                alCambiarFiltro={actualizarFiltroRanking}
+                alLimpiar={restablecerFiltrosRanking}
+              />
+
+              <CandidateRankingTable
+                candidatos={rankingCandidatos}
+                paginacion={paginacionRanking}
+                cargando={cargandoRanking}
+                tituloConvocatoria={selectedOpening.titulo_puesto}
+                alCambiarPagina={cambiarPaginaRanking}
+                alVerAfinidad={(postulante) => setPostulanteAfinidad(postulante)}
+              />
+            </>
+          ) : (
+            <>
+              <AffinityRangeFilter
+                key={selectedOpening.id_convocatoria}
+                minAfinidad={filtroAfinidad.minAfinidad}
+                maxAfinidad={filtroAfinidad.maxAfinidad}
+                onCambiarRango={manejarCambioRangoAfinidad}
+                disabled={loadingApplicants}
+              />
+              <ApplicantList
+                applicants={applicants}
+                loading={loadingApplicants}
+                openingTitle={selectedOpening.titulo_puesto}
+                onRegistrarPrimerPostulante={handleToggleForm}
+                onVerAfinidad={(postulante) => setPostulanteAfinidad(postulante)}
+              />
+            </>
+          )}
         </Tarjeta>
       )}
+
+      {/* Modal de desglose comparativo de afinidad (RF-12) */}
+      <AffinityBreakdownModal
+        abierto={Boolean(postulanteAfinidad)}
+        onCerrar={() => setPostulanteAfinidad(null)}
+        idPostulacion={postulanteAfinidad?.id_postulacion}
+        nombrePostulante={`${postulanteAfinidad?.nombres || ""} ${postulanteAfinidad?.apellidos || ""}`.trim()}
+        alRecalcular={() => {
+          cargarPostulantes(selectedOpening?.id_convocatoria, filtroAfinidad);
+          recargarRanking();
+        }}
+      />
     </section>
   );
 }

@@ -1,0 +1,51 @@
+sequenceDiagram
+  autonumber
+  actor S as Supervisor o RRHH
+  participant P as Calendario de ausencias
+  participant GW as API Gateway
+  participant CAL as CalendarioAusenciasService
+  participant E as EmployeeService
+  participant M as Modelo
+  participant DB as AttendanceDB
+
+  S->>P: abre el calendario
+  P->>GW: GET /att/calendario/ausencias/alcance
+  GW->>CAL: alcance(identidad)
+  alt rol distinto de supervisor, gerente o admin
+    CAL-->>P: 403
+  else supervisor
+    CAL->>E: sucursal del supervisor
+    CAL-->>P: su sucursal fija, áreas y tipos
+  else RRHH
+    CAL-->>P: todas las sucursales, áreas, tipos y permiso de umbrales
+  end
+  S->>P: sucursal, departamento, vista y mes
+  P->>GW: GET /att/calendario/ausencias?id_sucursal&id_departamento&desde&hasta
+  GW->>CAL: consultar(filtros, identidad)
+  opt supervisor pide otra sucursal
+    CAL-->>P: 403 solo puede ver su sucursal
+  end
+  CAL->>E: personal activo de la sucursal y el área
+  par consultas en paralelo
+    CAL->>M: ausencias aprobadas del personal en el rango
+    M->>DB: SOLICITUDES_VACACION y SOLICITUDES_LICENCIA (estado APROBADA)
+  and
+    CAL->>M: turnos publicados y feriados
+    M->>DB: TURNOS_PUBLICADOS y FERIADOS
+  and
+    CAL->>M: umbrales de cobertura
+    M->>DB: UMBRALES_COBERTURA
+  end
+  CAL->>CAL: por día y área, programados, ausentes y presentes frente al umbral
+  CAL-->>P: ausencias, días con baja_cobertura y resumen
+  P->>P: cuadrícula con color por tipo y advertencia en los días de baja cobertura
+  S->>P: clic en un bloque
+  P-->>S: colaborador, cargo, tipo y período aprobado
+  opt RRHH configura umbrales
+    S->>P: Umbrales de cobertura
+    P->>GW: PUT /att/calendario/umbrales
+    GW->>CAL: guardarUmbral
+    CAL->>M: upsert por sucursal y área
+    M->>DB: UMBRALES_COBERTURA
+    P->>GW: vuelve a consultar el calendario
+  end

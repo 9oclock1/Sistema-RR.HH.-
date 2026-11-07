@@ -15,7 +15,7 @@ export const getPerfilCargo = (idCargo, { signal } = {}) => request(`${BASE}/per
 // Toda convocatoria nace como borrador.
 export const createConvocatoria = (convocatoria) => request(BASE, { method: 'POST', body: convocatoria });
 
-// Solo se puede editar mientras es borrador.
+// Se puede editar en borrador o publicada; si cambian los requisitos se recalcula la afinidad de los postulantes.
 export const updateConvocatoria = (idConvocatoria, cambios) =>
   request(`${BASE}/${idConvocatoria}`, { method: 'PATCH', body: cambios });
 

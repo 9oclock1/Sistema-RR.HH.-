@@ -16,4 +16,24 @@ function evaluarLimite(tipo, dias) {
 // Criterio 2: el goce de haberes lo define el catálogo, no el empleado.
 const clasificarParaNomina = (tipo) => (tipo.es_con_goce_haberes ? "CON_GOCE" : "SIN_GOCE");
 
-module.exports = { ESTADO_SOLICITUD, diasSolicitados, evaluarLimite, clasificarParaNomina };
+const MAX_MOTIVO_RESOLUCION = 500;
+const DECISIONES = { APROBADA: ESTADO_SOLICITUD.APROBADA, RECHAZADA: ESTADO_SOLICITUD.RECHAZADA };
+
+// KAN-54 criterio 2: un rechazo no se registra sin la justificación que leerá el colaborador.
+function validarResolucion(datos = {}) {
+  const decision = typeof datos.decision === "string" ? datos.decision.trim().toUpperCase() : "";
+  const motivo = typeof datos.motivo === "string" ? datos.motivo.trim() : "";
+  const errores = [];
+  if (!Object.hasOwn(DECISIONES, decision)) {
+    errores.push({ campo: "decision", mensaje: "La decisión debe ser APROBADA o RECHAZADA." });
+  }
+  if (decision === "RECHAZADA" && !motivo) {
+    errores.push({ campo: "motivo", mensaje: "Ingrese la justificación del rechazo." });
+  }
+  if (motivo.length > MAX_MOTIVO_RESOLUCION) {
+    errores.push({ campo: "motivo", mensaje: `El motivo no puede exceder los ${MAX_MOTIVO_RESOLUCION} caracteres.` });
+  }
+  return { errores, decision, motivo: motivo || null };
+}
+
+module.exports = { ESTADO_SOLICITUD, DECISIONES, diasSolicitados, evaluarLimite, clasificarParaNomina, validarResolucion };

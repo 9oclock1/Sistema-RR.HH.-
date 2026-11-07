@@ -4,6 +4,7 @@ import { urlPdfMemorandum } from '../../../api/memorandumsApi';
 import { Alerta, Boton, EstadoVacio, Etiqueta, Pestanas, Tabla, TextoTruncado } from '../../../components/ui';
 import { formatearFecha } from '../../Vacantes/utils/formato';
 import { useMemorandumsEmpleado } from '../hooks/useMemorandumsEmpleado';
+import { estadoAcuse, formatearFechaHora } from '../../Memorandums/acuses/formatoAcuse';
 
 const GRAVEDADES = { LEVE: 'Gravedad leve', MODERADA: 'Gravedad moderada', GRAVE: 'Gravedad grave' };
 
@@ -44,7 +45,7 @@ const COLUMNAS = [
   {
     clave: 'tipo',
     titulo: 'Tipo',
-    ancho: '25%',
+    ancho: '20%',
     celda: (memo) =>
       memo.es_reconocimiento ? (
         <Etiqueta tono="exito" icono={Award}>
@@ -81,9 +82,24 @@ const COLUMNAS = [
     ),
   },
   {
+    // RF-39: estado del acuse de recibo del colaborador.
+    clave: 'estado_acuse',
+    titulo: 'Acuse',
+    ancho: '20%',
+    celda: (memo) => {
+      const estado = estadoAcuse(memo.estado_acuse);
+      return (
+        <div className="asig-celda asig-celda--inicio">
+          <Etiqueta tono={estado.tono}>{estado.etiqueta}</Etiqueta>
+          {memo.fecha_hora_acuse && <span className="asig-celda__sub">{formatearFechaHora(memo.fecha_hora_acuse)}</span>}
+        </div>
+      );
+    },
+  },
+  {
     clave: 'documento_pdf_url',
     titulo: 'Documento PDF',
-    ancho: '26%',
+    ancho: '16%',
     celda: (memo) =>
       memo.documento_pdf_url ? (
         <Boton

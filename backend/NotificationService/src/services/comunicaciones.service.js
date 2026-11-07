@@ -1,8 +1,18 @@
 const modelo = require("../models/comunicaciones.model");
 const empleadosServicio = require("./empleados.service");
 const { ErrorApp } = require("../utils/errores");
-const { validarCamposObligatorios, validarUuid } = require("../utils/validaciones");
+const correoServicio = require("./correo.service");
+const { validarCamposObligatorios, validarUuid, validarPrioridad, validarEnlace } = require("../utils/validaciones");
 const { ALCANCE, TIPO, ALCANCE_ID, TIPO_ID } = require("../config/catalogos");
+
+// Cuerpo del correo: el mensaje y, si lo hay, el acceso directo al portal (PORTAL_URL + enlace).
+function armarTextoCorreo(contenido, enlace) {
+  const portal = (process.env.PORTAL_URL || "").replace(/\/+$/, "");
+  const acceso = portal
+    ? `\n\nIngrese al portal de RR.HH.: ${portal}${enlace || ""}`
+    : "\n\nIngrese al portal de RR.HH. para ver el detalle.";
+  return `${contenido}${acceso}\n\nEste es un aviso automático del Sistema de RR.HH.; no responda a este correo.`;
+}
 
 // ==========================================
 // RF-64: COMUNICACIONES DIRECTAS
@@ -14,6 +24,9 @@ async function enviarComunicacionDirecta({
   contenido,
   requiereConfirmacion = false,
   remitenteNombre = null,
+  prioridad,
+  enlace,
+  notificarCorreo = false,
 }) {
   // Remitente obligatorio: no permitir fallback silencioso al destinatario
   if (!idUsuarioRemitente || typeof idUsuarioRemitente !== "string" || !idUsuarioRemitente.trim()) {
@@ -31,6 +44,8 @@ async function enviarComunicacionDirecta({
 
   // Criterio 2: Validación de campos obligatorios
   const { asunto: asuntoValido, contenido: contenidoValido } = validarCamposObligatorios(asunto, contenido);
+  const prioridadValida = validarPrioridad(prioridad);
+  const enlaceValido = validarEnlace(enlace);
 
   // Criterio 4: Verificar que el destinatario sea un empleado ACTIVO
   const empleadoDestino = await empleadosServicio.verificarEmpleadoActivo(idDestinatarioLimpio);
@@ -55,10 +70,21 @@ async function enviarComunicacionDirecta({
     asunto: asuntoValido,
     contenido: contenidoValido,
     requiereConfirmacion: Boolean(requiereConfirmacion),
+    prioridad: prioridadValida,
+    enlace: enlaceValido,
     idDepartamentoDestino: null,
     idSucursalDestino: null,
     idsEmpleadosDestinatarios: [empleadoDestino.id_empleado],
   });
+
+  // RF-39: además de la bandeja, el aviso puede llegar por correo. Si el correo falla, el mensaje igual quedó entregado.
+  const correo = notificarCorreo
+    ? await correoServicio.enviarCorreo({
+        para: empleadoDestino.correo,
+        asunto: prioridadValida === "ALTA" ? `[Prioridad alta] ${asuntoValido}` : asuntoValido,
+        texto: armarTextoCorreo(contenidoValido, enlaceValido),
+      })
+    : null;
 
   return {
     ...comunicacion,
@@ -66,6 +92,7 @@ async function enviarComunicacionDirecta({
       id_empleado: empleadoDestino.id_empleado,
       nombre_completo: `${empleadoDestino.nombres} ${empleadoDestino.apellidos}`,
     },
+    correo,
     mensaje: "Mensaje directo enviado exitosamente a la bandeja del empleado.",
   };
 }
@@ -199,12 +226,14 @@ async function consultarBandeja(idEmpleado, filtros = {}) {
   const idEmpleadoLimpio = validarUuid(idEmpleado, "id_empleado");
 
   const mensajes = await modelo.listarBandejaEmpleado(idEmpleadoLimpio, filtros);
-  const totalNoLeidos = mensajes.filter((m) => m.estado_codigo === "NO_LEIDO").length;
+  const noLeidos = mensajes.filter((m) => m.estado_codigo === "NO_LEIDO");
 
   return {
     mensajes,
     total: mensajes.length,
-    no_leidos: totalNoLeidos,
+    no_leidos: noLeidos.length,
+    // RF-39: avisos urgentes sin abrir que el portal destaca arriba de la bandeja.
+    alta_prioridad_no_leidos: noLeidos.filter((m) => m.prioridad === "ALTA").length,
   };
 }
 

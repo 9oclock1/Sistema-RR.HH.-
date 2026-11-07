@@ -1,0 +1,60 @@
+@startuml sec-03-kan41-entrada
+!include _estilo-secuencia.iuml
+title KAN-41 · Marcaje de entrada (RF-21)\n<size:12><color:#555555>Desde el portal o el reloj biométrico: empleado activo, jornada del turno, sin duplicados y atraso al instante.</color></size>
+
+actor "Colaborador" as COL
+boundary "MarcajePage\n(Reloj)" as P #D5E8D4
+participant "Reloj biométrico" as BIO #F8CECC
+participant "API Gateway\n(NGINX)" as GW #F5F5F5
+control "IdentificarEmpleado\n· AutenticarDispositivo" as MW #FFE6CC
+control "MarcajesController" as C
+control "MarcajesService" as S
+control "NovedadesService" as NS
+entity "MarcajesModel\n· NovedadesModel" as M #E1D5E7
+database "AttendanceDB\n(PostgreSQL)" as DB #FFF2CC
+participant "EmployeeService" as EMP #F8CECC
+
+alt desde el portal
+  COL -> P : «Marcar entrada»
+  P -> GW : POST /api/att/marcajes/entrada [X-Empleado-Id] (registrarEntrada)
+  GW -> MW : IdentificarEmpleado
+  alt sin X-Empleado-Id
+    $error(MW, P, "401 Identifíquese como empleado para continuar")
+  end
+  MW -> C : registrarEntrada(req, res)
+else desde el reloj biométrico
+  BIO -> GW : POST /api/att/marcajes/biometrico/entrada\n[X-Dispositivo-Clave] { id_empleado }
+  GW -> MW : AutenticarDispositivo
+  alt clave de dispositivo desconocida
+    $error(MW, BIO, "401 Dispositivo biométrico no autorizado")
+  end
+  MW -> C : registrarEntradaBiometrica(req, res)
+  C -> S : leerEmpleadoReconocido(body) · origen BIOMETRICO
+end
+
+C -> S : registrarEntrada(idEmpleado, { origen, codigoDispositivo })
+S -> EMP : GET /empleados/{id} (verificarEmpleado)
+alt EmployeeService no responde
+  $error(S, P, "503 No se pudo verificar al empleado (no se guarda nada)")
+else no existe o está inactivo
+  $error(S, P, "403 El empleado no está activo, no puede registrar marcajes")
+else activo
+  S -> M : momentoActual() · listarRecientes(idEmpleado) (leerJornada)
+  S -> M : listarProgramacion(idEmpleado, ayer..mañana) (jornadaParaEntrada)
+  M -> DB : TURNOS_PUBLICADOS o ASIGNACIONES_TURNO vigente
+  S -> S : fechaJornadaEntrada(): turno cuya ventana (4 h antes del\ninicio hasta el fin) contiene la hora; si no, la fecha de hoy
+  alt ya marcó entrada o la jornada está cerrada
+    $error(S, P, "409 Ya registró su entrada de hoy a las HH:MM")
+  else primera entrada de la jornada
+    S -> M : registrar(ENTRADA, REGISTRADO, fecha_jornada)
+    M -> DB : INSERT MARCAJES (hora del servidor)
+    S -> NS : alMarcar(idEmpleado, [entrada])
+    NS -> M : contrastar(ayer..mañana, idEmpleado)
+    M -> DB : INSERT NOVEDADES_ASISTENCIA (ATRASO si pasó la tolerancia)
+    NS --> S : atraso o nada
+    S --> C : marcaje + atraso
+    C --> P : 201
+    P --> COL : hora de ingreso registrada (y minutos de atraso)
+  end
+end
+@enduml

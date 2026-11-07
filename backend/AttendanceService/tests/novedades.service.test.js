@@ -46,6 +46,7 @@ beforeEach(() => {
   mock.method(modelo, "listarMarcajes", async () => [entrada(ANA, "08:20")]);
   mock.method(modelo, "sumarAtrasosDelMes", async () => [{ id_empleado: ANA, minutos: 45, cantidad: 2 }]);
   mock.method(modelo, "listarJustificadas", async () => []);
+  mock.method(modelo, "listarAusenciasAprobadas", async () => []);
   registrar = mock.method(modelo, "registrar", async (filas) => filas.length);
   mock.method(horasExtra, "calcular", async () => 3);
 });
@@ -66,6 +67,23 @@ test("contrastar guarda el atraso con la copia del turno y la falta solo de empl
   assert.equal(falta.id_empleado, LUIS);
   assert.equal(falta.id_tipo_novedad, TIPO_NOVEDAD.INASISTENCIA);
   assert.equal(falta.minutos_penalizacion, 420);
+});
+
+test("no se registra falta en un día con licencia o vacación aprobada", async () => {
+  mock.method(modelo, "listarAusenciasAprobadas", async () => [{ id_empleado: LUIS, fecha_inicio: HOY, fecha_fin: HOY }]);
+  await servicio.contrastar({ desde: HOY, hasta: HOY, activos: new Set([ANA, LUIS]), ahora: AHORA });
+  assert.deepEqual(
+    registrar.mock.calls[0].arguments[0].map((f) => [f.id_empleado, f.id_tipo_novedad]),
+    [[ANA, TIPO_NOVEDAD.ATRASO]]
+  );
+});
+
+test("una licencia de otro día no evita la falta", async () => {
+  mock.method(modelo, "listarAusenciasAprobadas", async () => [
+    { id_empleado: LUIS, fecha_inicio: "2026-10-13", fecha_fin: "2026-10-14" },
+  ]);
+  await servicio.contrastar({ desde: HOY, hasta: HOY, activos: new Set([LUIS]), ahora: AHORA });
+  assert.ok(registrar.mock.calls[0].arguments[0].some((f) => f.id_empleado === LUIS && f.id_tipo_novedad === TIPO_NOVEDAD.INASISTENCIA));
 });
 
 test("sin lista de activos no se registran faltas", async () => {

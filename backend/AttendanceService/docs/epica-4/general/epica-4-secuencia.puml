@@ -1,0 +1,85 @@
+@startuml epica-4-secuencia
+title Épica 4 · Seguimiento de entrada y salida (Control de asistencia)\nDiagrama de secuencia (resumen de la épica)
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 260
+skinparam sequence {
+  LifeLineBorderColor #888888
+  ParticipantBorderColor #6C8EBF
+  ParticipantBackgroundColor #DAE8FC
+  ActorBorderColor #333333
+  ActorBackgroundColor #FFFFFF
+  GroupBorderColor #888888
+  GroupBackgroundColor #F5F5F5
+  DividerBackgroundColor #EEEEEE
+  DividerBorderColor #BBBBBB
+}
+autonumber "<b>00"
+
+actor "Administrador\nde RRHH" as RRHH
+actor "Supervisor" as SUP
+actor "Colaborador" as COL
+boundary "Frontend\n(React)" as FE #D5E8D4
+control "AttendanceService" as AS
+participant "EmployeeService" as ES #F8CECC
+queue "Google Pub/Sub\n→ Producción, Entregas" as PS #F8CECC
+participant "CompensationService\n(planillas)" as CS #F8CECC
+
+== KAN-43 · Turnos, refrigerios y tolerancias (RF-23) ==
+RRHH -> FE : configura turnos, refrigerios y tolerancias
+FE -> AS : guardar turno
+AS --> FE : turno creado
+
+== KAN-44 · Turnos rotativos (RF-24) ==
+SUP -> FE : arma y publica el rol semanal o mensual
+FE -> AS : publicar rol
+AS -> AS : valida descansos mínimos entre jornadas
+AS ->> PS : rol de turnos publicado
+AS --> FE : rol publicado
+
+== KAN-41 · KAN-42 · Marcaje de entrada y salida (RF-21, RF-22) ==
+COL -> FE : marca entrada (portal o reloj biométrico)
+FE -> AS : registrar entrada
+AS -> ES : ¿empleado activo?
+ES --> AS : activo
+AS --> FE : entrada registrada (con atraso si lo hay)
+COL -> FE : marca salida
+FE -> AS : registrar salida
+AS --> FE : salida y horas trabajadas
+
+== KAN-45 · KAN-47 · Contraste y cálculo automático (RF-25, RF-27) ==
+loop cada 5 minutos
+  AS -> AS : contrasta turnos y marcajes\n(atrasos, faltas, salidas anticipadas)
+  AS -> AS : calcula horas ordinarias, nocturnas y extra
+  AS ->> CS : jornada consolidada
+end
+SUP -> FE : revisa el panel de alertas del día
+FE -> AS : consultar panel
+AS --> FE : estado de cada colaborador
+
+== KAN-46 · Justificativos (RF-26) ==
+COL -> FE : justifica la falta o el atraso con un comprobante
+FE -> AS : registrar justificativo
+SUP -> FE : aprueba el justificativo
+FE -> AS : revisar justificativo
+AS -> AS : la novedad queda justificada, sin penalización
+
+== KAN-47 · Horas extra (RF-27) ==
+SUP -> FE : aprueba o ajusta las horas extra (tope de 2 h por día)
+FE -> AS : revisar horas extra
+SUP -> FE : cierra el periodo
+FE -> AS : consolidar periodo
+AS ->> CS : horas extra consolidadas
+
+== KAN-48 · KAN-49 · Historial y reportes (RF-28, RF-29) ==
+COL -> FE : consulta su historial de asistencia
+FE -> AS : mi historial
+AS --> FE : marcaciones, atrasos y horas computadas
+RRHH -> FE : exporta el reporte de una sucursal o área
+FE -> AS : generar reporte
+AS --> FE : archivo PDF, Excel o CSV
+@enduml

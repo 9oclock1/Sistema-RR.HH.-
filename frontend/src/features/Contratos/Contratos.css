@@ -1,0 +1,208 @@
+.contratos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.contratos .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+.contratos-contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: calc(var(--size-sidebar) * 3);
+}
+
+.contratos-resultado {
+  border-radius: var(--radius-card);
+}
+
+.contratos-resultado:focus {
+  outline: none;
+}
+
+.contratos-resultado:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-border-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.contratos-seccion,
+.contratos-cargando {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.contratos-codigo {
+  font-family: var(--font-family-mono);
+}
+
+.contratos-nota {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.contratos-actual {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-page);
+}
+
+.contratos-actual__encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.contratos-actual__encabezado .ds-etiqueta {
+  flex: none;
+}
+
+.contratos-actual__titulo {
+  color: var(--color-text);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.contratos-actual__datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--size-sidebar) * 0.6), 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+}
+
+.contratos-dato {
+  min-width: 0;
+}
+
+.contratos-dato dt {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.contratos-dato dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+}
+
+.contratos-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.contratos-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.contratos-fila {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.contratos-fila--tres {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.contratos-form__pie {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.contratos-revision {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.contratos-revision__datos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+}
+
+.contratos-revision__datos dt {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.contratos-revision__datos dd {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.contratos-revision__archivo {
+  overflow-wrap: anywhere;
+}
+
+.contratos-cambios {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contratos-cambio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text-subtle);
+}
+
+.contratos-cambio__campo {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.contratos-cambio__antes {
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+}
+
+.contratos-cambio__despues {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+@media (max-width: 640px) {
+  .contratos-fila,
+  .contratos-fila--tres,
+  .contratos-revision__datos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .contratos-cambio {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .contratos-cambio__campo {
+    grid-column: 1 / -1;
+  }
+}

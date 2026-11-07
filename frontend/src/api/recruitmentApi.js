@@ -46,14 +46,55 @@ export async function registerApplicant(applicantData) {
 }
 
 /**
- * Obtiene la lista de postulantes de una convocatoria específica.
+ * Obtiene la lista de postulantes de una convocatoria específica,
+ * admitiendo filtros opcionales de rango de afinidad.
  * @param {string} id_convocatoria - UUID de la convocatoria
+ * @param {Object} [filtros={}] - { minAfinidad, maxAfinidad }
  * @returns {Promise<Object>} { convocatoria, total_postulantes, postulantes }
  */
-export async function fetchApplicantsByJobOpening(id_convocatoria) {
+export async function fetchApplicantsByJobOpening(
+  id_convocatoria,
+  { minAfinidad = null, maxAfinidad = null } = {},
+) {
   try {
-    const respuesta = await solicitar(`${RUTA_BASE}/by-opening/${id_convocatoria}`);
+    const params = new URLSearchParams();
+    if (minAfinidad !== null && minAfinidad !== "") {
+      params.append("minAfinidad", minAfinidad);
+    }
+    if (maxAfinidad !== null && maxAfinidad !== "") {
+      params.append("maxAfinidad", maxAfinidad);
+    }
+
+    const queryStr = params.toString() ? `?${params.toString()}` : "";
+    const respuesta = await solicitar(
+      `${RUTA_BASE}/by-opening/${id_convocatoria}${queryStr}`,
+    );
     return respuesta?.data ?? respuesta ?? { postulantes: [] };
+  } catch (error) {
+    throw adaptarError(error);
+  }
+}
+
+/**
+ * Obtiene el ranking de postulantes ordenados por matching score para una convocatoria.
+ * @param {string} id_convocatoria - UUID de la convocatoria
+ * @param {Object} [parametros={}] - Parámetros de consulta (pagina, limite, desempate, filtros)
+ * @returns {Promise<Object>} { convocatoria, paginacion, criterios_aplicados, ranking }
+ */
+export async function fetchCandidateRanking(id_convocatoria, parametros = {}) {
+  try {
+    const query = new URLSearchParams();
+    Object.entries(parametros).forEach(([clave, valor]) => {
+      if (valor !== undefined && valor !== null && valor !== "") {
+        query.append(clave, valor);
+      }
+    });
+
+    const queryString = query.toString() ? `?${query.toString()}` : "";
+    const respuesta = await solicitar(
+      `/recr/convocatorias/${id_convocatoria}/ranking${queryString}`,
+    );
+    return respuesta?.data ?? respuesta ?? { ranking: [] };
   } catch (error) {
     throw adaptarError(error);
   }
@@ -63,3 +104,4 @@ export async function fetchApplicantsByJobOpening(id_convocatoria) {
 export const listarConvocatoriasActivas = fetchActiveJobOpenings;
 export const registrarPostulante = registerApplicant;
 export const listarPostulantesPorConvocatoria = fetchApplicantsByJobOpening;
+export const obtenerRankingCandidatos = fetchCandidateRanking;

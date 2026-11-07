@@ -137,6 +137,26 @@ async function listarAreas() {
   return Array.isArray(lista) ? lista.map(({ id_departamento, nombre }) => ({ id_departamento, nombre })) : [];
 }
 
+// Dónde trabaja hoy el empleado, con el código del área (decide a qué módulo del ERP se avisa su ausencia).
+// null si el empleado no existe; ErrorApp 503 si no se pudo consultar a EmployeeService.
+async function obtenerUbicacionConArea(idEmpleado) {
+  if (usarSimulados()) {
+    return { id_sucursal: null, id_departamento: null, cargo: "Personal simulado", area: "Área simulada", area_codigo: "SIM", sucursal: "Sucursal simulada" };
+  }
+  const ficha = await consultar(`/empleados/${idEmpleado}/ficha`, sinDatosDePersonal);
+  const actual = ficha?.asignacion_actual;
+  if (!actual) return null;
+  const area = await obtenerArea(actual.area.id_departamento);
+  return {
+    id_sucursal: actual.sucursal.id_sucursal,
+    id_departamento: actual.area.id_departamento,
+    cargo: actual.cargo.nombre,
+    area: actual.area.nombre,
+    area_codigo: area?.codigo ?? null,
+    sucursal: actual.sucursal.nombre,
+  };
+}
+
 module.exports = {
   obtener,
   listarPorArea,
@@ -146,6 +166,7 @@ module.exports = {
   obtenerSucursal,
   obtenerArea,
   obtenerUbicacion,
+  obtenerUbicacionConArea,
   listarCargosSubordinados,
   listarSucursales,
   listarAreas,

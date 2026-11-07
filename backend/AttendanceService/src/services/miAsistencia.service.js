@@ -190,7 +190,7 @@ async function consultar(idEmpleado, consulta = {}) {
         turno,
         entrada: resumirMarcaje(entrada),
         salida: resumirMarcaje(salida),
-        minutos_trabajados: h?.minutos_trabajados ?? null,
+        minutos_trabajados: h?.minutos_computados ?? null,
         minutos_extra_aprobados: h?.minutos_extra_aprobados ?? 0,
         horas_extra: h && h.estado_extra_codigo !== "SIN_EXTRA" ? { codigo: h.estado_extra_codigo, nombre: h.estado_extra_nombre } : null,
         novedades: novedadesDia,

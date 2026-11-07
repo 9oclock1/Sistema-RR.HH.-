@@ -8,4 +8,8 @@ async function confirmar(req, res) {
   res.json(await servicio.confirmar(req.params.id));
 }
 
-module.exports = { listar, confirmar };
+async function reintentar(req, res) {
+  res.json(await servicio.reintentar(req.params.id));
+}
+
+module.exports = { listar, confirmar, reintentar };

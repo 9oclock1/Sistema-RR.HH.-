@@ -1,6 +1,7 @@
 const memorandumsModel = require('../models/memorandumsModel');
 const asignacionesModel = require('../models/asignacionesModel');
 const pdfReconocimientosService = require('./pdfReconocimientosService');
+const acusesMemorandumService = require('./acusesMemorandumService');
 const HttpError = require('../utils/HttpError');
 const { withTransaction } = require('../utils/transaction');
 
@@ -16,8 +17,9 @@ const crearReconocimiento = async (datos) => {
   // El PDF se genera dentro de la transacción: si falla, no queda un reconocimiento sin documento
   // ni un correlativo consumido.
   let rutaPdf = null;
+  let reconocimiento;
   try {
-    return await withTransaction(async (client) => {
+    reconocimiento = await withTransaction(async (client) => {
       // Se valida antes de pedir el correlativo para no bloquear el contador con una petición inválida.
       const tipo = await memorandumsModel.obtenerTipo(client, datos.id_tipo_memo);
       if (!tipo) {
@@ -48,6 +50,10 @@ const crearReconocimiento = async (datos) => {
     if (rutaPdf) await pdfReconocimientosService.descartarPdf(rutaPdf);
     throw error;
   }
+
+  // RF-39: el aviso al colaborador sale recién con el reconocimiento confirmado.
+  const notificado = await acusesMemorandumService.notificarEmision(reconocimiento.id_memorandum);
+  return { ...reconocimiento, notificado };
 };
 
 module.exports = { crearReconocimiento };

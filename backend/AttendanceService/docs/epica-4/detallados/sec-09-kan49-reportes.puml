@@ -1,0 +1,33 @@
+@startuml sec-09-kan49-reportes
+!include _estilo-secuencia.iuml
+title KAN-49 · Reportes de asistencia por área o sucursal (RF-29) · BORRADOR\n<size:12><color:#555555>Armado con los criterios de aceptación; ajustar nombres y rutas con la implementación.</color></size>
+
+actor "Administrador de RRHH\no Supervisor" as U
+boundary "Reportes de asistencia" as P #D5E8D4
+participant "API Gateway\n(NGINX)" as GW #F5F5F5
+control "ReportesController" as C
+control "ReportesService" as S
+entity "Modelos de novedades\ny horas" as M #E1D5E7
+database "AttendanceDB\n(PostgreSQL)" as DB #FFF2CC
+participant "EmployeeService" as EMP #F8CECC
+
+U -> P : sucursal, departamento y rango de fechas
+P -> GW : GET reporte consolidado
+GW -> C : generar(req, res)
+C -> S : generar(filtros, usuario)
+S -> EMP : sucursal asignada al supervisor y personal del área
+alt el supervisor pide otra sucursal
+  $error(S, P, "403 Solo puede ver al personal de su sucursal")
+else permitido
+  S -> M : agregaciones por empleado
+  M -> DB : NOVEDADES_ASISTENCIA · HORAS_JORNADA\n· SOLICITUDES_JUSTIFICACION
+  S -> S : % de ausentismo, minutos de atraso, faltas justificadas\ne injustificadas y horas extra
+  C --> P : 200 consolidado agrupado por empleado
+  U -> P : «Exportar»
+  P -> GW : GET reporte (formato PDF, Excel o CSV)
+  GW -> C : exportar(req, res)
+  C -> S : exportar(filtros, formato)
+  S -> S : genera el archivo con los mismos indicadores
+  C --> P : archivo descargable
+end
+@enduml

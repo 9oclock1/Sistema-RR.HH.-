@@ -45,11 +45,14 @@ function agruparMarcajes(marcajes) {
 }
 
 // Contrasta los turnos programados con los marcajes y guarda las novedades nuevas.
-// Solo se registra inasistencia a los empleados de `activos` (sin la lista, a nadie).
+// Solo se registra inasistencia a los empleados de `activos` (sin la lista, a nadie) y no en días con licencia o vacación aprobada.
 async function contrastar({ desde, hasta, ids = null, activos = null, ahora }) {
   const programacion = await modelo.listarProgramacion(desde, hasta, ids);
   const idsEmpleados = ids ?? [...new Set(programacion.map((turno) => turno.id_empleado))];
   const marcajes = agruparMarcajes(await modelo.listarMarcajes(idsEmpleados, desde, hasta));
+  const ausencias = await modelo.listarAusenciasAprobadas(idsEmpleados, desde, hasta);
+  const conAusenciaAprobada = (turno) =>
+    ausencias.some((a) => a.id_empleado === turno.id_empleado && a.fecha_inicio <= turno.fecha && a.fecha_fin >= turno.fecha);
 
   const resultados = new Map();
   const filas = [];
@@ -60,7 +63,7 @@ async function contrastar({ desde, hasta, ids = null, activos = null, ahora }) {
       marcajes: marcajes.get(turno.id_empleado) ?? [],
       ahoraMs: ahora.getTime(),
       minutosCierre: minutosCierre(),
-      registrarFaltas: activos?.has(turno.id_empleado) ?? false,
+      registrarFaltas: (activos?.has(turno.id_empleado) ?? false) && !conAusenciaAprobada(turno),
     });
     resultados.set(`${turno.id_empleado}|${turno.fecha}`, { turno, resultado });
     filas.push(...filasNovedades(turno, resultado));

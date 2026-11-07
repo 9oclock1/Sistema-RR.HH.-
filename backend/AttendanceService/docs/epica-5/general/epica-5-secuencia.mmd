@@ -1,0 +1,46 @@
+sequenceDiagram
+  autonumber
+  actor C as Colaborador
+  actor S as Supervisor o RRHH
+  participant P as Portal
+  participant A as AttendanceService
+  participant E as EmployeeService
+  participant N as NotificationService
+  participant ERP as Producción y Entregas
+  participant DB as AttendanceDB
+
+  rect rgb(233, 242, 254)
+    Note over C,DB: KAN-52 · KAN-50 · KAN-51 · el colaborador pide
+    C->>P: consulta su saldo y pide vacaciones o una licencia
+    P->>A: GET saldo, POST solicitud
+    A->>E: fecha de ingreso, estado y supervisor
+    A->>DB: valida saldo, cruces y topes, guarda la solicitud y reserva los días
+    A-->>N: mensaje directo al supervisor
+  end
+
+  rect rgb(255, 247, 214)
+    Note over S,DB: KAN-53 · el supervisor decide
+    S->>P: abre Aprobaciones
+    P->>A: GET bandeja y detalle
+    A->>E: personal de la sucursal
+    A->>DB: solicitudes, ausencias del equipo y saldo
+    S->>P: aprueba o rechaza con motivo
+    P->>A: POST resolución
+    A->>DB: una transacción: estado, saldo y evento de indisponibilidad
+    A-->>ERP: PERSONAL_NO_DISPONIBLE por REST o Pub/Sub
+  end
+
+  rect rgb(220, 255, 241)
+    Note over C,N: KAN-54 · el colaborador se entera
+    A->>N: POST resolución de solicitud
+    N->>N: alerta en el portal y correo resumen
+    C->>P: campana, Notificaciones, Ver solicitud
+  end
+
+  rect rgb(243, 240, 255)
+    Note over S,DB: KAN-55 · cobertura del equipo
+    S->>P: Calendario de ausencias
+    P->>A: GET calendario por sucursal, área y rango
+    A->>DB: ausencias aprobadas, turnos, feriados y umbrales
+    A-->>P: ausencias y días con baja cobertura
+  end

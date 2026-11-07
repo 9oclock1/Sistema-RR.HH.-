@@ -1,0 +1,243 @@
+@startuml epica-4-clases
+!pragma layout smetana
+title Épica 4 · Seguimiento de entrada y salida (Control de asistencia)\nDiagrama de clases (resumen de la épica)
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 70
+skinparam class {
+  BackgroundColor #DAE8FC
+  BorderColor #6C8EBF
+  ArrowColor #444444
+  StereotypeFontColor #555555
+}
+skinparam package {
+  BackgroundColor #FAFAFA
+  BorderColor #BBBBBB
+  FontColor #555555
+}
+
+package "Organización (EmployeeService)" {
+  class Empleado <<EmployeeService>> #F8CECC {
+    id_empleado: UUID
+    nombres: String
+    apellidos: String
+    activo: Boolean
+  }
+}
+
+package "KAN-43 · Turnos (RF-23)" {
+  class Turno {
+    nombre: String
+    tipo_jornada: DIURNO | VESPERTINO | NOCTURNO
+    hora_inicio: Time
+    hora_fin: Time
+    minutos_refrigerio: Integer
+    minutos_tolerancia: Integer
+    --
+    + horasEfectivas(): Integer
+    + evaluarMarcaje(fechaHora)
+  }
+  class AsignacionTurno <<turno fijo>> {
+    fecha_desde: Date
+    fecha_hasta: Date [0..1]
+  }
+}
+
+package "KAN-44 · Turnos rotativos (RF-24)" {
+  class RolTurno {
+    id_sucursal: UUID
+    id_departamento: UUID
+    periodo: SEMANAL | MENSUAL
+    fecha_inicio: Date
+    fecha_fin: Date
+    estado: BORRADOR | PUBLICADO
+    --
+    + guardarAsignaciones(celdas)
+    + publicar()
+  }
+  class AsignacionRolTurno {
+    fecha: Date
+    es_descanso: Boolean
+  }
+}
+
+package "KAN-41 · KAN-42 · Marcajes (RF-21, RF-22)" {
+  class Marcaje {
+    tipo: ENTRADA | SALIDA
+    origen: OrigenMarcaje
+    fecha_hora_marcaje: DateTime
+    fecha_jornada: Date
+    --
+    + registrarEntrada(idEmpleado)
+    + registrarSalida(idEmpleado)
+  }
+}
+
+package "KAN-45 · Atrasos e inasistencias (RF-25)" {
+  class NovedadAsistencia {
+    tipo: TipoNovedad
+    estado: REGISTRADA | JUSTIFICADA
+    fecha_jornada: Date
+    minutos: Integer
+    minutos_penalizacion: Integer
+    --
+    + contrastar(desde, hasta)
+    + consolidar()
+  }
+}
+
+package "KAN-46 · Justificativos (RF-26)" {
+  class SolicitudJustificacion {
+    motivo: String
+    descripcion: String [0..1]
+    estado: EstadoJustificacion
+    comentario_revision: String [0..1]
+    --
+    + registrar(novedad, archivos)
+    + revisar(decision, comentario)
+  }
+  class AdjuntoJustificacion {
+    nombre_original: String
+    tipo_mime: PDF | JPG | PNG
+    tamano_bytes: Integer
+  }
+}
+
+package "KAN-47 · Horas extra y recargo nocturno (RF-27)" {
+  class HorasJornada {
+    fecha_jornada: Date
+    tipo_dia: HABIL | DOMINGO | FERIADO
+    minutos_ordinarios: Integer
+    minutos_nocturnos: Integer
+    minutos_extra: Integer
+    minutos_extra_aprobados: Integer [0..1]
+    estado: EstadoHorasExtra
+    --
+    + calcular(desde, hasta)
+    + revisar(decision, minutos)
+  }
+  class AutorizacionHorasExtra {
+    fecha_jornada: Date
+    minutos_autorizados: Integer
+    motivo: String
+  }
+  class PeriodoHorasExtra {
+    fecha_inicio: Date
+    fecha_fin: Date
+    --
+    + consolidar()
+  }
+}
+
+package "KAN-48 · KAN-49 · Historial y reportes (RF-28, RF-29)" {
+  class HistorialAsistencia <<consulta>> #E1F5FE {
+    /dias_laborados: Integer
+    /minutos_atraso: Integer
+    /faltas: Integer
+    --
+    + consultar(idEmpleado, desde, hasta)
+  }
+  class ReporteAsistencia <<consulta>> #E1F5FE {
+    /porcentaje_ausentismo: Decimal
+    /minutos_atraso: Integer
+    /faltas_justificadas: Integer
+    /horas_extra: Integer
+    --
+    + generar(sucursal, area, desde, hasta)
+    + exportar(PDF | Excel | CSV)
+  }
+}
+
+package "Enumeraciones" {
+  enum OrigenMarcaje #FFF2CC {
+    PORTAL
+    BIOMETRICO
+  }
+  enum TipoNovedad #FFF2CC {
+    ATRASO
+    INASISTENCIA
+    SALIDA_ANTICIPADA
+    OMISION_SALIDA
+  }
+  enum EstadoJustificacion #FFF2CC {
+    PENDIENTE
+    APROBADA
+    RECHAZADA
+  }
+  enum EstadoHorasExtra #FFF2CC {
+    SIN_EXTRA
+    PENDIENTE
+    APROBADA
+    AJUSTADA
+    RECHAZADA
+  }
+}
+
+package "Sistemas externos" {
+  class EventoSaliente <<outbox>> {
+    topico: String
+    tipo_evento: String
+    carga: JSON
+    estado: PENDIENTE | ENTREGADO | FALLIDO
+    --
+    + despachar()
+  }
+  class "Google Pub/Sub" as PubSub <<Producción · Entregas>> #F8CECC {
+    + rolTurnosPublicado(evento)
+  }
+  class CompensationService <<microservicio>> #F8CECC {
+    + jornadaConsolidada(evento)
+    + horasExtraConsolidadas(evento)
+  }
+}
+
+AsignacionTurno "*" --> "1" Turno
+AsignacionTurno "*" --> "1" Empleado
+RolTurno "1" *-- "0..*" AsignacionRolTurno : borrador
+AsignacionRolTurno "*" --> "0..1" Turno : turno del día
+AsignacionRolTurno "*" --> "1" Empleado
+Marcaje "*" --> "1" Empleado
+Marcaje ..> Empleado : <<HTTP>> ¿activo?
+
+NovedadAsistencia "*" --> "0..1" Marcaje
+NovedadAsistencia "*" --> "0..1" Turno : turno programado
+SolicitudJustificacion "*" --> "1" NovedadAsistencia : justifica
+SolicitudJustificacion "1" *-- "1..3" AdjuntoJustificacion : comprobantes
+
+HorasJornada "0..1" --> "2" Marcaje : entrada y salida
+HorasJornada "*" --> "0..1" AutorizacionHorasExtra : autorización previa
+PeriodoHorasExtra "0..1" o-- "0..*" HorasJornada : consolida
+
+HistorialAsistencia ..> Marcaje
+HistorialAsistencia ..> NovedadAsistencia
+ReporteAsistencia ..> NovedadAsistencia
+ReporteAsistencia ..> HorasJornada
+
+RolTurno ..> EventoSaliente : rol publicado
+NovedadAsistencia ..> EventoSaliente : jornada consolidada
+PeriodoHorasExtra ..> EventoSaliente : horas extra consolidadas
+EventoSaliente ..> PubSub : <<publica>>
+EventoSaliente ..> CompensationService : <<HTTP>>
+
+note bottom of NovedadAsistencia
+  Un proceso contrasta cada 5 minutos los turnos
+  programados con los marcajes de los últimos 7 días.
+  Una novedad justificada no suma penalización.
+end note
+
+note bottom of HorasJornada
+  Tope legal de 2 horas extra por día.
+  Nocturnas: entre las 20:00 y las 06:00.
+end note
+
+note bottom of EventoSaliente
+  Se guarda en la misma transacción que la operación
+  y un despachador lo envía; reintenta si falla.
+end note
+@enduml

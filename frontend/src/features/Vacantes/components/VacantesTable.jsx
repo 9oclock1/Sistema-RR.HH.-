@@ -100,6 +100,15 @@ function AccionesFila({ vacante, enProceso, onEditar, onPublicar, onCerrar }) {
     return (
       <div className="vacantes-acciones">
         <Boton
+          variante="sutil"
+          soloIcono
+          icono={Pencil}
+          aria-label={`Editar ${vacante.titulo_puesto}`}
+          title="Editar requisitos (recalcula la afinidad de los postulantes)"
+          disabled={enProceso}
+          onClick={() => onEditar(vacante)}
+        />
+        <Boton
           tamano="sm"
           icono={Lock}
           cargando={enProceso}

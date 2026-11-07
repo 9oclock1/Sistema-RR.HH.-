@@ -1,0 +1,34 @@
+sequenceDiagram
+  autonumber
+  participant AT as AttendanceService
+  participant N as NotificationService
+  participant NDB as NotificationDB
+  participant E as EmployeeService
+  participant SMTP as Servidor de correo
+  actor C as Colaborador
+  participant P as Portal (campana y Notificaciones)
+
+  AT->>N: POST /notificaciones/resolucion-solicitud (categoría, estado, motivo)
+  N->>N: valida y arma el mensaje y el enlace de su categoría
+  N->>NDB: INSERT notificación (ON CONFLICT DO NOTHING)
+  alt ya existía (reintento)
+    N-->>AT: 200 sin repetir alerta ni correo
+  else nueva
+    N->>E: correo del empleado
+    N->>SMTP: correo resumen con el enlace al detalle
+    N->>NDB: correo_estado ENVIADO, FALLIDO o NO_APLICA
+    N-->>AT: 201
+  end
+  alt NotificationService no respondió
+    AT->>AT: resolucion_notificada_en vacío, el reintento cada 60 s lo completa
+  end
+  loop cada 30 segundos con la pestaña visible
+    P->>N: GET /notificaciones/conteo
+    N-->>P: no leídas (contador de la campana)
+  end
+  C->>P: abre la campana o la página Notificaciones
+  P->>N: GET /notificaciones (estado, límite, desplazamiento)
+  N-->>P: página, no leídas y total
+  C->>P: Ver solicitud
+  P->>N: POST /notificaciones/:id/leer
+  P->>P: navega al detalle de la solicitud

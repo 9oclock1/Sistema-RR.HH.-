@@ -1,4 +1,5 @@
 const { ConvocatoriaModel } = require("../models/convocatoriaModel");
+const { leerFiltroAfinidad } = require("../utils/filtroAfinidad");
 
 const ConvocatoriaController = {
   async listarPostulantes(req, res, next) {
@@ -7,6 +8,7 @@ const ConvocatoriaController = {
       const postulantes =
         await ConvocatoriaModel.listarPostulantesPorConvocatoria(
           idConvocatoria,
+          leerFiltroAfinidad(req.query),
         );
       return res.json({ success: true, data: postulantes });
     } catch (error) {

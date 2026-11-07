@@ -1,0 +1,90 @@
+@startuml sec-02-kan44-rol-turnos
+!include _estilo-secuencia.iuml
+title KAN-44 · Roles de turnos rotativos por sucursal (RF-24)\n<size:12><color:#555555>Borrador en matriz, validación de descansos, publicación con evento para Producción y Entregas, y consulta del colaborador.</color></size>
+
+actor "Supervisor" as SUP
+actor "Colaborador" as COL
+boundary "RolTurnosPage\n(MatrizRol)" as P #D5E8D4
+boundary "MarcajePage\n(MisTurnos)" as PC #D5E8D4
+participant "API Gateway\n(NGINX)" as GW #F5F5F5
+control "RolesTurnoController" as C
+control "RolesTurnoService" as S
+control "EventosService" as EV
+entity "RolesTurnoModel" as M #E1D5E7
+database "AttendanceDB\n(PostgreSQL)" as DB #FFF2CC
+participant "EmployeeService" as EMP #F8CECC
+
+== Crear el rol ==
+SUP -> P : sucursal, área operativa y periodo (semanal o mensual)
+P -> GW : POST /api/att/roles-turno (crearRol)
+GW -> C : POST /roles-turno
+C -> S : crear(body)
+S -> S : validarNuevoRol · calcularPeriodo\n(lunes a domingo o mes completo)
+S -> EMP : GET /sucursales · GET /departamentos\n(obtenerSucursal, obtenerArea)
+S -> M : buscarSolapado(sucursal, área, fechas)
+alt ya hay un rol del área con días en común
+  $error(S, P, "409 Ya existe un rol de turnos para esta área y sucursal")
+else libre
+  S -> M : crear(rol)
+  M -> DB : INSERT ROLES_TURNO (BORRADOR)
+  S -> S : armarDetalle(rol): personal del área y alertas
+  C --> P : 201 matriz de colaboradores por día
+end
+
+== Asignar turnos y descansos ==
+SUP -> P : arrastra turnos, descansos o una cuadrilla a la matriz
+P -> GW : PUT /api/att/roles-turno/{id}/asignaciones (guardarAsignaciones)
+GW -> C : PUT /roles-turno/{id}/asignaciones
+C -> S : guardarAsignaciones(id, cambios)
+S -> S : validarCambios · validarTurnosAsignables
+alt turno inactivo o celda inválida
+  $error(S, P, "400 Hay turnos que no se pueden asignar")
+else válidos
+  S -> EMP : GET /empleados?id_sucursal&id_departamento (armarPersonal)
+  S -> M : BEGIN · bloquear(rol) · aplicarCambios(cambios)
+  M -> DB : UPSERT / DELETE ASIGNACIONES_ROL_TURNO · COMMIT
+  S -> S : calcularAlertas(): descanso mínimo entre el fin\nde un turno y el inicio del siguiente
+  C --> P : 200 matriz con alertas de descanso
+end
+
+== Publicar el rol ==
+SUP -> P : «Publicar»
+P -> GW : POST /api/att/roles-turno/{id}/publicar (publicarRol)
+GW -> C : POST /roles-turno/{id}/publicar
+C -> S : publicar(id)
+S -> S : armarDetalle · verificarPublicable()
+alt sin personal activo, sin cambios, celdas vacías, turnos inactivos o alertas
+  $error(S, P, "409 No se puede publicar el rol: corrija las observaciones")
+else publicable
+  S -> M : BEGIN · bloquear(rol) · obtener(rol)
+  alt el rol cambió mientras se publicaba
+    $error(S, P, "409 El rol cambió mientras se publicaba (ROLLBACK)")
+  else sin cambios
+    S -> M : publicar(cliente, id, empleados)
+    M -> DB : copia el borrador a TURNOS_PUBLICADOS\n· versión + 1 · estado PUBLICADO
+    S -> EV : registrarPublicacion(cliente, detalle)
+    EV -> DB : INSERT EVENTOS_SALIENTES (ROL_TURNOS_PUBLICADO)\npor tópico: Producción (G) y/o Entregas (H)
+    note right of EV
+      Solo si el área es de producción
+      o de reparto. El envío a Pub/Sub
+      lo hace el despachador (sec-10).
+    end note
+    S -> M : COMMIT
+    alt el colaborador ya tiene turno publicado en otro rol (23505)
+      $error(S, P, "409 Hay colaboradores con turnos ya publicados en otro rol")
+    else publicado
+      C --> P : 200 rol PUBLICADO (versión n)
+    end
+  end
+end
+
+== Consulta del colaborador ==
+COL -> PC : abre «Mis turnos»
+PC -> GW : GET /api/att/mis-turnos [X-Empleado-Id] (consultarMisTurnos)
+GW -> C : misTurnos (tras IdentificarEmpleado)
+C -> S : misTurnos(idEmpleado, rango)
+S -> M : listarPublicadosDeEmpleado(idEmpleado, desde, hasta)
+M -> DB : SELECT TURNOS_PUBLICADOS
+C --> PC : 200 turnos o descansos por día
+PC --> COL : horario de la semana o del mes
+@enduml

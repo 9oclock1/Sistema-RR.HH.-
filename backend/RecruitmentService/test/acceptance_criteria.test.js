@@ -86,6 +86,20 @@ async function apiRequest(endpoint, options = {}) {
  */
 async function cleanTestData() {
   console.log("\n🧹 Cleaning test-specific applicant data from DB (non-destructive)...");
+  // RF-14: stage history and outgoing events reference POSTULACIONES, so they go first.
+  for (const tabla of ["EVENTOS_SALIENTES", "HISTORIALES_ETAPA_POSTULACION"]) {
+    await pool.query(
+      `DELETE FROM ${tabla}
+       WHERE id_postulacion IN (
+         SELECT p.id_postulacion FROM POSTULACIONES p
+         INNER JOIN POSTULANTES pos ON pos.id_postulante = p.id_postulante
+         WHERE pos.numero_documento = ANY($1)
+            OR pos.correo_electronico LIKE '%@testempresa.com'
+            OR pos.correo_electronico LIKE '%@test.com'
+       );`,
+      [TEST_DOCUMENTS]
+    );
+  }
   await pool.query(
     `DELETE FROM POSTULACIONES 
      WHERE id_postulante IN (

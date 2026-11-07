@@ -7,6 +7,11 @@ const applicantRoutes = require("./routes/applicantRoutes");
 const postulacionRoutes = require("./routes/postulacionRoutes");
 const cvDataRoutes = require("./routes/cvDataRoutes");
 const errorHandler = require("./middlewares/errorHandler");
+const affinityRoutes = require("./routes/affinityRoutes");
+const rankingRoutes = require("./routes/rankingRoutes");
+const etapaPostulacionRoutes = require("./routes/etapaPostulacionRoutes");
+const entrevistaRoutes = require("./routes/entrevistaRoutes");
+const mensajesPublicadosRoutes = require("./routes/mensajesPublicadosRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -49,6 +54,21 @@ app.use("/postulaciones", postulacionRoutes);
 
 // RF-11: datos extraídos del CV.
 app.use(cvDataRoutes);
+
+// RF-12: cálculo y desglose de afinidad CV vs requisitos.
+app.use(affinityRoutes);
+
+// RF-13: Ranking de postulantes por score de matching
+app.use("/convocatorias", rankingRoutes);
+
+// RF-14: cambio de etapa del postulante, historial y catálogo del pipeline.
+app.use(etapaPostulacionRoutes);
+
+// RF-15: agenda de entrevistas (agendar, reprogramar, cancelar) y notificación al candidato.
+app.use(entrevistaRoutes);
+
+// Mensajes publicados en Pub/Sub, para mostrarlos en la consola del navegador.
+app.use(mensajesPublicadosRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

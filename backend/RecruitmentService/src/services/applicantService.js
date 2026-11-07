@@ -51,9 +51,9 @@ async function registerApplicant(data) {
   // Evaluate the lock:
   // If acepta_postulaciones was computed in SQL, use it; fallback to JS evaluation in America/La_Paz
   const fechaLimite = convocatoria.fecha_limite_postulacion
-    ? (convocatoria.fecha_limite_postulacion instanceof Date
-        ? convocatoria.fecha_limite_postulacion.toISOString().split("T")[0]
-        : String(convocatoria.fecha_limite_postulacion).split("T")[0])
+    ? convocatoria.fecha_limite_postulacion instanceof Date
+      ? convocatoria.fecha_limite_postulacion.toISOString().split("T")[0]
+      : String(convocatoria.fecha_limite_postulacion).split("T")[0]
     : null;
   const hoyLaPaz = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/La_Paz",
@@ -65,7 +65,8 @@ async function registerApplicant(data) {
   const isAccepting =
     convocatoria.acepta_postulaciones !== undefined
       ? Boolean(convocatoria.acepta_postulaciones)
-      : Boolean(convocatoria.esta_activa) && (!fechaLimite || fechaLimite >= hoyLaPaz);
+      : Boolean(convocatoria.esta_activa) &&
+        (!fechaLimite || fechaLimite >= hoyLaPaz);
 
   if (!isAccepting) {
     return {
@@ -98,7 +99,10 @@ async function registerApplicant(data) {
     ]);
 
     // Check if applicant already exists by document number INSIDE transaction
-    let applicant = await applicantModel.findByDocumentNumber(numero_documento, client);
+    let applicant = await applicantModel.findByDocumentNumber(
+      numero_documento,
+      client,
+    );
 
     if (applicant) {
       // 3. Duplicate detection: same document → same convocatoria
@@ -106,7 +110,7 @@ async function registerApplicant(data) {
         await applicationModel.findByConvocatoriaAndPostulante(
           id_convocatoria,
           applicant.id_postulante,
-          client
+          client,
         );
 
       if (existingApplication) {
@@ -128,8 +132,14 @@ async function registerApplicant(data) {
 
       // Check if provided email belongs to ANOTHER applicant with a different document number
       if (correo_electronico) {
-        const existingByEmail = await applicantModel.findByEmail(correo_electronico, client);
-        if (existingByEmail && existingByEmail.id_postulante !== applicant.id_postulante) {
+        const existingByEmail = await applicantModel.findByEmail(
+          correo_electronico,
+          client,
+        );
+        if (
+          existingByEmail &&
+          existingByEmail.id_postulante !== applicant.id_postulante
+        ) {
           await client.query("ROLLBACK");
           return {
             success: false,
@@ -145,7 +155,10 @@ async function registerApplicant(data) {
       // without mutating POSTULANTES, preventing data corruption of historical applications.
     } else {
       // Check email uniqueness before creating new applicant
-      const existingByEmail = await applicantModel.findByEmail(correo_electronico, client);
+      const existingByEmail = await applicantModel.findByEmail(
+        correo_electronico,
+        client,
+      );
       if (existingByEmail) {
         await client.query("ROLLBACK");
         return {
@@ -167,7 +180,7 @@ async function registerApplicant(data) {
           direccion_residencia,
           ciudad,
         },
-        client
+        client,
       );
     }
 
@@ -182,7 +195,7 @@ async function registerApplicant(data) {
         cv_archivo_url: data.cv_archivo_url || "pending",
         cv_formato_mimetype: data.cv_formato_mimetype || "application/pdf",
       },
-      client
+      client,
     );
 
     await client.query("COMMIT");
@@ -224,8 +237,7 @@ async function registerApplicant(data) {
  * @param {string} id_convocatoria
  * @returns {Object}
  */
-async function getApplicantsByJobOpening(id_convocatoria) {
-  // Verify the job opening exists
+async function getApplicantsByJobOpening(id_convocatoria, filtros = {}) {
   const convocatoria = await jobOpeningModel.findById(id_convocatoria);
   if (!convocatoria) {
     return {
@@ -236,7 +248,10 @@ async function getApplicantsByJobOpening(id_convocatoria) {
     };
   }
 
-  const applicants = await applicationModel.findByConvocatoria(id_convocatoria);
+  const applicants = await applicationModel.findByConvocatoria(
+    id_convocatoria,
+    filtros,
+  );
 
   return {
     success: true,

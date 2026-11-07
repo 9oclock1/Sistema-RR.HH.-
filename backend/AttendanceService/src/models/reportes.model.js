@@ -36,4 +36,16 @@ async function totalizarHorasExtra(ids, desde, hasta) {
   return rows;
 }
 
-module.exports = { totalizarNovedades, totalizarHorasExtra };
+// Días en que cada empleado marcó entrada: son los días asistidos (un día sin marcajes no cuenta aunque el contraste aún no registre la falta).
+async function listarDiasConEntrada(ids, desde, hasta) {
+  if (ids.length === 0) return [];
+  const { rows } = await pool.query(
+    `SELECT DISTINCT id_empleado, fecha_jornada AS fecha
+     FROM marcajes
+     WHERE id_tipo_marcaje = 1 AND id_empleado = ANY($1::uuid[]) AND fecha_jornada BETWEEN $2 AND $3`,
+    [ids, desde, hasta]
+  );
+  return rows;
+}
+
+module.exports = { totalizarNovedades, totalizarHorasExtra, listarDiasConEntrada };

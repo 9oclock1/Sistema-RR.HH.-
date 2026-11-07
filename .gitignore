@@ -1,4 +1,7 @@
 # Configuracion de VSCode
 .vscode/*
+.vscode/settings.json
 # archivos subidos (comprobantes de licencias)
 backend/AttendanceService/uploads/
+credentials/
+project-a96e5fe1-*.json
