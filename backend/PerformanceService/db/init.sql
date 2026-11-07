@@ -335,7 +335,12 @@ CREATE TABLE PLANTILLAS_EVALUACION (
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT PLANTILLAS_EVALUACION_pk PRIMARY KEY (id_plantilla),
-    CONSTRAINT chk_plantilla_vigencia CHECK (vigencia_hasta >= vigencia_desde)
+    CONSTRAINT chk_plantilla_vigencia CHECK (vigencia_hasta >= vigencia_desde),
+    CONSTRAINT ex_plantilla_nombre_area_vigencia EXCLUDE USING gist (
+        nombre WITH =,
+        id_departamento_destino WITH =,
+        daterange(vigencia_desde, vigencia_hasta, '[]') WITH &&
+    )
 );
 -- Table: PREGUNTAS_EVALUACION
 CREATE TABLE PREGUNTAS_EVALUACION (
@@ -570,80 +575,4 @@ ADD CONSTRAINT VERSIONES_PLANTILLA_EMPLEADOS FOREIGN KEY (id_empleado_publicador
 -- Reference: VERSIONES_PLANTILLA_PLANTILLAS_EVALUACION (table: VERSIONES_PLANTILLA)
 ALTER TABLE VERSIONES_PLANTILLA
 ADD CONSTRAINT VERSIONES_PLANTILLA_PLANTILLAS_EVALUACION FOREIGN KEY (id_plantilla) REFERENCES PLANTILLAS_EVALUACION (id_plantilla) NOT DEFERRABLE INITIALLY IMMEDIATE;
--- additional constraints
--- KAN-9: no puede haber dos plantillas con el mismo nombre y área si sus vigencias se cruzan.
-ALTER TABLE PLANTILLAS_EVALUACION
-ADD CONSTRAINT ex_plantilla_nombre_area_vigencia EXCLUDE USING gist (
-    nombre WITH =,
-    id_departamento_destino WITH =,
-    daterange(vigencia_desde, vigencia_hasta, '[]') WITH &&
-);
--- seed
-INSERT INTO CATALOGOS_ESTADO_VERSION (id_estado_version, codigo, nombre)
-VALUES (1, 'BORRADOR', 'Borrador'),
-    (2, 'PUBLICADA', 'Publicada'),
-    (3, 'ARCHIVADA', 'Archivada');
-INSERT INTO CATALOGOS_TIPO_COMPETENCIA (id_tipo_competencia, codigo, nombre)
-VALUES (1, 'COMPETENCIA_LABORAL', 'Competencia laboral'),
-    (2, 'FACTOR_OPERATIVO', 'Factor operativo');
-INSERT INTO CATALOGOS_TIPO_ESCALA (id_tipo_escala, codigo, nombre)
-VALUES (1, 'CUANTITATIVA', 'Cuantitativa'),
-    (2, 'CUALITATIVA', 'Cualitativa');
-INSERT INTO CATALOGOS_ESTADO_CICLO (id_estado_ciclo, codigo, nombre)
-VALUES (1, 'PROGRAMADO', 'Programado'),
-    (2, 'ACTIVO', 'Activo'),
-    (3, 'CERRADO', 'Cerrado');
-INSERT INTO CATALOGOS_ESTADO_EVALUACION (id_estado_evaluacion, codigo, nombre)
-VALUES (1, 'PENDIENTE', 'Pendiente'),
-    (2, 'BORRADOR', 'Borrador'),
-    (3, 'ENVIADA', 'Enviada'),
-    (4, 'VENCIDA', 'Vencida');
-INSERT INTO CATALOGOS_ESTADO_EVENTO (id_estado_evento, codigo, nombre)
-VALUES (1, 'PENDIENTE', 'Pendiente'),
-    (2, 'ENTREGADO', 'Entregado'),
-    (3, 'FALLIDO', 'Fallido');
-INSERT INTO CATALOGOS_ESTADO_MENSAJE (id_estado_mensaje, codigo, nombre)
-VALUES (1, 'RECIBIDO', 'Recibido'),
-    (2, 'PROCESADO', 'Procesado'),
-    (3, 'EN_DLQ', 'En cola de errores');
-INSERT INTO CATALOGOS_MODULO_EXTERNO (id_modulo_externo, codigo, nombre, grupo)
-VALUES (1, 'CRM', 'CRM', 'B');
-INSERT INTO CATALOGOS_CATEGORIA_QUEJA (id_categoria_queja, codigo, nombre)
-VALUES (1, 'CLIMA_LABORAL', 'Clima laboral'),
-    (2, 'ACOSO', 'Acoso'),
-    (3, 'CONDICIONES_TRABAJO', 'Condiciones de trabajo'),
-    (4, 'OTRO', 'Otro');
-INSERT INTO CATALOGOS_ESTADO_QUEJA (id_estado_queja, codigo, nombre, es_final)
-VALUES (1, 'REGISTRADA', 'Registrada', FALSE),
-    (2, 'ASIGNADA', 'Asignada', FALSE),
-    (3, 'EN_ATENCION', 'En atención', FALSE),
-    (4, 'RESUELTA', 'Resuelta', TRUE),
-    (5, 'DESESTIMADA', 'Desestimada', TRUE);
-INSERT INTO CATALOGOS_TIPO_ACCION_QUEJA (id_tipo_accion_queja, codigo, nombre)
-VALUES (1, 'PREVENTIVA', 'Preventiva'),
-    (2, 'CORRECTIVA', 'Correctiva');
--- Escalas de partida: KAN-22 pide la etiqueta de cada nivel de la escala Likert de 1 a 5.
-INSERT INTO ESCALAS_VALORACION (id_escala, id_tipo_escala, nombre, descripcion)
-VALUES (
-        '00000000-0000-4000-8000-000000000001',
-        1,
-        'Likert de 1 a 5',
-        'Escala cuantitativa de cinco niveles'
-    ),
-    (
-        '00000000-0000-4000-8000-000000000002',
-        2,
-        'Nivel de cumplimiento',
-        'Escala cualitativa de cuatro niveles'
-    );
-INSERT INTO NIVELES_ESCALA (id_escala, valor, etiqueta)
-VALUES ('00000000-0000-4000-8000-000000000001', 1, 'Muy deficiente'),
-    ('00000000-0000-4000-8000-000000000001', 2, 'Deficiente'),
-    ('00000000-0000-4000-8000-000000000001', 3, 'Aceptable'),
-    ('00000000-0000-4000-8000-000000000001', 4, 'Bueno'),
-    ('00000000-0000-4000-8000-000000000001', 5, 'Excelente'),
-    ('00000000-0000-4000-8000-000000000002', 1, 'No cumple'),
-    ('00000000-0000-4000-8000-000000000002', 2, 'Cumple parcialmente'),
-    ('00000000-0000-4000-8000-000000000002', 3, 'Cumple'),
-    ('00000000-0000-4000-8000-000000000002', 4, 'Supera lo esperado');
 -- End of file.

@@ -2,7 +2,7 @@
  * Suite de integración: KAN-88 (RF-68) buzón de quejas, criterios de aceptación y anonimato.
  *
  * Levanta PerformanceService como proceso hijo (para revisar sus logs) contra la PerformanceDB de DATABASE_URL,
- * con un EmployeeService simulado, y comprueba la base, el disco y los logs. Requiere el esquema de db/init.sql.
+ * con un EmployeeService simulado, y comprueba la base, el disco y los logs. Requiere db/init.sql y los catálogos de db/seed.sql.
  * Crea sus propias quejas (empleados «bb000000-…») y al terminar borra solo esas. Sin base disponible, se omite.
  * Con el sistema en Docker:
  *   docker compose exec performance-service npm run test:quejas
