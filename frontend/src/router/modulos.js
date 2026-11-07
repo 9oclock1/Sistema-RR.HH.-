@@ -1,8 +1,10 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardPenLine, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
 import { RUTA_EVALUACIONES } from "../features/evaluaciones/ruta";
+import PlantillasPage from "../features/plantillas-evaluacion/PlantillasPage";
+import { RUTA_PLANTILLAS } from "../features/plantillas-evaluacion/ruta";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
@@ -332,6 +334,14 @@ export const SECCIONES = [
         icono: ClipboardPenLine,
         roles: ["supervisor"],
         pagina: EvaluacionesPage,
+      },
+      {
+        ruta: RUTA_PLANTILLAS,
+        etiqueta: "Plantillas de evaluación",
+        descripcion: "Diseño de plantillas estandarizadas por área y vigencia, en borrador hasta su publicación.",
+        icono: ClipboardList,
+        roles: ["admin"],
+        pagina: PlantillasPage,
       },
     ],
   },

@@ -1,0 +1,132 @@
+.pl-pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.pl-pagina .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+.pl-barra {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.pl-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.pl-filtros .ds-campo {
+  width: calc(var(--size-sidebar) * 0.9);
+  max-width: 100%;
+}
+
+.pl-total {
+  margin: 0 0 0 auto;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--size-control);
+}
+
+.pl-tabla .ds-tabla {
+  min-width: calc(var(--size-sidebar) * 3.5);
+}
+
+.pl-tabla th:last-child {
+  width: calc(var(--size-control) * 2 + var(--space-1) + var(--space-2) * 2);
+}
+
+.pl-celda {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+  padding-block: var(--space-1);
+}
+
+.pl-celda > * {
+  max-width: 100%;
+}
+
+.pl-celda__principal {
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.pl-sutil {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.pl-vigencia,
+.pl-numero {
+  font-variant-numeric: tabular-nums;
+}
+
+.pl-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+/* Formulario de la plantilla (dentro del modal) */
+.pl-formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-1);
+}
+
+.pl-formulario__campos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.pl-formulario__ancho {
+  grid-column: 1 / -1;
+}
+
+.pl-nota {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+@media (pointer: coarse) {
+  .pl-tabla th:last-child {
+    width: calc(var(--size-touch) * 2 + var(--space-1) + var(--space-2) * 2);
+  }
+}
+
+@media (max-width: 640px) {
+  .pl-formulario__campos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pl-filtros .ds-campo {
+    flex: 1 1 calc(var(--size-sidebar) * 0.5);
+  }
+
+  .pl-total {
+    width: 100%;
+    margin: 0;
+    line-height: var(--line-height-small);
+  }
+
+  .pl-barra {
+    justify-content: stretch;
+  }
+}
