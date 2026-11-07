@@ -4,6 +4,10 @@ async function listar(req, res) {
   res.json(await servicio.listar(req.query));
 }
 
+async function listarJornadas(req, res) {
+  res.json(await servicio.listarJornadas(req.query));
+}
+
 // Con ?formato=csv se descarga para planillas.
 async function resumen(req, res) {
   const datos = await servicio.resumen(req.query);
@@ -46,6 +50,7 @@ async function eliminarAutorizacion(req, res) {
 
 module.exports = {
   listar,
+  listarJornadas,
   resumen,
   listarPeriodos,
   consolidar,

@@ -69,8 +69,8 @@ async function crear(cliente, c) {
   return rows[0].id_concepto;
 }
 
-async function actualizar(id, c) {
-  const { rowCount } = await pool.query(
+async function actualizar(id, c, db = pool) {
+  const { rowCount } = await db.query(
     `UPDATE conceptos_planilla
      SET codigo = $1, nombre = $2, descripcion = $3, base_calculo = $4, es_de_ley = $5,
          cuenta_contable_codigo = $6, cuenta_contable_nombre = $7, actualizado_en = CURRENT_TIMESTAMP
@@ -139,6 +139,7 @@ async function crearVigencia(cliente, idConcepto, v) {
 }
 
 module.exports = {
+  CON_VIGENCIA,
   listar,
   obtener,
   listarVigencias,
