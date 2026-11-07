@@ -219,6 +219,13 @@ CREATE TABLE PLANILLA_EMPLEADOS (
     minutos_descanso int NOT NULL DEFAULT 0,
     minutos_nocturnos int NOT NULL DEFAULT 0,
     observaciones text[] NOT NULL DEFAULT '{}',
+    -- Resultado del cálculo (detalle en CALCULOS_PLANILLA). El líquido puede quedar negativo: es una alerta.
+    total_ganado numeric(12,2) NOT NULL DEFAULT 0,
+    total_descuentos numeric(12,2) NOT NULL DEFAULT 0,
+    liquido_pagable numeric(12,2) NOT NULL DEFAULT 0,
+    total_aportes numeric(12,2) NOT NULL DEFAULT 0,
+    -- Inconsistencias del cálculo: con alguna, la planilla no se aprueba.
+    alertas text[] NOT NULL DEFAULT '{}',
     CONSTRAINT PLANILLA_EMPLEADOS_pk PRIMARY KEY (id_planilla_empleado),
     CONSTRAINT uq_planilla_empleado UNIQUE (id_planilla, id_empleado),
     CONSTRAINT fk_planilla_empleado_planilla FOREIGN KEY (id_planilla)
@@ -233,6 +240,10 @@ CREATE TABLE PLANILLA_EMPLEADOS (
         atrasos >= 0 AND minutos_atraso >= 0 AND minutos_extra_habil >= 0 AND minutos_extra_domingo >= 0
         AND minutos_extra_feriado >= 0 AND minutos_extra_nocturnos >= 0 AND minutos_domingo >= 0
         AND minutos_feriado >= 0 AND minutos_descanso >= 0 AND minutos_nocturnos >= 0
+    ),
+    CONSTRAINT chk_planilla_empleado_totales CHECK (
+        total_ganado >= 0 AND total_descuentos >= 0 AND total_aportes >= 0
+        AND liquido_pagable = total_ganado - total_descuentos
     )
 );
 -- Tabla: NOVEDADES_PLANILLA
@@ -262,6 +273,34 @@ CREATE TABLE NOVEDADES_PLANILLA (
     CONSTRAINT chk_novedad_planilla_monto CHECK ((forma_calculo = 'MONTO_FIJO') = (monto IS NOT NULL))
 );
 CREATE INDEX idx_novedades_planilla_empleado ON NOVEDADES_PLANILLA (id_planilla_empleado);
+-- Tabla: CALCULOS_PLANILLA
+-- Detalle del cálculo de cada colaborador: un renglón por concepto, con la vigencia que dio el valor, la base,
+-- la cantidad (días u horas) y el resultado redondeado a centavos. Los totales del colaborador son su suma.
+CREATE TABLE CALCULOS_PLANILLA (
+    id_calculo UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla_empleado UUID NOT NULL,
+    id_vigencia UUID NOT NULL,
+    orden smallint NOT NULL,
+    tipo varchar(10) NOT NULL,
+    codigo varchar(20) NOT NULL,
+    nombre varchar(80) NOT NULL,
+    forma_calculo varchar(12) NOT NULL,
+    base numeric(12,2) NULL,
+    cantidad numeric(10,2) NULL,
+    valor numeric(12,4) NOT NULL,
+    resultado numeric(12,2) NOT NULL,
+    detalle varchar(250) NULL,
+    CONSTRAINT CALCULOS_PLANILLA_pk PRIMARY KEY (id_calculo),
+    CONSTRAINT uq_calculo_orden UNIQUE (id_planilla_empleado, orden),
+    CONSTRAINT fk_calculo_planilla_empleado FOREIGN KEY (id_planilla_empleado)
+        REFERENCES PLANILLA_EMPLEADOS (id_planilla_empleado) ON DELETE CASCADE,
+    -- Un concepto usado en una planilla no se puede eliminar, solo inactivar.
+    CONSTRAINT fk_calculo_vigencia FOREIGN KEY (id_vigencia) REFERENCES VIGENCIAS_CONCEPTO (id_vigencia),
+    CONSTRAINT chk_calculo_tipo CHECK (tipo IN ('INGRESO', 'DESCUENTO', 'APORTE')),
+    CONSTRAINT chk_calculo_forma CHECK (forma_calculo IN ('MONTO_FIJO', 'PORCENTAJE')),
+    CONSTRAINT chk_calculo_valores CHECK (valor > 0 AND resultado >= 0 AND (base IS NULL OR base >= 0) AND (cantidad IS NULL OR cantidad >= 0))
+);
+CREATE INDEX idx_calculos_planilla_empleado ON CALCULOS_PLANILLA (id_planilla_empleado);
 -- Tabla: EVENTOS_SALIENTES
 -- Bandeja de salida (outbox): el evento se guarda en la misma transacción que la aprobación y se envía
 -- después al broker, con reintentos, hasta que se entrega.
@@ -322,4 +361,40 @@ JOIN (VALUES
     ('SIP-RIESGO-PROF', 1.71),
     ('PRO-VIVIENDA', 2.00),
     ('SIP-SOLIDARIO-PAT', 3.00)
+) AS v (codigo, valor) USING (codigo);
+-- Conceptos que calcula la planilla con las novedades del mes (KAN-64). El valor de cada vigencia es el
+-- porcentaje que aplica el servicio: haber básico por días pagados, recargo de horas extra, pago adicional de
+-- domingos, feriados y descansos trabajados, recargo nocturno y Aporte Nacional Solidario por tramo
+-- (sobre el excedente de Bs 13.000, 25.000 y 35.000 del total ganado, Ley 065).
+WITH conceptos AS (
+    INSERT INTO CONCEPTOS_PLANILLA (codigo, nombre, descripcion, tipo, forma_calculo, base_calculo, es_de_ley,
+                                    cuenta_contable_codigo, cuenta_contable_nombre)
+    VALUES
+        ('HABER-BASICO', 'Haber básico', 'Porcentaje del haber mensual por los días pagados del mes (sobre 30).',
+         'INGRESO', 'PORCENTAJE', 'HABER_BASICO', TRUE, '5.1.1.01', 'Sueldos y salarios'),
+        ('HORAS-EXTRA', 'Horas extraordinarias', 'Recargo sobre el valor de la hora (haber mensual / 240) por cada hora extra aprobada.',
+         'INGRESO', 'PORCENTAJE', 'HABER_BASICO', TRUE, '5.1.1.02', 'Horas extraordinarias'),
+        ('DOMINICAL', 'Domingos, feriados y descansos trabajados', 'Pago adicional sobre el valor de la hora por las horas ordinarias trabajadas en domingo, feriado o día de descanso.',
+         'INGRESO', 'PORCENTAJE', 'HABER_BASICO', TRUE, '5.1.1.03', 'Dominicales y feriados trabajados'),
+        ('RECARGO-NOCTURNO', 'Recargo nocturno', 'Recargo sobre el valor de la hora por las horas trabajadas entre las 20:00 y las 06:00.',
+         'INGRESO', 'PORCENTAJE', 'HABER_BASICO', TRUE, '5.1.1.04', 'Recargo nocturno'),
+        ('ANS-13000', 'Aporte nacional solidario (excedente de Bs 13.000)', 'Sobre la parte del total ganado que supera Bs 13.000.',
+         'DESCUENTO', 'PORCENTAJE', 'TOTAL_GANADO', TRUE, '2.1.3.01', 'Aportes laborales por pagar'),
+        ('ANS-25000', 'Aporte nacional solidario (excedente de Bs 25.000)', 'Sobre la parte del total ganado que supera Bs 25.000.',
+         'DESCUENTO', 'PORCENTAJE', 'TOTAL_GANADO', TRUE, '2.1.3.01', 'Aportes laborales por pagar'),
+        ('ANS-35000', 'Aporte nacional solidario (excedente de Bs 35.000)', 'Sobre la parte del total ganado que supera Bs 35.000.',
+         'DESCUENTO', 'PORCENTAJE', 'TOTAL_GANADO', TRUE, '2.1.3.01', 'Aportes laborales por pagar')
+    RETURNING id_concepto, codigo
+)
+INSERT INTO VIGENCIAS_CONCEPTO (id_concepto, valor, vigente_desde)
+SELECT c.id_concepto, v.valor, DATE '2026-01-01'
+FROM conceptos c
+JOIN (VALUES
+    ('HABER-BASICO', 100.00),
+    ('HORAS-EXTRA', 100.00),
+    ('DOMINICAL', 100.00),
+    ('RECARGO-NOCTURNO', 25.00),
+    ('ANS-13000', 1.00),
+    ('ANS-25000', 5.00),
+    ('ANS-35000', 10.00)
 ) AS v (codigo, valor) USING (codigo);
