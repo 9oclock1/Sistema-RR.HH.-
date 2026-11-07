@@ -51,6 +51,28 @@ const listarHistorial = async (db, idEmpleado) => {
   return rows;
 };
 
+// Versiones de contrato de todo el personal que rigen en el rango (para planillas). Cada versión rige hasta
+// que empieza la siguiente del mismo colaborador o termina su contrato; vigente_hasta NULL = sin fecha de fin.
+const listarVigentesEnRango = async (db, desde, hasta) => {
+  const { rows } = await db.query(
+    `WITH versiones AS (
+       SELECT k.id_contrato, k.id_empleado, k.numero_contrato, k.haber_mensual_pactado,
+              lower(k.periodo_vigencia) AS desde,
+              LEAST(upper(k.periodo_vigencia),
+                    LEAD(lower(k.periodo_vigencia)) OVER (PARTITION BY k.id_empleado
+                                                          ORDER BY lower(k.periodo_vigencia), k.registrado_en)) AS hasta_exclusivo
+         FROM contratos k
+     )
+     SELECT id_contrato, id_empleado, numero_contrato, haber_mensual_pactado,
+            desde AS vigente_desde, hasta_exclusivo - 1 AS vigente_hasta
+       FROM versiones
+      WHERE daterange(desde, hasta_exclusivo) && daterange($1::date, $2::date, '[]')
+      ORDER BY id_empleado, desde`,
+    [desde, hasta]
+  );
+  return rows;
+};
+
 const obtenerVersion = async (db, idEmpleado, idContrato) => {
   const { rows } = await db.query(`${SELECT_HISTORIAL} WHERE v.id_contrato = $2`, [idEmpleado, idContrato]);
   return rows[0] || null;
@@ -165,6 +187,7 @@ const listarCatalogos = async (db) => {
 
 module.exports = {
   listarHistorial,
+  listarVigentesEnRango,
   obtenerVersion,
   existeEmpleado,
   bloquearEmpleado,

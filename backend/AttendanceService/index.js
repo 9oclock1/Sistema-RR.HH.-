@@ -17,6 +17,7 @@ const reportesRoutes = require("./src/routes/reportes.routes");
 const miAsistenciaRoutes = require("./src/routes/miAsistencia.routes");
 const aprobacionesRoutes = require("./src/routes/aprobaciones.routes");
 const calendarioAusenciasRoutes = require("./src/routes/calendarioAusencias.routes");
+const licenciasPlanillaRoutes = require("./src/routes/licenciasPlanilla.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 const { iniciarDespachador } = require("./src/services/eventos.service");
 const { iniciarContraste } = require("./src/services/novedades.service");
@@ -68,6 +69,7 @@ app.use(reportesRoutes);
 app.use(miAsistenciaRoutes);
 app.use(aprobacionesRoutes);
 app.use(calendarioAusenciasRoutes);
+app.use(licenciasPlanillaRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
