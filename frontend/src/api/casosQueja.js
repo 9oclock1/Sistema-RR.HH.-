@@ -61,6 +61,18 @@ export const quitarInvolucradoQueja = (sesion, idQueja, idEmpleado) =>
 
 export const listarEmpleadosQueja = () => solicitar("/empl/empleados");
 
+export const listarSucursalesQueja = () => solicitar("/empl/sucursales");
+
+export const obtenerSucursalQueja = (sesion, idQueja) =>
+  solicitar(`${RUTA}/casos/${idQueja}/sucursal`, { cabeceras: comoAdministrador(sesion) });
+
+export const registrarSucursalQueja = (sesion, idQueja, idSucursal) =>
+  solicitar(`${RUTA}/casos/${idQueja}/sucursal`, {
+    metodo: "PUT",
+    cuerpo: { id_sucursal: idSucursal || null },
+    cabeceras: comoAdministrador(sesion),
+  });
+
 const comoEmpleado = ({ rol, idEmpleado }) => ({ ...(rol && { "X-Rol": rol }), ...(idEmpleado && { "X-Empleado-Id": idEmpleado }) });
 
 export const listarCatalogosAsignados = (sesion) =>

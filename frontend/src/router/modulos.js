@@ -9,6 +9,8 @@ import { RUTA_BUZON_QUEJAS, RUTA_CONSULTAR_QUEJA } from "../features/quejas/regl
 import CasosQuejaPage from "../features/quejas/casos/CasosQuejaPage";
 import MisCasosQuejaPage from "../features/quejas/casos/MisCasosQuejaPage";
 import { RUTA_CASOS_QUEJA, RUTA_MIS_CASOS_QUEJA } from "../features/quejas/casos/casos";
+import HistorialQuejasPage from "../features/quejas/historial/HistorialQuejasPage";
+import { RUTA_HISTORIAL_QUEJAS } from "../features/quejas/historial/historial";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
@@ -391,6 +393,15 @@ export const SECCIONES = [
         icono: ClipboardList,
         roles: ["supervisor", "reclutador"],
         pagina: MisCasosQuejaPage,
+      },
+      {
+        ruta: RUTA_HISTORIAL_QUEJAS,
+        parametroOpcional: "idQueja",
+        etiqueta: "Historial de quejas",
+        descripcion: "Quejas cerradas con su trazabilidad completa, filtros y exportación para auditoría.",
+        icono: History,
+        roles: ["admin", "auditor"],
+        pagina: HistorialQuejasPage,
       },
     ],
   },
