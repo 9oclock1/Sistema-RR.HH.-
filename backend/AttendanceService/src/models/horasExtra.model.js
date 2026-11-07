@@ -164,6 +164,20 @@ async function listar(ids, desde, hasta, estados = null) {
   return rows;
 }
 
+// Jornadas de todo el personal en el rango, con el nombre del feriado del día.
+async function listarJornadas(desde, hasta) {
+  const { rows } = await pool.query(
+    `SELECT h.id_empleado, h.fecha_jornada, h.tipo_dia, f.nombre AS feriado,
+            h.entrada_en, h.salida_en, h.minutos_trabajados, h.minutos_nocturnos
+     FROM horas_jornada h
+     LEFT JOIN feriados f ON f.fecha = h.fecha_jornada
+     WHERE h.fecha_jornada BETWEEN $1 AND $2
+     ORDER BY h.fecha_jornada, h.id_empleado`,
+    [desde, hasta]
+  );
+  return rows;
+}
+
 // Totales por empleado del rango. `ids` NULL incluye a todos.
 async function totalizar(db, desde, hasta, ids = null) {
   const { rows } = await db.query(
@@ -240,6 +254,7 @@ module.exports = {
   listarFeriados,
   guardarCalculos,
   listar,
+  listarJornadas,
   totalizar,
   contarPendientes,
   crearPeriodo,

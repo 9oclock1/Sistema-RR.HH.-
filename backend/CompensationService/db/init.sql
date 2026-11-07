@@ -51,6 +51,99 @@ CREATE TABLE VIGENCIAS_CONCEPTO (
         daterange(vigente_desde, vigente_hasta, '[]') WITH &&
     )
 );
+-- Tabla: CONDICIONES_ESPECIALES
+-- Bonificación por una condición especial de trabajo. Su valor, vigencias y cuenta contable son los de un
+-- concepto de tipo INGRESO. TRASNOCHE y FERIADO se detectan de las jornadas marcadas en Asistencia;
+-- ASIGNACION se asigna por colaborador (por ejemplo, áreas de congelados).
+-- Monto fijo: por jornada detectada o por mes asignado. Porcentaje: del haber básico diario por jornada
+-- detectada, o del haber básico mensual en una asignación (prorrateado por días).
+CREATE TABLE CONDICIONES_ESPECIALES (
+    id_condicion UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_concepto UUID NOT NULL,
+    tipo_condicion varchar(10) NOT NULL,
+    -- Solo TRASNOCHE: minutos trabajados entre las 20:00 y las 06:00 para que la jornada cuente.
+    minutos_nocturnos_minimos smallint NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT CONDICIONES_ESPECIALES_pk PRIMARY KEY (id_condicion),
+    CONSTRAINT uq_condicion_concepto UNIQUE (id_concepto),
+    CONSTRAINT fk_condicion_concepto FOREIGN KEY (id_concepto)
+        REFERENCES CONCEPTOS_PLANILLA (id_concepto) ON DELETE CASCADE,
+    CONSTRAINT chk_condicion_tipo CHECK (tipo_condicion IN ('TRASNOCHE', 'FERIADO', 'ASIGNACION')),
+    CONSTRAINT chk_condicion_minutos CHECK (
+        (tipo_condicion = 'TRASNOCHE' AND minutos_nocturnos_minimos BETWEEN 1 AND 600)
+        OR (tipo_condicion <> 'TRASNOCHE' AND minutos_nocturnos_minimos IS NULL)
+    )
+);
+-- Tabla: ASIGNACIONES_CONDICION
+-- Colaboradores con una condición de tipo ASIGNACION. El bono se aplica mientras la asignación está vigente
+-- (vigente_hasta NULL = sin fecha de fin). Nombre y área son copia de EmployeeService al asignar.
+CREATE TABLE ASIGNACIONES_CONDICION (
+    id_asignacion UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_condicion UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    nombre_empleado varchar(150) NOT NULL,
+    area varchar(100) NULL,
+    vigente_desde date NOT NULL,
+    vigente_hasta date NULL,
+    motivo varchar(250) NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ASIGNACIONES_CONDICION_pk PRIMARY KEY (id_asignacion),
+    CONSTRAINT fk_asignacion_condicion FOREIGN KEY (id_condicion)
+        REFERENCES CONDICIONES_ESPECIALES (id_condicion) ON DELETE CASCADE,
+    CONSTRAINT chk_asignacion_fechas CHECK (vigente_hasta IS NULL OR vigente_hasta >= vigente_desde),
+    CONSTRAINT ex_asignacion_sin_solapamiento EXCLUDE USING gist (
+        id_condicion WITH =,
+        id_empleado WITH =,
+        daterange(vigente_desde, vigente_hasta, '[]') WITH &&
+    )
+);
+CREATE INDEX idx_asignaciones_condicion_empleado ON ASIGNACIONES_CONDICION (id_empleado);
+-- Tabla: PROCESOS_CONDICION
+-- Último procesamiento de bonos de cada mes (periodo AAAA-MM). Reprocesar reemplaza sus bonos.
+CREATE TABLE PROCESOS_CONDICION (
+    id_proceso UUID NOT NULL DEFAULT gen_random_uuid(),
+    periodo char(7) NOT NULL,
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    jornadas_analizadas int NOT NULL DEFAULT 0,
+    procesado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PROCESOS_CONDICION_pk PRIMARY KEY (id_proceso),
+    CONSTRAINT uq_proceso_periodo UNIQUE (periodo),
+    CONSTRAINT chk_proceso_fechas CHECK (fecha_fin >= fecha_inicio)
+);
+-- Tabla: BONOS_CONDICION
+-- Bono de un colaborador en un periodo, con la vigencia del concepto que le dio el valor.
+-- cantidad: jornadas detectadas o días asignados. factor: multiplicador del valor (jornadas para monto fijo,
+-- jornadas/30 o días asignados/días del mes para porcentaje). monto: solo en monto fijo; el porcentaje se
+-- calcula en la planilla sobre el haber básico.
+CREATE TABLE BONOS_CONDICION (
+    id_bono UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_proceso UUID NOT NULL,
+    id_condicion UUID NOT NULL,
+    id_vigencia UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    nombre_empleado varchar(150) NOT NULL,
+    origen varchar(10) NOT NULL,
+    id_asignacion UUID NULL,
+    cantidad smallint NOT NULL,
+    fechas date[] NOT NULL DEFAULT '{}',
+    factor numeric(10,6) NOT NULL,
+    valor numeric(12,4) NOT NULL,
+    monto numeric(12,2) NULL,
+    CONSTRAINT BONOS_CONDICION_pk PRIMARY KEY (id_bono),
+    CONSTRAINT fk_bono_proceso FOREIGN KEY (id_proceso)
+        REFERENCES PROCESOS_CONDICION (id_proceso) ON DELETE CASCADE,
+    CONSTRAINT fk_bono_condicion FOREIGN KEY (id_condicion) REFERENCES CONDICIONES_ESPECIALES (id_condicion),
+    -- Una condición con bonos procesados no se puede eliminar, solo inactivar.
+    CONSTRAINT fk_bono_vigencia FOREIGN KEY (id_vigencia) REFERENCES VIGENCIAS_CONCEPTO (id_vigencia),
+    CONSTRAINT fk_bono_asignacion FOREIGN KEY (id_asignacion)
+        REFERENCES ASIGNACIONES_CONDICION (id_asignacion) ON DELETE SET NULL,
+    CONSTRAINT chk_bono_origen CHECK (origen IN ('DETECCION', 'ASIGNACION')),
+    CONSTRAINT chk_bono_cantidad CHECK (cantidad > 0 AND factor > 0)
+);
+CREATE INDEX idx_bonos_condicion_proceso ON BONOS_CONDICION (id_proceso);
+CREATE INDEX idx_bonos_condicion_empleado ON BONOS_CONDICION (id_empleado);
 -- datos iniciales
 -- Aportes de ley sobre el total ganado (Ley 065 de Pensiones y seguridad social de corto plazo).
 -- Cuentas contables referenciales: ajustar al plan de cuentas de Contabilidad.

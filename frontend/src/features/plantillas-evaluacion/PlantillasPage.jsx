@@ -14,6 +14,7 @@ import {
   EncabezadoPagina,
   EstadoVacio,
   ModalConfirmacion,
+  Pestanas,
   Selector,
   Tarjeta,
   useAvisos,
@@ -21,6 +22,7 @@ import {
 import { useUsuario } from "../../context/sesion";
 import { useDepartamentosActivos } from "../../hooks/useDepartamentosActivos";
 import FormularioPlantilla from "./FormularioPlantilla";
+import PanelEscalas from "./PanelEscalas";
 import TablaPlantillas from "./TablaPlantillas";
 import { OPCIONES_ESTADO, coincideConBusqueda } from "./formato";
 import "./plantillasEvaluacion.css";
@@ -221,6 +223,7 @@ function Listado({ idEmpleado, intento, onActualizar }) {
 export default function PlantillasPage() {
   // Usuario de prueba de la barra lateral: figura como creador hasta contar con inicio de sesión.
   const idEmpleado = useUsuario();
+  const [pestana, setPestana] = useState("plantillas");
   const [intento, setIntento] = useState(0);
   const actualizar = () => setIntento((n) => n + 1);
 
@@ -231,11 +234,27 @@ export default function PlantillasPage() {
         enlace={Link}
         titulo="Plantillas de evaluación"
         idTitulo="pl-titulo"
-        descripcion="Plantillas estandarizadas para medir competencias laborales y rendimiento operativo en cada periodo."
+        descripcion="Plantillas estandarizadas para medir competencias laborales y rendimiento operativo en cada periodo, y las escalas de valoración que usan sus preguntas."
       />
 
       {idEmpleado ? (
-        <Listado key={idEmpleado} idEmpleado={idEmpleado} intento={intento} onActualizar={actualizar} />
+        <Pestanas
+          etiqueta="Configuración de evaluaciones"
+          activa={pestana}
+          onCambiar={setPestana}
+          pestanas={[
+            {
+              id: "plantillas",
+              etiqueta: "Plantillas",
+              contenido: <Listado key={idEmpleado} idEmpleado={idEmpleado} intento={intento} onActualizar={actualizar} />,
+            },
+            {
+              id: "escalas",
+              etiqueta: "Escalas de valoración",
+              contenido: <PanelEscalas key={idEmpleado} idEmpleado={idEmpleado} />,
+            },
+          ]}
+        />
       ) : (
         <EstadoVacio
           icono={UserRound}

@@ -60,3 +60,16 @@ export const publicarVersion = (idEmpleado, idPlantilla, idVersion) =>
 // Nuevo borrador con la estructura de la versión más reciente. Si ya hay un borrador abierto responde 409.
 export const crearVersion = (idEmpleado, idPlantilla) =>
   solicitar(`${RUTA}/${idPlantilla}/versiones`, { metodo: "POST", cabeceras: comoEmpleado(idEmpleado) });
+
+// Escalas de valoración: catálogo común a todas las plantillas. Cada escala trae sus niveles (valor y etiqueta).
+// Si está en uso en una plantilla publicada, solo se pueden cambiar su nombre y su descripción (409 si no).
+export const listarEscalas = (idEmpleado) => solicitar("/perf/escalas", { cabeceras: comoEmpleado(idEmpleado) });
+
+export const crearEscala = (idEmpleado, escala) =>
+  solicitar("/perf/escalas", { metodo: "POST", cuerpo: escala, cabeceras: comoEmpleado(idEmpleado) });
+
+export const actualizarEscala = (idEmpleado, idEscala, escala) =>
+  solicitar(`/perf/escalas/${idEscala}`, { metodo: "PUT", cuerpo: escala, cabeceras: comoEmpleado(idEmpleado) });
+
+export const eliminarEscala = (idEmpleado, idEscala) =>
+  solicitar(`/perf/escalas/${idEscala}`, { metodo: "DELETE", cabeceras: comoEmpleado(idEmpleado) });

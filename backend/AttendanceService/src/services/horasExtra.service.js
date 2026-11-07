@@ -290,6 +290,15 @@ async function resumen(filtros) {
   return { desde, hasta, empleados: empleadosResumen, totales: sumarResumen(empleadosResumen) };
 }
 
+// Jornadas marcadas de todo el personal, para detectar trasnoches y feriados trabajados (bonos de planilla).
+async function listarJornadas(filtros) {
+  const { hoy } = await modelo.momentoActual();
+  const { desde, hasta, errores } = leerRango(filtros, hoy);
+  if (errores.length > 0) throw new ErrorApp(400, "Filtros inválidos", errores);
+  await calcular({ desde, hasta });
+  return { desde, hasta, jornadas: await modelo.listarJornadas(desde, hasta) };
+}
+
 const horas = (minutos) => (minutos / 60).toFixed(2).replace(".", ",");
 const celda = (valor) => {
   const texto = String(valor ?? "");
@@ -539,6 +548,7 @@ async function eliminarAutorizacion(idAutorizacion, idSolicitante) {
 module.exports = {
   calcular,
   listar,
+  listarJornadas,
   resumen,
   aCsv,
   consolidar,
