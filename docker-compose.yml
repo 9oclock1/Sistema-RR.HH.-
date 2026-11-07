@@ -17,6 +17,7 @@ services:
       - ./backend/AttendanceService/db/init.sql:/init-scripts/attendance/init.sql:ro
       - ./backend/CompensationService/db/init.sql:/init-scripts/compensation/init.sql:ro
       - ./backend/PerformanceService/db/init.sql:/init-scripts/performance/init.sql:ro
+      - ./backend/PerformanceService/db/catalogos.sql:/init-scripts/performance/catalogos.sql:ro
       - ./backend/NotificationService/db/init.sql:/init-scripts/notification/init.sql:ro
     networks:
       - rrhh-network

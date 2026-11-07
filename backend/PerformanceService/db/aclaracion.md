@@ -2,7 +2,7 @@
 
 Dentro de la base de datos se encuentran las siguientes observaciones que deben ser tomadas a consideración al momento de llenar los datos y saber a que conectar y a qué no. La base no usa procedimientos almacenados, triggers ni vistas, así que las reglas marcadas como "backend" las valida el servicio.
 
-`init.sql` solo crea el esquema (sin datos). Los catálogos, las escalas de partida y los datos de prueba están en `seed.sql`, que se corre a mano después.
+`init.sql` solo crea el esquema (sin datos). Los catálogos y las escalas de partida están en `catalogos.sql`, que `init-all.sh` carga solo justo después de `init.sql` al crear la base. Los datos de prueba están en `seed.sql`, que se corre a mano después.
 
 ## Réplica mínima de EmployeeDB
 
@@ -24,7 +24,7 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 
 - `COMPETENCIAS` es un catálogo común a todas las plantillas: permite comparar una misma competencia entre versiones y ciclos. Cada sección de una versión usa una competencia, que es de tipo competencia laboral o factor operativo.
 - Toda escala se define por sus niveles (`NIVELES_ESCALA`): `etiqueta` es lo que ve el evaluador y `valor` es lo que se usa para calcular, también en las escalas cualitativas.
-- `seed.sql` carga dos escalas de partida: Likert de 1 a 5 (cuantitativa) y Nivel de cumplimiento (cualitativa).
+- `catalogos.sql` carga dos escalas de partida: Likert de 1 a 5 (cuantitativa) y Nivel de cumplimiento (cualitativa).
 - Backend: no se modifican los niveles de una escala usada en una versión publicada.
 
 ## Ciclos y evaluaciones
@@ -48,7 +48,7 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 
 ## Datos de prueba
 
-- `seed.sql` carga primero los catálogos y las escalas de partida, y luego datos ficticios para probar KAN-24: una plantilla publicada con 6 preguntas (pesos que suman 100 y una opcional), tres ciclos y seis evaluaciones en distintos estados. No se ejecuta al crear la base ni está montado en `docker-compose.yml`; se corre a mano después de `init.sql` y se puede repetir sin duplicar filas.
+- `seed.sql` carga datos ficticios para probar KAN-24: una plantilla publicada con 6 preguntas (pesos que suman 100 y una opcional), tres ciclos y seis evaluaciones en distintos estados. No se ejecuta al crear la base ni está montado en `docker-compose.yml`; se corre a mano después de que `init.sql` y `catalogos.sql` crearon la base, y se puede repetir sin duplicar filas.
 - Los empleados del seed son réplicas con id de demostración. Para ver la bandeja con el "Usuario de prueba" del portal, pasa su `id_empleado` de EmployeeService como `-v id_evaluador=<uuid>`; las demás variables (`id_evaluador_2`, `id_creador`, `id_evaluado_1` a `id_evaluado_4`) son opcionales. El encabezado del archivo trae el comando completo.
 
 ## Integración con CRM
