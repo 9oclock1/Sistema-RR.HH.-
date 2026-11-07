@@ -5,9 +5,11 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "test": "node --test src/tests/puntajePonderadoTest.js src/tests/guardadoParcialTest.js src/tests/envioEvaluacionTest.js src/tests/bandejaEvaluacionesTest.js && node test/acceptance_criteria.test.js",
+    "test": "node --test src/tests/puntajePonderadoTest.js src/tests/guardadoParcialTest.js src/tests/envioEvaluacionTest.js src/tests/bandejaEvaluacionesTest.js src/tests/cifradoQuejasTest.js src/tests/codigoSeguimientoTest.js src/tests/validacionQuejaTest.js src/tests/limitarConsultasTest.js src/tests/limpiarAdjuntoTest.js src/tests/registroQuejaTest.js && node test/acceptance_criteria.test.js",
     "test:kan24": "node --test src/tests/puntajePonderadoTest.js src/tests/guardadoParcialTest.js src/tests/envioEvaluacionTest.js src/tests/bandejaEvaluacionesTest.js",
-    "test:calculo": "node --test src/tests/puntajePonderadoTest.js"
+    "test:calculo": "node --test src/tests/puntajePonderadoTest.js",
+    "test:quejas": "node --test src/tests/cifradoQuejasTest.js src/tests/codigoSeguimientoTest.js src/tests/validacionQuejaTest.js src/tests/limitarConsultasTest.js src/tests/limpiarAdjuntoTest.js src/tests/registroQuejaTest.js test/quejas.test.js",
+    "test:quejas:unitarias": "node --test src/tests/cifradoQuejasTest.js src/tests/codigoSeguimientoTest.js src/tests/validacionQuejaTest.js src/tests/limitarConsultasTest.js src/tests/limpiarAdjuntoTest.js src/tests/registroQuejaTest.js"
   },
   "keywords": [],
   "author": "",
