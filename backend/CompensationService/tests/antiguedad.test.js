@@ -1,6 +1,6 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
-const { validarVigenciaEscala, cierreDeUltimaVigencia, tramoParaAnios, redondear } = require("../src/utils/antiguedad");
+const { validarVigenciaEscala, cierreDeUltimaVigencia, tramoParaAnios, pisoBono, redondear } = require("../src/utils/antiguedad");
 const { aniosDeServicio, esPrimerDiaDeMes } = require("../src/utils/fechas");
 
 const campos = (fn) => {
@@ -143,6 +143,23 @@ describe("tramoParaAnios", () => {
 
   test("devuelve undefined si ningún tramo cubre la antigüedad", () => {
     assert.equal(tramoParaAnios(TRAMOS_VALIDOS, 1), undefined);
+  });
+});
+
+describe("pisoBono", () => {
+  test("devuelve los años desde los que empieza el primer tramo", () => {
+    assert.equal(pisoBono(TRAMOS_VALIDOS), 2);
+  });
+
+  test("permite distinguir antigüedad insuficiente (bajo el piso) de un hueco real en la escala", () => {
+    // 1 año: ningún tramo lo cubre, y además está bajo el piso -> "antigüedad insuficiente".
+    assert.equal(tramoParaAnios(TRAMOS_VALIDOS, 1), undefined);
+    assert.equal(1 < pisoBono(TRAMOS_VALIDOS), true);
+  });
+
+  test("exactamente en el piso (2 años) ya no es insuficiente", () => {
+    assert.equal(2 < pisoBono(TRAMOS_VALIDOS), false);
+    assert.equal(tramoParaAnios(TRAMOS_VALIDOS, 2).porcentaje, 5);
   });
 });
 

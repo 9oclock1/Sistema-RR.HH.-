@@ -4,7 +4,7 @@ const { enTransaccion } = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const { esFecha, esPrimerDiaDeMes, hoyLaPaz, aniosDeServicio } = require("../utils/fechas");
-const { validarVigenciaEscala, cierreDeUltimaVigencia, tramoParaAnios, redondear } = require("../utils/antiguedad");
+const { validarVigenciaEscala, cierreDeUltimaVigencia, tramoParaAnios, pisoBono, redondear } = require("../utils/antiguedad");
 
 const sinEscalaVigente = () =>
   new ErrorApp(409, "No hay una escala de antigüedad vigente para esa fecha", [
@@ -69,12 +69,24 @@ async function calcularBono(idEmpleado, periodo) {
   const escala = await obtenerEscalaVigente(periodo);
   const tramo = tramoParaAnios(escala.tramos, aniosServicio);
   if (!tramo) {
+    // Por debajo del primer tramo (hoy, menos de 2 años): no es una falla del cálculo, es que la ley
+    // todavía no le da derecho al bono. El código ANTIGUEDAD_INSUFICIENTE le permite al front mostrar
+    // el estado "Omitido por error" sin tener que distinguirlo del resto de errores por el texto.
+    const piso = pisoBono(escala.tramos);
+    if (aniosServicio < piso) {
+      throw new ErrorApp(
+        409,
+        "Omitido por error",
+        [{ campo: "anios_servicio", mensaje: `El bono aplica desde los ${piso} años de servicio; el colaborador tiene ${aniosServicio}.` }],
+        "ANTIGUEDAD_INSUFICIENTE"
+      );
+    }
     throw new ErrorApp(409, "La escala vigente no cubre esa antigüedad", [
       { campo: "tramos", mensaje: `No hay un tramo definido para ${aniosServicio} años de servicio.` },
     ]);
   }
 
-  const haberBasico = await empleadosCliente.obtenerHaberVigente(idEmpleado);
+  const haberBasico = await empleadosCliente.obtenerHaberVigente(idEmpleado, periodo);
   if (!haberBasico) {
     throw new ErrorApp(409, "El colaborador no tiene un contrato vigente", [
       { campo: "id_empleado", mensaje: "No se puede calcular el bono sin un contrato vigente." },
@@ -105,7 +117,7 @@ async function calcularBonoPlanilla(periodo) {
     try {
       bonos.push(await calcularBono(empleado.id_empleado, periodo));
     } catch (error) {
-      omitidos.push({ id_empleado: empleado.id_empleado, motivo: error.message });
+      omitidos.push({ id_empleado: empleado.id_empleado, motivo: error.message, codigo: error.codigo });
     }
   }
   return { periodo, bonos, omitidos };

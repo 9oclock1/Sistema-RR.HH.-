@@ -106,7 +106,7 @@ async function eliminar(id) {
 // Bloquea el concepto para que dos vigencias nuevas no se registren a la vez.
 async function bloquear(cliente, id) {
   const { rows } = await cliente.query(
-    "SELECT id_concepto, forma_calculo FROM conceptos_planilla WHERE id_concepto = $1 FOR UPDATE",
+    "SELECT id_concepto, codigo, forma_calculo FROM conceptos_planilla WHERE id_concepto = $1 FOR UPDATE",
     [id]
   );
   return rows[0];

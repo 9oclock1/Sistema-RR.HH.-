@@ -12,6 +12,7 @@ export default function BonoColaboradorTab() {
   const [periodo, setPeriodo] = useState(hoyLaPaz().slice(0, 7));
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState(null);
+  const [omitido, setOmitido] = useState(null);
   const [calculando, setCalculando] = useState(false);
 
   useEffect(() => {
@@ -27,11 +28,15 @@ export default function BonoColaboradorTab() {
     evento.preventDefault();
     setCalculando(true);
     setError(null);
+    setOmitido(null);
     setResultado(null);
     try {
       setResultado(await calcularBono(idEmpleado, `${periodo}-01`));
     } catch (err) {
-      setError(err.message);
+      // Antigüedad por debajo del primer tramo (menos de 2 años): no es una falla del cálculo, es un
+      // estado de negocio esperado, así que se muestra aparte de los errores reales.
+      if (err.codigo === "ANTIGUEDAD_INSUFICIENTE") setOmitido(err.message);
+      else setError(err.message);
     } finally {
       setCalculando(false);
     }
@@ -74,6 +79,12 @@ export default function BonoColaboradorTab() {
         </Alerta>
       )}
 
+      {omitido && (
+        <Alerta tono="aviso" role="status" titulo="Omitido por error">
+          {omitido}
+        </Alerta>
+      )}
+
       {resultado && (
         <Tarjeta className="antiguedad-bono__resultado">
           <dl className="antiguedad-bono__resumen">
@@ -101,7 +112,7 @@ export default function BonoColaboradorTab() {
         </Tarjeta>
       )}
 
-      {!resultado && !error && !calculando && (
+      {!resultado && !error && !omitido && !calculando && (
         <EstadoVacio
           icono={Calculator}
           titulo="Seleccione un colaborador y un periodo"

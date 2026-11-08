@@ -107,6 +107,12 @@ function tramoParaAnios(tramos, anios) {
   return tramos.find((t) => anios >= t.anios_desde && (t.anios_hasta === null || anios <= t.anios_hasta));
 }
 
+// Años desde los que empieza a aplicar el primer tramo de la escala (hoy, 2). Permite distinguir "todavía
+// no llega a la antigüedad mínima" (estado de negocio esperado) de un hueco real en la escala.
+function pisoBono(tramos) {
+  return Math.min(...tramos.map((t) => t.anios_desde));
+}
+
 const redondear = (valor) => Math.round(valor * 100) / 100;
 
-module.exports = { validarVigenciaEscala, cierreDeUltimaVigencia, tramoParaAnios, redondear };
+module.exports = { validarVigenciaEscala, cierreDeUltimaVigencia, tramoParaAnios, pisoBono, redondear };

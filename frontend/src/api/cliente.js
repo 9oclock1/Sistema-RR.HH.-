@@ -1,10 +1,11 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? "/api";
 
 export class ErrorApi extends Error {
-  constructor(estado, mensaje, detalles = []) {
+  constructor(estado, mensaje, detalles = [], codigo) {
     super(mensaje);
     this.estado = estado;
     this.detalles = detalles;
+    this.codigo = codigo;
   }
 }
 
@@ -53,6 +54,7 @@ export async function solicitar(
       respuesta.status,
       datos?.message || datos?.error || "Error inesperado del servidor",
       datos?.detalles,
+      datos?.codigo,
     );
   }
   return datos;
