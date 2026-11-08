@@ -33,6 +33,28 @@ async function listarCuotas(idPrestamo) {
   return rows;
 }
 
+// Suma, por periodo, las cuotas pendientes que el colaborador ya tiene comprometidas en OTROS préstamos
+// activos: el tope de descuento se evalúa sobre el total comprometido, no sobre un préstamo aislado.
+async function sumarComprometidoPorPeriodo(idEmpleado) {
+  const { rows } = await pool.query(
+    `SELECT c.periodo, SUM(c.monto) AS total
+       FROM cuotas_prestamo c
+       JOIN prestamos p ON p.id_prestamo = c.id_prestamo
+      WHERE p.id_empleado = $1 AND p.estado = 'ACTIVO' AND c.estado = 'PENDIENTE'
+      GROUP BY c.periodo`,
+    [idEmpleado]
+  );
+  return Object.fromEntries(rows.map((fila) => [fila.periodo, Number(fila.total)]));
+}
+
+// Periodo más antiguo que todavía tiene cuotas pendientes, de cualquier préstamo. null si no hay ninguna.
+async function obtenerPeriodoPendienteMasAntiguo() {
+  const { rows } = await pool.query(
+    "SELECT MIN(periodo) AS periodo FROM cuotas_prestamo WHERE estado = 'PENDIENTE'"
+  );
+  return rows[0].periodo || null;
+}
+
 async function crear(cliente, prestamo) {
   const { rows } = await cliente.query(
     `INSERT INTO prestamos (id_empleado, tipo, monto, numero_cuotas, mes_inicio, motivo,
@@ -100,4 +122,14 @@ async function cerrarPeriodo(cliente, periodo) {
   return cuotas.length;
 }
 
-module.exports = { listar, obtener, listarCuotas, crear, crearCuotas, listarCuotasDelPeriodo, cerrarPeriodo };
+module.exports = {
+  listar,
+  obtener,
+  listarCuotas,
+  crear,
+  crearCuotas,
+  listarCuotasDelPeriodo,
+  cerrarPeriodo,
+  sumarComprometidoPorPeriodo,
+  obtenerPeriodoPendienteMasAntiguo,
+};

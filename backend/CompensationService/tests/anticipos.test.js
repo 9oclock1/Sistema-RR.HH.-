@@ -4,9 +4,10 @@ const {
   validarDatosPrestamo,
   calcularCuotas,
   validarTopeDescuento,
+  validarOrdenCierre,
   PORCENTAJE_MAXIMO_DESCUENTO,
 } = require("../src/utils/anticipos");
-const { esFecha, esPrimerDiaDeMes, sumarMeses } = require("../src/utils/fechas");
+const { esFecha, esPrimerDiaDeMes, sumarMeses, hoyLaPaz } = require("../src/utils/fechas");
 
 const campos = (fn) => {
   try {
@@ -67,6 +68,31 @@ describe("validarDatosPrestamo", () => {
   test("motivo demasiado largo", () => {
     assert.deepEqual(campos(() => validarDatosPrestamo({ ...DATOS, motivo: "a".repeat(251) })), ["motivo"]);
   });
+
+  test("id_empleado que no es un UUID (evita pasarlo tal cual a EmployeeService)", () => {
+    for (const id_empleado of ["abc", "123", "", "   ", "11111111-1111-1111-1111-11111111111"]) {
+      assert.deepEqual(campos(() => validarDatosPrestamo({ ...DATOS, id_empleado })), ["id_empleado"]);
+    }
+  });
+
+  test("mes de inicio en el pasado se rechaza", () => {
+    assert.deepEqual(campos(() => validarDatosPrestamo({ ...DATOS, mes_inicio: "2020-01-01" })), ["mes_inicio"]);
+  });
+
+  test("mes de inicio igual al mes actual se acepta", () => {
+    const mesActual = `${hoyLaPaz().slice(0, 7)}-01`;
+    const prestamo = validarDatosPrestamo({ ...DATOS, mes_inicio: mesActual });
+    assert.equal(prestamo.mes_inicio, mesActual);
+  });
+
+  test("monto demasiado bajo para el número de cuotas (evita cuotas de Bs 0)", () => {
+    assert.deepEqual(campos(() => validarDatosPrestamo({ ...DATOS, monto: 0.05, numero_cuotas: 10 })), ["numero_cuotas"]);
+  });
+
+  test("monto suficiente para que cada cuota sea de al menos Bs 0.01", () => {
+    const prestamo = validarDatosPrestamo({ ...DATOS, monto: 0.1, numero_cuotas: 10 });
+    assert.equal(prestamo.monto, 0.1);
+  });
 });
 
 describe("calcularCuotas", () => {
@@ -112,6 +138,52 @@ describe("validarTopeDescuento", () => {
   test("acepta justo en el límite", () => {
     const cuotas = calcularCuotas({ monto: 200, numero_cuotas: 1, mes_inicio: "2026-12-01" });
     assert.doesNotThrow(() => validarTopeDescuento(cuotas, 1000));
+  });
+
+  test("rechaza cuando se suma a cuotas ya comprometidas en otros préstamos activos (caso Ana)", () => {
+    // Líquido pagable Bs 6000 -> límite Bs 1200. Un segundo préstamo cuya cuota, aislada, es de solo
+    // Bs 333 no debería aprobarse si en diciembre ya tiene comprometidos Bs 1200 de otro préstamo activo.
+    const cuotas = calcularCuotas({ monto: 1000, numero_cuotas: 3, mes_inicio: "2026-12-01" });
+    const comprometidoPorPeriodo = { "2026-12-01": 1200 };
+    try {
+      validarTopeDescuento(cuotas, 6000, comprometidoPorPeriodo);
+    } catch (error) {
+      assert.equal(error.estado, 400);
+      assert.equal(error.detalles[0].campo, "numero_cuotas");
+      return;
+    }
+    assert.fail("debía rechazar la cuota combinada");
+  });
+
+  test("acepta cuando lo comprometido en otros periodos no se solapa con el plan nuevo", () => {
+    const cuotas = calcularCuotas({ monto: 300, numero_cuotas: 1, mes_inicio: "2026-12-01" });
+    const comprometidoPorPeriodo = { "2027-05-01": 900 };
+    assert.doesNotThrow(() => validarTopeDescuento(cuotas, 2000, comprometidoPorPeriodo));
+  });
+});
+
+describe("validarOrdenCierre", () => {
+  test("permite cerrar cuando no hay periodos pendientes", () => {
+    assert.doesNotThrow(() => validarOrdenCierre("2027-01-01", null));
+  });
+
+  test("permite cerrar el periodo pendiente más antiguo", () => {
+    assert.doesNotThrow(() => validarOrdenCierre("2027-01-01", "2027-01-01"));
+  });
+
+  test("permite cerrar periodos anteriores al más antiguo pendiente", () => {
+    assert.doesNotThrow(() => validarOrdenCierre("2026-12-01", "2027-01-01"));
+  });
+
+  test("rechaza cerrar un periodo futuro saltándose uno anterior pendiente (caso: cerrar febrero antes de enero)", () => {
+    try {
+      validarOrdenCierre("2027-02-01", "2027-01-01");
+    } catch (error) {
+      assert.equal(error.estado, 409);
+      assert.equal(error.detalles[0].campo, "periodo");
+      return;
+    }
+    assert.fail("debía rechazar el cierre fuera de orden");
   });
 });
 
