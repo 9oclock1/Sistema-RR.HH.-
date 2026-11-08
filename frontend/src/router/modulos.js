@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, SquareKanban, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, SquareKanban, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
@@ -26,6 +26,7 @@ import NotificacionesPage from "../features/notificaciones/NotificacionesPage";
 import CargosList from "../features/Cargos/CargosList";
 import ConceptosPage from "../features/conceptos/ConceptosPage";
 import CondicionesPage from "../features/condiciones/CondicionesPage";
+import PlanillaMensualPage from "../features/planillas/PlanillaMensualPage";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import ContratosView from "../features/Contratos/ContratosView";
 import { RUTA_CONTRATOS } from "../features/Contratos/utils/opciones";
@@ -261,6 +262,14 @@ export const SECCIONES = [
   {
     titulo: "Planillas",
     modulos: [
+      {
+        ruta: "/planillas/mensual",
+        etiqueta: "Planilla mensual",
+        descripcion: "Asistencia, horas extra, licencias y bonos del mes por colaborador, en un borrador para revisar y aprobar.",
+        icono: FileSpreadsheet,
+        roles: ["admin"],
+        pagina: PlanillaMensualPage,
+      },
       {
         ruta: "/planillas/conceptos",
         etiqueta: "Conceptos de pago",

@@ -1,6 +1,7 @@
 const pool = require("../config/db");
 const modelo = require("../models/condiciones.model");
 const conceptos = require("../models/conceptos.model");
+const planillas = require("../models/planillas.model");
 const externos = require("./externos.service");
 const { traducirErrorBD, formatear: formatearConcepto } = require("./conceptos.service");
 const { enTransaccion } = require("../config/transaccion");
@@ -133,6 +134,10 @@ async function nombresDe(bonos) {
 // Detecta trasnoches y feriados en las jornadas marcadas del mes y aplica las asignaciones vigentes.
 async function procesar({ periodo } = {}) {
   const rango = rangoPeriodo(periodo, hoyLaPaz());
+  const [planilla] = await planillas.listar(periodo);
+  if (planilla && planilla.estado !== "BORRADOR") {
+    throw new ErrorApp(409, "La planilla del mes ya fue aprobada: sus bonos no se pueden volver a procesar.");
+  }
   const condiciones = await modelo.activasConVigencias(rango.desde, rango.hasta);
   const hayDetectables = condiciones.some((c) => DETECTABLES.includes(c.tipo_condicion));
   const hayAsignables = condiciones.some((c) => c.tipo_condicion === "ASIGNACION");

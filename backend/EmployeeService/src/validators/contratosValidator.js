@@ -72,6 +72,23 @@ const validarFiltrosContratos = (query) => {
   return filtros;
 };
 
+const DIAS_MAXIMOS_VIGENTES = 92;
+
+// Rango para las versiones vigentes de todo el personal (planillas): como máximo 92 días.
+const validarRangoVigentes = (query) => {
+  const datos = cuerpoComoObjeto(query);
+  const errores = [];
+  const desde = normalizarFecha(datos.desde, 'desde', { requerido: true }, errores);
+  const hasta = normalizarFecha(datos.hasta, 'hasta', { requerido: true }, errores);
+  if (desde && hasta) {
+    const dias = (Date.parse(hasta) - Date.parse(desde)) / 86400000 + 1;
+    if (dias < 1) errores.push(invalido('hasta', 'La fecha final no puede ser anterior a la inicial.'));
+    else if (dias > DIAS_MAXIMOS_VIGENTES) errores.push(invalido('hasta', `Consulte como máximo ${DIAS_MAXIMOS_VIGENTES} días.`));
+  }
+  lanzarSiHayErrores(errores);
+  return { desde, hasta };
+};
+
 const validarRegistrador = (valor) => {
   if (esVacio(valor)) {
     const mensaje = 'Identifique al usuario que registra el cambio.';
@@ -85,4 +102,4 @@ const validarRegistrador = (valor) => {
 
 const validarId = (valor) => validarIdRuta(valor, 'id');
 
-module.exports = { TIPOS_MODIFICACION, validarModificacion, validarFiltrosContratos, validarRegistrador, validarId };
+module.exports = { TIPOS_MODIFICACION, validarModificacion, validarFiltrosContratos, validarRangoVigentes, validarRegistrador, validarId };

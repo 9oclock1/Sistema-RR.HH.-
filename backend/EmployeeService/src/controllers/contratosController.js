@@ -1,5 +1,5 @@
 const contratosService = require('../services/contratosService');
-const { validarModificacion, validarFiltrosContratos, validarRegistrador, validarId } = require('../validators/contratosValidator');
+const { validarModificacion, validarFiltrosContratos, validarRangoVigentes, validarRegistrador, validarId } = require('../validators/contratosValidator');
 const { datosDocumento, descartarDocumento } = require('../middlewares/documentoContratoUpload');
 const HttpError = require('../utils/HttpError');
 
@@ -23,6 +23,10 @@ const listarHistorial = async (req, res) => {
   res.status(200).json(await contratosService.listarHistorial(filtros));
 };
 
+const listarVigentes = async (req, res) => {
+  res.status(200).json(await contratosService.listarVigentes(validarRangoVigentes(req.query)));
+};
+
 const obtenerCatalogos = async (req, res) => {
   res.status(200).json(await contratosService.obtenerCatalogos());
 };
@@ -35,4 +39,4 @@ const descargarDocumento = async (req, res) => {
   });
 };
 
-module.exports = { registrarModificacion, listarHistorial, obtenerCatalogos, descargarDocumento };
+module.exports = { registrarModificacion, listarHistorial, listarVigentes, obtenerCatalogos, descargarDocumento };
