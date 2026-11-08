@@ -1,5 +1,7 @@
 // Cálculo de haberes, descuentos de ley y líquido pagable de un colaborador (KAN-64).
 // Los valores salen de las vigencias de los conceptos (KAN-62); cada renglón guarda la vigencia que usó.
+const { aniosDeServicio } = require("./fechas");
+const { tramoParaAnios } = require("./antiguedad");
 
 // Valor de la hora = haber mensual / (30 días × 8 horas).
 const HORAS_MES = 240;
@@ -11,7 +13,9 @@ const CALCULADOS = {
   EXTRA: "HORAS-EXTRA",
   DOMINICAL: "DOMINICAL",
   NOCTURNO: "RECARGO-NOCTURNO",
+  ANTIGUEDAD: "BONO-ANTIGUEDAD",
 };
+const CUOTA = "CUOTA-PRESTAMO";
 // Aporte Nacional Solidario (Ley 065): cada tramo se aplica sobre lo que el total ganado supera su umbral.
 const TRAMOS_ANS = [
   { codigo: "ANS-13000", umbral: 13000 },
@@ -71,6 +75,43 @@ function renglonBono(n, haber) {
   return renglon(concepto, { base: haber, cantidad: n.cantidad, resultado: haber * (n.valor / 100) * n.factor, detalle: n.detalle });
 }
 
+function antiguedadDelColaborador(escala, fechaIngreso, periodo) {
+  if (!escala) return { alerta: "No hay una escala de antigüedad vigente en el mes: no se calculó el bono de antigüedad." };
+  if (!fechaIngreso) return { alerta: "El colaborador no tiene fecha de ingreso registrada: no se calculó el bono de antigüedad." };
+  const anios = aniosDeServicio(fechaIngreso, periodo);
+  const tramo = tramoParaAnios(escala.tramos, anios);
+  return { anios, porcentaje: tramo ? Number(tramo.porcentaje) : null };
+}
+
+function renglonAntiguedad({ anios, porcentaje }, haber, dias) {
+  const concepto = {
+    id_vigencia: null,
+    tipo: "INGRESO",
+    codigo: CALCULADOS.ANTIGUEDAD,
+    nombre: "Bono de antigüedad",
+    forma_calculo: "PORCENTAJE",
+    valor: porcentaje,
+  };
+  return renglon(concepto, {
+    base: haber,
+    cantidad: dias,
+    resultado: haber * (porcentaje / 100) * (dias / DIAS_MES),
+    detalle: `${anios} años de servicio · ${dias} de ${DIAS_MES} días`,
+  });
+}
+
+function renglonCuota(cuota) {
+  const concepto = {
+    id_vigencia: null,
+    tipo: "DESCUENTO",
+    codigo: CUOTA,
+    nombre: cuota.tipo === "ANTICIPO" ? "Cuota de anticipo de sueldo" : "Cuota de préstamo",
+    forma_calculo: "MONTO_FIJO",
+    valor: cuota.monto,
+  };
+  return renglon(concepto, { resultado: cuota.monto, detalle: `Cuota n.º ${cuota.numero_cuota}` });
+}
+
 // Concepto general (aplica a todos): monto fijo de ingreso por días pagados, de descuento o aporte completo;
 // porcentaje sobre el haber básico ganado o el total ganado.
 function renglonGeneral(c, { dias, haberGanado, totalGanado }) {
@@ -112,6 +153,8 @@ function calcularEmpleado(fila, conceptos) {
     alertas.push(faltaConcepto(CALCULADOS.HABER, "el haber básico"));
   }
   const haberGanado = ingresos[0]?.resultado ?? 0;
+  if (fila.antiguedad?.alerta) alertas.push(fila.antiguedad.alerta);
+  else if (fila.antiguedad?.porcentaje) ingresos.push(renglonAntiguedad(fila.antiguedad, haber, dias));
   const recargo = (valor) => 1 + valor / 100;
   const adicional = (valor) => valor / 100;
   ingresos.push(
@@ -165,6 +208,7 @@ function calcularEmpleado(fila, conceptos) {
       })
     );
   }
+  descuentos.push(...(fila.cuotas ?? []).map(renglonCuota));
   // Aportes patronales: no se descuentan al colaborador.
   const aportes = generales.filter((g) => g.tipo === "APORTE").map((c) => renglonGeneral(c, contexto));
 
@@ -203,4 +247,14 @@ function validarConsistencia({ renglones, total_ganado, total_descuentos, liquid
   return alertas;
 }
 
-module.exports = { HORAS_MES, CALCULADOS, TRAMOS_ANS, aCentavos, dosDecimales, calcularEmpleado, validarConsistencia };
+module.exports = {
+  HORAS_MES,
+  CALCULADOS,
+  CUOTA,
+  TRAMOS_ANS,
+  aCentavos,
+  dosDecimales,
+  antiguedadDelColaborador,
+  calcularEmpleado,
+  validarConsistencia,
+};

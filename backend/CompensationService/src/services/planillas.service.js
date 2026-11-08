@@ -2,12 +2,15 @@ const pool = require("../config/db");
 const modelo = require("../models/planillas.model");
 const externos = require("./externos.service");
 const condiciones = require("./condiciones.service");
+const antiguedad = require("./antiguedad.service");
+const anticiposModelo = require("../models/anticipos.model");
+const empleadosCliente = require("../clients/empleados.cliente");
 const { enTransaccion } = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const { hoyLaPaz } = require("../utils/fechas");
 const { CAMPOS_MINUTOS, rangoPlanilla, tramoSinConsolidar, validarResponsable, consolidarPlanilla } = require("../utils/planillas");
-const { calcularEmpleado } = require("../utils/calculo");
+const { antiguedadDelColaborador, calcularEmpleado } = require("../utils/calculo");
 
 const PERIODO_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -122,6 +125,22 @@ function responsableEn(personal, id) {
   return persona.nombre_completo;
 }
 
+async function escalaDelMes(fecha) {
+  try {
+    return await antiguedad.obtenerEscalaVigente(fecha);
+  } catch (error) {
+    if (error.estado === 409) return null;
+    throw error;
+  }
+}
+
+async function fechasDeIngreso(empleados) {
+  const resultados = await Promise.allSettled(empleados.map((e) => empleadosCliente.obtenerEmpleado(e.id_empleado)));
+  return new Map(
+    empleados.map((e, i) => [e.id_empleado, resultados[i].status === "fulfilled" ? resultados[i].value?.fecha_ingreso ?? null : null])
+  );
+}
+
 // Criterio 1: consolida asistencia, horas extra, recargos, licencias y bonos del mes en una planilla borrador.
 // Volver a generar un borrador reemplaza sus datos; una planilla aprobada ya no se genera.
 async function generar(datos = {}, identidad = {}) {
@@ -154,7 +173,20 @@ async function generar(datos = {}, identidad = {}) {
   const { advertencias } = consolidado;
   // KAN-64: haberes, descuentos y líquido de cada colaborador con los conceptos vigentes al cierre del mes.
   const conceptos = await modelo.conceptosVigentes(rango.hasta);
-  const empleados = consolidado.empleados.map((e) => ({ ...e, ...calcularEmpleado(e, conceptos) }));
+  const inicioMes = `${periodo}-01`;
+  const [escala, cuotas, fechasIngreso] = await Promise.all([
+    escalaDelMes(inicioMes),
+    anticiposModelo.listarCuotasDelPeriodo(inicioMes),
+    fechasDeIngreso(consolidado.empleados),
+  ]);
+  const empleados = consolidado.empleados.map((e) => {
+    const fila = {
+      ...e,
+      antiguedad: antiguedadDelColaborador(escala, fechasIngreso.get(e.id_empleado), inicioMes),
+      cuotas: cuotas.filter((c) => c.id_empleado === e.id_empleado),
+    };
+    return { ...e, ...calcularEmpleado(fila, conceptos) };
+  });
   const cabecera = {
     periodo,
     fecha_inicio: rango.desde,

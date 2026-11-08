@@ -276,10 +276,11 @@ CREATE INDEX idx_novedades_planilla_empleado ON NOVEDADES_PLANILLA (id_planilla_
 -- Tabla: CALCULOS_PLANILLA
 -- Detalle del cálculo de cada colaborador: un renglón por concepto, con la vigencia que dio el valor, la base,
 -- la cantidad (días u horas) y el resultado redondeado a centavos. Los totales del colaborador son su suma.
+-- El bono de antigüedad (escala de KAN-70) y las cuotas de préstamos (KAN-65) no salen de una vigencia de concepto.
 CREATE TABLE CALCULOS_PLANILLA (
     id_calculo UUID NOT NULL DEFAULT gen_random_uuid(),
     id_planilla_empleado UUID NOT NULL,
-    id_vigencia UUID NOT NULL,
+    id_vigencia UUID NULL,
     orden smallint NOT NULL,
     tipo varchar(10) NOT NULL,
     codigo varchar(20) NOT NULL,
@@ -298,6 +299,7 @@ CREATE TABLE CALCULOS_PLANILLA (
     CONSTRAINT fk_calculo_vigencia FOREIGN KEY (id_vigencia) REFERENCES VIGENCIAS_CONCEPTO (id_vigencia),
     CONSTRAINT chk_calculo_tipo CHECK (tipo IN ('INGRESO', 'DESCUENTO', 'APORTE')),
     CONSTRAINT chk_calculo_forma CHECK (forma_calculo IN ('MONTO_FIJO', 'PORCENTAJE')),
+    CONSTRAINT chk_calculo_origen CHECK (id_vigencia IS NOT NULL OR codigo IN ('BONO-ANTIGUEDAD', 'CUOTA-PRESTAMO')),
     CONSTRAINT chk_calculo_valores CHECK (valor > 0 AND resultado >= 0 AND (base IS NULL OR base >= 0) AND (cantidad IS NULL OR cantidad >= 0))
 );
 CREATE INDEX idx_calculos_planilla_empleado ON CALCULOS_PLANILLA (id_planilla_empleado);
