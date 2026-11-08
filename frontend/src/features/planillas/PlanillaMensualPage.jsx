@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { FileSpreadsheet, ListChecks, RefreshCw, Search, Trash2, TriangleAlert } from "lucide-react";
-import { descartarPlanilla, generarPlanilla, listarPlanillas, obtenerPlanilla } from "../../api/planillas";
+import { BadgeCheck, FileSpreadsheet, ListChecks, RefreshCw, Search, Trash2, TriangleAlert } from "lucide-react";
+import {
+  aprobarPlanilla,
+  descartarPlanilla,
+  generarPlanilla,
+  listarPlanillas,
+  obtenerPlanilla,
+  reenviarIntegracion,
+} from "../../api/planillas";
 import {
   Alerta,
   Boton,
@@ -19,12 +26,15 @@ import { useRol, useUsuario } from "../../context/sesion";
 import { formatearFecha } from "../conceptos/formato";
 import { formatearMes, formatearMomento, mesActual } from "../condiciones/formato";
 import DetalleColaboradorModal from "./DetalleColaboradorModal";
+import IntegracionesPlanilla from "./IntegracionesPlanilla";
 import { ESTADOS_PLANILLA, formatearBs, mesAnterior, plural } from "./formato";
 import "../conceptos/conceptos.css";
 import "./planillas.css";
 
 const PERIODO_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const RUTA_HORAS_EXTRA = "/asistencia/horas-extra";
+// Mientras falte una confirmación, la planilla aprobada se vuelve a consultar cada tanto.
+const INTERVALO_INTEGRACIONES_MS = 10000;
 
 // Nombre del mes dentro de una frase: "planilla de octubre de 2026".
 const nombreMes = (periodo) => formatearMes(periodo).toLowerCase();
@@ -138,6 +148,7 @@ export default function PlanillaMensualPage() {
   const [accion, setAccion] = useState(null);
   const [errorAccion, setErrorAccion] = useState(null);
   const [descartando, setDescartando] = useState(false);
+  const [aprobando, setAprobando] = useState(false);
   const [detalle, setDetalle] = useState(null);
   const [busqueda, setBusqueda] = useState("");
   const [soloAlertas, setSoloAlertas] = useState(false);
@@ -161,6 +172,23 @@ export default function PlanillaMensualPage() {
   const errorDelMes = errorAccion?.periodo === periodo ? errorAccion : null;
   const editable = !planilla || planilla.estado === "BORRADOR";
   const identidad = { idEmpleado, rol };
+  const borrador = planilla?.estado === "BORRADOR";
+  const enCurso = borrador && planilla.datos_hasta < planilla.fecha_fin;
+  // Mismas reglas que el servicio: mes completo, con colaboradores y sin inconsistencias.
+  const aprobable = borrador && !enCurso && planilla.totales.colaboradores > 0 && planilla.totales.con_alertas === 0;
+
+  // Criterio 4: mientras falte una respuesta de Contabilidad o Pagos, se vuelve a consultar la planilla.
+  const idAprobada = planilla?.estado === "APROBADA" ? planilla.id_planilla : null;
+  useEffect(() => {
+    if (!idAprobada) return undefined;
+    const temporizador = setInterval(() => {
+      if (document.hidden) return;
+      obtenerPlanilla(idAprobada)
+        .then((nueva) => setCarga((previa) => (previa?.planilla?.id_planilla === idAprobada ? { ...previa, planilla: nueva } : previa)))
+        .catch(() => {});
+    }, INTERVALO_INTEGRACIONES_MS);
+    return () => clearInterval(temporizador);
+  }, [idAprobada]);
 
   const filas = useMemo(() => {
     const texto = normalizar(busqueda.trim());
@@ -216,9 +244,44 @@ export default function PlanillaMensualPage() {
     }
   };
 
+  // Criterio 2 y 3: aprobada, queda bloqueada y se envía a Contabilidad y Pagos.
+  const confirmarAprobacion = async () => {
+    setAccion("aprobar");
+    setErrorAccion(null);
+    try {
+      const aprobada = await aprobarPlanilla(planilla.id_planilla, identidad);
+      setCarga({ periodo, planilla: aprobada });
+      avisar({
+        tono: "exito",
+        titulo: `Planilla de ${nombreMes(periodo)} aprobada`,
+        mensaje: "Se envía a Contabilidad y Pagos.",
+      });
+    } catch (e) {
+      setErrorAccion({ periodo, mensaje: e.message });
+    } finally {
+      setAccion(null);
+      setAprobando(false);
+    }
+  };
+
+  const reenviar = async (destino) => {
+    setAccion(`reenviar-${destino}`);
+    setErrorAccion(null);
+    try {
+      const actualizada = await reenviarIntegracion(planilla.id_planilla, destino, identidad);
+      setCarga({ periodo, planilla: actualizada });
+      avisar({ tono: "exito", titulo: "Envío en cola", mensaje: `Planilla de ${nombreMes(periodo)}` });
+    } catch (e) {
+      setErrorAccion({ periodo, mensaje: e.message });
+    } finally {
+      setAccion(null);
+    }
+  };
+
+  // Un solo botón principal: aprobar, cuando se puede; si no, generar.
   const botonGenerar = (
     <Boton
-      variante="primario"
+      variante={aprobable ? "predeterminado" : "primario"}
       icono={RefreshCw}
       cargando={accion === "generar"}
       disabled={!valido || !idEmpleado || Boolean(accion) || cargando || !editable}
@@ -237,12 +300,12 @@ export default function PlanillaMensualPage() {
         enlace={Link}
         titulo="Planilla mensual"
         idTitulo="planilla-titulo"
-        descripcion="Consolida la asistencia, las horas extra aprobadas, las licencias y los bonos del mes por colaborador para revisarlos antes de aprobar."
+        descripcion="Consolida la asistencia, las horas extra aprobadas, las licencias y los bonos del mes por colaborador para revisarlos, aprobarlos y enviarlos a Contabilidad y Pagos."
       />
 
       {!idEmpleado && (
         <Alerta tono="info" titulo="Elija su usuario">
-          Para generar o descartar la planilla, elija su usuario de prueba en la barra superior.
+          Para generar, aprobar o descartar la planilla, elija su usuario de prueba en la barra superior.
         </Alerta>
       )}
 
@@ -269,6 +332,16 @@ export default function PlanillaMensualPage() {
               </Boton>
             )}
             {editable && botonGenerar}
+            {borrador && (
+              <Boton
+                variante={aprobable ? "primario" : "predeterminado"}
+                icono={BadgeCheck}
+                disabled={!aprobable || !idEmpleado || Boolean(accion)}
+                onClick={() => setAprobando(true)}
+              >
+                Aprobar planilla
+              </Boton>
+            )}
           </div>
         </div>
 
@@ -326,8 +399,24 @@ export default function PlanillaMensualPage() {
                   </span>
                 </div>
 
+                {enCurso && (
+                  <Alerta tono="info" titulo="Vista previa del mes en curso">
+                    Los datos llegan hasta el {formatearFecha(planilla.datos_hasta)}. Podrá aprobarla cuando termine el mes y
+                    la vuelva a generar.
+                  </Alerta>
+                )}
+
+                {!borrador && (
+                  <IntegracionesPlanilla
+                    planilla={planilla}
+                    reenviando={accion?.startsWith("reenviar-") ? accion.slice("reenviar-".length) : null}
+                    puedeReenviar={Boolean(idEmpleado) && !accion}
+                    onReenviar={reenviar}
+                  />
+                )}
+
                 {planilla.advertencias.length > 0 && (
-                  <Alerta tono="aviso" titulo="Revise antes de aprobar">
+                  <Alerta tono="aviso" titulo={borrador ? "Revise antes de aprobar" : "Observaciones de la planilla"}>
                     <ul className="planilla-advertencias">
                       {planilla.advertencias.map((texto) => (
                         <li key={texto}>{texto}</li>
@@ -407,6 +496,43 @@ export default function PlanillaMensualPage() {
       >
         Se eliminará el borrador de la planilla de <strong>{nombreMes(periodo)}</strong>. Podrá generarla de nuevo cuando
         quiera.
+      </ModalConfirmacion>
+
+      <ModalConfirmacion
+        abierto={aprobando}
+        titulo={`¿Aprobar la planilla de ${nombreMes(periodo)}?`}
+        textoConfirmar="Aprobar planilla"
+        variante="primario"
+        procesando={accion === "aprobar"}
+        onConfirmar={confirmarAprobacion}
+        onCancelar={() => setAprobando(false)}
+      >
+        {planilla?.totales && (
+          <div className="planilla-aprobacion">
+            <dl className="vigencias-resumen planilla-aprobacion__totales">
+              <div>
+                <dt>Colaboradores</dt>
+                <dd>{planilla.totales.colaboradores}</dd>
+              </div>
+              <div>
+                <dt>Total ganado</dt>
+                <dd className="planilla-cifra">{formatearBs(planilla.totales.total_ganado)}</dd>
+              </div>
+              <div>
+                <dt>Líquido pagable</dt>
+                <dd className="planilla-cifra">{formatearBs(planilla.totales.liquido_pagable)}</dd>
+              </div>
+              <div>
+                <dt>Aportes patronales</dt>
+                <dd className="planilla-cifra">{formatearBs(planilla.totales.total_aportes)}</dd>
+              </div>
+            </dl>
+            <p>
+              Ya no se podrá volver a generar ni descartar. Se enviará el asiento contable a <strong>Contabilidad</strong> y
+              la orden de pago a <strong>Pagos</strong>.
+            </p>
+          </div>
+        )}
       </ModalConfirmacion>
     </section>
   );
