@@ -17,6 +17,11 @@ const {
   buscarFaltantes,
   calcularResultado,
 } = require("../utils/formulario");
+const {
+  validarRetroalimentacion,
+  verificarFechasCompromisos,
+  describirRetroalimentacion,
+} = require("../utils/retroalimentacion");
 
 const describirColaborador = ({
   id_empleado_evaluado,
@@ -31,6 +36,11 @@ const describirColaborador = ({
   nombre_completo: nombreCompleto({ nombres, apellidos }),
   sucursal,
   departamento,
+});
+
+const describirEvaluador = ({ id_empleado_evaluador, evaluador_nombres, evaluador_apellidos }) => ({
+  id_empleado: id_empleado_evaluador,
+  nombre_completo: nombreCompleto({ nombres: evaluador_nombres ?? "", apellidos: evaluador_apellidos ?? "" }),
 });
 
 async function listarEvaluaciones(idEmpleado, consulta) {
@@ -148,6 +158,10 @@ async function obtenerFormulario(idEmpleado, idEvaluacion) {
           puntaje_final: evaluacion.puntaje_final,
         }
       : null,
+    retroalimentacion: describirRetroalimentacion(
+      evaluacion,
+      await modelo.listarCompromisos(evaluacion.id_evaluacion),
+    ),
   };
 }
 
@@ -313,7 +327,107 @@ async function enviar(idEmpleado, idEvaluacion) {
   };
 }
 
+// KAN-26: el evaluador registra la retroalimentación cualitativa en la sección final, una vez que completó los
+// puntajes. Los textos se reemplazan y la lista de compromisos sustituye a la guardada. Tras el envío ya no se edita.
+async function guardarRetroalimentacion(idEmpleado, idEvaluacion, cuerpo) {
+  const datos = validarRetroalimentacion(cuerpo);
+
+  const resultado = await enTransaccion(async (db) => {
+    const evaluacion = await prepararEscritura(idEmpleado, idEvaluacion, db);
+    if (evaluacion.vencida) return { evaluacion };
+
+    const formulario = await cargarFormulario(evaluacion, db);
+    const faltantes = buscarFaltantes(formulario);
+    if (faltantes.length > 0 || resumirProgreso(formulario).respondidas === 0) {
+      throw new ErrorApp(
+        422,
+        "Complete los puntajes de la evaluación antes de registrar la retroalimentación final.",
+        faltantes,
+      );
+    }
+    verificarFechasCompromisos(datos.compromisos, evaluacion.hoy);
+
+    const actualizadoEn = await modelo.guardarRetroalimentacion(evaluacion.id_evaluacion, datos, db);
+    if (!actualizadoEn) {
+      throw new ErrorApp(409, "La evaluación ya fue enviada y no se puede modificar.");
+    }
+    await modelo.reemplazarCompromisos(evaluacion.id_evaluacion, datos.compromisos, db);
+    return {
+      evaluacion: { ...evaluacion, ...datos },
+      actualizadoEn,
+      compromisos: await modelo.listarCompromisos(evaluacion.id_evaluacion, db),
+    };
+  });
+
+  if (resultado.evaluacion.vencida) throw errorVencida(resultado.evaluacion);
+  return {
+    id_evaluacion: resultado.evaluacion.id_evaluacion,
+    actualizado_en: resultado.actualizadoEn,
+    retroalimentacion: describirRetroalimentacion(resultado.evaluacion, resultado.compromisos),
+  };
+}
+
+// KAN-26: el colaborador ve solo sus evaluaciones ya enviadas.
+async function listarMisResultados(idEmpleado) {
+  const filas = await modelo.listarResultadosDelEvaluado(idEmpleado);
+  return filas.map((fila) => ({
+    id_evaluacion: fila.id_evaluacion,
+    ciclo: { id_ciclo: fila.id_ciclo, nombre: fila.ciclo, fecha_limite: fila.fecha_limite },
+    plantilla: { nombre: fila.plantilla },
+    evaluador: {
+      nombre_completo: nombreCompleto({ nombres: fila.evaluador_nombres, apellidos: fila.evaluador_apellidos }),
+    },
+    puntaje_final: fila.puntaje_final,
+    enviada_en: fila.enviada_en,
+    compromisos: fila.compromisos,
+  }));
+}
+
+// KAN-26: resultado de una evaluación enviada, visto por el colaborador evaluado. Es de solo lectura: el
+// servicio no ofrece ninguna escritura al evaluado, y las del evaluador rechazan una evaluación enviada.
+async function obtenerMiResultado(idEmpleado, idEvaluacion) {
+  const evaluacion = UUID_RE.test(idEvaluacion)
+    ? await modelo.obtenerEvaluacion(idEvaluacion.toLowerCase())
+    : null;
+  if (!evaluacion) throw new ErrorApp(404, "Evaluación no encontrada");
+  if (evaluacion.id_empleado_evaluado !== idEmpleado) {
+    throw new ErrorApp(403, "Solo puede consultar los resultados de sus propias evaluaciones.");
+  }
+  if (evaluacion.id_estado_evaluacion !== ESTADO_EVALUACION.ENVIADA) {
+    throw new ErrorApp(409, "Los resultados estarán disponibles cuando su evaluador envíe la evaluación.");
+  }
+
+  const formulario = await cargarFormulario(evaluacion);
+  return {
+    id_evaluacion: evaluacion.id_evaluacion,
+    estado_codigo: CODIGO_ESTADO_EVALUACION[ESTADO_EVALUACION.ENVIADA],
+    editable: false,
+    colaborador: describirColaborador(evaluacion),
+    evaluador: describirEvaluador(evaluacion),
+    ciclo: {
+      id_ciclo: evaluacion.id_ciclo,
+      nombre: evaluacion.ciclo,
+      fecha_limite: evaluacion.fecha_limite,
+    },
+    plantilla: {
+      nombre: evaluacion.plantilla,
+      objetivo: evaluacion.objetivo,
+      numero_version: evaluacion.numero_version,
+    },
+    puntaje_final: evaluacion.puntaje_final,
+    enviada_en: evaluacion.enviada_en,
+    resultado: { ...calcularResultado(formulario), puntaje_final: evaluacion.puntaje_final },
+    retroalimentacion: describirRetroalimentacion(
+      evaluacion,
+      await modelo.listarCompromisos(evaluacion.id_evaluacion),
+    ),
+  };
+}
+
 module.exports = {
+  guardarRetroalimentacion,
+  listarMisResultados,
+  obtenerMiResultado,
   listarEvaluaciones,
   listarCiclos,
   obtenerFormulario,

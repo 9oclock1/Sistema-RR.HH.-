@@ -2,7 +2,8 @@ import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculato
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
-import { RUTA_EVALUACIONES } from "../features/evaluaciones/ruta";
+import MisResultadosPage from "../features/evaluaciones/MisResultadosPage";
+import { RUTA_EVALUACIONES, RUTA_MIS_RESULTADOS } from "../features/evaluaciones/ruta";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
@@ -341,6 +342,15 @@ export const SECCIONES = [
         icono: ClipboardPenLine,
         roles: ["supervisor"],
         pagina: EvaluacionesPage,
+      },
+      {
+        ruta: RUTA_MIS_RESULTADOS,
+        parametroOpcional: "idEvaluacion",
+        etiqueta: "Mis resultados",
+        descripcion: "Puntaje de sus evaluaciones enviadas, con fortalezas, aspectos de mejora y compromisos de desarrollo.",
+        icono: Award,
+        roles: ["empleado"],
+        pagina: MisResultadosPage,
       },
     ],
   },

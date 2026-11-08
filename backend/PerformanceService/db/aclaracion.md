@@ -43,6 +43,13 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 - El resultado se redondea a 2 decimales y se congela al enviar. Ejemplo del seed (evaluación `…0125`): `(20×100 + 15×80 + 15×80 + 20×100 + 20×75) / 90 = 87.78`.
 - El desglose por criterio o competencia usa la misma fórmula, pero solo con las preguntas de ese criterio o competencia.
 
+### Retroalimentación cualitativa final (KAN-26)
+
+- `fortalezas`, `aspectos_mejora` y `comentarios_generales` de `EVALUACIONES` son opcionales; un texto vacío se guarda como NULL.
+- Cada compromiso de `COMPROMISOS_DESARROLLO` tiene descripción y fecha objetivo obligatorias. Al guardar, la lista enviada reemplaza a la anterior.
+- Backend: solo el evaluador la registra, y solo cuando ya respondió todas las preguntas obligatorias. La fecha objetivo no puede ser anterior a hoy (hora de Bolivia).
+- Backend: al enviar la evaluación la retroalimentación queda congelada. El colaborador evaluado la consulta en `GET /evaluaciones/mis-resultados[/:id]`, que solo muestra evaluaciones `ENVIADA` y no tiene escritura.
+
 ## Datos de prueba
 
 - `seed.sql` carga datos ficticios para probar KAN-24: una plantilla publicada con 6 preguntas (pesos que suman 100 y una opcional), tres ciclos y seis evaluaciones en distintos estados. No se ejecuta al crear la base ni está montado en `docker-compose.yml`; se corre a mano después de `init.sql` y se puede repetir sin duplicar filas.

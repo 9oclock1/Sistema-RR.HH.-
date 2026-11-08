@@ -47,6 +47,7 @@ describe("RF-04: servicio de envío de la evaluación (base simulada)", () => {
       async () => filas ?? ayudas.filas(almacen),
     );
     mock.method(modelo, "listarNiveles", async () => ayudas.NIVELES);
+    mock.method(modelo, "listarCompromisos", async () => []);
     mock.method(modelo, "cambiarEstadoAbierta", async (id, estado) => {
       llamadas.estado.push(estado);
       return "2030-12-01T10:05:00.000Z";
