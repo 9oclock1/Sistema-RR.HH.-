@@ -16,4 +16,13 @@ const diaAnterior = (fecha) => sumarDias(fecha, -1);
 const hoyLaPaz = (ahora = new Date()) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "America/La_Paz" }).format(ahora);
 
-module.exports = { esFecha, sumarDias, diaAnterior, hoyLaPaz };
+const esPrimerDiaDeMes = (fecha) => esFecha(fecha) && fecha.slice(8, 10) === "01";
+
+// Mismo día 1, `n` meses después. Usamos UTC para no arrastrar el huso horario local del servidor.
+const sumarMeses = (fecha, n) => {
+  const fechaUtc = new Date(`${fecha}T00:00:00Z`);
+  fechaUtc.setUTCMonth(fechaUtc.getUTCMonth() + n);
+  return fechaUtc.toISOString().slice(0, 10);
+};
+
+module.exports = { esFecha, sumarDias, diaAnterior, hoyLaPaz, esPrimerDiaDeMes, sumarMeses };

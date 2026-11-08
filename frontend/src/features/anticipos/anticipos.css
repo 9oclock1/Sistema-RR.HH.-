@@ -1,0 +1,122 @@
+.anticipos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.anticipos .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+.anticipos-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.anticipos-filtros .ds-campo {
+  width: calc(var(--size-sidebar) * 0.75);
+  max-width: 100%;
+}
+
+.anticipos-total {
+  margin: 0 0 0 auto;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--size-control);
+}
+
+.anticipos-tabla .ds-tabla {
+  min-width: calc(var(--size-sidebar) * 3.5);
+}
+
+.anticipos-nombre {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.anticipos-nota {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+/* Formulario de registro (dentro del modal) */
+.anticipo-formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-1);
+}
+
+.anticipo-formulario__campos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.anticipo-formulario__ancho {
+  grid-column: 1 / -1;
+}
+
+.anticipo-nota {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+/* Tabla de amortización */
+.amortizacion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.amortizacion-resumen {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-page);
+}
+
+.amortizacion-resumen dt {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.amortizacion-resumen dd {
+  margin: 0;
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.amortizacion-tabla td {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .anticipo-formulario__campos,
+  .amortizacion-resumen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .anticipos-filtros .ds-campo {
+    flex: 1 1 calc(var(--size-sidebar) * 0.5);
+  }
+
+  .anticipos-total {
+    width: 100%;
+    margin: 0;
+    line-height: var(--line-height-small);
+  }
+}
