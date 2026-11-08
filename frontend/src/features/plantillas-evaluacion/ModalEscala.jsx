@@ -11,7 +11,7 @@ const sinCampos = (errores, quitar) => Object.fromEntries(Object.entries(errores
 
 // Se monta al abrirse (con una key por escala), así el formulario parte de la escala indicada.
 // escala: la escala a editar, o null para crear una. onGuardada recibe la escala guardada.
-export default function ModalEscala({ escala, onGuardada, onCerrar }) {
+export default function ModalEscala({ escala, idEmpleado, onGuardada, onCerrar }) {
   const [formulario, setFormulario] = useState(() => (escala ? escalaAFormulario(escala) : nuevaEscala()));
   const [errores, setErrores] = useState({});
   const [alerta, setAlerta] = useState(null);
@@ -52,7 +52,7 @@ export default function ModalEscala({ escala, onGuardada, onCerrar }) {
     setAlerta(null);
     try {
       const datos = escalaADatos(formulario);
-      const guardada = escala ? await actualizarEscala(escala.id_escala, datos) : await crearEscala(datos);
+      const guardada = escala ? await actualizarEscala(idEmpleado, escala.id_escala, datos) : await crearEscala(idEmpleado, datos);
       onGuardada(guardada, Boolean(escala));
     } catch (error) {
       const porCampo = Object.fromEntries((error.detalles ?? []).map((d) => [d.campo, d.mensaje]));

@@ -1,8 +1,8 @@
 const { test, beforeEach, mock } = require("node:test");
 const assert = require("node:assert/strict");
-const modelo = require("../src/models/catalogos.model");
+const modelo = require("../src/models/escalasModel");
 const transaccion = require("../src/config/transaccion");
-const servicio = require("../src/services/catalogos.service");
+const servicio = require("../src/services/escalasService");
 
 const ID = "00000000-0000-4000-8000-000000000001";
 const NIVELES = [

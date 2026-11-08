@@ -1,7 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { validarPlantilla } = require("../src/utils/validarPlantilla");
-const { validarEscala, validarCompetencia } = require("../src/utils/validarCatalogos");
+const { validarEscala } = require("../src/utils/escalas");
 const { balancePesos, describirDesbalance } = require("../src/utils/ponderacion");
 
 const LIKERT = "00000000-0000-4000-8000-000000000001";
@@ -128,16 +128,6 @@ test("criterio 3: rechaza escalas mal definidas", () => {
   rechaza(validarEscala, { ...base, niveles: [{ valor: 1, etiqueta: "A" }, { valor: 2, etiqueta: "a" }] }, "niveles[1].etiqueta");
   rechaza(validarEscala, { ...base, niveles: [{ valor: -1, etiqueta: "A" }, { valor: 2, etiqueta: "B" }] }, "niveles[0].valor");
   rechaza(validarEscala, { ...base, niveles: [{ valor: 1, etiqueta: "A" }, { valor: 1000, etiqueta: "B" }] }, "niveles[1].valor");
-});
-
-test("valida las competencias del catálogo", () => {
-  assert.deepEqual(validarCompetencia({ nombre: " Trabajo en equipo ", tipo: "competencia_laboral" }), {
-    nombre: "Trabajo en equipo",
-    descripcion: null,
-    id_tipo_competencia: 1,
-  });
-  rechaza(validarCompetencia, { nombre: "Puntualidad", tipo: "OTRO" }, "tipo");
-  rechaza(validarCompetencia, { tipo: "FACTOR_OPERATIVO" }, "nombre");
 });
 
 test("criterio 2: el balance suma en centésimas y describe el desbalance", () => {

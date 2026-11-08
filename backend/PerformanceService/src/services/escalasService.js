@@ -1,9 +1,9 @@
-const modelo = require("../models/catalogos.model");
+const modelo = require("../models/escalasModel");
 const transaccion = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const { aCentesimas } = require("../utils/ponderacion");
-const { validarEscala, validarCompetencia } = require("../utils/validarCatalogos");
+const { validarEscala } = require("../utils/escalas");
 
 const escalaNoEncontrada = () => new ErrorApp(404, "Escala de valoración no encontrada");
 
@@ -81,21 +81,10 @@ async function eliminarEscala(idEscala) {
   });
 }
 
-const listarCompetencias = () => modelo.listarCompetencias();
-
-async function crearCompetencia(datos) {
-  const competencia = validarCompetencia(datos);
-  return modelo.crearCompetencia(competencia).catch((error) => {
-    throw traducirError(error, { nombre: competencia.nombre, catalogo: "una competencia" });
-  });
-}
-
 module.exports = {
   listarEscalas,
   obtenerEscala,
   crearEscala,
   actualizarEscala,
   eliminarEscala,
-  listarCompetencias,
-  crearCompetencia,
 };

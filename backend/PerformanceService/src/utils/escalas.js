@@ -1,6 +1,8 @@
 const { ErrorApp } = require("./errores");
 const { aCentesimas } = require("./ponderacion");
-const { TIPO_ESCALA, TIPO_COMPETENCIA } = require("./catalogos");
+
+// Ids fijos del catálogo CATALOGOS_TIPO_ESCALA que carga init.sql.
+const TIPO_ESCALA = { CUANTITATIVA: 1, CUALITATIVA: 2 };
 
 const MIN_NIVELES = 2;
 const MAX_NIVELES = 10;
@@ -57,21 +59,4 @@ function validarEscala(datos = {}) {
   return { nombre, descripcion, id_tipo_escala: TIPO_ESCALA[tipo], niveles };
 }
 
-function validarCompetencia(datos = {}) {
-  const errores = [];
-  const agregar = (campo, mensaje) => errores.push({ campo, mensaje });
-  const nombre = texto(datos.nombre);
-  const descripcion = texto(datos.descripcion) || null;
-  const tipo = typeof datos.tipo === "string" ? datos.tipo.trim().toUpperCase() : "";
-
-  if (!nombre || nombre.length > 100) agregar("nombre", "Ingrese un nombre de hasta 100 caracteres.");
-  if (descripcion?.length > 255) agregar("descripcion", "Use hasta 255 caracteres.");
-  if (!Object.hasOwn(TIPO_COMPETENCIA, tipo)) {
-    agregar("tipo", "Seleccione si es una competencia laboral o un factor operativo.");
-  }
-
-  if (errores.length > 0) throw new ErrorApp(400, "Datos de competencia inválidos", errores);
-  return { nombre, descripcion, id_tipo_competencia: TIPO_COMPETENCIA[tipo] };
-}
-
-module.exports = { validarEscala, validarCompetencia };
+module.exports = { validarEscala, TIPO_ESCALA };

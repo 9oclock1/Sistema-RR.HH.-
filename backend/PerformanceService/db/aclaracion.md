@@ -20,6 +20,18 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 - Backend: solo se editan versiones en `BORRADOR`, y para cambiar una publicada se copia su estructura a una versión nueva.
 - Backend: al publicar se verifica que la suma de `peso_porcentual` de todas las preguntas de la versión sea 100.
 
+### Diseño de plantillas
+
+- Al crear una plantilla se crea en la misma transacción su versión 1 en `BORRADOR`.
+- La duplicidad se compara con `lower(btrim(nombre))`, el área y el rango de vigencia (`[desde, hasta]` inclusivo): "Evaluación Cajeros" y " evaluación cajeros " son el mismo nombre. El mismo nombre y área en periodos que no se cruzan sí se permite. La base responde con el error `23P01` y el backend lo convierte en una alerta de duplicidad (409).
+- `nombre` y `objetivo` no pueden ser solo espacios (`chk_plantilla_nombre`, `chk_plantilla_objetivo`).
+- Backend: la cabecera (nombre, área, objetivo y vigencia) se bloquea cuando alguna versión de la plantilla ya fue publicada, y una plantilla que alguna vez se publicó no se elimina.
+- Backend: al publicar se valida que la cabecera esté completa, que la vigencia no haya terminado, que la versión tenga al menos una sección con una competencia activa, que cada sección tenga criterios y cada criterio al menos una pregunta, y que los pesos sumen 100. Al publicar una versión nueva, la publicada anterior pasa a `ARCHIVADA`.
+- Backend: la estructura de un borrador se guarda completa con `PUT /plantillas/:id/versiones/:idVersion/estructura` (secciones, criterios y preguntas con su peso y su escala). Un borrador puede quedar con los pesos desbalanceados; la respuesta trae el `balance` (suma, diferencia y si suma 100) y el desbalance recién bloquea la publicación.
+- Backend: no se crea una versión nueva de una plantilla cuya vigencia ya terminó. La cabecera no se puede cambiar después de publicar, así que esa versión nunca podría publicarse; hay que crear una plantilla nueva.
+- Backend: eliminar un borrador que nunca se publicó borra en cascada preguntas, criterios, secciones y versiones.
+- Backend: una plantilla tiene a lo sumo un borrador a la vez.
+
 ## Competencias y escalas
 
 - `COMPETENCIAS` es un catálogo común a todas las plantillas: permite comparar una misma competencia entre versiones y ciclos. Cada sección de una versión usa una competencia, que es de tipo competencia laboral o factor operativo.

@@ -4,6 +4,7 @@ import { eliminarEscala, listarEscalas } from "../../api/plantillasEvaluacion";
 import { Alerta, Boton, EstadoVacio, Etiqueta, ModalConfirmacion, Tabla, Tarjeta, useAvisos } from "../../components/ui";
 import ModalEscala from "./ModalEscala";
 import { describirNiveles, TIPOS_ESCALA } from "./plantilla";
+import "./escalas.css";
 
 const nombreTipo = (tipo) => TIPOS_ESCALA.find((t) => t.valor === tipo)?.etiqueta ?? tipo;
 
@@ -65,7 +66,8 @@ const COLUMNAS = ({ onEditar, onEliminar }) => [
 ];
 
 // Catálogo de escalas de valoración que usan las preguntas de todas las plantillas.
-export default function PanelEscalas() {
+// idEmpleado: usuario de prueba de la barra lateral; viaja en X-Empleado-Id.
+export default function PanelEscalas({ idEmpleado }) {
   const avisar = useAvisos();
   const [escalas, setEscalas] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -78,14 +80,14 @@ export default function PanelEscalas() {
 
   const cargar = useCallback(
     () =>
-      listarEscalas()
+      listarEscalas(idEmpleado)
         .then((lista) => {
           setEscalas(lista);
           setErrorCarga(null);
         })
         .catch((error) => setErrorCarga(error.message))
         .finally(() => setCargando(false)),
-    []
+    [idEmpleado]
   );
 
   useEffect(() => {
@@ -102,7 +104,7 @@ export default function PanelEscalas() {
     const escala = porEliminar;
     setEliminando(true);
     try {
-      await eliminarEscala(escala.id_escala);
+      await eliminarEscala(idEmpleado, escala.id_escala);
       await cargar();
       avisar({ tono: "exito", titulo: "Escala eliminada", mensaje: escala.nombre });
     } catch (error) {
@@ -174,6 +176,7 @@ export default function PanelEscalas() {
         <ModalEscala
           key={editando?.id_escala ?? "nueva"}
           escala={editando}
+          idEmpleado={idEmpleado}
           onGuardada={guardada}
           onCerrar={() => setEditando(undefined)}
         />

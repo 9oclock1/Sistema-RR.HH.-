@@ -11,6 +11,8 @@ import MisCasosQuejaPage from "../features/quejas/casos/MisCasosQuejaPage";
 import { RUTA_CASOS_QUEJA, RUTA_MIS_CASOS_QUEJA } from "../features/quejas/casos/casos";
 import HistorialQuejasPage from "../features/quejas/historial/HistorialQuejasPage";
 import { RUTA_HISTORIAL_QUEJAS } from "../features/quejas/historial/historial";
+import PlantillasEvaluacionPage from "../features/plantillas-evaluacion/PlantillasEvaluacionPage";
+import { RUTA_PLANTILLAS } from "../features/plantillas-evaluacion/ruta";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
@@ -35,7 +37,6 @@ import MisMemorandumsPage from "../features/Memorandums/acuses/MisMemorandumsPag
 import MiAsistenciaPage from "../features/mi-asistencia/MiAsistenciaPage";
 import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
-import PlantillasEvaluacionPage from "../features/plantillas-evaluacion/PlantillasEvaluacionPage";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import PipelineSeleccionPage from "../features/recruitment/pipeline/PipelineSeleccionPage";
 import AgendaEntrevistasPage from "../features/recruitment/entrevistas/AgendaEntrevistasPage";
@@ -343,9 +344,10 @@ export const SECCIONES = [
     titulo: "Desempeño",
     modulos: [
       {
-        ruta: "/desempeno/plantillas",
+        ruta: RUTA_PLANTILLAS,
+        parametroOpcional: "idPlantilla",
         etiqueta: "Plantillas de evaluación",
-        descripcion: "Criterios, preguntas ponderadas y escalas de valoración, con control de versiones.",
+        descripcion: "Diseño de plantillas estandarizadas por área y vigencia, con sus secciones, criterios, preguntas ponderadas y escalas de valoración.",
         icono: ClipboardList,
         roles: ["admin"],
         pagina: PlantillasEvaluacionPage,
