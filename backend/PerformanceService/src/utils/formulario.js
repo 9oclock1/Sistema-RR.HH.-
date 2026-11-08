@@ -121,6 +121,7 @@ function calcularResultado(formulario) {
       const preguntasSeccion = seccion.criterios.flatMap((criterio) => criterio.preguntas);
       return {
         id_seccion: seccion.id_seccion,
+        id_competencia: seccion.competencia.id_competencia,
         competencia: seccion.competencia.nombre,
         peso_porcentual: sumarPesos(preguntasSeccion),
         puntaje: calcularPuntaje(comoItems(preguntasSeccion)),

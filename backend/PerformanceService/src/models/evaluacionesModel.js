@@ -243,7 +243,84 @@ async function listarResultadosDelEvaluado(idEvaluado, db = pool) {
   return rows;
 }
 
+// Historial de desempeño: evaluaciones enviadas del colaborador en ciclos ya cerrados, con su periodo y retroalimentación.
+async function listarHistorialDelEvaluado(idEvaluado, db = pool) {
+  const { rows } = await db.query(
+    `SELECT e.id_evaluacion, e.puntaje_final, e.enviada_en,
+            e.fortalezas, e.aspectos_mejora, e.comentarios_generales,
+            c.id_ciclo, c.id_version, c.nombre AS ciclo, c.fecha_inicio, c.fecha_limite, c.cerrado_en,
+            pe.id_periodo, pe.nombre AS periodo, pe.fecha_inicio AS periodo_fecha_inicio, pe.fecha_fin AS periodo_fecha_fin,
+            ev.nombres AS evaluador_nombres, ev.apellidos AS evaluador_apellidos,
+            pl.nombre AS plantilla
+     FROM evaluaciones e
+     JOIN ciclos_evaluacion c ON c.id_ciclo = e.id_ciclo
+     JOIN periodos_evaluacion pe ON pe.id_periodo = c.id_periodo
+     JOIN empleados ev ON ev.id_empleado = e.id_empleado_evaluador
+     JOIN versiones_plantilla v ON v.id_version = c.id_version
+     JOIN plantillas_evaluacion pl ON pl.id_plantilla = v.id_plantilla
+     WHERE e.id_empleado_evaluado = $1
+       AND e.id_estado_evaluacion = ${ESTADO_EVALUACION.ENVIADA}
+       AND c.id_estado_ciclo = ${ESTADO_CICLO.CERRADO}
+     ORDER BY pe.fecha_inicio DESC, c.fecha_limite DESC, e.enviada_en`,
+    [idEvaluado],
+  );
+  return rows;
+}
+
+// Estructura y respuestas de varias evaluaciones en una sola consulta (mismas columnas que listarEstructura).
+async function listarEstructuraDeEvaluaciones(idsEvaluacion, db = pool) {
+  if (idsEvaluacion.length === 0) return [];
+  const { rows } = await db.query(
+    `SELECT e.id_evaluacion,
+            s.id_seccion, s.orden AS orden_seccion,
+            co.id_competencia, co.nombre AS competencia, co.descripcion AS competencia_descripcion, tc.codigo AS tipo_competencia,
+            cr.id_criterio, cr.nombre AS criterio, cr.descripcion AS criterio_descripcion, cr.orden AS orden_criterio,
+            p.id_pregunta, p.texto, p.peso_porcentual, p.es_obligatoria, p.orden AS orden_pregunta,
+            esc.id_escala, esc.nombre AS escala, te.codigo AS tipo_escala,
+            r.id_nivel AS id_nivel_respondido, nr.valor AS valor_respondido
+     FROM evaluaciones e
+     JOIN ciclos_evaluacion c ON c.id_ciclo = e.id_ciclo
+     JOIN secciones_plantilla s ON s.id_version = c.id_version
+     JOIN competencias co ON co.id_competencia = s.id_competencia
+     JOIN catalogos_tipo_competencia tc ON tc.id_tipo_competencia = co.id_tipo_competencia
+     JOIN criterios_evaluacion cr ON cr.id_seccion = s.id_seccion
+     JOIN preguntas_evaluacion p ON p.id_criterio = cr.id_criterio
+     JOIN escalas_valoracion esc ON esc.id_escala = p.id_escala
+     JOIN catalogos_tipo_escala te ON te.id_tipo_escala = esc.id_tipo_escala
+     LEFT JOIN respuestas_evaluacion r ON r.id_pregunta = p.id_pregunta AND r.id_evaluacion = e.id_evaluacion
+     LEFT JOIN niveles_escala nr ON nr.id_nivel = r.id_nivel
+     WHERE e.id_evaluacion = ANY($1::uuid[])
+     ORDER BY e.id_evaluacion, s.orden, cr.orden, p.orden`,
+    [idsEvaluacion],
+  );
+  return rows;
+}
+
+async function listarCompromisosDeEvaluaciones(idsEvaluacion, db = pool) {
+  if (idsEvaluacion.length === 0) return [];
+  const { rows } = await db.query(
+    `SELECT id_evaluacion, id_compromiso, descripcion, fecha_objetivo
+     FROM compromisos_desarrollo
+     WHERE id_evaluacion = ANY($1::uuid[])
+     ORDER BY fecha_objetivo, creado_en, id_compromiso`,
+    [idsEvaluacion],
+  );
+  return rows;
+}
+
+async function obtenerEmpleado(idEmpleado, db = pool) {
+  const { rows } = await db.query(
+    "SELECT id_empleado, nombres, apellidos FROM empleados WHERE id_empleado = $1",
+    [idEmpleado],
+  );
+  return rows[0] ?? null;
+}
+
 module.exports = {
+  listarHistorialDelEvaluado,
+  listarEstructuraDeEvaluaciones,
+  listarCompromisosDeEvaluaciones,
+  obtenerEmpleado,
   hoy,
   listarBandeja,
   listarCiclos,

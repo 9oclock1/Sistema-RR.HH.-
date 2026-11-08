@@ -32,7 +32,18 @@ async function obtenerMiResultado(req, res) {
   res.json(await servicio.obtenerMiResultado(req.idEmpleado, req.params.idEvaluacion));
 }
 
+async function obtenerHistorialDesempeno(req, res) {
+  res.json(
+    await servicio.obtenerHistorialDesempeno({
+      idSolicitante: req.idEmpleado,
+      rol: req.get("X-Rol")?.trim().toLowerCase() || null,
+      idColaborador: req.params.idEmpleado,
+    }),
+  );
+}
+
 module.exports = {
+  obtenerHistorialDesempeno,
   listarEvaluaciones,
   listarCiclos,
   obtenerFormulario,

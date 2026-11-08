@@ -9,6 +9,7 @@ import {
   guardarRetroalimentacion,
   listarMisResultados,
   obtenerEvaluacion,
+  obtenerHistorialDesempeno,
   obtenerMiResultado,
 } from "../../api/evaluaciones";
 import ProveedorAvisos from "../../components/ui/ProveedorAvisos";
@@ -107,6 +108,7 @@ const seccionFinal = () => screen.getByRole("heading", { level: 2, name: "Retroa
 
 beforeEach(() => {
   localStorage.setItem("rrhh.idEmpleado", EMPLEADO);
+  obtenerHistorialDesempeno.mockResolvedValue({ resumen: {}, evolucion: [], ciclos: [] });
   guardarRespuestas.mockResolvedValue({ estado_codigo: "BORRADOR", progreso: {} });
   guardarRetroalimentacion.mockImplementation(async (id, idEv, cuerpo) => ({
     id_evaluacion: idEv,

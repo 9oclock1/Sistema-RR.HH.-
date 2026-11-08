@@ -48,3 +48,10 @@ export const listarMisResultados = (idEmpleado) =>
 
 export const obtenerMiResultado = (idEmpleado, idEvaluacion) =>
   solicitar(`${RUTA}/mis-resultados/${idEvaluacion}`, { cabeceras: comoEvaluador(idEmpleado) });
+
+// Historial de desempeño consolidado por ciclo cerrado y su evolución por periodo. El servicio aplica RBAC:
+// sin un rol de RRHH (admin, gerente) solo se puede consultar el propio (idColaborador = idEmpleado); si no, 403.
+export const obtenerHistorialDesempeno = (idEmpleado, rol, idColaborador = idEmpleado) =>
+  solicitar(`${RUTA}/historial/${idColaborador}`, {
+    cabeceras: { ...comoEvaluador(idEmpleado), ...(rol && { "X-Rol": rol }) },
+  });

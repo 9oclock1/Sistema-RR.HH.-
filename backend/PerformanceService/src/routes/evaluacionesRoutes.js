@@ -20,6 +20,12 @@ router.get(
   identificarEmpleado,
   controlador.obtenerMiResultado,
 );
+// Historial consolidado de un colaborador (RBAC: el propio, o cualquiera si el rol es de RRHH).
+router.get(
+  "/evaluaciones/historial/:idEmpleado",
+  identificarEmpleado,
+  controlador.obtenerHistorialDesempeno,
+);
 router.get(
   "/evaluaciones",
   identificarEmpleado,
