@@ -71,4 +71,9 @@ async function ultimosDePlanilla(db, idPlanilla) {
   return Object.fromEntries(rows.map((r) => [r.destino, r]));
 }
 
-module.exports = { registrar, reservarPendientes, marcarEntregado, marcarError, reencolar, ultimosDePlanilla };
+async function obtener(db, id) {
+  const { rows } = await db.query(`SELECT ${COLUMNAS} FROM eventos_salientes WHERE id_evento = $1`, [id]);
+  return rows[0];
+}
+
+module.exports = { registrar, reservarPendientes, marcarEntregado, marcarError, reencolar, ultimosDePlanilla, obtener };

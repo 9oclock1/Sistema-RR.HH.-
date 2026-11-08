@@ -20,7 +20,8 @@ La base no usa triggers, procedimientos almacenados ni vistas (decisión del equ
 - Servicio: solo se aprueba un mes completo (`datos_hasta` = `fecha_fin`) con al menos un colaborador y ninguno con `alertas` de inconsistencia (líquido negativo, totales que no cuadran, concepto de cálculo faltante).
 - `CALCULOS_PLANILLA` guarda un renglón por concepto con su vigencia. Cada renglón se redondea a centavos y los totales de `PLANILLA_EMPLEADOS` son la suma de los renglones (`liquido_pagable = total_ganado - total_descuentos`, también como CHECK). Los aportes patronales no se descuentan.
 - Los conceptos `HABER-BASICO`, `HORAS-EXTRA`, `DOMINICAL`, `RECARGO-NOCTURNO` y `ANS-*` los calcula el servicio con las novedades del mes; los demás conceptos activos con valor al cierre del mes se aplican a todos los colaboradores, salvo los de condiciones especiales (llegan como bonos).
-- Base: `CERRADA` exige las confirmaciones de Contabilidad y Pagos (`chk_planilla_cierre`).
+- Base: `CERRADA` exige las confirmaciones de Contabilidad y Pagos (`chk_planilla_cierre`); un borrador no tiene respuestas, un rechazo lleva motivo y solo una confirmación lleva referencia (`chk_planilla_respuestas`).
+- Servicio: una integración rechazada deja la planilla `APROBADA`; se reenvía con un mensaje nuevo y vuelve a `PENDIENTE`. Una integración confirmada ya no cambia.
 - `EVENTOS_SALIENTES` es la bandeja de salida: el evento se guarda en la misma transacción que la aprobación y se envía después.
 - Servicio: no se aprueba si algún concepto con monto en la planilla no tiene cuenta contable (el asiento no se podría armar).
 
@@ -87,3 +88,36 @@ Atributos de Pub/Sub (para filtrar sin leer el cuerpo): `id_mensaje`, `origen`, 
 ```
 
 - Un beneficiario por colaborador con líquido mayor a cero. RRHH no guarda cuentas bancarias: Pagos identifica a cada colaborador por `id_empleado` y `numero_documento`.
+
+### Confirmaciones de Contabilidad y Pagos
+
+Cada sistema responde en su propio tópico (`ucb-sis323-sub-d`, `ucb-sis323-sub-a`); RRHH los lee con suscripciones propias (`<tópico>-rrhh-planillas`, se crean si faltan) y solo toma los mensajes con `destino.grupo = "F"` y uno de estos tipos:
+
+| Tipo | Lo envía | Responde a |
+|---|---|---|
+| `CONFIRMACION_ASIENTO_PLANILLA` | D (Contabilidad) | `PLANILLA_APROBADA_ASIENTO` |
+| `CONFIRMACION_ORDEN_PAGO_PLANILLA` | A (Pagos) | `PLANILLA_APROBADA_ORDEN_PAGO` |
+
+```json
+{
+  "encabezado": {
+    "id_mensaje": "id propio del remitente",
+    "origen": { "grupo": "D", "modulo": "Contabilidad" },
+    "destino": { "grupo": "F", "modulo": "RRHH" },
+    "tipo": "CONFIRMACION_ASIENTO_PLANILLA",
+    "fecha": "2026-11-02T14:06:10.000Z",
+    "version_esquema": 1
+  },
+  "datos": {
+    "id_planilla": "uuid de la planilla",
+    "id_mensaje_origen": "id_mensaje del envío de RRHH que se responde",
+    "resultado": "CONFIRMADA",
+    "referencia": "AS-2026-0458",
+    "motivo": null
+  }
+}
+```
+
+- `resultado`: `CONFIRMADA` (con `referencia` opcional: número de asiento u orden, hasta 60 caracteres) o `RECHAZADA` (con `motivo` obligatorio, hasta 255).
+- Con las dos confirmaciones la planilla pasa a `CERRADA`. Una respuesta a un envío anterior (la planilla se reenvió después) o a una integración ya confirmada se registra como `IGNORADO`.
+- `EVENTOS_ENTRANTES` guarda cada mensaje una sola vez por `id_mensaje` (los duplicados de Pub/Sub no cambian nada). Un mensaje inválido (tipo enviado por otro grupo, datos faltantes, planilla o envío inexistente) queda `FALLIDO` sin reintentos; un error pasajero se reintenta con nueva entrega (2 s, 4 s, 8 s…) y tras 5 intentos queda `FALLIDO`. Es la cola de mensajes fallidos: `GET /confirmaciones?estado=FALLIDO` y `POST /confirmaciones/:id/reprocesar`.

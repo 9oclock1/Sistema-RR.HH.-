@@ -36,8 +36,12 @@ const formatearEnvio = (e) =>
       }
     : null;
 
+// Estado de la respuesta (PENDIENTE, CONFIRMADA o RECHAZADA) y del último envío.
 const formatearIntegracion = (p, envio, campo) => ({
   estado: p[`estado_${campo}`],
+  referencia: p[`referencia_${campo}`] ?? null,
+  motivo: p[`motivo_${campo}`] ?? null,
+  respondida_en: p[`respondida_${campo}_en`] ?? null,
   envio: formatearEnvio(envio),
 });
 
@@ -293,7 +297,8 @@ async function aprobar(id, identidad = {}) {
 const DESTINO_RUTA = { contabilidad: "CONTABILIDAD", pagos: "PAGOS" };
 const NOMBRE_DESTINO = { CONTABILIDAD: "Contabilidad", PAGOS: "Pagos" };
 
-// Reenvía a un destino el mensaje que Pub/Sub rechazó de forma permanente (por ejemplo, un tópico inexistente).
+// Reenvía a un destino: el mismo mensaje si Pub/Sub lo rechazó de forma permanente (por ejemplo, un tópico
+// inexistente), o uno nuevo con las cuentas actuales si el destino rechazó la planilla. La planilla sigue aprobada.
 async function reenviar(id, destinoRuta, identidad = {}) {
   const idResponsable = validarResponsable(identidad);
   const destino = DESTINO_RUTA[destinoRuta];
@@ -306,11 +311,19 @@ async function reenviar(id, destinoRuta, identidad = {}) {
     if (planilla.estado === "BORRADOR") {
       throw new ErrorApp(409, `La planilla de ${mes} está en borrador: se envía al aprobarla.`);
     }
+    if (planilla.estado === "CERRADA") throw new ErrorApp(409, `La planilla de ${mes} ya está cerrada.`);
     const envio = (await eventos.ultimosDePlanilla(cliente, id))[destino];
     if (envio?.estado === "FALLIDO" && (await eventos.reencolar(cliente, envio.id_evento))) return;
-    throw new ErrorApp(409, `El envío a ${NOMBRE_DESTINO[destino]} de la planilla de ${mes} no falló: no hace falta reenviarlo.`);
+    if (await modelo.reabrirIntegracion(cliente, id, destino)) {
+      await registrarEnvio(cliente, id, destino);
+      return;
+    }
+    throw new ErrorApp(
+      409,
+      `${NOMBRE_DESTINO[destino]} no rechazó la planilla de ${mes} y su envío no falló: no hace falta reenviarla.`
+    );
   });
   return obtener(id);
 }
 
-module.exports = { listar, obtener, generar, descartar, aprobar, reenviar };
+module.exports = { listar, obtener, generar, descartar, aprobar, reenviar, responsableEn };

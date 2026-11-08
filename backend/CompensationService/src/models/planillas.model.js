@@ -3,7 +3,8 @@ const { CON_VIGENCIA } = require("./conceptos.model");
 
 const COLUMNAS_PLANILLA = `p.id_planilla, p.periodo, p.fecha_inicio, p.fecha_fin, p.datos_hasta, p.estado, p.advertencias,
   p.generada_por, p.generada_por_nombre, p.generada_en, p.aprobada_por, p.aprobada_por_nombre, p.aprobada_en,
-  p.estado_contabilidad, p.estado_pagos, p.cerrada_en,
+  p.estado_contabilidad, p.referencia_contabilidad, p.motivo_contabilidad, p.respondida_contabilidad_en,
+  p.estado_pagos, p.referencia_pagos, p.motivo_pagos, p.respondida_pagos_en, p.cerrada_en,
   (SELECT COUNT(*) FROM planilla_empleados pe WHERE pe.id_planilla = p.id_planilla)::int AS colaboradores`;
 
 const COLUMNAS_EMPLEADO = [
@@ -82,7 +83,11 @@ async function bloquearPeriodo(cliente, periodo) {
 }
 
 async function bloquear(cliente, id) {
-  const { rows } = await cliente.query("SELECT id_planilla, periodo, estado, datos_hasta, fecha_fin FROM planillas WHERE id_planilla = $1 FOR UPDATE", [id]);
+  const { rows } = await cliente.query(
+    `SELECT id_planilla, periodo, estado, datos_hasta, fecha_fin, estado_contabilidad, estado_pagos
+     FROM planillas WHERE id_planilla = $1 FOR UPDATE`,
+    [id]
+  );
   return rows[0];
 }
 
@@ -204,6 +209,44 @@ async function empleadosDeIntegracion(cliente, id) {
   return rows;
 }
 
+
+// Columnas de la respuesta de cada destino (nombres fijos, no vienen del usuario).
+const CAMPO_DESTINO = { CONTABILIDAD: "contabilidad", PAGOS: "pagos" };
+
+// Respuesta de Contabilidad o Pagos. Una integración confirmada ya no cambia.
+async function responder(cliente, id, destino, { resultado, referencia, motivo }) {
+  const c = CAMPO_DESTINO[destino];
+  const { rowCount } = await cliente.query(
+    `UPDATE planillas
+     SET estado_${c} = $2, referencia_${c} = $3, motivo_${c} = $4, respondida_${c}_en = CURRENT_TIMESTAMP
+     WHERE id_planilla = $1 AND estado = 'APROBADA' AND estado_${c} <> 'CONFIRMADA'`,
+    [id, resultado, referencia, motivo]
+  );
+  return rowCount === 1;
+}
+
+// Criterio 4: con las dos confirmaciones, la planilla se cierra.
+async function cerrarSiConfirmada(cliente, id) {
+  const { rowCount } = await cliente.query(
+    `UPDATE planillas SET estado = 'CERRADA', cerrada_en = CURRENT_TIMESTAMP
+     WHERE id_planilla = $1 AND estado = 'APROBADA' AND estado_contabilidad = 'CONFIRMADA' AND estado_pagos = 'CONFIRMADA'`,
+    [id]
+  );
+  return rowCount === 1;
+}
+
+// Antes de reenviar a un destino que rechazó: vuelve a pendiente y borra el motivo.
+async function reabrirIntegracion(cliente, id, destino) {
+  const c = CAMPO_DESTINO[destino];
+  const { rowCount } = await cliente.query(
+    `UPDATE planillas
+     SET estado_${c} = 'PENDIENTE', referencia_${c} = NULL, motivo_${c} = NULL, respondida_${c}_en = NULL
+     WHERE id_planilla = $1 AND estado = 'APROBADA' AND estado_${c} = 'RECHAZADA'`,
+    [id]
+  );
+  return rowCount === 1;
+}
+
 module.exports = {
   listar,
   conceptosVigentes,
@@ -220,4 +263,7 @@ module.exports = {
   contarConAlertas,
   conceptosDeIntegracion,
   empleadosDeIntegracion,
+  responder,
+  cerrarSiConfirmada,
+  reabrirIntegracion,
 };

@@ -165,6 +165,13 @@ CREATE TABLE PLANILLAS (
     aprobada_en TIMESTAMPTZ NULL,
     estado_contabilidad varchar(10) NOT NULL DEFAULT 'PENDIENTE',
     estado_pagos varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    -- Respuesta de cada sistema: número de asiento u orden si confirmó, motivo si rechazó.
+    referencia_contabilidad varchar(60) NULL,
+    motivo_contabilidad varchar(255) NULL,
+    respondida_contabilidad_en TIMESTAMPTZ NULL,
+    referencia_pagos varchar(60) NULL,
+    motivo_pagos varchar(255) NULL,
+    respondida_pagos_en TIMESTAMPTZ NULL,
     cerrada_en TIMESTAMPTZ NULL,
     CONSTRAINT PLANILLAS_pk PRIMARY KEY (id_planilla),
     CONSTRAINT uq_planilla_periodo UNIQUE (periodo),
@@ -183,6 +190,16 @@ CREATE TABLE PLANILLAS (
     CONSTRAINT chk_planilla_cierre CHECK (
         (estado = 'CERRADA') = (cerrada_en IS NOT NULL)
         AND (estado <> 'CERRADA' OR (estado_contabilidad = 'CONFIRMADA' AND estado_pagos = 'CONFIRMADA'))
+    ),
+    -- Un borrador no se envió: no tiene respuestas.
+    CONSTRAINT chk_planilla_respuestas CHECK (
+        (estado <> 'BORRADOR' OR (estado_contabilidad = 'PENDIENTE' AND estado_pagos = 'PENDIENTE'))
+        AND (estado_contabilidad = 'PENDIENTE') = (respondida_contabilidad_en IS NULL)
+        AND (estado_contabilidad = 'RECHAZADA') = (motivo_contabilidad IS NOT NULL)
+        AND (referencia_contabilidad IS NULL OR estado_contabilidad = 'CONFIRMADA')
+        AND (estado_pagos = 'PENDIENTE') = (respondida_pagos_en IS NULL)
+        AND (estado_pagos = 'RECHAZADA') = (motivo_pagos IS NOT NULL)
+        AND (referencia_pagos IS NULL OR estado_pagos = 'CONFIRMADA')
     )
 );
 -- Tabla: PLANILLA_EMPLEADOS
@@ -328,6 +345,35 @@ CREATE TABLE EVENTOS_SALIENTES (
 );
 CREATE INDEX idx_eventos_salientes_pendientes ON EVENTOS_SALIENTES (estado, proximo_intento_en);
 CREATE INDEX idx_eventos_salientes_planilla ON EVENTOS_SALIENTES (id_planilla, destino, creado_en);
+-- Tabla: EVENTOS_ENTRANTES
+-- Bandeja de entrada: confirmaciones de Contabilidad y Pagos. id_mensaje (del remitente) evita procesar dos veces
+-- el mismo mensaje. RECIBIDO: en proceso o esperando reintento; PROCESADO: aplicado a la planilla; IGNORADO: no
+-- cambia nada (por ejemplo, ya estaba confirmada); FALLIDO: inválido o sin procesar tras varios intentos (cola de
+-- mensajes fallidos, se puede reprocesar). id_planilla solo se guarda si la planilla existe.
+CREATE TABLE EVENTOS_ENTRANTES (
+    id_evento_entrante UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_mensaje varchar(100) NOT NULL,
+    topico varchar(60) NOT NULL,
+    tipo_evento varchar(60) NOT NULL,
+    origen varchar(10) NULL,
+    id_planilla UUID NULL,
+    destino varchar(15) NULL,
+    carga JSONB NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'RECIBIDO',
+    intentos smallint NOT NULL DEFAULT 0,
+    detalle varchar(255) NULL,
+    recibido_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    procesado_en TIMESTAMPTZ NULL,
+    CONSTRAINT EVENTOS_ENTRANTES_pk PRIMARY KEY (id_evento_entrante),
+    CONSTRAINT uq_evento_entrante_mensaje UNIQUE (id_mensaje),
+    CONSTRAINT fk_evento_entrante_planilla FOREIGN KEY (id_planilla) REFERENCES PLANILLAS (id_planilla),
+    CONSTRAINT chk_evento_entrante_estado CHECK (estado IN ('RECIBIDO', 'PROCESADO', 'IGNORADO', 'FALLIDO')),
+    CONSTRAINT chk_evento_entrante_destino CHECK (destino IN ('CONTABILIDAD', 'PAGOS')),
+    CONSTRAINT chk_evento_entrante_intentos CHECK (intentos >= 0),
+    CONSTRAINT chk_evento_entrante_procesado CHECK ((estado IN ('PROCESADO', 'IGNORADO')) = (procesado_en IS NOT NULL))
+);
+CREATE INDEX idx_eventos_entrantes_estado ON EVENTOS_ENTRANTES (estado, recibido_en);
+CREATE INDEX idx_eventos_entrantes_planilla ON EVENTOS_ENTRANTES (id_planilla);
 -- datos iniciales
 -- Aportes de ley sobre el total ganado (Ley 065 de Pensiones y seguridad social de corto plazo).
 -- Cuentas contables referenciales: ajustar al plan de cuentas de Contabilidad.

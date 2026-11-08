@@ -163,10 +163,65 @@ function armarOrdenPago({ planilla, empleados, concepto }) {
   };
 }
 
+// Respuestas de Contabilidad y Pagos (KAN-347). Cada tipo lo envía solo el grupo del destino.
+const TIPOS_CONFIRMACION = {
+  CONFIRMACION_ASIENTO_PLANILLA: "CONTABILIDAD",
+  CONFIRMACION_ORDEN_PAGO_PLANILLA: "PAGOS",
+};
+const RESULTADOS = ["CONFIRMADA", "RECHAZADA"];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Una confirmación que se procesa mal se reintenta así: 2 s, 4 s, 8 s… (máx. 1 min); tras 5 intentos queda FALLIDA.
+const MAXIMO_INTENTOS_ENTRADA = 5;
+const esperaNuevaEntrega = (intentos) => Math.min(1000 * 2 ** intentos, 60 * 1000);
+
+// Los tópicos que se leen traen mensajes para otros grupos: solo interesan las confirmaciones dirigidas a RRHH.
+function esConfirmacion(cuerpo) {
+  const encabezado = cuerpo?.encabezado;
+  return Boolean(
+    encabezado && encabezado.destino?.grupo === ORIGEN.grupo && Object.hasOwn(TIPOS_CONFIRMACION, encabezado.tipo ?? "")
+  );
+}
+
+const texto = (valor, maximo) => (typeof valor === "string" && valor.trim() ? valor.trim().slice(0, maximo) : null);
+
+// Devuelve { errores } si el mensaje no se puede aplicar, o la confirmación lista para aplicar.
+function leerConfirmacion(cuerpo) {
+  const { encabezado, datos } = cuerpo;
+  const destino = TIPOS_CONFIRMACION[encabezado.tipo];
+  const grupo = DESTINOS[destino].grupo;
+  const errores = [];
+  if (encabezado.origen?.grupo !== grupo) errores.push(`El tipo ${encabezado.tipo} solo lo envía el grupo ${grupo}.`);
+  if (!datos || typeof datos !== "object") {
+    errores.push("Falta el bloque datos.");
+    return { errores };
+  }
+  if (!UUID_RE.test(datos.id_planilla ?? "")) errores.push("datos.id_planilla debe ser un UUID.");
+  if (!UUID_RE.test(datos.id_mensaje_origen ?? "")) errores.push("datos.id_mensaje_origen debe ser el id_mensaje enviado por RRHH.");
+  if (!RESULTADOS.includes(datos.resultado)) errores.push("datos.resultado debe ser CONFIRMADA o RECHAZADA.");
+  const motivo = texto(datos.motivo, 255);
+  if (datos.resultado === "RECHAZADA" && !motivo) errores.push("Una respuesta RECHAZADA necesita datos.motivo.");
+  if (errores.length > 0) return { errores };
+  const confirmada = datos.resultado === "CONFIRMADA";
+  return {
+    destino,
+    idPlanilla: datos.id_planilla.toLowerCase(),
+    idMensajeOrigen: datos.id_mensaje_origen.toLowerCase(),
+    resultado: datos.resultado,
+    referencia: confirmada ? texto(datos.referencia, 60) : null,
+    motivo: confirmada ? null : motivo,
+  };
+}
+
 module.exports = {
   ORIGEN,
   DESTINOS,
   CUENTAS,
+  TIPOS_CONFIRMACION,
+  MAXIMO_INTENTOS_ENTRADA,
+  esperaNuevaEntrega,
+  esConfirmacion,
+  leerConfirmacion,
   esperaReintento,
   armarMensaje,
   atributosDe,
