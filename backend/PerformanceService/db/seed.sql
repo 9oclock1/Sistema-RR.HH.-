@@ -1,5 +1,5 @@
 -- Datos de prueba de PerformanceDB
--- Requiere que init.sql ya se haya ejecutado.
+-- Requiere init.sql y catalogos.sql, que se cargan solos al crear la base.
 -- NO formatear con un formateador de SQL: los comandos de psql (\set, \if, \else, \endif) deben ir
 -- cada uno en su propia línea y el formateador los une y rompe el archivo.
 -- Uso (PowerShell):
@@ -473,4 +473,94 @@ FROM (
     JOIN PREGUNTAS_EVALUACION p ON p.id_pregunta = r.id_pregunta
     JOIN NIVELES_ESCALA n ON n.id_escala = p.id_escala
     AND n.valor = r.valor ON CONFLICT DO NOTHING;
+INSERT INTO COMPETENCIAS (
+        id_competencia,
+        id_tipo_competencia,
+        nombre,
+        descripcion
+    )
+VALUES (
+        'f0000000-0000-4000-8000-000000000104',
+        2,
+        'Cumplimiento de metas',
+        'Logro de los objetivos operativos asignados al puesto'
+    ) ON CONFLICT DO NOTHING;
+INSERT INTO PLANTILLAS_EVALUACION (
+        id_plantilla,
+        id_departamento_destino,
+        id_empleado_creador,
+        nombre,
+        objetivo,
+        vigencia_desde,
+        vigencia_hasta
+    )
+VALUES (
+        'f0000000-0000-4000-8000-000000000052',
+        'f0000000-0000-4000-8000-000000000002',
+        :'id_creador'::uuid,
+        'Evaluación de personal administrativo',
+        'Medir el trabajo en equipo y el cumplimiento de metas del personal administrativo.',
+        '2027-01-01',
+        '2027-12-31'
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000053',
+        'f0000000-0000-4000-8000-000000000001',
+        :'id_creador'::uuid,
+        'Evaluación de personal de tienda',
+        'Medir la atención al cliente del personal de tienda durante la gestión 2027.',
+        '2027-01-01',
+        '2027-12-31'
+    ) ON CONFLICT DO NOTHING;
+INSERT INTO VERSIONES_PLANTILLA (
+        id_version,
+        id_plantilla,
+        id_estado_version,
+        numero_version
+    )
+VALUES (
+        'f0000000-0000-4000-8000-000000000062',
+        'f0000000-0000-4000-8000-000000000052',
+        1,
+        1
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000063',
+        'f0000000-0000-4000-8000-000000000053',
+        1,
+        1
+    ) ON CONFLICT DO NOTHING;
+INSERT INTO SECCIONES_PLANTILLA (id_seccion, id_version, id_competencia, orden)
+VALUES (
+        'f0000000-0000-4000-8000-000000000074',
+        'f0000000-0000-4000-8000-000000000062',
+        'f0000000-0000-4000-8000-000000000102',
+        1
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000075',
+        'f0000000-0000-4000-8000-000000000062',
+        'f0000000-0000-4000-8000-000000000103',
+        2
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000076',
+        'f0000000-0000-4000-8000-000000000062',
+        'f0000000-0000-4000-8000-000000000104',
+        3
+    ) ON CONFLICT DO NOTHING;
+-- KAN-26: compromisos de desarrollo de la evaluación enviada 125 (ids fijos para no duplicar al repetir).
+INSERT INTO COMPROMISOS_DESARROLLO (id_compromiso, id_evaluacion, descripcion, fecha_objetivo)
+VALUES (
+        'f0000000-0000-4000-8000-000000000131',
+        'f0000000-0000-4000-8000-000000000125',
+        'Completar el curso interno de manejo de reclamos complejos.',
+        '2026-09-30'
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000132',
+        'f0000000-0000-4000-8000-000000000125',
+        'Acompañar a un compañero nuevo durante su primer mes en tienda.',
+        '2026-12-15'
+    ) ON CONFLICT DO NOTHING;
 COMMIT;

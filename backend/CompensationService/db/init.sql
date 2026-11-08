@@ -362,6 +362,122 @@ JOIN (VALUES
     ('PRO-VIVIENDA', 2.00),
     ('SIP-SOLIDARIO-PAT', 3.00)
 ) AS v (codigo, valor) USING (codigo);
+
+-- tablas
+-- Tabla: PRESTAMOS
+-- Anticipos de sueldo y préstamos otorgados a un colaborador, con su plan de cuotas.
+-- id_empleado referencia a EMPLOYEES (EmployeeDB): sin FK por ser otro servicio, se valida en el backend.
+-- liquido_pagable_referencial y porcentaje_cuota quedan fijos al registrar: conservan la base que se usó
+-- para aprobar el préstamo, aunque el sueldo del colaborador cambie después.
+CREATE TABLE PRESTAMOS (
+    id_prestamo UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    tipo varchar(10) NOT NULL,
+    monto numeric(12,2) NOT NULL,
+    numero_cuotas smallint NOT NULL,
+    mes_inicio date NOT NULL,
+    motivo varchar(250) NULL,
+    liquido_pagable_referencial numeric(12,2) NOT NULL,
+    porcentaje_cuota numeric(5,2) NOT NULL,
+    saldo_pendiente numeric(12,2) NOT NULL,
+    estado varchar(12) NOT NULL DEFAULT 'ACTIVO',
+    registrado_por varchar(80) NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PRESTAMOS_pk PRIMARY KEY (id_prestamo),
+    CONSTRAINT chk_prestamo_tipo CHECK (tipo IN ('ANTICIPO', 'PRESTAMO')),
+    CONSTRAINT chk_prestamo_monto CHECK (monto > 0),
+    CONSTRAINT chk_prestamo_cuotas CHECK (numero_cuotas BETWEEN 1 AND 60),
+    CONSTRAINT chk_prestamo_liquido CHECK (liquido_pagable_referencial > 0),
+    CONSTRAINT chk_prestamo_saldo CHECK (saldo_pendiente >= 0),
+    CONSTRAINT chk_prestamo_estado CHECK (estado IN ('ACTIVO', 'COMPLETADO', 'CANCELADO')),
+    CONSTRAINT chk_prestamo_mes_inicio CHECK (mes_inicio = date_trunc('month', mes_inicio)::date)
+);
+CREATE INDEX idx_prestamos_empleado ON PRESTAMOS (id_empleado);
+-- Tabla: CUOTAS_PRESTAMO
+-- Plan de cuotas de cada préstamo: una fila por mes de descuento, con su estado de pago.
+-- periodo = primer día del mes en que la cuota se descuenta en la planilla.
+CREATE TABLE CUOTAS_PRESTAMO (
+    id_cuota UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_prestamo UUID NOT NULL,
+    numero_cuota smallint NOT NULL,
+    periodo date NOT NULL,
+    monto numeric(12,2) NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    pagada_en TIMESTAMPTZ NULL,
+    CONSTRAINT CUOTAS_PRESTAMO_pk PRIMARY KEY (id_cuota),
+    CONSTRAINT fk_cuota_prestamo FOREIGN KEY (id_prestamo)
+        REFERENCES PRESTAMOS (id_prestamo) ON DELETE CASCADE,
+    CONSTRAINT chk_cuota_monto CHECK (monto > 0),
+    CONSTRAINT chk_cuota_estado CHECK (estado IN ('PENDIENTE', 'PAGADA')),
+    CONSTRAINT chk_cuota_pago CHECK ((estado = 'PAGADA') = (pagada_en IS NOT NULL)),
+    CONSTRAINT chk_cuota_periodo CHECK (periodo = date_trunc('month', periodo)::date),
+    CONSTRAINT uq_cuota_prestamo_numero UNIQUE (id_prestamo, numero_cuota),
+    CONSTRAINT uq_cuota_prestamo_periodo UNIQUE (id_prestamo, periodo)
+);
+-- La planilla de un periodo consulta todas las cuotas pendientes de ese mes, de todos los préstamos.
+CREATE INDEX idx_cuotas_periodo_estado ON CUOTAS_PRESTAMO (periodo, estado);
+
+-- Tabla: VIGENCIAS_ESCALA_ANTIGUEDAD
+-- Versiones de la tabla legal de escalas de antigüedad (RF-50). Una vigencia nueva cierra la anterior sin
+-- modificar sus tramos, así los bonos ya calculados en planillas anteriores conservan el porcentaje histórico.
+CREATE TABLE VIGENCIAS_ESCALA_ANTIGUEDAD (
+    id_vigencia UUID NOT NULL DEFAULT gen_random_uuid(),
+    vigente_desde date NOT NULL,
+    vigente_hasta date NULL,
+    motivo varchar(250) NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT VIGENCIAS_ESCALA_ANTIGUEDAD_pk PRIMARY KEY (id_vigencia),
+    CONSTRAINT chk_escala_fechas CHECK (vigente_hasta IS NULL OR vigente_hasta >= vigente_desde),
+    CONSTRAINT ex_escala_sin_solapamiento EXCLUDE USING gist (
+        daterange(vigente_desde, vigente_hasta, '[]') WITH &&
+    )
+);
+-- Tabla: TRAMOS_ANTIGUEDAD
+-- Tramos de años de servicio y su porcentaje de bono, dentro de una vigencia de la escala legal.
+-- anios_hasta NULL = sin tope (el tramo más alto de la escala).
+CREATE TABLE TRAMOS_ANTIGUEDAD (
+    id_tramo UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_vigencia UUID NOT NULL,
+    anios_desde smallint NOT NULL,
+    anios_hasta smallint NULL,
+    porcentaje numeric(5,2) NOT NULL,
+    CONSTRAINT TRAMOS_ANTIGUEDAD_pk PRIMARY KEY (id_tramo),
+    CONSTRAINT fk_tramo_vigencia FOREIGN KEY (id_vigencia)
+        REFERENCES VIGENCIAS_ESCALA_ANTIGUEDAD (id_vigencia) ON DELETE CASCADE,
+    CONSTRAINT chk_tramo_anios_desde CHECK (anios_desde >= 0),
+    CONSTRAINT chk_tramo_rango CHECK (anios_hasta IS NULL OR anios_hasta >= anios_desde),
+    CONSTRAINT chk_tramo_porcentaje CHECK (porcentaje > 0 AND porcentaje <= 100),
+    CONSTRAINT uq_tramo_vigencia_desde UNIQUE (id_vigencia, anios_desde)
+);
+CREATE INDEX idx_tramos_vigencia ON TRAMOS_ANTIGUEDAD (id_vigencia);
+
+-- El bono de antigüedad es un ingreso de la planilla (RF-50, criterio 1); su porcentaje no es fijo por
+-- vigencia de concepto sino que depende del tramo de años de servicio, por lo que no lleva VIGENCIAS_CONCEPTO.
+INSERT INTO CONCEPTOS_PLANILLA (codigo, nombre, descripcion, tipo, forma_calculo, base_calculo, es_de_ley)
+VALUES ('BONO-ANTIGUEDAD', 'Bono de antigüedad', 'Se calcula según los años de servicio y la escala legal vigente.',
+        'INGRESO', 'PORCENTAJE', 'HABER_BASICO', TRUE);
+
+-- datos iniciales
+-- Escala de referencia: ajustar a la tabla legal vigente desde la pantalla de parametrización (RF-50, criterio 3).
+WITH vigencia AS (
+    INSERT INTO VIGENCIAS_ESCALA_ANTIGUEDAD (vigente_desde, motivo)
+    VALUES (DATE '2026-01-01', 'Escala de referencia inicial, pendiente de validar por Administración')
+    RETURNING id_vigencia
+)
+INSERT INTO TRAMOS_ANTIGUEDAD (id_vigencia, anios_desde, anios_hasta, porcentaje)
+SELECT v.id_vigencia, t.anios_desde, t.anios_hasta, t.porcentaje
+FROM vigencia v
+JOIN (VALUES
+    (2, 4, 5.00),
+    (5, 7, 11.00),
+    (8, 10, 18.00),
+    (11, 14, 26.00),
+    (15, 19, 34.00),
+    (20, 24, 42.00),
+    (25, NULL, 50.00)
+) AS t (anios_desde, anios_hasta, porcentaje) ON TRUE;
+
 -- Conceptos que calcula la planilla con las novedades del mes (KAN-64). El valor de cada vigencia es el
 -- porcentaje que aplica el servicio: haber básico por días pagados, recargo de horas extra, pago adicional de
 -- domingos, feriados y descansos trabajados, recargo nocturno y Aporte Nacional Solidario por tramo

@@ -1,6 +1,9 @@
 # dependencias
 node_modules/
 
+# adjuntos cifrados de las quejas
+uploads/
+
 # logs
 logs/
 *.log

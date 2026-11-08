@@ -5,6 +5,7 @@ export const ROLES = {
   reclutador: { nombre: "Encargado de reclutamiento", incluye: ["empleado"] },
   supervisor: { nombre: "Supervisor de área", incluye: ["empleado"] },
   empleado: { nombre: "Empleado", incluye: [] },
+  auditor: { nombre: "Auditor (TI)", incluye: [] },
 };
 
 export const ROL_PREDETERMINADO = "admin";

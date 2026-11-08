@@ -1,0 +1,190 @@
+.antiguedad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.antiguedad .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+.antiguedad-nota {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+/* Bono por colaborador */
+.antiguedad-bono {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+}
+
+.antiguedad-bono__formulario {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-4);
+}
+
+.antiguedad-bono__formulario .ds-campo {
+  width: calc(var(--size-sidebar) * 0.75);
+  max-width: 100%;
+}
+
+.antiguedad-bono__resumen {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.antiguedad-bono__resumen dt {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.antiguedad-bono__resumen dd {
+  margin: 0;
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.antiguedad-bono__monto {
+  color: var(--color-success-text, var(--color-text));
+  font-size: var(--font-size-section);
+}
+
+/* Escalas de antigüedad */
+.antiguedad-escalas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+}
+
+.antiguedad-escalas__cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.antiguedad-escalas__cargando {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.antiguedad-escala-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.antiguedad-escala-tarjeta__cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.antiguedad-escala-tarjeta__rango {
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.antiguedad-escala-tarjeta__tramos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.antiguedad-escala-tarjeta__tramos li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 7rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-page);
+  font-variant-numeric: tabular-nums;
+}
+
+.antiguedad-escala-tarjeta__tramos li span:first-child {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+}
+
+.antiguedad-escala-tarjeta__tramos li span:last-child {
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Formulario de nueva vigencia (dentro del modal) */
+.antiguedad-escala-formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-1);
+}
+
+.antiguedad-escala-formulario__campos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.antiguedad-escala-formulario__ancho {
+  grid-column: 1 / -1;
+}
+
+.antiguedad-tramos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.antiguedad-tramos legend {
+  margin: 0 0 var(--space-1);
+  padding: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-semibold);
+}
+
+.antiguedad-tramos__fila {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+@media (max-width: 640px) {
+  .antiguedad-bono__formulario .ds-campo,
+  .antiguedad-escala-formulario__campos,
+  .antiguedad-bono__resumen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .antiguedad-bono__formulario .ds-campo {
+    flex: 1 1 100%;
+  }
+
+  .antiguedad-tramos__fila {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

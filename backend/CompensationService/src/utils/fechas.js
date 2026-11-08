@@ -16,4 +16,22 @@ const diaAnterior = (fecha) => sumarDias(fecha, -1);
 const hoyLaPaz = (ahora = new Date()) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "America/La_Paz" }).format(ahora);
 
-module.exports = { esFecha, sumarDias, diaAnterior, hoyLaPaz };
+const esPrimerDiaDeMes = (fecha) => esFecha(fecha) && fecha.slice(8, 10) === "01";
+
+// Mismo día 1, `n` meses después. Usamos UTC para no arrastrar el huso horario local del servidor.
+const sumarMeses = (fecha, n) => {
+  const fechaUtc = new Date(`${fecha}T00:00:00Z`);
+  fechaUtc.setUTCMonth(fechaUtc.getUTCMonth() + n);
+  return fechaUtc.toISOString().slice(0, 10);
+};
+
+// Años completos de servicio a una fecha de referencia (RF-50): cuenta solo los aniversarios ya cumplidos.
+function aniosDeServicio(fechaIngreso, referencia) {
+  const [anioIngreso, mesIngreso, diaIngreso] = fechaIngreso.split("-").map(Number);
+  const [anioRef, mesRef, diaRef] = referencia.split("-").map(Number);
+  let anios = anioRef - anioIngreso;
+  if (mesRef < mesIngreso || (mesRef === mesIngreso && diaRef < diaIngreso)) anios -= 1;
+  return Math.max(anios, 0);
+}
+
+module.exports = { esFecha, sumarDias, diaAnterior, hoyLaPaz, esPrimerDiaDeMes, sumarMeses, aniosDeServicio };

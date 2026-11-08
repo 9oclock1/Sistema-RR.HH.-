@@ -8,6 +8,15 @@ const COLUMNAS = [
   { clave: "puntaje", titulo: "Puntaje", ancho: "20%", alinear: "fin", celda: (s) => formatearPuntaje(s.puntaje) },
 ];
 
+// Desglose del puntaje por competencia; también lo usa la vista del colaborador (KAN-26).
+export function TablaResultado({ resultado }) {
+  return (
+    <Tarjeta nivelTitulo={2} titulo="Resultado por competencia">
+      <Tabla descripcion="Puntaje por competencia" columnas={COLUMNAS} filas={resultado.secciones} claveFila="id_seccion" />
+    </Tarjeta>
+  );
+}
+
 export default function ResultadoEvaluacion({ resultado, enviadaEn, ref }) {
   return (
     <>
@@ -17,14 +26,7 @@ export default function ResultadoEvaluacion({ resultado, enviadaEn, ref }) {
           {enviadaEn && <> (enviada el {formatearFechaHora(enviadaEn)})</>}. Ya no se puede modificar.
         </p>
       </Alerta>
-      <Tarjeta nivelTitulo={2} titulo="Resultado por competencia">
-        <Tabla
-          descripcion="Puntaje por competencia"
-          columnas={COLUMNAS}
-          filas={resultado.secciones}
-          claveFila="id_seccion"
-        />
-      </Tarjeta>
+      <TablaResultado resultado={resultado} />
     </>
   );
 }

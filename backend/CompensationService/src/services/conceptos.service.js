@@ -7,6 +7,12 @@ const { TIPOS, validarConcepto, validarEdicion, validarVigencia, cierreDeUltima 
 
 const noEncontrado = () => new ErrorApp(404, "Concepto no encontrado");
 
+// BONO-ANTIGUEDAD no admite vigencias manuales: su porcentaje depende exclusivamente del tramo de
+// TRAMOS_ANTIGUEDAD vigente para los años de servicio del colaborador (ver antiguedad.service.js).
+// Permitir una vigencia aquí dejaría un valor "fantasma" en la pantalla de Conceptos que nunca se usa
+// para calcular el bono, contradiciendo la escala legal.
+const CODIGOS_CON_PORCENTAJE_EXTERNO = new Set(["BONO-ANTIGUEDAD"]);
+
 function traducirErrorBD(error) {
   if (error.code === "23505") {
     throw new ErrorApp(409, "Ya existe un concepto con ese código", [
@@ -114,6 +120,14 @@ async function agregarVigencia(id, datos) {
   await enTransaccion(async (cliente) => {
     const concepto = await modelo.bloquear(cliente, id);
     if (!concepto) throw noEncontrado();
+    if (CODIGOS_CON_PORCENTAJE_EXTERNO.has(concepto.codigo)) {
+      throw new ErrorApp(409, "Este concepto no admite vigencias manuales", [
+        {
+          campo: "valor",
+          mensaje: "El porcentaje del bono de antigüedad depende de la escala legal vigente. Adminístrelo desde la pantalla de Antigüedad.",
+        },
+      ]);
+    }
     const vigencia = validarVigencia(datos, concepto.forma_calculo);
     const ultima = await modelo.ultimaVigencia(cliente, id);
     const cierre = cierreDeUltima(ultima, vigencia);

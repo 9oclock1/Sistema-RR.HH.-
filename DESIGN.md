@@ -100,6 +100,7 @@ import { Boton, CampoTexto, Tabla, useAvisos } from "../../components/ui";
 |---|---|
 | `Boton` | Con `href`, o con `as={Link}` + `to`, se pinta como enlace. `variante`: `primario` \| `predeterminado` \| `sutil` \| `peligro`; `tamano`: `md` \| `sm`; `icono`, `soloIcono` (requiere `aria-label`), `cargando`, `disabled` |
 | `CampoTexto` | Input con `etiqueta`, `ayuda`, `error`, `requerido` y el resto de atributos de `<input>` |
+| `CampoAreaTexto` | Área de texto con las mismas props de campo más `filas` (4 por defecto) |
 | `Selector` | `<select>` con las mismas props de campo más `opciones` `[{ valor, etiqueta }]` y `textoVacio` |
 | `Casilla` | Checkbox con `etiqueta` y `ayuda`; el resto de atributos van al `<input>` |
 | `Campo` | Envoltorio de etiqueta, ayuda y error para crear otros controles |
@@ -113,12 +114,14 @@ import { Boton, CampoTexto, Tabla, useAvisos } from "../../components/ui";
 | `ModalConfirmacion` | Confirmación de acciones destructivas: `titulo`, `textoConfirmar`, `procesando`, `onConfirmar`, `onCancelar` |
 | `ProveedorAvisos` + `useAvisos` | Avisos flotantes que se cierran solos, para confirmar una acción; lo que el usuario debe leer o resolver va en `Alerta`. Ya envuelve la app en `main.jsx`. `const avisar = useAvisos(); avisar({ tono, titulo, mensaje })` |
 | `Tabla` | `columnas` `[{ clave, titulo, ancho, alinear, celda }]`, `filas`, `cargando`, `vacio` |
+| `Paginacion` | Debajo de una tabla paginada en el servidor: `pagina`, `limite`, `total`, `onCambiar(pagina)`, `etiqueta`, `disabled`. Muestra «21–40 de 57» y los botones Anterior / Siguiente; sin resultados no se pinta |
 | `Pestanas` | `pestanas` `[{ id, etiqueta, contador, contenido }]`, `activa`, `onCambiar`, `etiqueta` |
 | `EncabezadoPagina` | Migas → título con `acciones` → `descripcion` → pestañas (`children`). `migas` `[{ etiqueta, href? }]`; `enlace={Link}` para usar el router |
 | `ElementoNavegacion` | Elemento de la barra lateral: `as={NavLink}` + `to` (marca el activo solo), o `href`, o `onClick` + `activo`; `icono`, `etiqueta`, `contador` |
 | `Esqueleto` | `forma`: `texto` \| `circulo` \| `bloque`; `ancho`, `alto` |
 | `EstadoVacio` | `icono`, `titulo`, `mensaje`, `accion` |
 | `TextoTruncado` | Corta con puntos suspensivos y muestra el texto completo al pasar el cursor |
+| `LineaTiempo` | Eventos en orden cronológico unidos por una línea vertical: `elementos` `[{ id, icono, tono, titulo, meta, contenido }]` (`tono` como en `Etiqueta`; `meta` para autor y fecha en 12px sutil), `etiqueta` |
 
 ### Íconos
 

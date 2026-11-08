@@ -128,6 +128,7 @@ describe("RF-04 criterio 2: servicio de guardado parcial (base simulada)", () =>
     });
     mock.method(modelo, "listarEstructura", async () => ayudas.filas(almacen));
     mock.method(modelo, "listarNiveles", async () => ayudas.NIVELES);
+    mock.method(modelo, "listarCompromisos", async () => []);
     mock.method(modelo, "guardarRespuestas", async (id, items) => {
       llamadas.guardar.push(
         items.map(({ idPregunta, idNivel }) => ({ idPregunta, idNivel })),

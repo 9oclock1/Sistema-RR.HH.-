@@ -1,6 +1,6 @@
 import { Calculator, History, Pencil, Trash2 } from "lucide-react";
 import { Boton, EstadoVacio, Etiqueta, Tabla } from "../../components/ui";
-import { BASES, TIPOS, formatearFecha, formatearValor } from "./formato";
+import { BASES, CODIGOS_CON_PORCENTAJE_EXTERNO, TIPOS, formatearFecha, formatearValor } from "./formato";
 
 const COLUMNAS = ({ onHistorial, onEditar, onEliminar }) => [
   {
@@ -25,20 +25,26 @@ const COLUMNAS = ({ onHistorial, onEditar, onEliminar }) => [
     titulo: "Valor vigente",
     ancho: "17%",
     alinear: "fin",
-    celda: (c) => (
-      <div className="conceptos-valor">
-        <span>{c.vigencia ? formatearValor(c.vigencia.valor, c.forma_calculo) : "Sin vigencia"}</span>
-        {c.vigencia && c.base_calculo && (
-          <span className="conceptos-nota">sobre {BASES[c.base_calculo].toLowerCase()}</span>
-        )}
-        {c.proxima_vigencia && (
-          <span className="conceptos-nota">
-            {formatearValor(c.proxima_vigencia.valor, c.forma_calculo)} desde{" "}
-            {formatearFecha(c.proxima_vigencia.vigente_desde)}
-          </span>
-        )}
-      </div>
-    ),
+    celda: (c) =>
+      CODIGOS_CON_PORCENTAJE_EXTERNO.has(c.codigo) ? (
+        <div className="conceptos-valor">
+          <span>Según escala de antigüedad</span>
+          <span className="conceptos-nota">se administra desde Antigüedad</span>
+        </div>
+      ) : (
+        <div className="conceptos-valor">
+          <span>{c.vigencia ? formatearValor(c.vigencia.valor, c.forma_calculo) : "Sin vigencia"}</span>
+          {c.vigencia && c.base_calculo && (
+            <span className="conceptos-nota">sobre {BASES[c.base_calculo].toLowerCase()}</span>
+          )}
+          {c.proxima_vigencia && (
+            <span className="conceptos-nota">
+              {formatearValor(c.proxima_vigencia.valor, c.forma_calculo)} desde{" "}
+              {formatearFecha(c.proxima_vigencia.vigente_desde)}
+            </span>
+          )}
+        </div>
+      ),
   },
   {
     clave: "cuenta",
@@ -70,7 +76,12 @@ const COLUMNAS = ({ onHistorial, onEditar, onEliminar }) => [
           soloIcono
           icono={History}
           aria-label={`Historial de vigencias de ${c.codigo}`}
-          title="Historial de vigencias"
+          title={
+            CODIGOS_CON_PORCENTAJE_EXTERNO.has(c.codigo)
+              ? "El porcentaje se administra desde la pantalla de Antigüedad"
+              : "Historial de vigencias"
+          }
+          disabled={CODIGOS_CON_PORCENTAJE_EXTERNO.has(c.codigo)}
           onClick={() => onHistorial(c)}
         />
         <Boton

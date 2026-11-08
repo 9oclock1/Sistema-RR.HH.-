@@ -5,14 +5,21 @@ import PaginaModulo from "../features/inicio/PaginaModulo";
 import PaginaNoEncontrada from "../features/inicio/PaginaNoEncontrada";
 import { SECCIONES } from "./modulos";
 
-const rutasModulos = SECCIONES.flatMap((seccion) =>
-  seccion.modulos.map((modulo) => ({
+const modulos = SECCIONES.flatMap((seccion) => seccion.modulos.map((modulo) => ({ seccion, modulo })));
+
+const rutasModulos = modulos
+  .filter(({ modulo }) => !modulo.publica)
+  .map(({ seccion, modulo }) => ({
     path: modulo.parametroOpcional ? `${modulo.ruta}/:${modulo.parametroOpcional}?` : modulo.ruta,
     element: <PaginaModulo key={modulo.ruta} seccion={seccion.titulo} modulo={modulo} />,
-  })),
-);
+  }));
+
+const rutasPublicas = modulos
+  .filter(({ modulo }) => modulo.publica)
+  .map(({ modulo: { ruta, pagina: Pagina } }) => ({ path: ruta, element: <Pagina /> }));
 
 export const router = createBrowserRouter([
+  ...rutasPublicas,
   {
     path: "/",
     element: <MainLayout />,

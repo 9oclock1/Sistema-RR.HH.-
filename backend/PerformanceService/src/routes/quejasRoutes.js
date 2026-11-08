@@ -1,0 +1,57 @@
+const { Router } = require("express");
+const controlador = require("../controllers/quejasController");
+const casos = require("../controllers/casosQuejaController");
+const seguimiento = require("../controllers/seguimientoQuejaController");
+const historial = require("../controllers/historialQuejaController");
+const sucursal = require("../controllers/sucursalQuejaController");
+const exigirRoles = require("../middlewares/exigirRoles");
+const subirAdjuntosQueja = require("../middlewares/subirAdjuntosQueja");
+const identificarDenunciante = require("../middlewares/identificarDenunciante");
+const identificarEmpleado = require("../middlewares/identificarEmpleado");
+const exigirAdministrador = require("../middlewares/exigirAdministrador");
+const identificarLectorCaso = require("../middlewares/identificarLectorCaso");
+const erroresQuejas = require("../middlewares/erroresQuejas");
+const { crearLimitador } = require("../middlewares/limitarConsultas");
+
+const router = Router();
+const limitarConsultas = crearLimitador({
+  maximo: Number(process.env.QUEJAS_CONSULTAS_MAXIMO) || 10,
+  ventanaMs: (Number(process.env.QUEJAS_CONSULTAS_VENTANA_MIN) || 15) * 60 * 1000,
+});
+const administrador = [exigirAdministrador, identificarEmpleado];
+const auditoria = exigirRoles(
+  ["admin", "auditor"],
+  "Solo el Administrador de RRHH y el Auditor pueden consultar el historial de quejas.",
+);
+
+router.get("/quejas/categorias", controlador.listarCategorias);
+router.post("/quejas", subirAdjuntosQueja, identificarDenunciante, controlador.registrar);
+router.post("/quejas/seguimiento", limitarConsultas, controlador.consultarSeguimiento);
+
+router.get("/quejas/catalogos", exigirAdministrador, casos.listarCatalogos);
+router.get("/quejas/responsables", exigirAdministrador, casos.listarResponsables);
+router.get("/quejas/casos", exigirAdministrador, casos.listarCasos);
+router.get("/quejas/casos/:idQueja", exigirAdministrador, casos.obtenerCaso);
+router.put("/quejas/casos/:idQueja/clasificacion", exigirAdministrador, casos.clasificar);
+router.post("/quejas/casos/:idQueja/involucrados", administrador, casos.registrarInvolucrado);
+router.delete("/quejas/casos/:idQueja/involucrados/:idEmpleado", exigirAdministrador, casos.quitarInvolucrado);
+router.post("/quejas/casos/:idQueja/derivacion", administrador, casos.derivar);
+router.post("/quejas/casos/:idQueja/derivacion/notificacion", administrador, casos.reintentarAviso);
+router.get("/quejas/casos/:idQueja/sucursal", exigirAdministrador, sucursal.obtener);
+router.put("/quejas/casos/:idQueja/sucursal", exigirAdministrador, sucursal.registrar);
+
+router.get("/quejas/historial/catalogos", auditoria, historial.listarCatalogos);
+router.get("/quejas/historial/exportacion", auditoria, historial.exportar);
+router.get("/quejas/historial", auditoria, historial.listar);
+router.get("/quejas/historial/:idQueja", auditoria, historial.obtener);
+
+router.get("/quejas/asignados/catalogos", identificarEmpleado, seguimiento.listarCatalogos);
+router.get("/quejas/asignados", identificarEmpleado, seguimiento.listarAsignados);
+router.get("/quejas/asignados/:idQueja", identificarEmpleado, seguimiento.obtenerAsignado);
+router.get("/quejas/casos/:idQueja/seguimiento", identificarLectorCaso, seguimiento.obtenerSeguimiento);
+router.post("/quejas/casos/:idQueja/acciones", identificarEmpleado, seguimiento.registrarAccion);
+router.post("/quejas/casos/:idQueja/estado", identificarEmpleado, seguimiento.cambiarEstado);
+router.post("/quejas/casos/:idQueja/resolucion/notificacion", identificarEmpleado, seguimiento.reintentarAvisoResolucion);
+router.use("/quejas", erroresQuejas);
+
+module.exports = router;

@@ -1,5 +1,5 @@
 -- Created by Redgate Data Modeler (https://datamodeler.redgate-platform.com)
--- Last modification date: 2026-11-04 12:41:33.000
+-- Last modification date: 2026-11-07 18:00:00.000
 -- extensions
 -- btree_gist: permite combinar el nombre, el área y el rango de vigencia en la restricción EXCLUDE de PLANTILLAS_EVALUACION.
 CREATE EXTENSION IF NOT EXISTS btree_gist;
@@ -10,11 +10,27 @@ CREATE TABLE ACCIONES_QUEJA (
     id_queja UUID NOT NULL,
     id_tipo_accion_queja SMALLINT NOT NULL,
     id_empleado_registrador UUID NOT NULL,
-    descripcion text NOT NULL,
-    fecha_compromiso date NULL,
-    fecha_cumplimiento date NULL,
+    descripcion bytea NOT NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT ACCIONES_QUEJA_pk PRIMARY KEY (id_accion)
+    CONSTRAINT ACCIONES_QUEJA_pk PRIMARY KEY (id_accion),
+    CONSTRAINT chk_accion_queja_cifrado CHECK (octet_length(descripcion) > 28)
+);
+CREATE INDEX idx_acciones_queja ON ACCIONES_QUEJA (id_queja, creado_en);
+-- Table: ADJUNTOS_QUEJA
+CREATE TABLE ADJUNTOS_QUEJA (
+    id_adjunto UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_queja UUID NOT NULL,
+    orden SMALLINT NOT NULL,
+    nombre_original bytea NULL,
+    tipo_mime varchar(50) NOT NULL,
+    tamano_bytes int NOT NULL,
+    clave_almacenamiento varchar(64) NOT NULL,
+    CONSTRAINT ADJUNTOS_QUEJA_pk PRIMARY KEY (id_adjunto),
+    CONSTRAINT uq_adjunto_queja_orden UNIQUE (id_queja, orden),
+    CONSTRAINT uq_adjunto_queja_clave UNIQUE (clave_almacenamiento),
+    CONSTRAINT chk_adjunto_queja_orden CHECK (orden BETWEEN 1 AND 3),
+    CONSTRAINT chk_adjunto_queja_tipo CHECK (tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png')),
+    CONSTRAINT chk_adjunto_queja_tamano CHECK (tamano_bytes > 0 AND tamano_bytes <= 5242880)
 );
 -- Table: ASIGNACIONES_QUEJA
 CREATE TABLE ASIGNACIONES_QUEJA (
@@ -22,10 +38,14 @@ CREATE TABLE ASIGNACIONES_QUEJA (
     id_queja UUID NOT NULL,
     id_empleado_responsable UUID NOT NULL,
     id_empleado_asignador UUID NOT NULL,
+    id_estado_notificacion SMALLINT NOT NULL DEFAULT 1,
     comentario varchar(500) NULL,
     asignada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT ASIGNACIONES_QUEJA_pk PRIMARY KEY (id_asignacion)
+    notificada_en TIMESTAMPTZ NULL,
+    CONSTRAINT ASIGNACIONES_QUEJA_pk PRIMARY KEY (id_asignacion),
+    CONSTRAINT chk_asignacion_notificacion CHECK ((id_estado_notificacion = 2) = (notificada_en IS NOT NULL))
 );
+CREATE INDEX idx_asignaciones_queja ON ASIGNACIONES_QUEJA (id_queja, asignada_en DESC);
 -- Table: CATALOGOS_CATEGORIA_QUEJA
 CREATE TABLE CATALOGOS_CATEGORIA_QUEJA (
     id_categoria_queja SMALLINT NOT NULL,
@@ -91,6 +111,14 @@ CREATE TABLE CATALOGOS_MODULO_EXTERNO (
     grupo char(1) NULL,
     CONSTRAINT CATALOGOS_MODULO_EXTERNO_pk PRIMARY KEY (id_modulo_externo),
     CONSTRAINT uq_modulo_externo_codigo UNIQUE (codigo)
+);
+-- Table: CATALOGOS_PRIORIDAD_QUEJA
+CREATE TABLE CATALOGOS_PRIORIDAD_QUEJA (
+    id_prioridad_queja SMALLINT NOT NULL,
+    codigo varchar(30) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    CONSTRAINT CATALOGOS_PRIORIDAD_QUEJA_pk PRIMARY KEY (id_prioridad_queja),
+    CONSTRAINT uq_prioridad_queja_codigo UNIQUE (codigo)
 );
 -- Table: CATALOGOS_TIPO_ACCION_QUEJA
 CREATE TABLE CATALOGOS_TIPO_ACCION_QUEJA (
@@ -180,8 +208,8 @@ CREATE TABLE DEPARTAMENTOS (
 CREATE TABLE EMPLEADOS (
     id_empleado UUID NOT NULL,
     id_usuario UUID NULL,
-    nombres varchar(70) NOT NULL,
-    apellidos varchar(100) NOT NULL,
+    nombres varchar(70) NULL,
+    apellidos varchar(100) NULL,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT EMPLEADOS_pk PRIMARY KEY (id_empleado),
     CONSTRAINT uq_empleado_usuario UNIQUE (id_usuario)
@@ -255,6 +283,16 @@ CREATE TABLE HISTORIALES_ESTADO_QUEJA (
     CONSTRAINT HISTORIALES_ESTADO_QUEJA_pk PRIMARY KEY (id_historial)
 );
 CREATE INDEX idx_historiales_estado_queja ON HISTORIALES_ESTADO_QUEJA (id_queja, fecha_cambio DESC);
+-- Table: INVOLUCRADOS_QUEJA
+CREATE TABLE INVOLUCRADOS_QUEJA (
+    id_involucrado UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_queja UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    id_empleado_registrador UUID NOT NULL,
+    registrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT INVOLUCRADOS_QUEJA_pk PRIMARY KEY (id_involucrado),
+    CONSTRAINT uq_involucrado_queja_empleado UNIQUE (id_queja, id_empleado)
+);
 -- Table: MENSAJES_ENTRANTES
 CREATE TABLE MENSAJES_ENTRANTES (
     id_mensaje UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -319,7 +357,14 @@ CREATE TABLE PLANTILLAS_EVALUACION (
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT PLANTILLAS_EVALUACION_pk PRIMARY KEY (id_plantilla),
-    CONSTRAINT chk_plantilla_vigencia CHECK (vigencia_hasta >= vigencia_desde)
+    CONSTRAINT chk_plantilla_vigencia CHECK (vigencia_hasta >= vigencia_desde),
+    CONSTRAINT chk_plantilla_nombre CHECK (btrim(nombre) <> ''),
+    CONSTRAINT chk_plantilla_objetivo CHECK (btrim(objetivo) <> ''),
+    CONSTRAINT ex_plantilla_nombre_area_vigencia EXCLUDE USING gist (
+        lower(btrim(nombre)) WITH =,
+        id_departamento_destino WITH =,
+        daterange(vigencia_desde, vigencia_hasta, '[]') WITH &&
+    )
 );
 -- Table: PREGUNTAS_EVALUACION
 CREATE TABLE PREGUNTAS_EVALUACION (
@@ -338,19 +383,32 @@ CREATE TABLE PREGUNTAS_EVALUACION (
 CREATE TABLE QUEJAS (
     id_queja UUID NOT NULL DEFAULT gen_random_uuid(),
     id_empleado_denunciante UUID NULL,
-    id_categoria_queja SMALLINT NULL,
+    id_categoria_queja SMALLINT NOT NULL,
+    id_prioridad_queja SMALLINT NULL,
     id_estado_queja SMALLINT NOT NULL DEFAULT 1,
     id_departamento UUID NULL,
     id_sucursal UUID NULL,
-    codigo_seguimiento varchar(20) NOT NULL,
-    asunto varchar(150) NOT NULL,
-    descripcion text NOT NULL,
+    es_anonima boolean NOT NULL DEFAULT FALSE,
+    codigo_seguimiento varchar(12) NOT NULL,
+    asunto bytea NOT NULL,
+    descripcion bytea NOT NULL,
+    resolucion bytea NULL,
+    id_estado_aviso_resolucion SMALLINT NULL,
+    aviso_resolucion_en TIMESTAMPTZ NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT QUEJAS_pk PRIMARY KEY (id_queja),
-    CONSTRAINT uq_queja_codigo_seguimiento UNIQUE (codigo_seguimiento)
+    CONSTRAINT uq_queja_codigo_seguimiento UNIQUE (codigo_seguimiento),
+    CONSTRAINT chk_queja_codigo_seguimiento CHECK (codigo_seguimiento ~ '^QJ-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$'),
+    CONSTRAINT chk_queja_anonimato CHECK (es_anonima = (id_empleado_denunciante IS NULL)),
+    CONSTRAINT chk_queja_cifrado CHECK (octet_length(asunto) > 28 AND octet_length(descripcion) > 28 AND (resolucion IS NULL OR octet_length(resolucion) > 28)),
+    CONSTRAINT chk_queja_resolucion CHECK ((id_estado_queja = 5) = (resolucion IS NOT NULL)),
+    CONSTRAINT chk_queja_aviso_resolucion CHECK (id_estado_aviso_resolucion IS NULL OR (resolucion IS NOT NULL AND NOT es_anonima)),
+    CONSTRAINT chk_queja_aviso_resolucion_entregado CHECK (COALESCE(id_estado_aviso_resolucion = 2, FALSE) = (aviso_resolucion_en IS NOT NULL))
 );
 CREATE INDEX idx_quejas_estado ON QUEJAS (id_estado_queja, creado_en);
+CREATE INDEX idx_quejas_categoria ON QUEJAS (id_categoria_queja, creado_en);
+CREATE INDEX idx_quejas_prioridad ON QUEJAS (id_prioridad_queja, creado_en);
 CREATE INDEX idx_quejas_denunciante ON QUEJAS (id_empleado_denunciante);
 CREATE INDEX idx_quejas_departamento ON QUEJAS (id_departamento);
 -- Table: RESPUESTAS_EVALUACION
@@ -406,6 +464,12 @@ ADD CONSTRAINT ACCIONES_QUEJA_EMPLEADOS FOREIGN KEY (id_empleado_registrador) RE
 -- Reference: ACCIONES_QUEJA_QUEJAS (table: ACCIONES_QUEJA)
 ALTER TABLE ACCIONES_QUEJA
 ADD CONSTRAINT ACCIONES_QUEJA_QUEJAS FOREIGN KEY (id_queja) REFERENCES QUEJAS (id_queja) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: ADJUNTOS_QUEJA_QUEJAS (table: ADJUNTOS_QUEJA)
+ALTER TABLE ADJUNTOS_QUEJA
+ADD CONSTRAINT ADJUNTOS_QUEJA_QUEJAS FOREIGN KEY (id_queja) REFERENCES QUEJAS (id_queja) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: ASIGNACIONES_QUEJA_CATALOGOS_ESTADO_EVENTO (table: ASIGNACIONES_QUEJA)
+ALTER TABLE ASIGNACIONES_QUEJA
+ADD CONSTRAINT ASIGNACIONES_QUEJA_CATALOGOS_ESTADO_EVENTO FOREIGN KEY (id_estado_notificacion) REFERENCES CATALOGOS_ESTADO_EVENTO (id_estado_evento) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- Reference: ASIGNACIONES_QUEJA_EMPLEADOS_ASIGNADOR (table: ASIGNACIONES_QUEJA)
 ALTER TABLE ASIGNACIONES_QUEJA
 ADD CONSTRAINT ASIGNACIONES_QUEJA_EMPLEADOS_ASIGNADOR FOREIGN KEY (id_empleado_asignador) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
@@ -478,6 +542,15 @@ ADD CONSTRAINT HISTORIALES_ESTADO_QUEJA_EMPLEADOS FOREIGN KEY (id_empleado_respo
 -- Reference: HISTORIALES_ESTADO_QUEJA_QUEJAS (table: HISTORIALES_ESTADO_QUEJA)
 ALTER TABLE HISTORIALES_ESTADO_QUEJA
 ADD CONSTRAINT HISTORIALES_ESTADO_QUEJA_QUEJAS FOREIGN KEY (id_queja) REFERENCES QUEJAS (id_queja) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: INVOLUCRADOS_QUEJA_EMPLEADOS (table: INVOLUCRADOS_QUEJA)
+ALTER TABLE INVOLUCRADOS_QUEJA
+ADD CONSTRAINT INVOLUCRADOS_QUEJA_EMPLEADOS FOREIGN KEY (id_empleado) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: INVOLUCRADOS_QUEJA_EMPLEADOS_REGISTRADOR (table: INVOLUCRADOS_QUEJA)
+ALTER TABLE INVOLUCRADOS_QUEJA
+ADD CONSTRAINT INVOLUCRADOS_QUEJA_EMPLEADOS_REGISTRADOR FOREIGN KEY (id_empleado_registrador) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: INVOLUCRADOS_QUEJA_QUEJAS (table: INVOLUCRADOS_QUEJA)
+ALTER TABLE INVOLUCRADOS_QUEJA
+ADD CONSTRAINT INVOLUCRADOS_QUEJA_QUEJAS FOREIGN KEY (id_queja) REFERENCES QUEJAS (id_queja) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- Reference: MENSAJES_ENTRANTES_CATALOGOS_ESTADO_MENSAJE (table: MENSAJES_ENTRANTES)
 ALTER TABLE MENSAJES_ENTRANTES
 ADD CONSTRAINT MENSAJES_ENTRANTES_CATALOGOS_ESTADO_MENSAJE FOREIGN KEY (id_estado_mensaje) REFERENCES CATALOGOS_ESTADO_MENSAJE (id_estado_mensaje) NOT DEFERRABLE INITIALLY IMMEDIATE;
@@ -511,9 +584,15 @@ ADD CONSTRAINT PREGUNTAS_EVALUACION_ESCALAS_VALORACION FOREIGN KEY (id_escala) R
 -- Reference: QUEJAS_CATALOGOS_CATEGORIA_QUEJA (table: QUEJAS)
 ALTER TABLE QUEJAS
 ADD CONSTRAINT QUEJAS_CATALOGOS_CATEGORIA_QUEJA FOREIGN KEY (id_categoria_queja) REFERENCES CATALOGOS_CATEGORIA_QUEJA (id_categoria_queja) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: QUEJAS_CATALOGOS_ESTADO_EVENTO (table: QUEJAS)
+ALTER TABLE QUEJAS
+ADD CONSTRAINT QUEJAS_CATALOGOS_ESTADO_EVENTO FOREIGN KEY (id_estado_aviso_resolucion) REFERENCES CATALOGOS_ESTADO_EVENTO (id_estado_evento) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- Reference: QUEJAS_CATALOGOS_ESTADO_QUEJA (table: QUEJAS)
 ALTER TABLE QUEJAS
 ADD CONSTRAINT QUEJAS_CATALOGOS_ESTADO_QUEJA FOREIGN KEY (id_estado_queja) REFERENCES CATALOGOS_ESTADO_QUEJA (id_estado_queja) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: QUEJAS_CATALOGOS_PRIORIDAD_QUEJA (table: QUEJAS)
+ALTER TABLE QUEJAS
+ADD CONSTRAINT QUEJAS_CATALOGOS_PRIORIDAD_QUEJA FOREIGN KEY (id_prioridad_queja) REFERENCES CATALOGOS_PRIORIDAD_QUEJA (id_prioridad_queja) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- Reference: QUEJAS_DEPARTAMENTOS (table: QUEJAS)
 ALTER TABLE QUEJAS
 ADD CONSTRAINT QUEJAS_DEPARTAMENTOS FOREIGN KEY (id_departamento) REFERENCES DEPARTAMENTOS (id_departamento) NOT DEFERRABLE INITIALLY IMMEDIATE;
@@ -547,80 +626,4 @@ ADD CONSTRAINT VERSIONES_PLANTILLA_EMPLEADOS FOREIGN KEY (id_empleado_publicador
 -- Reference: VERSIONES_PLANTILLA_PLANTILLAS_EVALUACION (table: VERSIONES_PLANTILLA)
 ALTER TABLE VERSIONES_PLANTILLA
 ADD CONSTRAINT VERSIONES_PLANTILLA_PLANTILLAS_EVALUACION FOREIGN KEY (id_plantilla) REFERENCES PLANTILLAS_EVALUACION (id_plantilla) NOT DEFERRABLE INITIALLY IMMEDIATE;
--- additional constraints
--- KAN-9: no puede haber dos plantillas con el mismo nombre y área si sus vigencias se cruzan.
-ALTER TABLE PLANTILLAS_EVALUACION
-ADD CONSTRAINT ex_plantilla_nombre_area_vigencia EXCLUDE USING gist (
-    nombre WITH =,
-    id_departamento_destino WITH =,
-    daterange(vigencia_desde, vigencia_hasta, '[]') WITH &&
-);
--- seed
-INSERT INTO CATALOGOS_ESTADO_VERSION (id_estado_version, codigo, nombre)
-VALUES (1, 'BORRADOR', 'Borrador'),
-    (2, 'PUBLICADA', 'Publicada'),
-    (3, 'ARCHIVADA', 'Archivada');
-INSERT INTO CATALOGOS_TIPO_COMPETENCIA (id_tipo_competencia, codigo, nombre)
-VALUES (1, 'COMPETENCIA_LABORAL', 'Competencia laboral'),
-    (2, 'FACTOR_OPERATIVO', 'Factor operativo');
-INSERT INTO CATALOGOS_TIPO_ESCALA (id_tipo_escala, codigo, nombre)
-VALUES (1, 'CUANTITATIVA', 'Cuantitativa'),
-    (2, 'CUALITATIVA', 'Cualitativa');
-INSERT INTO CATALOGOS_ESTADO_CICLO (id_estado_ciclo, codigo, nombre)
-VALUES (1, 'PROGRAMADO', 'Programado'),
-    (2, 'ACTIVO', 'Activo'),
-    (3, 'CERRADO', 'Cerrado');
-INSERT INTO CATALOGOS_ESTADO_EVALUACION (id_estado_evaluacion, codigo, nombre)
-VALUES (1, 'PENDIENTE', 'Pendiente'),
-    (2, 'BORRADOR', 'Borrador'),
-    (3, 'ENVIADA', 'Enviada'),
-    (4, 'VENCIDA', 'Vencida');
-INSERT INTO CATALOGOS_ESTADO_EVENTO (id_estado_evento, codigo, nombre)
-VALUES (1, 'PENDIENTE', 'Pendiente'),
-    (2, 'ENTREGADO', 'Entregado'),
-    (3, 'FALLIDO', 'Fallido');
-INSERT INTO CATALOGOS_ESTADO_MENSAJE (id_estado_mensaje, codigo, nombre)
-VALUES (1, 'RECIBIDO', 'Recibido'),
-    (2, 'PROCESADO', 'Procesado'),
-    (3, 'EN_DLQ', 'En cola de errores');
-INSERT INTO CATALOGOS_MODULO_EXTERNO (id_modulo_externo, codigo, nombre, grupo)
-VALUES (1, 'CRM', 'CRM', 'B');
-INSERT INTO CATALOGOS_CATEGORIA_QUEJA (id_categoria_queja, codigo, nombre)
-VALUES (1, 'CLIMA_LABORAL', 'Clima laboral'),
-    (2, 'ACOSO', 'Acoso'),
-    (3, 'CONDICIONES_TRABAJO', 'Condiciones de trabajo'),
-    (4, 'OTRO', 'Otro');
-INSERT INTO CATALOGOS_ESTADO_QUEJA (id_estado_queja, codigo, nombre, es_final)
-VALUES (1, 'REGISTRADA', 'Registrada', FALSE),
-    (2, 'ASIGNADA', 'Asignada', FALSE),
-    (3, 'EN_ATENCION', 'En atención', FALSE),
-    (4, 'RESUELTA', 'Resuelta', TRUE),
-    (5, 'DESESTIMADA', 'Desestimada', TRUE);
-INSERT INTO CATALOGOS_TIPO_ACCION_QUEJA (id_tipo_accion_queja, codigo, nombre)
-VALUES (1, 'PREVENTIVA', 'Preventiva'),
-    (2, 'CORRECTIVA', 'Correctiva');
--- Escalas de partida: KAN-22 pide la etiqueta de cada nivel de la escala Likert de 1 a 5.
-INSERT INTO ESCALAS_VALORACION (id_escala, id_tipo_escala, nombre, descripcion)
-VALUES (
-        '00000000-0000-4000-8000-000000000001',
-        1,
-        'Likert de 1 a 5',
-        'Escala cuantitativa de cinco niveles'
-    ),
-    (
-        '00000000-0000-4000-8000-000000000002',
-        2,
-        'Nivel de cumplimiento',
-        'Escala cualitativa de cuatro niveles'
-    );
-INSERT INTO NIVELES_ESCALA (id_escala, valor, etiqueta)
-VALUES ('00000000-0000-4000-8000-000000000001', 1, 'Muy deficiente'),
-    ('00000000-0000-4000-8000-000000000001', 2, 'Deficiente'),
-    ('00000000-0000-4000-8000-000000000001', 3, 'Aceptable'),
-    ('00000000-0000-4000-8000-000000000001', 4, 'Bueno'),
-    ('00000000-0000-4000-8000-000000000001', 5, 'Excelente'),
-    ('00000000-0000-4000-8000-000000000002', 1, 'No cumple'),
-    ('00000000-0000-4000-8000-000000000002', 2, 'Cumple parcialmente'),
-    ('00000000-0000-4000-8000-000000000002', 3, 'Cumple'),
-    ('00000000-0000-4000-8000-000000000002', 4, 'Supera lo esperado');
 -- End of file.

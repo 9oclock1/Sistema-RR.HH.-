@@ -1,8 +1,21 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardPenLine, FileChartColumn, FileCheck, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, ListTree, Mail, Megaphone, MoonStar, Network, Send, SquareKanban, TreePalm, Timer, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, SquareKanban, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
+import AnticiposPage from "../features/anticipos/AnticiposPage";
+import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
-import { RUTA_EVALUACIONES } from "../features/evaluaciones/ruta";
+import MisResultadosPage from "../features/evaluaciones/MisResultadosPage";
+import { RUTA_EVALUACIONES, RUTA_MIS_RESULTADOS } from "../features/evaluaciones/ruta";
+import BuzonQuejasPage from "../features/quejas/BuzonQuejasPage";
+import ConsultarQuejaPage from "../features/quejas/ConsultarQuejaPage";
+import { RUTA_BUZON_QUEJAS, RUTA_CONSULTAR_QUEJA } from "../features/quejas/reglas";
+import CasosQuejaPage from "../features/quejas/casos/CasosQuejaPage";
+import MisCasosQuejaPage from "../features/quejas/casos/MisCasosQuejaPage";
+import { RUTA_CASOS_QUEJA, RUTA_MIS_CASOS_QUEJA } from "../features/quejas/casos/casos";
+import HistorialQuejasPage from "../features/quejas/historial/HistorialQuejasPage";
+import { RUTA_HISTORIAL_QUEJAS } from "../features/quejas/historial/historial";
+import PlantillasEvaluacionPage from "../features/plantillas-evaluacion/PlantillasEvaluacionPage";
+import { RUTA_PLANTILLAS } from "../features/plantillas-evaluacion/ruta";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
@@ -273,6 +286,22 @@ export const SECCIONES = [
         roles: ["admin"],
         pagina: CondicionesPage,
       },
+      {
+        ruta: "/planillas/anticipos",
+        etiqueta: "Anticipos y préstamos",
+        descripcion: "Anticipos de sueldo y préstamos con su plan de cuotas, descontados en la planilla del periodo.",
+        icono: HandCoins,
+        roles: ["admin"],
+        pagina: AnticiposPage,
+      },
+      {
+        ruta: "/planillas/antiguedad",
+        etiqueta: "Bono de antigüedad",
+        descripcion: "Cálculo del bono por colaborador y parametrización de la escala legal de antigüedad.",
+        icono: Hourglass,
+        roles: ["admin"],
+        pagina: AntiguedadPage,
+      },
     ],
   },
   {
@@ -343,6 +372,15 @@ export const SECCIONES = [
     titulo: "Desempeño",
     modulos: [
       {
+        ruta: RUTA_PLANTILLAS,
+        parametroOpcional: "idPlantilla",
+        etiqueta: "Plantillas de evaluación",
+        descripcion: "Diseño de plantillas estandarizadas por área y vigencia, con sus secciones, criterios, preguntas ponderadas y escalas de valoración.",
+        icono: ClipboardList,
+        roles: ["admin"],
+        pagina: PlantillasEvaluacionPage,
+      },
+      {
         ruta: RUTA_EVALUACIONES,
         parametroOpcional: "idEvaluacion",
         etiqueta: "Evaluaciones",
@@ -350,6 +388,59 @@ export const SECCIONES = [
         icono: ClipboardPenLine,
         roles: ["supervisor"],
         pagina: EvaluacionesPage,
+      },
+      {
+        ruta: RUTA_MIS_RESULTADOS,
+        parametroOpcional: "idEvaluacion",
+        etiqueta: "Mis resultados",
+        descripcion: "Puntaje de sus evaluaciones enviadas, con fortalezas, aspectos de mejora y compromisos de desarrollo.",
+        icono: Award,
+        roles: ["empleado"],
+        pagina: MisResultadosPage,
+      },
+      {
+        ruta: RUTA_BUZON_QUEJAS,
+        etiqueta: "Buzón de quejas",
+        descripcion: "Quejas sobre clima laboral, acoso o condiciones de trabajo, con su nombre o de forma anónima.",
+        icono: MessageSquareWarning,
+        roles: ["empleado"],
+        pagina: BuzonQuejasPage,
+      },
+      {
+        ruta: RUTA_CONSULTAR_QUEJA,
+        etiqueta: "Consultar mi queja",
+        descripcion: "Estado de una queja con su código de seguimiento, sin identificarse.",
+        icono: FileSearch,
+        roles: [],
+        publica: true,
+        pagina: ConsultarQuejaPage,
+      },
+      {
+        ruta: RUTA_CASOS_QUEJA,
+        parametroOpcional: "idQueja",
+        etiqueta: "Casos de quejas",
+        descripcion: "Clasificación de las quejas recibidas y derivación a la persona responsable de atenderlas.",
+        icono: Inbox,
+        roles: ["admin"],
+        pagina: CasosQuejaPage,
+      },
+      {
+        ruta: RUTA_MIS_CASOS_QUEJA,
+        parametroOpcional: "idQueja",
+        etiqueta: "Mis casos de quejas",
+        descripcion: "Quejas derivadas a usted: acciones preventivas o correctivas y avance hasta su resolución.",
+        icono: ClipboardList,
+        roles: ["supervisor", "reclutador"],
+        pagina: MisCasosQuejaPage,
+      },
+      {
+        ruta: RUTA_HISTORIAL_QUEJAS,
+        parametroOpcional: "idQueja",
+        etiqueta: "Historial de quejas",
+        descripcion: "Quejas cerradas con su trazabilidad completa, filtros y exportación para auditoría.",
+        icono: History,
+        roles: ["admin", "auditor"],
+        pagina: HistorialQuejasPage,
       },
     ],
   },
