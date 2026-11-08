@@ -73,13 +73,16 @@ async function obtenerEvaluacion(
   const { rows } = await db.query(
     `SELECT e.id_evaluacion, e.id_empleado_evaluado, e.id_empleado_evaluador, e.id_estado_evaluacion,
             e.puntaje_final, e.enviada_en, e.actualizado_en,
+            e.fortalezas, e.aspectos_mejora, e.comentarios_generales,
             c.id_ciclo, c.id_version, c.nombre AS ciclo, c.fecha_limite, c.id_estado_ciclo,
             ${HOY_BOLIVIA} AS hoy,
             em.nombres, em.apellidos, su.nombre AS sucursal, de.nombre AS departamento,
+            ev.nombres AS evaluador_nombres, ev.apellidos AS evaluador_apellidos,
             pl.nombre AS plantilla, pl.objetivo, v.numero_version
      FROM evaluaciones e
      JOIN ciclos_evaluacion c ON c.id_ciclo = e.id_ciclo
      JOIN empleados em ON em.id_empleado = e.id_empleado_evaluado
+     JOIN empleados ev ON ev.id_empleado = e.id_empleado_evaluador
      JOIN sucursales su ON su.id_sucursal = e.id_sucursal
      JOIN departamentos de ON de.id_departamento = e.id_departamento
      JOIN versiones_plantilla v ON v.id_version = c.id_version
@@ -180,6 +183,66 @@ async function marcarEnviada(idEvaluacion, puntaje, db = pool) {
   return rows[0]?.enviada_en ?? null;
 }
 
+// KAN-26: compromisos de desarrollo de la evaluación, del más próximo al más lejano.
+async function listarCompromisos(idEvaluacion, db = pool) {
+  const { rows } = await db.query(
+    `SELECT id_compromiso, descripcion, fecha_objetivo
+     FROM compromisos_desarrollo
+     WHERE id_evaluacion = $1
+     ORDER BY fecha_objetivo, creado_en, id_compromiso`,
+    [idEvaluacion],
+  );
+  return rows;
+}
+
+// Guarda los textos de la retroalimentación. Solo en evaluaciones abiertas: una enviada no se vuelve a tocar.
+async function guardarRetroalimentacion(
+  idEvaluacion,
+  { fortalezas, aspectos_mejora: aspectosMejora, comentarios_generales: comentariosGenerales },
+  db = pool,
+) {
+  const { rows } = await db.query(
+    `UPDATE evaluaciones
+     SET fortalezas = $2, aspectos_mejora = $3, comentarios_generales = $4, actualizado_en = CURRENT_TIMESTAMP
+     WHERE id_evaluacion = $1 AND id_estado_evaluacion IN (${ESTADO_EVALUACION.PENDIENTE}, ${ESTADO_EVALUACION.BORRADOR})
+     RETURNING actualizado_en`,
+    [idEvaluacion, fortalezas, aspectosMejora, comentariosGenerales],
+  );
+  return rows[0]?.actualizado_en ?? null;
+}
+
+// La lista enviada reemplaza a la guardada: así quitar un compromiso es simplemente no enviarlo.
+async function reemplazarCompromisos(idEvaluacion, compromisos, db = pool) {
+  await db.query("DELETE FROM compromisos_desarrollo WHERE id_evaluacion = $1", [idEvaluacion]);
+  if (compromisos.length === 0) return;
+  await db.query(
+    `INSERT INTO compromisos_desarrollo (id_evaluacion, descripcion, fecha_objetivo)
+     SELECT $1::uuid, t.descripcion, t.fecha_objetivo
+     FROM unnest($2::text[], $3::date[]) AS t (descripcion, fecha_objetivo)`,
+    [idEvaluacion, compromisos.map((c) => c.descripcion), compromisos.map((c) => c.fechaObjetivo)],
+  );
+}
+
+// KAN-26: evaluaciones enviadas de un colaborador, para que consulte sus resultados.
+async function listarResultadosDelEvaluado(idEvaluado, db = pool) {
+  const { rows } = await db.query(
+    `SELECT e.id_evaluacion, e.puntaje_final, e.enviada_en,
+            c.id_ciclo, c.nombre AS ciclo, c.fecha_limite,
+            ev.nombres AS evaluador_nombres, ev.apellidos AS evaluador_apellidos,
+            pl.nombre AS plantilla,
+            (SELECT count(*)::int FROM compromisos_desarrollo cd WHERE cd.id_evaluacion = e.id_evaluacion) AS compromisos
+     FROM evaluaciones e
+     JOIN ciclos_evaluacion c ON c.id_ciclo = e.id_ciclo
+     JOIN empleados ev ON ev.id_empleado = e.id_empleado_evaluador
+     JOIN versiones_plantilla v ON v.id_version = c.id_version
+     JOIN plantillas_evaluacion pl ON pl.id_plantilla = v.id_plantilla
+     WHERE e.id_empleado_evaluado = $1 AND e.id_estado_evaluacion = ${ESTADO_EVALUACION.ENVIADA}
+     ORDER BY e.enviada_en DESC`,
+    [idEvaluado],
+  );
+  return rows;
+}
+
 module.exports = {
   hoy,
   listarBandeja,
@@ -192,4 +255,8 @@ module.exports = {
   contarRespuestas,
   cambiarEstadoAbierta,
   marcarEnviada,
+  listarCompromisos,
+  guardarRetroalimentacion,
+  reemplazarCompromisos,
+  listarResultadosDelEvaluado,
 };

@@ -549,4 +549,18 @@ VALUES (
         'f0000000-0000-4000-8000-000000000104',
         3
     ) ON CONFLICT DO NOTHING;
+-- KAN-26: compromisos de desarrollo de la evaluación enviada 125 (ids fijos para no duplicar al repetir).
+INSERT INTO COMPROMISOS_DESARROLLO (id_compromiso, id_evaluacion, descripcion, fecha_objetivo)
+VALUES (
+        'f0000000-0000-4000-8000-000000000131',
+        'f0000000-0000-4000-8000-000000000125',
+        'Completar el curso interno de manejo de reclamos complejos.',
+        '2026-09-30'
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000132',
+        'f0000000-0000-4000-8000-000000000125',
+        'Acompañar a un compañero nuevo durante su primer mes en tienda.',
+        '2026-12-15'
+    ) ON CONFLICT DO NOTHING;
 COMMIT;

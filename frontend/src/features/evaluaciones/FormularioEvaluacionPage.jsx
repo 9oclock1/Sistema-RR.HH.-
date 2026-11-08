@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { ArrowLeft, Send, UserRound } from "lucide-react";
-import { enviarEvaluacion, guardarRespuestas, obtenerEvaluacion } from "../../api/evaluaciones";
+import {
+  enviarEvaluacion,
+  guardarRespuestas,
+  guardarRetroalimentacion,
+  obtenerEvaluacion,
+} from "../../api/evaluaciones";
 import {
   Alerta,
   Avatar,
@@ -18,9 +23,15 @@ import { useUsuario } from "../../context/sesion";
 import { formatearFecha } from "../solicitud-vacaciones/formato";
 import EstadoGuardado from "./EstadoGuardado";
 import ResultadoEvaluacion from "./ResultadoEvaluacion";
+import {
+  FormularioRetroalimentacion,
+  RetroalimentacionBloqueada,
+  VistaRetroalimentacion,
+} from "./RetroalimentacionEvaluacion";
+import { aCuerpo, aEstado, erroresDelServicio, mismoContenido, validarRetroalimentacion } from "./retroalimentacion";
 import SeccionEvaluacion from "./SeccionEvaluacion";
 import useAutoguardado from "./useAutoguardado";
-import { describirPlazo, ESTADOS_EVALUACION, formatearPuntaje, idCampoPregunta } from "./formato";
+import { describirPlazo, ESTADOS_EVALUACION, formatearPuntaje, hoyEnBolivia, idCampoPregunta } from "./formato";
 import { RUTA_EVALUACIONES } from "./ruta";
 import "./evaluaciones.css";
 
@@ -59,6 +70,11 @@ function Formulario({ datos, idEvaluador, aviso, onConflicto }) {
   const [confirmando, setConfirmando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [recienEnviada, setRecienEnviada] = useState(false);
+  // KAN-26: retroalimentación final. «guardada» es lo último confirmado por el servicio.
+  const [retro, setRetro] = useState(() => aEstado(datos.retroalimentacion));
+  const [retroGuardada, setRetroGuardada] = useState(() => aEstado(datos.retroalimentacion));
+  const [erroresRetro, setErroresRetro] = useState({});
+  const [guardandoRetro, setGuardandoRetro] = useState(false);
   const refResumen = useRef(null);
   const refResultado = useRef(null);
 
@@ -74,6 +90,8 @@ function Formulario({ datos, idEvaluador, aviso, onConflicto }) {
   const obligatorias = preguntas.filter((pregunta) => pregunta.es_obligatoria);
   const obligatoriasRespondidas = obligatorias.filter((pregunta) => respuestas[pregunta.id_pregunta]).length;
   const respondidas = preguntas.filter((pregunta) => respuestas[pregunta.id_pregunta]).length;
+  const puntajesCompletos = respondidas > 0 && obligatoriasRespondidas === obligatorias.length;
+  const retroSinGuardar = !mismoContenido(retro, retroGuardada);
 
   const guardar = useCallback(
     (lote) =>
@@ -104,6 +122,34 @@ function Formulario({ datos, idEvaluador, aviso, onConflicto }) {
     autoguardado.encolar(idPregunta, idNivel);
   };
 
+  const cambiarRetro = (valor) => {
+    setRetro(valor);
+    setErroresRetro({});
+  };
+
+  // Devuelve true si quedó guardada. Valida antes en el navegador con las mismas reglas del servicio.
+  const guardarRetro = async () => {
+    const errores = validarRetroalimentacion(retro, hoyEnBolivia());
+    setErroresRetro(errores);
+    if (Object.keys(errores).length > 0) return false;
+    setGuardandoRetro(true);
+    try {
+      const guardada = await guardarRetroalimentacion(idEvaluador, datos.id_evaluacion, aCuerpo(retro));
+      const estadoGuardado = aEstado(guardada.retroalimentacion);
+      setRetro(estadoGuardado);
+      setRetroGuardada(estadoGuardado);
+      avisar({ tono: "exito", titulo: "Retroalimentación guardada" });
+      return true;
+    } catch (error) {
+      if (esConflicto(error)) onConflicto(error.message);
+      else if (error.estado === 400 && error.detalles?.length) setErroresRetro(erroresDelServicio(error.detalles));
+      else avisar({ tono: "peligro", titulo: "No se pudo guardar la retroalimentación", mensaje: error.message });
+      return false;
+    } finally {
+      setGuardandoRetro(false);
+    }
+  };
+
   const mostrarFaltantes = (ids) => {
     setFaltantes(ids);
     setIntentosFallidos((n) => n + 1);
@@ -121,6 +167,11 @@ function Formulario({ datos, idEvaluador, aviso, onConflicto }) {
     const sinResponder = obligatorias.filter((pregunta) => !respuestas[pregunta.id_pregunta]);
     if (sinResponder.length > 0) {
       mostrarFaltantes(sinResponder.map((pregunta) => pregunta.id_pregunta));
+      return;
+    }
+    // La retroalimentación escrita y no guardada se guarda antes de enviar, para que no se pierda.
+    if (retroSinGuardar && !(await guardarRetro())) {
+      setErrorEnvio("Revise la retroalimentación final: no se pudo guardar, por eso la evaluación no se envió.");
       return;
     }
     setConfirmando(true);
@@ -289,6 +340,24 @@ function Formulario({ datos, idEvaluador, aviso, onConflicto }) {
         ))
       )}
 
+      {estado === "ENVIADA" ? (
+        <VistaRetroalimentacion retroalimentacion={aCuerpo(retroGuardada)} />
+      ) : editable && datos.secciones.length > 0 ? (
+        puntajesCompletos ? (
+          <FormularioRetroalimentacion
+            valor={retro}
+            errores={erroresRetro}
+            hoy={hoyEnBolivia()}
+            sinGuardar={retroSinGuardar}
+            guardando={guardandoRetro}
+            onCambiar={cambiarRetro}
+            onGuardar={guardarRetro}
+          />
+        ) : (
+          <RetroalimentacionBloqueada faltantes={obligatorias.length - obligatoriasRespondidas} />
+        )
+      ) : null}
+
       <div className="ev-pie">
         <VolverALaBandeja />
         {editable && (
@@ -309,7 +378,7 @@ function Formulario({ datos, idEvaluador, aviso, onConflicto }) {
       >
         <p>
           Se calculará el puntaje final de {colaborador} y la evaluación quedará bloqueada: después de enviarla no podrá
-          modificar sus respuestas.
+          modificar sus respuestas ni la retroalimentación final.
         </p>
       </ModalConfirmacion>
     </div>
