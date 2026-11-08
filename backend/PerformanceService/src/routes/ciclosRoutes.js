@@ -14,6 +14,8 @@ router.post("/ciclos/vista-previa", soloAdministrador, controlador.vistaPrevia);
 // Crea el ciclo y sus asignaciones. El creador viaja en X-Empleado-Id.
 router.post("/ciclos", soloAdministrador, identificarEmpleado, controlador.crear);
 router.get("/ciclos", soloAdministrador, controlador.listar);
+// Ejecuta ahora la activación, los recordatorios y el cierre que el job hace cada día.
+router.post("/ciclos/procesar", soloAdministrador, controlador.procesar);
 router.get("/ciclos/:idCiclo", soloAdministrador, controlador.obtener);
 
 module.exports = router;

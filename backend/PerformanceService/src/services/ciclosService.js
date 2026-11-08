@@ -4,6 +4,7 @@ const { enTransaccion } = require("../config/transaccion");
 const empleados = require("./empleados.service");
 const jerarquia = require("./jerarquiaExterna");
 const { ErrorApp } = require("../utils/errores");
+const { conLimite } = require("../utils/concurrencia");
 const { UUID_RE } = require("../utils/formatos");
 const { ESTADO_VERSION } = require("../utils/catalogos");
 const { nombreCompleto } = require("../utils/evaluaciones");
@@ -11,20 +12,6 @@ const { validarCiclo, validarVistaPrevia, verificarFechas } = require("../utils/
 const { resolverAsignaciones } = require("../utils/asignacionCiclo");
 
 const CONSULTAS_SIMULTANEAS = 8;
-
-// Ejecuta tarea(elemento) para todos los elementos sin pasar de `limite` consultas a la vez.
-async function conLimite(elementos, limite, tarea) {
-  const resultados = new Array(elementos.length);
-  let siguiente = 0;
-  const trabajadores = Array.from({ length: Math.min(limite, elementos.length) }, async () => {
-    while (siguiente < elementos.length) {
-      const posicion = siguiente++;
-      resultados[posicion] = await tarea(elementos[posicion]);
-    }
-  });
-  await Promise.all(trabajadores);
-  return resultados;
-}
 
 // Traduce las restricciones de PerformanceDB a errores para el usuario.
 function traducirError(error, nombre) {
