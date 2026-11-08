@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { ArrowLeft, Award, RefreshCw, UserRound } from "lucide-react";
-import { listarMisResultados, obtenerMiResultado } from "../../api/evaluaciones";
+import { listarMisResultados, obtenerHistorialDesempeno, obtenerMiResultado } from "../../api/evaluaciones";
 import { Alerta, Boton, EncabezadoPagina, Esqueleto, EstadoVacio, Tabla, Tarjeta } from "../../components/ui";
-import { useUsuario } from "../../context/sesion";
+import { useRol, useUsuario } from "../../context/sesion";
 import { formatearFechaHora } from "../justificaciones/formato";
 import { formatearPuntaje } from "./formato";
+import HistorialDesempeno from "./HistorialDesempeno";
 import { TablaResultado } from "./ResultadoEvaluacion";
 import { VistaRetroalimentacion } from "./RetroalimentacionEvaluacion";
 import { RUTA_MIS_RESULTADOS, rutaMiResultado } from "./ruta";
@@ -77,8 +78,30 @@ function ErrorCarga({ error, titulo, onReintentar, accion }) {
   );
 }
 
+function Historial({ idEmpleado, clave }) {
+  const rol = useRol();
+  const { datos, error, reintentar } = useCarga(() => obtenerHistorialDesempeno(idEmpleado, rol), [idEmpleado, clave]);
+  if (error) return <ErrorCarga error={error} titulo="No se pudo cargar su historial de desempeño" onReintentar={reintentar} />;
+  if (!datos) {
+    return (
+      <div className="ev-carga" aria-busy="true">
+        <p className="ds-solo-lector" role="status">
+          Cargando su historial…
+        </p>
+        <Esqueleto forma="bloque" alto="14rem" />
+      </div>
+    );
+  }
+  return <HistorialDesempeno historial={datos} />;
+}
+
 function ListaResultados({ idEmpleado }) {
   const { datos, error, reintentar } = useCarga(() => listarMisResultados(idEmpleado), [idEmpleado]);
+  const [actualizaciones, setActualizaciones] = useState(0);
+  const actualizar = () => {
+    reintentar();
+    setActualizaciones((n) => n + 1);
+  };
 
   return (
     <section className="ev-bandeja" aria-labelledby="ev-mis-resultados-titulo">
@@ -87,13 +110,14 @@ function ListaResultados({ idEmpleado }) {
         enlace={Link}
         titulo="Mis resultados"
         idTitulo="ev-mis-resultados-titulo"
-        descripcion="Resultados de sus evaluaciones de desempeño ya enviadas, con la retroalimentación de su evaluador."
+        descripcion="Su puntaje de desempeño histórico, el consolidado de cada ciclo cerrado y sus evaluaciones enviadas con la retroalimentación de cada evaluador."
         acciones={
-          <Boton icono={RefreshCw} onClick={reintentar}>
+          <Boton icono={RefreshCw} onClick={actualizar}>
             Actualizar
           </Boton>
         }
       />
+      <Historial idEmpleado={idEmpleado} clave={String(actualizaciones + 1)} />
       {error ? (
         <ErrorCarga error={error} titulo="No se pudieron cargar sus resultados" onReintentar={reintentar} />
       ) : (

@@ -22,6 +22,7 @@ const {
   verificarFechasCompromisos,
   describirRetroalimentacion,
 } = require("../utils/retroalimentacion");
+const { autorizarConsulta, consolidarHistorial } = require("../utils/historialDesempeno");
 
 const describirColaborador = ({
   id_empleado_evaluado,
@@ -424,7 +425,50 @@ async function obtenerMiResultado(idEmpleado, idEvaluacion) {
   };
 }
 
+const agruparPor = (filas, clave) => {
+  const grupos = new Map();
+  for (const fila of filas) {
+    if (!grupos.has(fila[clave])) grupos.set(fila[clave], []);
+    grupos.get(fila[clave]).push(fila);
+  }
+  return grupos;
+};
+
+// Historial de desempeño de un colaborador: consolidado por ciclo cerrado (puntaje final, desglose por
+// competencia y retroalimentación de cada evaluador) y evolución del puntaje por periodo.
+// RBAC: el colaborador solo consulta el suyo; RRHH (admin, gerente) puede consultar el de otros.
+async function obtenerHistorialDesempeno({ idSolicitante, rol, idColaborador: idPedido }) {
+  const { idColaborador, propio } = autorizarConsulta({ idSolicitante, rol, idColaborador: idPedido });
+
+  const empleado = await modelo.obtenerEmpleado(idColaborador);
+  if (!empleado && !propio) throw new ErrorApp(404, "Colaborador no encontrado");
+
+  const evaluaciones = await modelo.listarHistorialDelEvaluado(idColaborador);
+  const ids = evaluaciones.map((fila) => fila.id_evaluacion);
+  const [estructura, compromisos] = await Promise.all([
+    modelo.listarEstructuraDeEvaluaciones(ids),
+    modelo.listarCompromisosDeEvaluaciones(ids),
+  ]);
+  const niveles = await modelo.listarNiveles([...new Set(estructura.map((fila) => fila.id_escala))]);
+
+  const resultados = new Map(
+    [...agruparPor(estructura, "id_evaluacion")].map(([id, filas]) => [
+      id,
+      calcularResultado(armarFormulario(filas, niveles)),
+    ]),
+  );
+
+  return {
+    colaborador: {
+      id_empleado: idColaborador,
+      nombre_completo: empleado ? nombreCompleto({ nombres: empleado.nombres ?? "", apellidos: empleado.apellidos ?? "" }) : null,
+    },
+    ...consolidarHistorial(evaluaciones, resultados, agruparPor(compromisos, "id_evaluacion")),
+  };
+}
+
 module.exports = {
+  obtenerHistorialDesempeno,
   guardarRetroalimentacion,
   listarMisResultados,
   obtenerMiResultado,

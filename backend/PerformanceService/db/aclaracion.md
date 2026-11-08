@@ -65,7 +65,18 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 - Backend: solo el evaluador la registra, y solo cuando ya respondió todas las preguntas obligatorias. La fecha objetivo no puede ser anterior a hoy (hora de Bolivia).
 - Backend: al enviar la evaluación la retroalimentación queda congelada. El colaborador evaluado la consulta en `GET /evaluaciones/mis-resultados[/:id]`, que solo muestra evaluaciones `ENVIADA` y no tiene escritura.
 
+### Consulta de evaluaciones individuales e historial de desempeño
+
+- `GET /evaluaciones/historial/:idEmpleado` devuelve el consolidado del colaborador. Solo cuenta evaluaciones `ENVIADA` de ciclos `CERRADO`: mientras el ciclo sigue activo, otro evaluador todavía puede enviar y el consolidado cambiaría.
+- Puntaje del ciclo: promedio simple de los `puntaje_final` de sus evaluaciones enviadas (un colaborador puede tener varios evaluadores en un ciclo). El desglose por competencia promedia el puntaje de cada competencia entre esas evaluaciones, agrupando por `id_competencia` del catálogo.
+- La evolución agrupa los ciclos por `PERIODOS_EVALUACION` en orden cronológico; si un periodo tiene varios ciclos, su puntaje es el promedio de ellos. Cada punto trae la variación respecto al periodo anterior.
+- La retroalimentación se muestra por evaluación (cada evaluador con sus textos y compromisos), no se mezcla.
+- RBAC: el colaborador solo consulta su propio historial (`X-Empleado-Id` = `:idEmpleado`). Consultar a otra persona exige `X-Rol` de RRHH (`admin` o `gerente`); cualquier otro rol recibe 403 sin que se lean datos. RRHH recibe 404 si el colaborador no está en la réplica de `EMPLEADOS`.
+- Promedios redondeados a 2 decimales, calculados en centésimas.
+
 ## Datos de prueba
+
+- Historial del evaluado 1: periodo `2025-S2` (ciclo cerrado, evaluación `…0127`, 72.22) y periodo `2026-S1` con dos evaluadores (`…0125` 87.78 y `…0128` 85.00, consolidado 86.39).
 
 - `seed.sql` carga datos ficticios para probar KAN-24: una plantilla publicada con 6 preguntas (pesos que suman 100 y una opcional), tres ciclos y seis evaluaciones en distintos estados. No se ejecuta al crear la base ni está montado en `docker-compose.yml`; se corre a mano después de que `init.sql` y `catalogos.sql` crearon la base, y se puede repetir sin duplicar filas.
 - Los empleados del seed son réplicas con id de demostración. Para ver la bandeja con el "Usuario de prueba" del portal, pasa su `id_empleado` de EmployeeService como `-v id_evaluador=<uuid>`; las demás variables (`id_evaluador_2`, `id_creador`, `id_evaluado_1` a `id_evaluado_4`) son opcionales. El encabezado del archivo trae el comando completo.
