@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { calcularEmpleado, validarConsistencia, dosDecimales } = require("../src/utils/calculo");
+const { antiguedadDelColaborador, calcularEmpleado, validarConsistencia, dosDecimales } = require("../src/utils/calculo");
 
 const concepto = (codigo, tipo, valor, extra = {}) => ({
   id_concepto: `c-${codigo}`,
@@ -185,4 +185,76 @@ test("criterio 4: cada renglón lleva su vigencia, base, valor, resultado y orde
   );
   assert.deepEqual(r.renglones.map((x) => x.orden), r.renglones.map((_, i) => i + 1));
   assert.equal(r.renglones[0].codigo, "HABER-BASICO");
+});
+
+const ESCALA = {
+  tramos: [
+    { anios_desde: 2, anios_hasta: 4, porcentaje: 5 },
+    { anios_desde: 5, anios_hasta: 7, porcentaje: 11 },
+    { anios_desde: 8, anios_hasta: null, porcentaje: 18 },
+  ],
+};
+
+test("antigüedad: años al día 1 del mes y porcentaje del tramo de la escala vigente", () => {
+  assert.deepEqual(antiguedadDelColaborador(ESCALA, "2018-02-01", "2026-01-01"), { anios: 7, porcentaje: 11 });
+  assert.deepEqual(antiguedadDelColaborador(ESCALA, "2018-02-01", "2026-02-01"), { anios: 8, porcentaje: 18 });
+  assert.deepEqual(antiguedadDelColaborador(ESCALA, "2025-03-01", "2026-11-01"), { anios: 1, porcentaje: null });
+});
+
+test("antigüedad: sin escala vigente o sin fecha de ingreso → alerta", () => {
+  assert.match(antiguedadDelColaborador(null, "2018-02-01", "2026-11-01").alerta, /escala de antigüedad/);
+  assert.match(antiguedadDelColaborador(ESCALA, null, "2026-11-01").alerta, /fecha de ingreso/);
+  const r = calcularEmpleado(fila({ antiguedad: antiguedadDelColaborador(null, "2018-02-01", "2026-11-01") }), DE_LEY);
+  assert.equal(de(r, "BONO-ANTIGUEDAD"), undefined);
+  assert.match(r.alertas.join(" "), /bono de antigüedad/);
+});
+
+test("criterio 1: el bono de antigüedad suma al total ganado y los aportes van sobre ese total", () => {
+  const r = calcularEmpleado(fila({ antiguedad: { anios: 8, porcentaje: 18 } }), DE_LEY);
+  const bono = de(r, "BONO-ANTIGUEDAD");
+  assert.deepEqual(
+    { tipo: bono.tipo, id_vigencia: bono.id_vigencia, base: bono.base, valor: bono.valor, resultado: bono.resultado },
+    { tipo: "INGRESO", id_vigencia: null, base: 4000, valor: 18, resultado: 720 }
+  );
+  assert.equal(r.total_ganado, 4720);
+  assert.equal(de(r, "SIP-VEJEZ").base, 4720);
+  assert.equal(r.renglones[1].codigo, "BONO-ANTIGUEDAD");
+  assert.deepEqual(r.alertas, []);
+});
+
+test("criterio 1: el bono de antigüedad se prorratea por los días pagados", () => {
+  const r = calcularEmpleado(fila({ dias_pagados: 27, antiguedad: { anios: 3, porcentaje: 5 } }), DE_LEY);
+  assert.equal(de(r, "BONO-ANTIGUEDAD").resultado, 180);
+});
+
+test("criterio 1: por debajo del primer tramo no hay bono ni alerta", () => {
+  const r = calcularEmpleado(fila({ antiguedad: { anios: 1, porcentaje: null } }), DE_LEY);
+  assert.equal(de(r, "BONO-ANTIGUEDAD"), undefined);
+  assert.deepEqual(r.alertas, []);
+});
+
+test("criterio 2: las cuotas de préstamos y anticipos del mes se descuentan por su monto", () => {
+  const cuotas = [
+    { tipo: "PRESTAMO", numero_cuota: 2, monto: 333.33 },
+    { tipo: "ANTICIPO", numero_cuota: 1, monto: 200 },
+  ];
+  const r = calcularEmpleado(fila({ cuotas }), DE_LEY);
+  const renglones = r.renglones.filter((x) => x.codigo === "CUOTA-PRESTAMO");
+  assert.deepEqual(
+    renglones.map((x) => [x.tipo, x.nombre, x.forma_calculo, x.id_vigencia, x.resultado]),
+    [
+      ["DESCUENTO", "Cuota de préstamo", "MONTO_FIJO", null, 333.33],
+      ["DESCUENTO", "Cuota de anticipo de sueldo", "MONTO_FIJO", null, 200],
+    ]
+  );
+  assert.equal(de(r, "SIP-VEJEZ").base, 4000);
+  assert.equal(r.total_descuentos, 1041.73);
+  assert.equal(r.liquido_pagable, 2958.27);
+  assert.deepEqual(r.alertas, []);
+});
+
+test("criterio 3: una cuota mayor al líquido deja el líquido negativo y marca alerta", () => {
+  const r = calcularEmpleado(fila({ cuotas: [{ tipo: "PRESTAMO", numero_cuota: 1, monto: 5000 }] }), DE_LEY);
+  assert.ok(r.liquido_pagable < 0);
+  assert.match(r.alertas.join(" "), /negativo/);
 });
