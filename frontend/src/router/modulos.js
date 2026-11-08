@@ -1,6 +1,8 @@
 import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, SquareKanban, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
+import CiclosEvaluacionPage from "../features/ciclos-evaluacion/CiclosEvaluacionPage";
+import { RUTA_CICLOS } from "../features/ciclos-evaluacion/ciclo";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
 import { RUTA_EVALUACIONES } from "../features/evaluaciones/ruta";
 import BuzonQuejasPage from "../features/quejas/BuzonQuejasPage";
@@ -349,6 +351,15 @@ export const SECCIONES = [
         icono: ClipboardList,
         roles: ["admin"],
         pagina: PlantillasEvaluacionPage,
+      },
+      {
+        ruta: RUTA_CICLOS,
+        parametroOpcional: "idCiclo",
+        etiqueta: "Ciclos de evaluación",
+        descripcion: "Programación de ciclos por periodo, con asignación de evaluadores por área o sucursal y fecha límite.",
+        icono: CalendarRange,
+        roles: ["admin"],
+        pagina: CiclosEvaluacionPage,
       },
       {
         ruta: RUTA_EVALUACIONES,

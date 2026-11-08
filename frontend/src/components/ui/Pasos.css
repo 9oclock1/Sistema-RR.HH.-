@@ -1,0 +1,111 @@
+.ds-pasos {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ds-pasos__paso {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ds-pasos__paso:last-child {
+  flex: 0 1 auto;
+}
+
+/* Línea que une un paso con el siguiente. */
+.ds-pasos__paso:not(:last-child)::after {
+  content: "";
+  flex: 1 1 var(--space-4);
+  min-width: var(--space-4);
+  height: var(--border-width);
+  background: var(--color-border);
+}
+
+.ds-pasos__paso[data-estado="completado"]:not(:last-child)::after {
+  background: var(--color-success);
+}
+
+.ds-pasos__contenido {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-medium);
+}
+
+.ds-pasos__boton {
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: color var(--transition);
+}
+
+.ds-pasos__boton:hover {
+  color: var(--color-text);
+}
+
+.ds-pasos__marca {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-avatar);
+  height: var(--size-avatar);
+  border: var(--border-width) solid var(--color-border-input);
+  border-radius: var(--radius-round);
+  background: var(--color-bg-surface);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  font-weight: var(--font-weight-medium);
+}
+
+.ds-pasos__etiqueta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-pasos__paso[data-estado="actual"] .ds-pasos__contenido {
+  color: var(--color-text);
+}
+
+.ds-pasos__paso[data-estado="actual"] .ds-pasos__marca {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.ds-pasos__paso[data-estado="completado"] .ds-pasos__marca {
+  border-color: var(--color-success);
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+/* En pantallas angostas solo se escribe la etiqueta del paso actual. */
+@media (max-width: 640px) {
+  .ds-pasos__paso:not([data-estado="actual"]) .ds-pasos__etiqueta {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .ds-pasos__paso:not(:last-child)::after {
+    min-width: var(--space-2);
+  }
+}
