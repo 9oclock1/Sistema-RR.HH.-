@@ -1,6 +1,7 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, SquareKanban, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, SquareKanban, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AnticiposPage from "../features/anticipos/AnticiposPage";
+import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
 import MisResultadosPage from "../features/evaluaciones/MisResultadosPage";
@@ -283,6 +284,14 @@ export const SECCIONES = [
         icono: HandCoins,
         roles: ["admin"],
         pagina: AnticiposPage,
+      },
+      {
+        ruta: "/planillas/antiguedad",
+        etiqueta: "Bono de antigüedad",
+        descripcion: "Cálculo del bono por colaborador y parametrización de la escala legal de antigüedad.",
+        icono: Hourglass,
+        roles: ["admin"],
+        pagina: AntiguedadPage,
       },
     ],
   },

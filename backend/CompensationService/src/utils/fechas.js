@@ -25,4 +25,13 @@ const sumarMeses = (fecha, n) => {
   return fechaUtc.toISOString().slice(0, 10);
 };
 
-module.exports = { esFecha, sumarDias, diaAnterior, hoyLaPaz, esPrimerDiaDeMes, sumarMeses };
+// Años completos de servicio a una fecha de referencia (RF-50): cuenta solo los aniversarios ya cumplidos.
+function aniosDeServicio(fechaIngreso, referencia) {
+  const [anioIngreso, mesIngreso, diaIngreso] = fechaIngreso.split("-").map(Number);
+  const [anioRef, mesRef, diaRef] = referencia.split("-").map(Number);
+  let anios = anioRef - anioIngreso;
+  if (mesRef < mesIngreso || (mesRef === mesIngreso && diaRef < diaIngreso)) anios -= 1;
+  return Math.max(anios, 0);
+}
+
+module.exports = { esFecha, sumarDias, diaAnterior, hoyLaPaz, esPrimerDiaDeMes, sumarMeses, aniosDeServicio };

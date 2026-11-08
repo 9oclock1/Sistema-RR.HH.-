@@ -4,6 +4,7 @@ const pool = require("./src/config/db");
 const conceptosRoutes = require("./src/routes/conceptos.routes");
 const condicionesRoutes = require("./src/routes/condiciones.routes");
 const anticiposRoutes = require("./src/routes/anticipos.routes");
+const antiguedadRoutes = require("./src/routes/antiguedad.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 
 const app = express();
@@ -38,6 +39,7 @@ app.get("/health", async (req, res) => {
 app.use(conceptosRoutes);
 app.use(condicionesRoutes);
 app.use(anticiposRoutes);
+app.use(antiguedadRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {

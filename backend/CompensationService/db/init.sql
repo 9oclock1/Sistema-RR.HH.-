@@ -237,3 +237,63 @@ CREATE TABLE CUOTAS_PRESTAMO (
 );
 -- La planilla de un periodo consulta todas las cuotas pendientes de ese mes, de todos los préstamos.
 CREATE INDEX idx_cuotas_periodo_estado ON CUOTAS_PRESTAMO (periodo, estado);
+
+-- Tabla: VIGENCIAS_ESCALA_ANTIGUEDAD
+-- Versiones de la tabla legal de escalas de antigüedad (RF-50). Una vigencia nueva cierra la anterior sin
+-- modificar sus tramos, así los bonos ya calculados en planillas anteriores conservan el porcentaje histórico.
+CREATE TABLE VIGENCIAS_ESCALA_ANTIGUEDAD (
+    id_vigencia UUID NOT NULL DEFAULT gen_random_uuid(),
+    vigente_desde date NOT NULL,
+    vigente_hasta date NULL,
+    motivo varchar(250) NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT VIGENCIAS_ESCALA_ANTIGUEDAD_pk PRIMARY KEY (id_vigencia),
+    CONSTRAINT chk_escala_fechas CHECK (vigente_hasta IS NULL OR vigente_hasta >= vigente_desde),
+    CONSTRAINT ex_escala_sin_solapamiento EXCLUDE USING gist (
+        daterange(vigente_desde, vigente_hasta, '[]') WITH &&
+    )
+);
+-- Tabla: TRAMOS_ANTIGUEDAD
+-- Tramos de años de servicio y su porcentaje de bono, dentro de una vigencia de la escala legal.
+-- anios_hasta NULL = sin tope (el tramo más alto de la escala).
+CREATE TABLE TRAMOS_ANTIGUEDAD (
+    id_tramo UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_vigencia UUID NOT NULL,
+    anios_desde smallint NOT NULL,
+    anios_hasta smallint NULL,
+    porcentaje numeric(5,2) NOT NULL,
+    CONSTRAINT TRAMOS_ANTIGUEDAD_pk PRIMARY KEY (id_tramo),
+    CONSTRAINT fk_tramo_vigencia FOREIGN KEY (id_vigencia)
+        REFERENCES VIGENCIAS_ESCALA_ANTIGUEDAD (id_vigencia) ON DELETE CASCADE,
+    CONSTRAINT chk_tramo_anios_desde CHECK (anios_desde >= 0),
+    CONSTRAINT chk_tramo_rango CHECK (anios_hasta IS NULL OR anios_hasta >= anios_desde),
+    CONSTRAINT chk_tramo_porcentaje CHECK (porcentaje > 0 AND porcentaje <= 100),
+    CONSTRAINT uq_tramo_vigencia_desde UNIQUE (id_vigencia, anios_desde)
+);
+CREATE INDEX idx_tramos_vigencia ON TRAMOS_ANTIGUEDAD (id_vigencia);
+
+-- El bono de antigüedad es un ingreso de la planilla (RF-50, criterio 1); su porcentaje no es fijo por
+-- vigencia de concepto sino que depende del tramo de años de servicio, por lo que no lleva VIGENCIAS_CONCEPTO.
+INSERT INTO CONCEPTOS_PLANILLA (codigo, nombre, descripcion, tipo, forma_calculo, base_calculo, es_de_ley)
+VALUES ('BONO-ANTIGUEDAD', 'Bono de antigüedad', 'Se calcula según los años de servicio y la escala legal vigente.',
+        'INGRESO', 'PORCENTAJE', 'HABER_BASICO', TRUE);
+
+-- datos iniciales
+-- Escala de referencia: ajustar a la tabla legal vigente desde la pantalla de parametrización (RF-50, criterio 3).
+WITH vigencia AS (
+    INSERT INTO VIGENCIAS_ESCALA_ANTIGUEDAD (vigente_desde, motivo)
+    VALUES (DATE '2026-01-01', 'Escala de referencia inicial, pendiente de validar por Administración')
+    RETURNING id_vigencia
+)
+INSERT INTO TRAMOS_ANTIGUEDAD (id_vigencia, anios_desde, anios_hasta, porcentaje)
+SELECT v.id_vigencia, t.anios_desde, t.anios_hasta, t.porcentaje
+FROM vigencia v
+JOIN (VALUES
+    (2, 4, 5.00),
+    (5, 7, 11.00),
+    (8, 10, 18.00),
+    (11, 14, 26.00),
+    (15, 19, 34.00),
+    (20, 24, 42.00),
+    (25, NULL, 50.00)
+) AS t (anios_desde, anios_hasta, porcentaje) ON TRUE;

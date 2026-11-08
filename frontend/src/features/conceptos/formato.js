@@ -14,6 +14,10 @@ export const BASES = {
   TOTAL_GANADO: "Total ganado",
 };
 
+// Conceptos cuyo porcentaje viene de otra pantalla (no de una vigencia manual aquí). Ver
+// ConceptosPage/TablaConceptos: bloquean el botón de Historial y muestran una nota en vez de "Sin vigencia".
+export const CODIGOS_CON_PORCENTAJE_EXTERNO = new Set(["BONO-ANTIGUEDAD"]);
+
 export const opciones = (catalogo) =>
   Object.entries(catalogo).map(([valor, etiqueta]) => ({
     valor,
