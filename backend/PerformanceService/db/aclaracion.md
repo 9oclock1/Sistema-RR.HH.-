@@ -38,6 +38,22 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 - `umbral_brecha` es el puntaje bajo el cual un área se resalta como brecha en ese ciclo. El valor por defecto de 60 es una suposición.
 - Backend: `id_nivel` debe pertenecer a la escala de la pregunta, y la pregunta a la versión del ciclo. Tampoco se editan evaluaciones `ENVIADA` o `VENCIDA`.
 
+### Programación de ciclos y asignaciones (KAN-23)
+
+- No hay tablas nuevas: el ciclo es `CICLOS_EVALUACION` y cada asignación evaluador–evaluado es una fila de `EVALUACIONES`. Todas las reglas de esta sección las valida el servicio.
+- Ciclo: se crea en `PROGRAMADO` con una versión `PUBLICADA`, un periodo, `fecha_inicio` y `fecha_limite`. Las fechas deben estar dentro del periodo, la de inicio no puede ser pasada y el nombre no se repite en el periodo.
+- Estados del ciclo: `PROGRAMADO` pasa a `ACTIVO` cuando llega su `fecha_inicio`, y `ACTIVO` pasa a `CERRADO` cuando se supera su `fecha_limite`. Un ciclo `PROGRAMADO` no aparece en la bandeja del evaluador.
+- Alcance: el administrador elige áreas, sucursales y colaboradores. Área y sucursal se combinan como intersección (por ejemplo, «Cajas de la sucursal Centro»); si se elige solo una de las dos, se toman todos sus colaboradores activos. Los colaboradores elegidos uno por uno se suman a ese resultado sin repetirse.
+- Área de la plantilla: se preselecciona el área destino de la plantilla. Si el alcance incluye colaboradores de otra área, la interfaz muestra una advertencia, pero no se bloquea.
+- Evaluador: se calcula en el servicio con `GET /empleados` y `GET /jerarquia/cargos` de EmployeeService. Es el colaborador activo que ocupa el cargo jefe directo del cargo del evaluado **en la misma sucursal del evaluado**. Si hay más de uno en esa sucursal se toma el primero por apellido y nombre, para que el resultado sea siempre el mismo.
+- Omitidos: el colaborador se omite y se informa el motivo cuando no tiene cargo superior, cuando nadie lo ocupa en su sucursal o cuando él mismo sería su evaluador. Si no queda ninguna asignación, el ciclo no se crea.
+- `EVALUACIONES.id_departamento` e `id_sucursal` guardan el área y la sucursal del evaluado al crear el ciclo, y las filas de `EMPLEADOS`, `DEPARTAMENTOS` y `SUCURSALES` se crean o actualizan en la misma transacción.
+- Si EmployeeService no responde, el ciclo no se crea (no queda a medias).
+- Activación, recordatorio y cierre los hace un job que corre una vez al día (y al arrancar el servicio) con la fecha de La Paz. Cada paso se puede repetir sin efectos duplicados.
+- Recordatorio: los ciclos `ACTIVO` a los que les faltan 3 días o menos para la `fecha_limite` generan un aviso por evaluador con sus evaluaciones `PENDIENTE` o `BORRADOR`. `recordatorio_enviado_en` se llena solo cuando NotificationService confirmó la entrega; si falló, se reintenta en la siguiente ejecución.
+- Cierre: en una sola transacción el ciclo pasa a `CERRADO` con `cerrado_en`, las evaluaciones `PENDIENTE` o `BORRADOR` pasan a `VENCIDA` (las `ENVIADA` no cambian) y se registra en `EVENTOS_SALIENTES` el evento `SOLICITUD_METRICAS_CRM` para el CRM (patrón outbox, ver «Integración con CRM»). La publicación de ese evento en el broker no forma parte de KAN-23.
+- Una evaluación `VENCIDA` no se puede editar ni enviar (KAN-24 responde 409), tanto si el job ya la marcó como si el plazo venció y el job aún no corrió.
+
 ### Cálculo del puntaje final (KAN-24)
 
 - Cada respuesta se convierte a 0-100 con `valor del nivel / valor máximo de su escala × 100`. El máximo es el mayor `valor` de `NIVELES_ESCALA` de esa escala (5 en Likert, 4 en Nivel de cumplimiento).
@@ -48,7 +64,7 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 
 ## Datos de prueba
 
-- `seed.sql` carga datos ficticios para probar KAN-24: una plantilla publicada con 6 preguntas (pesos que suman 100 y una opcional), tres ciclos y seis evaluaciones en distintos estados. No se ejecuta al crear la base ni está montado en `docker-compose.yml`; se corre a mano después de que `init.sql` y `catalogos.sql` crearon la base, y se puede repetir sin duplicar filas.
+- `seed.sql` carga datos ficticios para probar KAN-24: una plantilla publicada con 6 preguntas (pesos que suman 100 y una opcional), tres ciclos y seis evaluaciones en distintos estados. Para KAN-23 agrega cuatro ciclos con sus evaluaciones: dos `PROGRAMADO` (uno que inicia en 15 días y otro que inicia hoy, para probar la activación), un `ACTIVO` que vence en 3 días (con evaluaciones pendientes, en borrador, enviada y ya recordada, y con dos evaluadores distintos) y un `ACTIVO` que venció ayer (para probar el cierre). Estas fechas usan el día de La Paz, no el del servidor de Postgres. No se ejecuta al crear la base ni está montado en `docker-compose.yml`; se corre a mano después de que `init.sql` y `catalogos.sql` crearon la base, y se puede repetir sin duplicar filas.
 - Los empleados del seed son réplicas con id de demostración. Para ver la bandeja con el "Usuario de prueba" del portal, pasa su `id_empleado` de EmployeeService como `-v id_evaluador=<uuid>`; las demás variables (`id_evaluador_2`, `id_creador`, `id_evaluado_1` a `id_evaluado_4`) son opcionales. El encabezado del archivo trae el comando completo.
 
 ## Integración con CRM

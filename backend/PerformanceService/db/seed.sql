@@ -15,6 +15,13 @@
 --   Ciclo "Evaluación de desempeño 2026-S2" (activo)       -> 121 PENDIENTE, 122 BORRADOR (3 respuestas), 124 de otro evaluador
 --   Ciclo "Evaluación de personal nuevo 2026" (activo)     -> 123 PENDIENTE, con una fecha límite más cercana
 --   Ciclo "Evaluación de desempeño 2026-S1" (cerrado)      -> 125 ENVIADA (puntaje 87.78), 126 VENCIDA
+-- Ciclos de KAN-23 (programación, recordatorios y cierre):
+--   "Evaluación de fin de año 2026" (programado, inicia en 15 días)   -> 127, 128 PENDIENTE: aún no aparecen en la bandeja
+--   "Evaluación de inducción 2026" (programado, inicia hoy)           -> 129 PENDIENTE: el job debe activarlo
+--   "Evaluación de campaña de fin de año" (activo, vence en 3 días)   -> 130 PENDIENTE, 131 BORRADOR, 132 PENDIENTE de otro evaluador,
+--                                                                        133 ENVIADA (no se recuerda), 134 PENDIENTE ya recordada (no se repite)
+--   "Evaluación de temporada baja" (activo, venció ayer)              -> 135 PENDIENTE, 136 BORRADOR, 137 ENVIADA: el job debe cerrarlo
+--                                                                        y dejar 135 y 136 como VENCIDA sin tocar 137
 -- La plantilla tiene 6 preguntas con pesos que suman 100; la pregunta 95 es opcional.
 \set ON_ERROR_STOP on
 \if :{?id_evaluador}
@@ -45,6 +52,8 @@
 \else
   \set id_evaluado_4 'f0000000-0000-4000-8000-000000000034'
 \endif
+-- Fecha de hoy en La Paz (la que usa el servicio), para que los ciclos de KAN-23 no se desfasen un día cuando el servidor de Postgres está en UTC.
+\set hoy_bolivia '(CURRENT_TIMESTAMP AT TIME ZONE ''America/La_Paz'')::date'
 BEGIN;
 -- Réplica mínima de EmployeeDB.
 INSERT INTO DEPARTAMENTOS (id_departamento, nombre)
@@ -421,6 +430,207 @@ VALUES -- Ciclo S2 activo: PENDIENTE del evaluador.
         NULL,
         NULL
     ) ON CONFLICT DO NOTHING;
+-- KAN-23: ciclos programados y activos para probar la activación, los recordatorios y el cierre automático.
+INSERT INTO CICLOS_EVALUACION (
+        id_ciclo,
+        id_version,
+        id_periodo,
+        id_estado_ciclo,
+        id_empleado_creador,
+        nombre,
+        fecha_inicio,
+        fecha_limite,
+        cerrado_en
+    )
+VALUES (
+        'f0000000-0000-4000-8000-000000000114',
+        'f0000000-0000-4000-8000-000000000061',
+        'f0000000-0000-4000-8000-000000000042',
+        1,
+        :'id_creador'::uuid,
+        'Evaluación de fin de año 2026',
+        :hoy_bolivia + 15,
+        :hoy_bolivia + 45,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000115',
+        'f0000000-0000-4000-8000-000000000061',
+        'f0000000-0000-4000-8000-000000000042',
+        1,
+        :'id_creador'::uuid,
+        'Evaluación de inducción 2026',
+        :hoy_bolivia,
+        :hoy_bolivia + 30,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000116',
+        'f0000000-0000-4000-8000-000000000061',
+        'f0000000-0000-4000-8000-000000000042',
+        2,
+        :'id_creador'::uuid,
+        'Evaluación de campaña de fin de año',
+        :hoy_bolivia - 27,
+        :hoy_bolivia + 3,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000117',
+        'f0000000-0000-4000-8000-000000000061',
+        'f0000000-0000-4000-8000-000000000042',
+        2,
+        :'id_creador'::uuid,
+        'Evaluación de temporada baja',
+        :hoy_bolivia - 40,
+        :hoy_bolivia - 1,
+        NULL
+    ) ON CONFLICT DO NOTHING;
+INSERT INTO EVALUACIONES (
+        id_evaluacion,
+        id_ciclo,
+        id_empleado_evaluado,
+        id_empleado_evaluador,
+        id_departamento,
+        id_sucursal,
+        id_estado_evaluacion,
+        puntaje_final,
+        enviada_en,
+        recordatorio_enviado_en
+    )
+VALUES
+    (
+        'f0000000-0000-4000-8000-000000000127',
+        'f0000000-0000-4000-8000-000000000114',
+        :'id_evaluado_1'::uuid,
+        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        1,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000128',
+        'f0000000-0000-4000-8000-000000000114',
+        :'id_evaluado_2'::uuid,
+        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        1,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000129',
+        'f0000000-0000-4000-8000-000000000115',
+        :'id_evaluado_3'::uuid,
+        :'id_evaluador_2'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000012',
+        1,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000130',
+        'f0000000-0000-4000-8000-000000000116',
+        :'id_evaluado_1'::uuid,
+        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        1,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000131',
+        'f0000000-0000-4000-8000-000000000116',
+        :'id_evaluado_2'::uuid,
+        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        2,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000132',
+        'f0000000-0000-4000-8000-000000000116',
+        :'id_evaluado_3'::uuid,
+        :'id_evaluador_2'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000012',
+        1,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000133',
+        'f0000000-0000-4000-8000-000000000116',
+        :'id_evaluado_4'::uuid,
+        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000012',
+        3,
+        87.78,
+        CURRENT_TIMESTAMP - INTERVAL '2 days',
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000134',
+        'f0000000-0000-4000-8000-000000000116',
+        :'id_evaluado_1'::uuid,
+        :'id_evaluador_2'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        1,
+        NULL,
+        NULL,
+        CURRENT_TIMESTAMP - INTERVAL '1 day'
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000135',
+        'f0000000-0000-4000-8000-000000000117',
+        :'id_evaluado_1'::uuid,
+        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        1,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000136',
+        'f0000000-0000-4000-8000-000000000117',
+        :'id_evaluado_2'::uuid,
+        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        2,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000137',
+        'f0000000-0000-4000-8000-000000000117',
+        :'id_evaluado_3'::uuid,
+        :'id_evaluador_2'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000012',
+        3,
+        87.78,
+        CURRENT_TIMESTAMP - INTERVAL '4 days',
+        NULL
+    ) ON CONFLICT DO NOTHING;
 -- Respuestas: se indica el valor del nivel y se busca el id_nivel de la escala de cada pregunta.
 INSERT INTO RESPUESTAS_EVALUACION (id_evaluacion, id_pregunta, id_nivel)
 SELECT r.id_evaluacion,
@@ -466,6 +676,77 @@ FROM (
             ),
             (
                 'f0000000-0000-4000-8000-000000000125'::uuid,
+                'f0000000-0000-4000-8000-000000000096'::uuid,
+                3
+            ),
+            -- KAN-23: 131 y 136 (BORRADOR) con dos respuestas; 133 y 137 (ENVIADA) con las mismas respuestas que la 125.
+            (
+                'f0000000-0000-4000-8000-000000000131'::uuid,
+                'f0000000-0000-4000-8000-000000000091'::uuid,
+                4
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000131'::uuid,
+                'f0000000-0000-4000-8000-000000000092'::uuid,
+                3
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000136'::uuid,
+                'f0000000-0000-4000-8000-000000000091'::uuid,
+                2
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000136'::uuid,
+                'f0000000-0000-4000-8000-000000000093'::uuid,
+                3
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000133'::uuid,
+                'f0000000-0000-4000-8000-000000000091'::uuid,
+                5
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000133'::uuid,
+                'f0000000-0000-4000-8000-000000000092'::uuid,
+                4
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000133'::uuid,
+                'f0000000-0000-4000-8000-000000000093'::uuid,
+                4
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000133'::uuid,
+                'f0000000-0000-4000-8000-000000000094'::uuid,
+                5
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000133'::uuid,
+                'f0000000-0000-4000-8000-000000000096'::uuid,
+                3
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000137'::uuid,
+                'f0000000-0000-4000-8000-000000000091'::uuid,
+                5
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000137'::uuid,
+                'f0000000-0000-4000-8000-000000000092'::uuid,
+                4
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000137'::uuid,
+                'f0000000-0000-4000-8000-000000000093'::uuid,
+                4
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000137'::uuid,
+                'f0000000-0000-4000-8000-000000000094'::uuid,
+                5
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000137'::uuid,
                 'f0000000-0000-4000-8000-000000000096'::uuid,
                 3
             )
