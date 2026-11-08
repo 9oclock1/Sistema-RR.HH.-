@@ -303,12 +303,14 @@ CREATE TABLE CALCULOS_PLANILLA (
 CREATE INDEX idx_calculos_planilla_empleado ON CALCULOS_PLANILLA (id_planilla_empleado);
 -- Tabla: EVENTOS_SALIENTES
 -- Bandeja de salida (outbox): el evento se guarda en la misma transacción que la aprobación y se envía
--- después al broker, con reintentos, hasta que se entrega.
+-- después al broker, con reintentos, hasta que se entrega. id_evento es el id_mensaje del mensaje enviado.
+-- destino: CONTABILIDAD (asiento de la planilla, grupo D) o PAGOS (orden de dispersión, grupo A).
 CREATE TABLE EVENTOS_SALIENTES (
     id_evento UUID NOT NULL DEFAULT gen_random_uuid(),
     topico varchar(60) NOT NULL,
     tipo_evento varchar(60) NOT NULL,
     id_planilla UUID NULL,
+    destino varchar(15) NULL,
     carga JSONB NOT NULL,
     estado varchar(10) NOT NULL DEFAULT 'PENDIENTE',
     intentos smallint NOT NULL DEFAULT 0,
@@ -320,10 +322,12 @@ CREATE TABLE EVENTOS_SALIENTES (
     CONSTRAINT fk_evento_planilla FOREIGN KEY (id_planilla) REFERENCES PLANILLAS (id_planilla),
     CONSTRAINT chk_evento_estado CHECK (estado IN ('PENDIENTE', 'ENTREGADO', 'FALLIDO')),
     CONSTRAINT chk_evento_intentos CHECK (intentos >= 0),
-    CONSTRAINT chk_evento_entrega CHECK ((estado = 'ENTREGADO') = (entregado_en IS NOT NULL))
+    CONSTRAINT chk_evento_entrega CHECK ((estado = 'ENTREGADO') = (entregado_en IS NOT NULL)),
+    CONSTRAINT chk_evento_destino CHECK (destino IN ('CONTABILIDAD', 'PAGOS')),
+    CONSTRAINT chk_evento_planilla_destino CHECK ((id_planilla IS NULL) = (destino IS NULL))
 );
 CREATE INDEX idx_eventos_salientes_pendientes ON EVENTOS_SALIENTES (estado, proximo_intento_en);
-CREATE INDEX idx_eventos_salientes_planilla ON EVENTOS_SALIENTES (id_planilla);
+CREATE INDEX idx_eventos_salientes_planilla ON EVENTOS_SALIENTES (id_planilla, destino, creado_en);
 -- datos iniciales
 -- Aportes de ley sobre el total ganado (Ley 065 de Pensiones y seguridad social de corto plazo).
 -- Cuentas contables referenciales: ajustar al plan de cuentas de Contabilidad.

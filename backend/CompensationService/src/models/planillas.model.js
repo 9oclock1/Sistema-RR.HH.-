@@ -177,6 +177,33 @@ async function contarConAlertas(cliente, id) {
   return rows[0].cantidad;
 }
 
+
+// Montos de la planilla por concepto, con la cuenta contable actual del concepto (para el asiento).
+async function conceptosDeIntegracion(cliente, id) {
+  const { rows } = await cliente.query(
+    `SELECT k.tipo, k.codigo, c.cuenta_contable_codigo AS cuenta_codigo, c.cuenta_contable_nombre AS cuenta_nombre,
+            SUM(k.resultado) AS monto
+     FROM calculos_planilla k
+     JOIN planilla_empleados pe USING (id_planilla_empleado)
+     JOIN vigencias_concepto v ON v.id_vigencia = k.id_vigencia
+     JOIN conceptos_planilla c ON c.id_concepto = v.id_concepto
+     WHERE pe.id_planilla = $1
+     GROUP BY k.tipo, k.codigo, c.cuenta_contable_codigo, c.cuenta_contable_nombre
+     ORDER BY k.tipo, k.codigo`,
+    [id]
+  );
+  return rows;
+}
+
+async function empleadosDeIntegracion(cliente, id) {
+  const { rows } = await cliente.query(
+    `SELECT id_empleado, nombre_empleado, numero_documento, total_ganado, total_descuentos, liquido_pagable, total_aportes
+     FROM planilla_empleados WHERE id_planilla = $1 ORDER BY nombre_empleado`,
+    [id]
+  );
+  return rows;
+}
+
 module.exports = {
   listar,
   conceptosVigentes,
@@ -191,4 +218,6 @@ module.exports = {
   aprobar,
   contarEmpleados,
   contarConAlertas,
+  conceptosDeIntegracion,
+  empleadosDeIntegracion,
 };

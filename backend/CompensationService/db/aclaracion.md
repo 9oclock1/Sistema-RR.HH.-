@@ -22,3 +22,68 @@ La base no usa triggers, procedimientos almacenados ni vistas (decisión del equ
 - Los conceptos `HABER-BASICO`, `HORAS-EXTRA`, `DOMINICAL`, `RECARGO-NOCTURNO` y `ANS-*` los calcula el servicio con las novedades del mes; los demás conceptos activos con valor al cierre del mes se aplican a todos los colaboradores, salvo los de condiciones especiales (llegan como bonos).
 - Base: `CERRADA` exige las confirmaciones de Contabilidad y Pagos (`chk_planilla_cierre`).
 - `EVENTOS_SALIENTES` es la bandeja de salida: el evento se guarda en la misma transacción que la aprobación y se envía después.
+- Servicio: no se aprueba si algún concepto con monto en la planilla no tiene cuenta contable (el asiento no se podría armar).
+
+## Integración con Contabilidad (D) y Pagos (A)
+
+Al aprobar la planilla se guardan dos mensajes en `EVENTOS_SALIENTES` y un despachador los publica cada 5 segundos en el tópico de RRHH (`ucb-sis323-sub-f`). Si Pub/Sub no responde, el mensaje sigue pendiente y se reintenta con espera creciente (30 s, 1 min, 2 min… hasta 1 h), sin perderse. Solo un error permanente (tópico inexistente, mensaje rechazado) lo deja `FALLIDO`; se reenvía con `POST /planillas/:id/integraciones/:destino/reenviar`.
+
+Sobre común del equipo (el `id_mensaje` sirve para descartar duplicados; Pub/Sub puede entregar dos veces):
+
+```json
+{
+  "encabezado": {
+    "id_mensaje": "uuid",
+    "origen": { "grupo": "F", "modulo": "RRHH" },
+    "destino": { "grupo": "D", "modulo": "Contabilidad" },
+    "tipo": "PLANILLA_APROBADA_ASIENTO",
+    "fecha": "2026-11-02T14:05:00.000Z",
+    "version_esquema": 1
+  },
+  "datos": { }
+}
+```
+
+Atributos de Pub/Sub (para filtrar sin leer el cuerpo): `id_mensaje`, `origen`, `origen_modulo`, `destino`, `destino_modulo`, `tipo`, `version_esquema`.
+
+### Asiento para Contabilidad: `PLANILLA_APROBADA_ASIENTO` (destino D)
+
+```json
+{
+  "id_planilla": "uuid", "periodo": "2026-10",
+  "aprobada": { "por": { "id_empleado": "uuid", "nombre_completo": "…" }, "en": "2026-11-02T14:05:00.000Z" },
+  "fecha_contable": "2026-10-31",
+  "glosa": "Planilla de sueldos y salarios de octubre de 2026",
+  "moneda": "BOB",
+  "renglones": [
+    { "cuenta": { "codigo": "5.1.1.01", "nombre": "Sueldos y salarios" }, "debe": 25000.00, "haber": 0, "conceptos": ["HABER-BASICO"] },
+    { "cuenta": { "codigo": "5.1.2.01", "nombre": "Cargas sociales patronales" }, "debe": 4177.50, "haber": 0, "conceptos": ["CNS-SALUD", "…"] },
+    { "cuenta": { "codigo": "2.1.3.01", "nombre": "Aportes laborales por pagar" }, "debe": 0, "haber": 3177.50, "conceptos": ["SIP-VEJEZ", "…"] },
+    { "cuenta": { "codigo": "2.1.3.02", "nombre": "Aportes patronales por pagar" }, "debe": 0, "haber": 4177.50, "conceptos": [] },
+    { "cuenta": { "codigo": "2.1.2.01", "nombre": "Sueldos y salarios por pagar" }, "debe": 0, "haber": 21822.50, "conceptos": [] }
+  ],
+  "total_debe": 29177.50, "total_haber": 29177.50,
+  "resumen": { "colaboradores": 8, "total_ganado": 25000.00, "total_descuentos": 3177.50, "liquido_pagable": 21822.50, "total_aportes": 4177.50 }
+}
+```
+
+- Debe: haberes y aportes patronales en la cuenta de cada concepto. Haber: descuentos en la cuenta de cada concepto, los aportes patronales por pagar (2.1.3.02) y el líquido pagable como sueldos por pagar (2.1.2.01). Siempre cuadra.
+- Las cuentas 2.1.2.01 y 2.1.3.02 y las de los conceptos sembrados son referenciales: ajustarlas al plan de cuentas de Contabilidad (las de los conceptos se cambian en Conceptos de pago).
+
+### Orden de dispersión para Pagos: `PLANILLA_APROBADA_ORDEN_PAGO` (destino A)
+
+```json
+{
+  "id_planilla": "uuid", "periodo": "2026-10",
+  "aprobada": { "por": { "id_empleado": "uuid", "nombre_completo": "…" }, "en": "2026-11-02T14:05:00.000Z" },
+  "concepto": "Pago de sueldos de octubre de 2026",
+  "moneda": "BOB",
+  "cantidad_beneficiarios": 8,
+  "total": 21822.50,
+  "beneficiarios": [
+    { "id_empleado": "uuid", "nombre_completo": "Ana Pérez", "numero_documento": "1234567", "monto": 3491.60 }
+  ]
+}
+```
+
+- Un beneficiario por colaborador con líquido mayor a cero. RRHH no guarda cuentas bancarias: Pagos identifica a cada colaborador por `id_empleado` y `numero_documento`.

@@ -1,5 +1,8 @@
+const { randomUUID } = require("node:crypto");
 const pool = require("../config/db");
 const modelo = require("../models/planillas.model");
+const eventos = require("../models/eventos.model");
+const { topicoPropio } = require("./eventos.service");
 const externos = require("./externos.service");
 const condiciones = require("./condiciones.service");
 const { enTransaccion } = require("../config/transaccion");
@@ -8,6 +11,7 @@ const { UUID_RE } = require("../utils/formatos");
 const { hoyLaPaz } = require("../utils/fechas");
 const { CAMPOS_MINUTOS, rangoPlanilla, tramoSinConsolidar, validarResponsable, consolidarPlanilla } = require("../utils/planillas");
 const { calcularEmpleado } = require("../utils/calculo");
+const { DESTINOS, armarMensaje, sinCuenta, armarAsiento, armarOrdenPago } = require("../utils/integraciones");
 
 const PERIODO_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -18,7 +22,26 @@ const nombreMes = (periodo) =>
 const yaAprobada = (periodo) =>
   new ErrorApp(409, `La planilla de ${nombreMes(periodo)} ya fue aprobada: no se puede volver a generar ni modificar.`);
 
-const formatearPlanilla = (p) => ({
+// Último envío a un destino: PENDIENTE (en cola o con reintentos), ENTREGADO a Pub/Sub o FALLIDO (no se reintenta).
+const formatearEnvio = (e) =>
+  e
+    ? {
+        id_mensaje: e.id_evento,
+        estado: e.estado,
+        intentos: e.intentos,
+        ultimo_error: e.ultimo_error,
+        proximo_intento_en: e.estado === "PENDIENTE" ? e.proximo_intento_en : null,
+        entregado_en: e.entregado_en,
+        creado_en: e.creado_en,
+      }
+    : null;
+
+const formatearIntegracion = (p, envio, campo) => ({
+  estado: p[`estado_${campo}`],
+  envio: formatearEnvio(envio),
+});
+
+const formatearPlanilla = (p, envios = {}) => ({
   id_planilla: p.id_planilla,
   periodo: p.periodo,
   fecha_inicio: p.fecha_inicio,
@@ -31,7 +54,10 @@ const formatearPlanilla = (p) => ({
   aprobada: p.aprobada_en
     ? { por: { id_empleado: p.aprobada_por, nombre_completo: p.aprobada_por_nombre }, en: p.aprobada_en }
     : null,
-  integraciones: { contabilidad: p.estado_contabilidad, pagos: p.estado_pagos },
+  integraciones: {
+    contabilidad: formatearIntegracion(p, envios.CONTABILIDAD, "contabilidad"),
+    pagos: formatearIntegracion(p, envios.PAGOS, "pagos"),
+  },
   cerrada_en: p.cerrada_en,
 });
 
@@ -109,8 +135,44 @@ async function listar({ periodo } = {}) {
 async function obtener(id) {
   const planilla = UUID_RE.test(id ?? "") ? await modelo.obtener(pool, id) : undefined;
   if (!planilla) throw noEncontrada();
-  const empleados = (await modelo.listarEmpleados(id)).map(formatearEmpleado);
-  return { ...formatearPlanilla(planilla), totales: totalizar(empleados), empleados };
+  const [filas, envios] = await Promise.all([modelo.listarEmpleados(id), eventos.ultimosDePlanilla(pool, id)]);
+  const empleados = filas.map(formatearEmpleado);
+  return { ...formatearPlanilla(planilla, envios), totales: totalizar(empleados), empleados };
+}
+
+// Criterio 3: mensaje de la planilla aprobada para un destino, con los montos guardados y la cuenta actual de cada
+// concepto. Se guarda en la bandeja de salida dentro de la misma transacción.
+async function registrarEnvio(cliente, id, destino) {
+  // En serie: un mismo cliente de la transacción no ejecuta consultas en paralelo.
+  const planilla = await modelo.obtener(cliente, id);
+  const conceptos = await modelo.conceptosDeIntegracion(cliente, id);
+  const empleados = await modelo.empleadosDeIntegracion(cliente, id);
+  const mes = nombreMes(planilla.periodo);
+  let datos;
+  if (destino === "CONTABILIDAD") {
+    const faltan = sinCuenta(conceptos);
+    if (faltan.length > 0) {
+      throw new ErrorApp(
+        409,
+        `${faltan.length === 1 ? "El concepto" : "Los conceptos"} ${faltan.join(", ")} no ${faltan.length === 1 ? "tiene" : "tienen"} cuenta contable: asígnela en Conceptos de pago para armar el asiento.`
+      );
+    }
+    datos = armarAsiento({ planilla, conceptos, empleados, glosa: `Planilla de sueldos y salarios de ${mes}` });
+    if (datos.total_debe !== datos.total_haber) {
+      throw new ErrorApp(409, `El asiento de la planilla de ${mes} no cuadra: vuelva a generarla.`);
+    }
+  } else {
+    datos = armarOrdenPago({ planilla, empleados, concepto: `Pago de sueldos de ${mes}` });
+  }
+  const idEvento = randomUUID();
+  await eventos.registrar(cliente, {
+    idEvento,
+    topico: topicoPropio(),
+    tipoEvento: DESTINOS[destino].tipo,
+    idPlanilla: id,
+    destino,
+    carga: armarMensaje({ idMensaje: idEvento, destino, fecha: new Date().toISOString(), datos }),
+  });
 }
 
 // El responsable debe ser un colaborador activo de EmployeeService.
@@ -222,8 +284,33 @@ async function aprobar(id, identidad = {}) {
     if (!(await modelo.aprobar(cliente, id, { idEmpleado: idResponsable, nombre }))) {
       throw new ErrorApp(409, `La planilla de ${mes} ya fue aprobada.`);
     }
+    // Criterio 3: el asiento para Contabilidad y la orden de dispersión para Pagos salen con la aprobación.
+    for (const destino of Object.keys(DESTINOS)) await registrarEnvio(cliente, id, destino);
   });
   return obtener(id);
 }
 
-module.exports = { listar, obtener, generar, descartar, aprobar };
+const DESTINO_RUTA = { contabilidad: "CONTABILIDAD", pagos: "PAGOS" };
+const NOMBRE_DESTINO = { CONTABILIDAD: "Contabilidad", PAGOS: "Pagos" };
+
+// Reenvía a un destino el mensaje que Pub/Sub rechazó de forma permanente (por ejemplo, un tópico inexistente).
+async function reenviar(id, destinoRuta, identidad = {}) {
+  const idResponsable = validarResponsable(identidad);
+  const destino = DESTINO_RUTA[destinoRuta];
+  if (!UUID_RE.test(id ?? "") || !destino) throw noEncontrada();
+  responsableEn(await externos.listarPersonal(), idResponsable);
+  await enTransaccion(async (cliente) => {
+    const planilla = await modelo.bloquear(cliente, id);
+    if (!planilla) throw noEncontrada();
+    const mes = nombreMes(planilla.periodo);
+    if (planilla.estado === "BORRADOR") {
+      throw new ErrorApp(409, `La planilla de ${mes} está en borrador: se envía al aprobarla.`);
+    }
+    const envio = (await eventos.ultimosDePlanilla(cliente, id))[destino];
+    if (envio?.estado === "FALLIDO" && (await eventos.reencolar(cliente, envio.id_evento))) return;
+    throw new ErrorApp(409, `El envío a ${NOMBRE_DESTINO[destino]} de la planilla de ${mes} no falló: no hace falta reenviarlo.`);
+  });
+  return obtener(id);
+}
+
+module.exports = { listar, obtener, generar, descartar, aprobar, reenviar };

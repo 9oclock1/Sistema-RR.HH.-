@@ -29,4 +29,8 @@ async function aprobar(req, res) {
   res.json(await servicio.aprobar(req.params.id, identidad(req)));
 }
 
-module.exports = { listar, obtener, generar, descartar, aprobar };
+async function reenviar(req, res) {
+  res.json(await servicio.reenviar(req.params.id, req.params.destino, identidad(req)));
+}
+
+module.exports = { listar, obtener, generar, descartar, aprobar, reenviar };
