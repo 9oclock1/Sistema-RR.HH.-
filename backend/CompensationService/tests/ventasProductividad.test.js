@@ -33,7 +33,7 @@ const regla = (extra) => ({
 const mensaje = (datos, extra = {}) => ({
   encabezado: {
     id_mensaje: "evt-1",
-    origen: { grupo: "E", modulo: "Marketplace y Ventas" },
+    origen: { grupo: "E", modulo: "Ventas y Marketing" },
     destino: { grupo: "F", modulo: "RRHH" },
     tipo: "CIERRE_VENTAS_PERIODO",
     fecha: "2026-11-01T00:00:00.000Z",
@@ -113,7 +113,7 @@ test("leerEventoVentas acepta un cierre de periodo válido y calcula el cumplimi
   assert.equal(lectura.metricas[1].porcentaje_cumplimiento, 60);
 });
 
-test("leerEventoVentas rechaza un mensaje que no viene de Marketplace y Ventas", () => {
+test("leerEventoVentas rechaza un mensaje que no viene de Ventas y Marketing", () => {
   const cuerpo = mensaje(
     { periodo: "2026-11", metricas: [{ id_empleado: ANA, rol: "VENDEDOR", monto_ventas: 1, cuota_asignada: 1 }] },
     { encabezado: { origen: { grupo: "D", modulo: "Contabilidad" } } }
@@ -139,15 +139,51 @@ test("leerEventoVentas rechaza un periodo o métricas inválidas", () => {
   );
 });
 
-test("leerEventoVentas rechaza un colaborador repetido en el mismo mensaje", () => {
+test("leerEventoVentas omite al colaborador repetido pero procesa su primera aparición y al resto", () => {
   const cuerpo = mensaje({
     periodo: "2026-11",
     metricas: [
       { id_empleado: ANA, rol: "VENDEDOR", monto_ventas: 1000, cuota_asignada: 1000 },
       { id_empleado: ANA, rol: "VENDEDOR", monto_ventas: 2000, cuota_asignada: 1000 },
+      { id_empleado: LUIS, rol: "CAJERO", monto_ventas: 500, cuota_asignada: 1000 },
     ],
   });
-  assert.ok(leerEventoVentas(cuerpo).errores.length > 0);
+  const lectura = leerEventoVentas(cuerpo);
+  assert.equal(lectura.errores, undefined);
+  assert.equal(lectura.metricas.length, 2);
+  assert.equal(lectura.metricas[0].monto_ventas, 1000);
+  assert.equal(lectura.omitidos.length, 1);
+  assert.equal(lectura.omitidos[0].id_empleado, ANA);
+});
+
+test("leerEventoVentas rechaza el mensaje solo cuando NINGÚN colaborador queda válido", () => {
+  const cuerpo = mensaje({
+    periodo: "2026-11",
+    metricas: [
+      { id_empleado: "no-es-uuid", rol: "VENDEDOR", monto_ventas: 1000, cuota_asignada: 1000 },
+      { id_empleado: ANA, rol: "GERENTE", monto_ventas: 1000, cuota_asignada: 1000 },
+    ],
+  });
+  const lectura = leerEventoVentas(cuerpo);
+  assert.equal(lectura.metricas, undefined);
+  assert.equal(lectura.errores.length, 2);
+});
+
+test("leerEventoVentas procesa a los colaboradores válidos y omite solo al que tiene datos inválidos", () => {
+  const cuerpo = mensaje({
+    periodo: "2026-11",
+    metricas: [
+      { id_empleado: ANA, rol: "VENDEDOR", monto_ventas: 15000, cuota_asignada: 12000 },
+      { id_empleado: LUIS, rol: "GERENTE", monto_ventas: 1000, cuota_asignada: 1000 },
+    ],
+  });
+  const lectura = leerEventoVentas(cuerpo);
+  assert.equal(lectura.errores, undefined);
+  assert.equal(lectura.metricas.length, 1);
+  assert.equal(lectura.metricas[0].id_empleado, ANA);
+  assert.equal(lectura.omitidos.length, 1);
+  assert.equal(lectura.omitidos[0].id_empleado, LUIS);
+  assert.match(lectura.omitidos[0].motivo, /rol/);
 });
 
 // ---- motor: montoDeRegla / cumpleUmbral ----

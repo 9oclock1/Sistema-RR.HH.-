@@ -51,5 +51,5 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`CompensationService corriendo en http://0.0.0.0:${PORT}`);
 });
 
-// RF-51: se suscribe al cierre de ventas del periodo publicado por Marketplace y Ventas (grupo E).
+// RF-51: se suscribe al cierre de ventas del periodo publicado por Ventas y Marketing (grupo E).
 ventasProductividad.iniciarConsumidor();

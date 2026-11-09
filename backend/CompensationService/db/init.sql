@@ -520,7 +520,7 @@ JOIN (VALUES
 -- Tabla: REGLAS_BONO_PRODUCTIVIDAD
 -- Reglas configurables de bonos variables por cumplimiento de metas (RF-51, KAN-71): venta, puntualidad o
 -- desempeño en caja. Una regla activa por tipo de meta y periodo; "puntualidad" y "desempeño en caja" quedan
--- definidas aquí para cuando existan esas métricas, pero hoy solo Marketplace y Ventas publica datos.
+-- definidas aquí para cuando existan esas métricas, pero hoy solo Ventas y Marketing publica datos.
 CREATE TABLE REGLAS_BONO_PRODUCTIVIDAD (
     id_regla UUID NOT NULL DEFAULT gen_random_uuid(),
     periodo date NOT NULL,
@@ -542,7 +542,7 @@ CREATE TABLE REGLAS_BONO_PRODUCTIVIDAD (
 CREATE INDEX idx_reglas_bono_periodo ON REGLAS_BONO_PRODUCTIVIDAD (periodo);
 
 -- Tabla: EVENTOS_VENTAS_ENTRANTES
--- Bandeja de entrada del cierre de ventas del periodo publicado por Marketplace y Ventas (grupo E). id_mensaje
+-- Bandeja de entrada del cierre de ventas del periodo publicado por Ventas y Marketing (grupo E). id_mensaje
 -- (del remitente) evita procesar dos veces el mismo mensaje (RF-51, criterio 4). RECIBIDO: en proceso o
 -- esperando reintento; PROCESADO: las métricas quedaron registradas; IGNORADO: mensaje repetido o que no es
 -- para RRHH; FALLIDO: inválido o sin procesar tras varios intentos (cola de mensajes fallidos, se reprocesa).
@@ -568,7 +568,7 @@ CREATE INDEX idx_eventos_venta_estado ON EVENTOS_VENTAS_ENTRANTES (estado, recib
 
 -- Tabla: METRICAS_VENTAS_PERIODO
 -- Ventas cerradas y cumplimiento de cuota de cada vendedor y cajero del periodo, tal como las publica
--- Marketplace y Ventas. Una fila por colaborador y periodo; el evento que la trajo queda para trazabilidad.
+-- Ventas y Marketing. Una fila por colaborador y periodo; el evento que la trajo queda para trazabilidad.
 -- Un periodo reenviado (no duplicado, un id_mensaje nuevo con una corrección) reemplaza la fila anterior.
 CREATE TABLE METRICAS_VENTAS_PERIODO (
     id_metrica UUID NOT NULL DEFAULT gen_random_uuid(),

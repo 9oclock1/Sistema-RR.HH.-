@@ -1,6 +1,8 @@
 // Reglas de bono por productividad (RF-51, KAN-71) y el mensaje de cierre de ventas del periodo que publica
-// Marketplace y Ventas (grupo E) para RRHH (grupo F). El formato del sobre (encabezado/datos) es el mismo que
-// usan los demás módulos del ERP (ver EmployeeService/comprasPubSubService y AttendanceService/utils/eventos).
+// Ventas y Marketing (grupo E, projects/project-a96e5fe1-5ba6-4698-a85/topics/ucb-sis323-sub-e) para RRHH
+// (grupo F). El formato del sobre (encabezado/datos) es el mismo que usan los demás módulos del ERP (ver
+// EmployeeService/comprasPubSubService y AttendanceService/utils/eventos); el esquema de "datos" está
+// documentado en db/aclaracion.md.
 const { ErrorApp } = require("./errores");
 const { UUID_RE } = require("./formatos");
 
@@ -104,12 +106,15 @@ function leerMetrica(m, i) {
   };
 }
 
-// Devuelve { errores } si el mensaje no se puede aplicar, o { periodo, metricas } listas para registrar.
+// Devuelve { errores } si el mensaje completo no se puede aplicar (sobre inválido, periodo inválido, sin
+// metricas), o { periodo, metricas, omitidos } si al menos un colaborador es válido. Un dato inválido o
+// repetido en UN colaborador no descarta a los demás (criterio de resiliencia, RF-51): esa fila queda en
+// "omitidos" con el motivo, igual que calcularBonoPlanilla hace con los colaboradores sin contrato vigente.
 function leerEventoVentas(cuerpo) {
   const { encabezado, datos } = cuerpo;
   const errores = [];
   if (encabezado.origen?.grupo !== GRUPO_VENTAS) {
-    errores.push(`El tipo ${encabezado.tipo} solo lo envía el grupo ${GRUPO_VENTAS} (Marketplace y Ventas).`);
+    errores.push(`El tipo ${encabezado.tipo} solo lo envía el grupo ${GRUPO_VENTAS} (Ventas y Marketing).`);
   }
   if (!datos || typeof datos !== "object") {
     errores.push("Falta el bloque datos.");
@@ -124,15 +129,27 @@ function leerEventoVentas(cuerpo) {
   }
   if (errores.length > 0) return { errores };
 
-  const leidas = metricas.map(leerMetrica);
-  const invalidas = leidas.flatMap((m) => m.errores ?? []);
-  if (invalidas.length > 0) return { errores: invalidas };
+  const vistos = new Set();
+  const validas = [];
+  const omitidos = [];
+  metricas.forEach((m, i) => {
+    const leida = leerMetrica(m, i);
+    if (leida.errores) {
+      omitidos.push({ indice: i, id_empleado: typeof m?.id_empleado === "string" ? m.id_empleado : null, motivo: leida.errores.join(" ") });
+      return;
+    }
+    if (vistos.has(leida.id_empleado)) {
+      omitidos.push({ indice: i, id_empleado: leida.id_empleado, motivo: "Colaborador repetido en el mismo mensaje: se usó su primera aparición." });
+      return;
+    }
+    vistos.add(leida.id_empleado);
+    validas.push(leida);
+  });
 
-  const porEmpleado = new Map(leidas.map((m) => [m.id_empleado, m]));
-  if (porEmpleado.size !== leidas.length) errores.push("datos.metricas no puede repetir el mismo id_empleado.");
-  if (errores.length > 0) return { errores };
-
-  return { periodo, metricas: leidas };
+  if (validas.length === 0) {
+    return { errores: omitidos.map((o) => `datos.metricas[${o.indice}]: ${o.motivo}`) };
+  }
+  return { periodo, metricas: validas, omitidos };
 }
 
 // Monto del bono cuando la regla es de monto fijo; en porcentaje lo calcula la planilla sobre el haber básico

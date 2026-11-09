@@ -28,7 +28,42 @@ La base no usa triggers, procedimientos almacenados ni vistas (decisión del equ
 ## Bonos de productividad (RF-51, KAN-71)
 
 - `REGLAS_BONO_PRODUCTIVIDAD`: una regla activa por `periodo` y `tipo_meta` (ventas, puntualidad o desempeño en caja), con su umbral de cumplimiento y su monto fijo o porcentaje. Una regla ya usada en `BONOS_PRODUCTIVIDAD` solo se inactiva, no se elimina (FK sin CASCADE).
-- `EVENTOS_VENTAS_ENTRANTES` es la bandeja de entrada del cierre de ventas del periodo que publica Marketplace y Ventas (grupo E) por Pub/Sub: `id_mensaje` (del remitente) evita procesar dos veces el mismo mensaje (criterio 4). Mismo patrón RECIBIDO/PROCESADO/IGNORADO/FALLIDO que una bandeja de salida, pero de entrada.
+- `EVENTOS_VENTAS_ENTRANTES` es la bandeja de entrada del cierre de ventas del periodo que publica Ventas y Marketing (grupo E) por Pub/Sub: `id_mensaje` (del remitente) evita procesar dos veces el mismo mensaje (criterio 4). Mismo patrón RECIBIDO/PROCESADO/IGNORADO/FALLIDO que una bandeja de salida, pero de entrada.
 - `METRICAS_VENTAS_PERIODO` guarda una fila por colaborador y periodo (clave `periodo, id_empleado`); un cierre reenviado con un `id_mensaje` nuevo (una corrección, no un duplicado) reemplaza la fila anterior del colaborador.
 - El motor (servicio) se ejecuta en la misma transacción que registra las métricas: aplica cada regla activa del periodo a sus métricas y reemplaza los bonos anteriores del periodo en `BONOS_PRODUCTIVIDAD` (solo a quienes superan el umbral, criterio 3). También se puede volver a ejecutar manualmente si una regla cambia después del cierre.
 - `BONO-PRODUCTIVIDAD` es un concepto de ingreso sin vigencia manual (como `BONO-ANTIGUEDAD`): el monto fijo o el porcentaje sobre el haber básico lo define la regla vigente del periodo, y llega a la planilla como bono (igual que `BONOS_CONDICION`).
+
+## Integración con Ventas y Marketing (E)
+
+RRHH se suscribe (no publica) en `projects/project-a96e5fe1-5ba6-4698-a85/topics/ucb-sis323-sub-e`, con la
+suscripción propia `ucb-sis323-sub-e<PUBSUB_SUFIJO_SUSCRIPCION>` (se crea si falta, ver
+`ventasProductividad.service.escuchar`). Mismo sobre común que el resto del ERP:
+
+```json
+{
+  "encabezado": {
+    "id_mensaje": "id propio del remitente (evita procesar dos veces el mismo mensaje)",
+    "origen": { "grupo": "E", "modulo": "Ventas y Marketing" },
+    "destino": { "grupo": "F", "modulo": "RRHH" },
+    "tipo": "CIERRE_VENTAS_PERIODO",
+    "fecha": "2026-11-02T06:00:00.000Z",
+    "version_esquema": 1
+  },
+  "datos": {
+    "periodo": "2026-10",
+    "fecha_inicio": "2026-10-01",
+    "fecha_fin": "2026-10-31",
+    "metricas": [
+      { "id_empleado": "uuid del vendedor o cajero", "rol": "VENDEDOR", "monto_ventas": 15000.00, "cuota_asignada": 12000.00 },
+      { "id_empleado": "uuid del vendedor o cajero", "rol": "CAJERO", "monto_ventas": 6000.00, "cuota_asignada": 10000.00 }
+    ]
+  }
+}
+```
+
+- `datos.periodo` (AAAA-MM) es la clave del cierre; `fecha_inicio`/`fecha_fin` son solo referenciales (el cálculo usa `periodo`, no se validan contra el rango de días del mes).
+- `rol`: `VENDEDOR` o `CAJERO`. `monto_ventas` ≥ 0, `cuota_asignada` > 0; `% cumplimiento = monto_ventas / cuota_asignada × 100`, calculado por RRHH (Ventas no lo envía).
+- Hasta 500 colaboradores por mensaje; mensajes más grandes se parten del lado de Ventas.
+- `EVENTOS_VENTAS_ENTRANTES` guarda cada mensaje una sola vez por `id_mensaje` (los duplicados de Pub/Sub no cambian nada, criterio 4). Un mensaje sin ningún colaborador válido (sobre inválido, periodo inválido, o los datos de todos los colaboradores inválidos) queda `FALLIDO` sin reintentos.
+- Un colaborador con datos inválidos (UUID mal formado, `rol` que no es `VENDEDOR`/`CAJERO`, número faltante o fuera de rango) o repetido en el mismo mensaje no descarta a los demás: ese colaborador queda fuera del cálculo y el motivo se anota en `detalle` del evento (consultable con `GET /bonos-productividad/eventos`), mientras el resto sí recibe su bono. Solo si ningún colaborador del mensaje es válido el evento completo queda `FALLIDO`.
+- Un error pasajero (la base, por ejemplo) se reintenta con nueva entrega (2 s, 4 s, 8 s… hasta 1 min) y tras 5 intentos queda `FALLIDO`: cola de mensajes fallidos con `GET /bonos-productividad/eventos?estado=FALLIDO` y `POST /bonos-productividad/eventos/:id/reprocesar`.

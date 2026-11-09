@@ -212,8 +212,13 @@ async function procesarEventoVentas({ idMensaje, topico, cuerpo }) {
       await modelo.guardarMetricas(cliente, fila.id_evento_entrante, lectura.periodo, lectura.metricas);
       // Criterio 3: el motor de bonos se ejecuta en la misma transacción, con las métricas recién registradas.
       await aplicarReglas(cliente, lectura.periodo);
-      await modelo.cerrar(cliente, fila.id_evento_entrante, { estado: "PROCESADO", periodo: lectura.periodo });
-      return { ack: true };
+      // Un colaborador con datos inválidos no descarta el mensaje: queda aquí para que Ventas lo revise,
+      // mientras los demás colaboradores sí reciben su bono.
+      const detalle = lectura.omitidos?.length
+        ? `${lectura.omitidos.length} colaborador(es) omitido(s): ${lectura.omitidos.map((o) => `[${o.indice}] ${o.motivo}`).join(" ")}`.slice(0, 255)
+        : null;
+      await modelo.cerrar(cliente, fila.id_evento_entrante, { estado: "PROCESADO", periodo: lectura.periodo, detalle });
+      return { ack: true, omitidos: lectura.omitidos };
     });
   } catch (error) {
     console.error(`Error al procesar el cierre de ventas ${registro.idMensaje}:`, error.message);
