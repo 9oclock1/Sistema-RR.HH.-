@@ -3,7 +3,8 @@ const { CON_VIGENCIA } = require("./conceptos.model");
 
 const COLUMNAS_PLANILLA = `p.id_planilla, p.periodo, p.fecha_inicio, p.fecha_fin, p.datos_hasta, p.estado, p.advertencias,
   p.generada_por, p.generada_por_nombre, p.generada_en, p.aprobada_por, p.aprobada_por_nombre, p.aprobada_en,
-  p.estado_contabilidad, p.estado_pagos, p.cerrada_en,
+  p.estado_contabilidad, p.referencia_contabilidad, p.motivo_contabilidad, p.respondida_contabilidad_en,
+  p.estado_pagos, p.referencia_pagos, p.motivo_pagos, p.respondida_pagos_en, p.cerrada_en,
   (SELECT COUNT(*) FROM planilla_empleados pe WHERE pe.id_planilla = p.id_planilla)::int AS colaboradores`;
 
 const COLUMNAS_EMPLEADO = [
@@ -82,7 +83,11 @@ async function bloquearPeriodo(cliente, periodo) {
 }
 
 async function bloquear(cliente, id) {
-  const { rows } = await cliente.query("SELECT id_planilla, periodo, estado, datos_hasta, fecha_fin FROM planillas WHERE id_planilla = $1 FOR UPDATE", [id]);
+  const { rows } = await cliente.query(
+    `SELECT id_planilla, periodo, estado, datos_hasta, fecha_fin, estado_contabilidad, estado_pagos
+     FROM planillas WHERE id_planilla = $1 FOR UPDATE`,
+    [id]
+  );
   return rows[0];
 }
 
@@ -177,6 +182,71 @@ async function contarConAlertas(cliente, id) {
   return rows[0].cantidad;
 }
 
+
+// Montos de la planilla por concepto, con la cuenta contable actual del concepto (para el asiento).
+async function conceptosDeIntegracion(cliente, id) {
+  const { rows } = await cliente.query(
+    `SELECT k.tipo, k.codigo, c.cuenta_contable_codigo AS cuenta_codigo, c.cuenta_contable_nombre AS cuenta_nombre,
+            SUM(k.resultado) AS monto
+     FROM calculos_planilla k
+     JOIN planilla_empleados pe USING (id_planilla_empleado)
+     LEFT JOIN vigencias_concepto v ON v.id_vigencia = k.id_vigencia
+     LEFT JOIN conceptos_planilla c ON c.id_concepto = v.id_concepto OR (k.id_vigencia IS NULL AND c.codigo = k.codigo)
+     WHERE pe.id_planilla = $1
+     GROUP BY k.tipo, k.codigo, c.cuenta_contable_codigo, c.cuenta_contable_nombre
+     ORDER BY k.tipo, k.codigo`,
+    [id]
+  );
+  return rows;
+}
+
+async function empleadosDeIntegracion(cliente, id) {
+  const { rows } = await cliente.query(
+    `SELECT id_empleado, nombre_empleado, numero_documento, total_ganado, total_descuentos, liquido_pagable, total_aportes
+     FROM planilla_empleados WHERE id_planilla = $1 ORDER BY nombre_empleado`,
+    [id]
+  );
+  return rows;
+}
+
+
+// Columnas de la respuesta de cada destino (nombres fijos, no vienen del usuario).
+const CAMPO_DESTINO = { CONTABILIDAD: "contabilidad", PAGOS: "pagos" };
+
+// Respuesta de Contabilidad o Pagos. Una integración confirmada ya no cambia.
+async function responder(cliente, id, destino, { resultado, referencia, motivo }) {
+  const c = CAMPO_DESTINO[destino];
+  const { rowCount } = await cliente.query(
+    `UPDATE planillas
+     SET estado_${c} = $2, referencia_${c} = $3, motivo_${c} = $4, respondida_${c}_en = CURRENT_TIMESTAMP
+     WHERE id_planilla = $1 AND estado = 'APROBADA' AND estado_${c} <> 'CONFIRMADA'`,
+    [id, resultado, referencia, motivo]
+  );
+  return rowCount === 1;
+}
+
+// Criterio 4: con las dos confirmaciones, la planilla se cierra.
+async function cerrarSiConfirmada(cliente, id) {
+  const { rowCount } = await cliente.query(
+    `UPDATE planillas SET estado = 'CERRADA', cerrada_en = CURRENT_TIMESTAMP
+     WHERE id_planilla = $1 AND estado = 'APROBADA' AND estado_contabilidad = 'CONFIRMADA' AND estado_pagos = 'CONFIRMADA'`,
+    [id]
+  );
+  return rowCount === 1;
+}
+
+// Antes de reenviar a un destino que rechazó: vuelve a pendiente y borra el motivo.
+async function reabrirIntegracion(cliente, id, destino) {
+  const c = CAMPO_DESTINO[destino];
+  const { rowCount } = await cliente.query(
+    `UPDATE planillas
+     SET estado_${c} = 'PENDIENTE', referencia_${c} = NULL, motivo_${c} = NULL, respondida_${c}_en = NULL
+     WHERE id_planilla = $1 AND estado = 'APROBADA' AND estado_${c} = 'RECHAZADA'`,
+    [id]
+  );
+  return rowCount === 1;
+}
+
 module.exports = {
   listar,
   conceptosVigentes,
@@ -191,4 +261,9 @@ module.exports = {
   aprobar,
   contarEmpleados,
   contarConAlertas,
+  conceptosDeIntegracion,
+  empleadosDeIntegracion,
+  responder,
+  cerrarSiConfirmada,
+  reabrirIntegracion,
 };

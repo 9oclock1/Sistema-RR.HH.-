@@ -140,6 +140,7 @@ services:
     volumes:
       - ./backend/CompensationService:/app
       - /app/node_modules
+      - ./credentials:/credentials:ro
     depends_on:
       - postgres
     networks:

@@ -17,3 +17,10 @@ export const generarPlanilla = (periodo, identidad) =>
 
 export const descartarPlanilla = (id, identidad) =>
   solicitar(`${RUTA}/${id}`, { metodo: "DELETE", cabeceras: cabeceras(identidad) });
+
+export const aprobarPlanilla = (id, identidad) =>
+  solicitar(`${RUTA}/${id}/aprobar`, { metodo: "POST", cabeceras: cabeceras(identidad) });
+
+// destino: "contabilidad" o "pagos".
+export const reenviarIntegracion = (id, destino, identidad) =>
+  solicitar(`${RUTA}/${id}/integraciones/${destino}/reenviar`, { metodo: "POST", cabeceras: cabeceras(identidad) });
