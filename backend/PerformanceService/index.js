@@ -7,6 +7,7 @@ const competenciasRoutes = require("./src/routes/competenciasRoutes");
 const escalasRoutes = require("./src/routes/escalasRoutes");
 const quejasRoutes = require("./src/routes/quejasRoutes");
 const ciclosRoutes = require("./src/routes/ciclosRoutes");
+const desempenoRoutes = require("./src/routes/desempenoRoutes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 const { iniciarCronCiclos } = require("./src/jobs/ciclosEvaluacionCron");
 
@@ -46,6 +47,7 @@ app.use(quejasRoutes);
 app.use(competenciasRoutes);
 app.use(escalasRoutes);
 app.use(ciclosRoutes);
+app.use(desempenoRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
