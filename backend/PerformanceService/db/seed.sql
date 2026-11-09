@@ -1,14 +1,11 @@
 -- Datos de prueba de PerformanceDB
 -- Requiere init.sql y catalogos.sql, que se cargan solos al crear la base.
--- NO formatear con un formateador de SQL: los comandos de psql (\set, \if, \else, \endif) deben ir
--- cada uno en su propia línea y el formateador los une y rompe el archivo.
+-- Es SQL puro (sin comandos de psql): se puede correr desde SQLTools, DBeaver o psql.
 -- Uso (PowerShell):
 --   Get-Content backend/PerformanceService/db/seed.sql | docker exec -i rrhh-postgres psql -U adminRRHH -d PerformanceDB
---
--- Para que la bandeja salga con TU usuario de prueba del portal, pasa su id_empleado (el de
--- EmployeeService) como evaluador. Las demás variables son opcionales:
---   ... psql -U adminRRHH -d PerformanceDB -v id_evaluador=<uuid> -v id_evaluado_1=<uuid> ...
--- Variables: id_evaluador, id_evaluador_2, id_creador, id_evaluado_1 .. id_evaluado_4.
+-- Los ids de personas, áreas y sucursales son los mismos de EmployeeService/db/seed.sql (cárguelo primero):
+--   evaluadores 21 (Marcela Quiroga, Sopocachi) y 22 (Jorge Mamani, Miraflores), creador 23, evaluados 31 a 34.
+-- Las fechas de los ciclos se calculan respecto de hoy en La Paz cada vez que se ejecuta.
 -- Los nombres de los empleados son de demostración; el servicio los actualiza desde EmployeeService.
 --
 -- Qué queda cargado (el evaluador es id_evaluador salvo la evaluación 124):
@@ -23,37 +20,6 @@
 --   "Evaluación de temporada baja" (activo, venció ayer)              -> 135 PENDIENTE, 136 BORRADOR, 137 ENVIADA: el job debe cerrarlo
 --                                                                        y dejar 135 y 136 como VENCIDA sin tocar 137
 -- La plantilla tiene 6 preguntas con pesos que suman 100; la pregunta 95 es opcional.
-\set ON_ERROR_STOP on
-\if :{?id_evaluador}
-\else
-  \set id_evaluador 'f0000000-0000-4000-8000-000000000021'
-\endif
-\if :{?id_evaluador_2}
-\else
-  \set id_evaluador_2 'f0000000-0000-4000-8000-000000000022'
-\endif
-\if :{?id_creador}
-\else
-  \set id_creador 'f0000000-0000-4000-8000-000000000023'
-\endif
-\if :{?id_evaluado_1}
-\else
-  \set id_evaluado_1 'f0000000-0000-4000-8000-000000000031'
-\endif
-\if :{?id_evaluado_2}
-\else
-  \set id_evaluado_2 'f0000000-0000-4000-8000-000000000032'
-\endif
-\if :{?id_evaluado_3}
-\else
-  \set id_evaluado_3 'f0000000-0000-4000-8000-000000000033'
-\endif
-\if :{?id_evaluado_4}
-\else
-  \set id_evaluado_4 'f0000000-0000-4000-8000-000000000034'
-\endif
--- Fecha de hoy en La Paz (la que usa el servicio), para que los ciclos de KAN-23 no se desfasen un día cuando el servidor de Postgres está en UTC.
-\set hoy_bolivia '(CURRENT_TIMESTAMP AT TIME ZONE ''America/La_Paz'')::date'
 BEGIN;
 -- Réplica mínima de EmployeeDB.
 INSERT INTO DEPARTAMENTOS (id_departamento, nombre)
@@ -75,18 +41,18 @@ VALUES (
         'Miraflores'
     ) ON CONFLICT DO NOTHING;
 INSERT INTO EMPLEADOS (id_empleado, nombres, apellidos)
-VALUES (:'id_evaluador'::uuid, 'Marcela', 'Quiroga Peña'),
+VALUES ('f0000000-0000-4000-8000-000000000021'::uuid, 'Marcela', 'Quiroga Peña'),
     (
-        :'id_evaluador_2'::uuid,
+        'f0000000-0000-4000-8000-000000000022'::uuid,
         'Jorge',
         'Mamani Condori'
     ),
-    (:'id_creador'::uuid, 'Andrea', 'Salazar Vega'),
-    (:'id_evaluado_1'::uuid, 'Carlos', 'Rojas Vargas'),
-    (:'id_evaluado_2'::uuid, 'Lucía', 'Flores Choque'),
-    (:'id_evaluado_3'::uuid, 'Diego', 'Quispe Mamani'),
+    ('f0000000-0000-4000-8000-000000000023'::uuid, 'Andrea', 'Salazar Vega'),
+    ('f0000000-0000-4000-8000-000000000031'::uuid, 'Carlos', 'Rojas Vargas'),
+    ('f0000000-0000-4000-8000-000000000032'::uuid, 'Lucía', 'Flores Choque'),
+    ('f0000000-0000-4000-8000-000000000033'::uuid, 'Diego', 'Quispe Mamani'),
     (
-        :'id_evaluado_4'::uuid,
+        'f0000000-0000-4000-8000-000000000034'::uuid,
         'Paola',
         'Gutiérrez Limachi'
     ) ON CONFLICT DO NOTHING;
@@ -140,7 +106,7 @@ INSERT INTO PLANTILLAS_EVALUACION (
 VALUES (
         'f0000000-0000-4000-8000-000000000051',
         'f0000000-0000-4000-8000-000000000001',
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de personal de tienda',
         'Medir la atención al cliente, el trabajo en equipo y la puntualidad del personal de tienda.',
         '2026-01-01',
@@ -158,7 +124,7 @@ VALUES (
         'f0000000-0000-4000-8000-000000000061',
         'f0000000-0000-4000-8000-000000000051',
         2,
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         1,
         '2026-01-10 09:00:00-04'
     ) ON CONFLICT DO NOTHING;
@@ -298,7 +264,7 @@ VALUES (
         'f0000000-0000-4000-8000-000000000061',
         'f0000000-0000-4000-8000-000000000042',
         2,
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de desempeño 2026-S2',
         CURRENT_DATE - 20,
         CURRENT_DATE + 25,
@@ -309,7 +275,7 @@ VALUES (
         'f0000000-0000-4000-8000-000000000061',
         'f0000000-0000-4000-8000-000000000042',
         2,
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de personal nuevo 2026',
         CURRENT_DATE - 10,
         CURRENT_DATE + 7,
@@ -320,7 +286,7 @@ VALUES (
         'f0000000-0000-4000-8000-000000000061',
         'f0000000-0000-4000-8000-000000000041',
         3,
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de desempeño 2026-S1',
         '2026-06-01',
         '2026-07-03',
@@ -344,8 +310,8 @@ VALUES -- Ciclo S2 activo: PENDIENTE del evaluador.
     (
         'f0000000-0000-4000-8000-000000000121',
         'f0000000-0000-4000-8000-000000000111',
-        :'id_evaluado_1'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         1,
@@ -359,8 +325,8 @@ VALUES -- Ciclo S2 activo: PENDIENTE del evaluador.
     (
         'f0000000-0000-4000-8000-000000000122',
         'f0000000-0000-4000-8000-000000000111',
-        :'id_evaluado_2'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000032'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         2,
@@ -374,8 +340,8 @@ VALUES -- Ciclo S2 activo: PENDIENTE del evaluador.
     (
         'f0000000-0000-4000-8000-000000000123',
         'f0000000-0000-4000-8000-000000000113',
-        :'id_evaluado_3'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000033'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000012',
         1,
@@ -389,8 +355,8 @@ VALUES -- Ciclo S2 activo: PENDIENTE del evaluador.
     (
         'f0000000-0000-4000-8000-000000000124',
         'f0000000-0000-4000-8000-000000000111',
-        :'id_evaluado_4'::uuid,
-        :'id_evaluador_2'::uuid,
+        'f0000000-0000-4000-8000-000000000034'::uuid,
+        'f0000000-0000-4000-8000-000000000022'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000012',
         1,
@@ -404,8 +370,8 @@ VALUES -- Ciclo S2 activo: PENDIENTE del evaluador.
     (
         'f0000000-0000-4000-8000-000000000125',
         'f0000000-0000-4000-8000-000000000112',
-        :'id_evaluado_1'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         3,
@@ -419,8 +385,8 @@ VALUES -- Ciclo S2 activo: PENDIENTE del evaluador.
     (
         'f0000000-0000-4000-8000-000000000126',
         'f0000000-0000-4000-8000-000000000112',
-        :'id_evaluado_2'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000032'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         4,
@@ -447,10 +413,10 @@ VALUES (
         'f0000000-0000-4000-8000-000000000061',
         'f0000000-0000-4000-8000-000000000042',
         1,
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de fin de año 2026',
-        :hoy_bolivia + 15,
-        :hoy_bolivia + 45,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date + 15,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date + 45,
         NULL
     ),
     (
@@ -458,10 +424,10 @@ VALUES (
         'f0000000-0000-4000-8000-000000000061',
         'f0000000-0000-4000-8000-000000000042',
         1,
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de inducción 2026',
-        :hoy_bolivia,
-        :hoy_bolivia + 30,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date + 30,
         NULL
     ),
     (
@@ -469,10 +435,10 @@ VALUES (
         'f0000000-0000-4000-8000-000000000061',
         'f0000000-0000-4000-8000-000000000042',
         2,
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de campaña de fin de año',
-        :hoy_bolivia - 27,
-        :hoy_bolivia + 3,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date - 27,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date + 3,
         NULL
     ),
     (
@@ -480,10 +446,10 @@ VALUES (
         'f0000000-0000-4000-8000-000000000061',
         'f0000000-0000-4000-8000-000000000042',
         2,
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de temporada baja',
-        :hoy_bolivia - 40,
-        :hoy_bolivia - 1,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date - 40,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date - 1,
         NULL
     ) ON CONFLICT DO NOTHING;
 INSERT INTO EVALUACIONES (
@@ -502,8 +468,8 @@ VALUES
     (
         'f0000000-0000-4000-8000-000000000127',
         'f0000000-0000-4000-8000-000000000114',
-        :'id_evaluado_1'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         1,
@@ -514,8 +480,8 @@ VALUES
     (
         'f0000000-0000-4000-8000-000000000128',
         'f0000000-0000-4000-8000-000000000114',
-        :'id_evaluado_2'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000032'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         1,
@@ -526,8 +492,8 @@ VALUES
     (
         'f0000000-0000-4000-8000-000000000129',
         'f0000000-0000-4000-8000-000000000115',
-        :'id_evaluado_3'::uuid,
-        :'id_evaluador_2'::uuid,
+        'f0000000-0000-4000-8000-000000000033'::uuid,
+        'f0000000-0000-4000-8000-000000000022'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000012',
         1,
@@ -538,8 +504,8 @@ VALUES
     (
         'f0000000-0000-4000-8000-000000000130',
         'f0000000-0000-4000-8000-000000000116',
-        :'id_evaluado_1'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         1,
@@ -550,8 +516,8 @@ VALUES
     (
         'f0000000-0000-4000-8000-000000000131',
         'f0000000-0000-4000-8000-000000000116',
-        :'id_evaluado_2'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000032'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         2,
@@ -562,8 +528,8 @@ VALUES
     (
         'f0000000-0000-4000-8000-000000000132',
         'f0000000-0000-4000-8000-000000000116',
-        :'id_evaluado_3'::uuid,
-        :'id_evaluador_2'::uuid,
+        'f0000000-0000-4000-8000-000000000033'::uuid,
+        'f0000000-0000-4000-8000-000000000022'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000012',
         1,
@@ -574,8 +540,8 @@ VALUES
     (
         'f0000000-0000-4000-8000-000000000133',
         'f0000000-0000-4000-8000-000000000116',
-        :'id_evaluado_4'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000034'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000012',
         3,
@@ -586,8 +552,8 @@ VALUES
     (
         'f0000000-0000-4000-8000-000000000134',
         'f0000000-0000-4000-8000-000000000116',
-        :'id_evaluado_1'::uuid,
-        :'id_evaluador_2'::uuid,
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000022'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         1,
@@ -598,8 +564,8 @@ VALUES
     (
         'f0000000-0000-4000-8000-000000000135',
         'f0000000-0000-4000-8000-000000000117',
-        :'id_evaluado_1'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         1,
@@ -610,8 +576,8 @@ VALUES
     (
         'f0000000-0000-4000-8000-000000000136',
         'f0000000-0000-4000-8000-000000000117',
-        :'id_evaluado_2'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000032'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         2,
@@ -622,8 +588,8 @@ VALUES
     (
         'f0000000-0000-4000-8000-000000000137',
         'f0000000-0000-4000-8000-000000000117',
-        :'id_evaluado_3'::uuid,
-        :'id_evaluador_2'::uuid,
+        'f0000000-0000-4000-8000-000000000033'::uuid,
+        'f0000000-0000-4000-8000-000000000022'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000012',
         3,
