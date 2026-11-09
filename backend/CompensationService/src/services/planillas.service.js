@@ -232,8 +232,9 @@ async function generar(datos = {}, identidad = {}) {
     externos.listarLicencias(rango.desde, rango.datos_hasta),
   ]);
   const nombreResponsable = responsableEn(personal, idResponsable);
-  // Los bonos por condiciones especiales se vuelven a procesar para reflejar las jornadas y asignaciones actuales.
-  const { bonos } = await condiciones.procesar({ periodo });
+  // Los bonos por condiciones especiales se vuelven a procesar para reflejar las jornadas y asignaciones
+  // actuales; la identidad queda en la auditoría de bonos (RF-53) como quien disparó el reproceso.
+  const { bonos } = await condiciones.procesar({ periodo }, { idEmpleado: idResponsable, rol: identidad.rol });
 
   const consolidado = consolidarPlanilla({ personal, contratos, asistencia, horasExtra, licencias, bonos }, rango);
   const { advertencias } = consolidado;

@@ -2,6 +2,7 @@ const pool = require("../config/db");
 const modelo = require("../models/condiciones.model");
 const conceptos = require("../models/conceptos.model");
 const planillas = require("../models/planillas.model");
+const bonificaciones = require("./bonificaciones.service");
 const externos = require("./externos.service");
 const { traducirErrorBD, formatear: formatearConcepto } = require("./conceptos.service");
 const { enTransaccion } = require("../config/transaccion");
@@ -132,7 +133,9 @@ async function nombresDe(bonos) {
 }
 
 // Detecta trasnoches y feriados en las jornadas marcadas del mes y aplica las asignaciones vigentes.
-async function procesar({ periodo } = {}) {
+// identidad: quién dispara el reproceso (el Administrador que genera la planilla, o quien llama a
+// /condiciones/procesar directamente), para la auditoría de bonos (RF-53, KAN-73).
+async function procesar({ periodo } = {}, identidad = {}) {
   const rango = rangoPeriodo(periodo, hoyLaPaz());
   const [planilla] = await planillas.listar(periodo);
   if (planilla && planilla.estado !== "BORRADOR") {
@@ -153,8 +156,15 @@ async function procesar({ periodo } = {}) {
     ...bonosAsignados(condiciones, asignaciones, rango),
   ];
   await enTransaccion(async (cliente) => {
+    // El candado se toma antes de leer el proceso anterior, para que la comparación de la auditoría no se
+    // cruce con otro reproceso del mismo mes.
+    await modelo.adquirirCandadoPeriodo(cliente, periodo);
+    const procesoAnterior = await modelo.obtenerProceso(periodo, cliente);
+    const anteriores = procesoAnterior ? await modelo.listarBonos(procesoAnterior.id_proceso, cliente) : [];
+
     const idProceso = await modelo.reemplazarProceso(cliente, { periodo, ...rango, jornadas: jornadas.length });
     await modelo.guardarBonos(cliente, idProceso, bonos);
+    await bonificaciones.registrarCambios(cliente, { anteriores, nuevos: bonos, periodo, identidad });
   });
   return listarBonos({ periodo });
 }

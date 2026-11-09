@@ -567,3 +567,43 @@ JOIN (VALUES
     ('ANS-25000', 5.00),
     ('ANS-35000', 10.00)
 ) AS v (codigo, valor) USING (codigo);
+
+-- Tabla: AUDITORIA_BONIFICACIONES
+-- Auditoría de altas, modificaciones y anulaciones de bonos (RF-53, KAN-73). bonos_condicion se reemplaza por
+-- completo en cada reproceso del periodo (ver reemplazarProceso), así que esta tabla es la única que conserva
+-- quién cambió qué y cuál era el valor anterior: el servicio compara los bonos del proceso anterior con los
+-- nuevos (misma condición, colaborador, vigencia y asignación) y solo registra una fila cuando algo cambió.
+-- tipo_bono queda listo para otras fuentes de bono (hoy solo CONDICION persiste bonos por colaborador).
+CREATE TABLE AUDITORIA_BONIFICACIONES (
+    id_auditoria UUID NOT NULL DEFAULT gen_random_uuid(),
+    tipo_bono varchar(20) NOT NULL,
+    id_condicion UUID NULL,
+    id_asignacion UUID NULL,
+    periodo char(7) NOT NULL,
+    id_empleado UUID NOT NULL,
+    nombre_empleado varchar(150) NOT NULL,
+    accion varchar(15) NOT NULL,
+    valor_anterior numeric(12,4) NULL,
+    valor_nuevo numeric(12,4) NULL,
+    monto_anterior numeric(12,2) NULL,
+    monto_nuevo numeric(12,2) NULL,
+    factor_anterior numeric(10,6) NULL,
+    factor_nuevo numeric(10,6) NULL,
+    realizado_por UUID NULL,
+    realizado_por_rol varchar(20) NULL,
+    realizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT AUDITORIA_BONIFICACIONES_pk PRIMARY KEY (id_auditoria),
+    CONSTRAINT fk_auditoria_condicion FOREIGN KEY (id_condicion) REFERENCES CONDICIONES_ESPECIALES (id_condicion),
+    CONSTRAINT fk_auditoria_asignacion FOREIGN KEY (id_asignacion)
+        REFERENCES ASIGNACIONES_CONDICION (id_asignacion) ON DELETE SET NULL,
+    CONSTRAINT chk_auditoria_tipo_bono CHECK (tipo_bono IN ('CONDICION')),
+    CONSTRAINT chk_auditoria_accion CHECK (accion IN ('ALTA', 'MODIFICACION', 'ANULACION')),
+    -- Alta: solo hay valor nuevo. Anulación: solo hay valor anterior. Modificación: hay ambos.
+    CONSTRAINT chk_auditoria_valores CHECK (
+        (accion = 'ALTA' AND valor_anterior IS NULL AND valor_nuevo IS NOT NULL)
+        OR (accion = 'ANULACION' AND valor_anterior IS NOT NULL AND valor_nuevo IS NULL)
+        OR (accion = 'MODIFICACION' AND valor_anterior IS NOT NULL AND valor_nuevo IS NOT NULL)
+    )
+);
+CREATE INDEX idx_auditoria_empleado ON AUDITORIA_BONIFICACIONES (id_empleado, periodo);
+CREATE INDEX idx_auditoria_periodo_tipo ON AUDITORIA_BONIFICACIONES (periodo, tipo_bono);
