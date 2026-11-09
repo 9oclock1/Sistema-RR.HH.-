@@ -1,10 +1,13 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, History, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, SquareKanban, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, SquareKanban, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
+import AnticiposPage from "../features/anticipos/AnticiposPage";
+import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import CiclosEvaluacionPage from "../features/ciclos-evaluacion/CiclosEvaluacionPage";
 import { RUTA_CICLOS } from "../features/ciclos-evaluacion/ciclo";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
-import { RUTA_EVALUACIONES } from "../features/evaluaciones/ruta";
+import MisResultadosPage from "../features/evaluaciones/MisResultadosPage";
+import { RUTA_EVALUACIONES, RUTA_MIS_RESULTADOS } from "../features/evaluaciones/ruta";
 import BuzonQuejasPage from "../features/quejas/BuzonQuejasPage";
 import ConsultarQuejaPage from "../features/quejas/ConsultarQuejaPage";
 import { RUTA_BUZON_QUEJAS, RUTA_CONSULTAR_QUEJA } from "../features/quejas/reglas";
@@ -13,6 +16,8 @@ import MisCasosQuejaPage from "../features/quejas/casos/MisCasosQuejaPage";
 import { RUTA_CASOS_QUEJA, RUTA_MIS_CASOS_QUEJA } from "../features/quejas/casos/casos";
 import HistorialQuejasPage from "../features/quejas/historial/HistorialQuejasPage";
 import { RUTA_HISTORIAL_QUEJAS } from "../features/quejas/historial/historial";
+import PlantillasEvaluacionPage from "../features/plantillas-evaluacion/PlantillasEvaluacionPage";
+import { RUTA_PLANTILLAS } from "../features/plantillas-evaluacion/ruta";
 import AsignacionesView from "../features/Asignaciones/AsignacionesView";
 import BandejaJustificacionesPage from "../features/justificaciones/BandejaJustificacionesPage";
 import ApplicantRegistration from "../features/recruitment/ApplicantRegistration";
@@ -23,6 +28,7 @@ import NotificacionesPage from "../features/notificaciones/NotificacionesPage";
 import CargosList from "../features/Cargos/CargosList";
 import ConceptosPage from "../features/conceptos/ConceptosPage";
 import CondicionesPage from "../features/condiciones/CondicionesPage";
+import PlanillaMensualPage from "../features/planillas/PlanillaMensualPage";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import ContratosView from "../features/Contratos/ContratosView";
 import { RUTA_CONTRATOS } from "../features/Contratos/utils/opciones";
@@ -37,7 +43,6 @@ import MisMemorandumsPage from "../features/Memorandums/acuses/MisMemorandumsPag
 import MiAsistenciaPage from "../features/mi-asistencia/MiAsistenciaPage";
 import OrganigramaView from "../features/organigrama/OrganigramaView";
 import OrganizacionView from "../features/organizacion/OrganizacionView";
-import PlantillasEvaluacionPage from "../features/plantillas-evaluacion/PlantillasEvaluacionPage";
 import PostulacionesPage from "../features/postulaciones/PostulacionesPage";
 import PipelineSeleccionPage from "../features/recruitment/pipeline/PipelineSeleccionPage";
 import AgendaEntrevistasPage from "../features/recruitment/entrevistas/AgendaEntrevistasPage";
@@ -260,6 +265,14 @@ export const SECCIONES = [
     titulo: "Planillas",
     modulos: [
       {
+        ruta: "/planillas/mensual",
+        etiqueta: "Planilla mensual",
+        descripcion: "Asistencia, horas extra, licencias y bonos del mes por colaborador, en un borrador para revisar y aprobar.",
+        icono: FileSpreadsheet,
+        roles: ["admin"],
+        pagina: PlanillaMensualPage,
+      },
+      {
         ruta: "/planillas/conceptos",
         etiqueta: "Conceptos de pago",
         descripcion: "Ingresos, descuentos y aportes de la planilla con su valor, vigencia y cuenta contable.",
@@ -274,6 +287,22 @@ export const SECCIONES = [
         icono: MoonStar,
         roles: ["admin"],
         pagina: CondicionesPage,
+      },
+      {
+        ruta: "/planillas/anticipos",
+        etiqueta: "Anticipos y préstamos",
+        descripcion: "Anticipos de sueldo y préstamos con su plan de cuotas, descontados en la planilla del periodo.",
+        icono: HandCoins,
+        roles: ["admin"],
+        pagina: AnticiposPage,
+      },
+      {
+        ruta: "/planillas/antiguedad",
+        etiqueta: "Bono de antigüedad",
+        descripcion: "Cálculo del bono por colaborador y parametrización de la escala legal de antigüedad.",
+        icono: Hourglass,
+        roles: ["admin"],
+        pagina: AntiguedadPage,
       },
     ],
   },
@@ -345,9 +374,10 @@ export const SECCIONES = [
     titulo: "Desempeño",
     modulos: [
       {
-        ruta: "/desempeno/plantillas",
+        ruta: RUTA_PLANTILLAS,
+        parametroOpcional: "idPlantilla",
         etiqueta: "Plantillas de evaluación",
-        descripcion: "Criterios, preguntas ponderadas y escalas de valoración, con control de versiones.",
+        descripcion: "Diseño de plantillas estandarizadas por área y vigencia, con sus secciones, criterios, preguntas ponderadas y escalas de valoración.",
         icono: ClipboardList,
         roles: ["admin"],
         pagina: PlantillasEvaluacionPage,
@@ -369,6 +399,15 @@ export const SECCIONES = [
         icono: ClipboardPenLine,
         roles: ["supervisor"],
         pagina: EvaluacionesPage,
+      },
+      {
+        ruta: RUTA_MIS_RESULTADOS,
+        parametroOpcional: "idEvaluacion",
+        etiqueta: "Mis resultados",
+        descripcion: "Puntaje de sus evaluaciones enviadas, con fortalezas, aspectos de mejora y compromisos de desarrollo.",
+        icono: Award,
+        roles: ["empleado"],
+        pagina: MisResultadosPage,
       },
       {
         ruta: RUTA_BUZON_QUEJAS,

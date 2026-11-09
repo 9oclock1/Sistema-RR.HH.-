@@ -1,101 +1,56 @@
-import { useState } from "react";
-import { crearCompetencia } from "../../api/plantillasEvaluacion";
-import { Alerta, Boton, CampoTexto, Modal, Selector } from "../../components/ui";
-import { TIPOS_COMPETENCIA } from "./plantilla";
+import { Boton, CampoAreaTexto, CampoTexto, Modal, Selector } from "../../components/ui";
+import { OPCIONES_TIPO_COMPETENCIA } from "./formato";
+import useFormularioPlantilla from "./useFormularioPlantilla";
+import { validarDatosCompetencia } from "./validacionPlantilla";
 
-const VACIA = { nombre: "", descripcion: "", tipo: "COMPETENCIA_LABORAL" };
+const ETIQUETAS = {
+  nombre: "Nombre",
+  tipo: "Tipo",
+  descripcion: "Descripción",
+};
 
-// Agrega una competencia al catálogo común; onCreada recibe la competencia guardada.
-export default function ModalCompetencia({ abierto, onCreada, onCerrar }) {
-  const [datos, setDatos] = useState(VACIA);
-  const [errores, setErrores] = useState({});
-  const [alerta, setAlerta] = useState(null);
-  const [guardando, setGuardando] = useState(false);
+const ID_FORMULARIO = "competencia-formulario";
 
-  const cerrar = () => {
-    setDatos(VACIA);
-    setErrores({});
-    setAlerta(null);
-    onCerrar();
-  };
-
-  const cambiar = (campo) => (evento) => {
-    setDatos((actual) => ({ ...actual, [campo]: evento.target.value }));
-    setErrores((actuales) => Object.fromEntries(Object.entries(actuales).filter(([c]) => c !== campo)));
-  };
-
-  const guardar = async (evento) => {
-    evento.preventDefault();
-    setGuardando(true);
-    setAlerta(null);
-    try {
-      const competencia = await crearCompetencia(datos);
-      setDatos(VACIA);
-      setErrores({});
-      onCreada(competencia);
-    } catch (error) {
-      const porCampo = Object.fromEntries((error.detalles ?? []).map((d) => [d.campo, d.mensaje]));
-      setErrores(porCampo);
-      if (Object.keys(porCampo).length === 0) setAlerta(error.message);
-    } finally {
-      setGuardando(false);
-    }
-  };
+// Alta de una competencia laboral o un factor operativo en el catálogo común a todas las plantillas.
+export default function ModalCompetencia({ onGuardar, onCancelar }) {
+  const { enviar, enviando, propsCampo, resumen } = useFormularioPlantilla({
+    inicial: { nombre: "", tipo: "", descripcion: "" },
+    etiquetas: ETIQUETAS,
+    prefijo: "competencia",
+    onGuardar,
+    validar: validarDatosCompetencia,
+    tituloConflicto: "Ya existe esa competencia",
+  });
 
   return (
     <Modal
-      abierto={abierto}
-      titulo="Nueva competencia"
-      onCerrar={cerrar}
-      bloqueado={guardando}
+      abierto
+      titulo="Nueva competencia o factor"
+      tamano="sm"
+      onCerrar={onCancelar}
+      bloqueado={enviando}
       pie={
         <>
-          <Boton onClick={cerrar} disabled={guardando}>
+          <Boton variante="sutil" onClick={onCancelar} disabled={enviando}>
             Cancelar
           </Boton>
-          <Boton variante="primario" type="submit" form="form-competencia" cargando={guardando}>
-            Crear competencia
+          <Boton variante="primario" type="submit" form={ID_FORMULARIO} cargando={enviando}>
+            {enviando ? "Guardando…" : "Crear y agregar"}
           </Boton>
         </>
       }
     >
-      <form id="form-competencia" className="plantilla-campos" onSubmit={guardar} noValidate>
-        {alerta && (
-          <Alerta tono="peligro" role="alert">
-            {alerta}
-          </Alerta>
-        )}
-        <p className="plantilla-nota">
-          Las competencias son comunes a todas las plantillas, para comparar resultados entre versiones y ciclos.
-        </p>
-        <CampoTexto
-          id="competencia-nombre"
-          etiqueta="Nombre"
-          requerido
-          maxLength={100}
-          autoComplete="off"
-          data-autofocus
-          value={datos.nombre}
-          onChange={cambiar("nombre")}
-          error={errores.nombre}
-        />
+      <form id={ID_FORMULARIO} className="pl-formulario" onSubmit={enviar} noValidate>
+        {resumen}
+        <CampoTexto {...propsCampo("nombre")} requerido maxLength={100} autoComplete="off" data-autofocus />
         <Selector
-          id="competencia-tipo"
-          etiqueta="Tipo"
+          {...propsCampo("tipo")}
           requerido
-          opciones={TIPOS_COMPETENCIA}
-          value={datos.tipo}
-          onChange={cambiar("tipo")}
-          error={errores.tipo}
+          textoVacio="Seleccione…"
+          opciones={OPCIONES_TIPO_COMPETENCIA}
+          ayuda="Una competencia laboral mide el desempeño de la persona; un factor operativo, el rendimiento del puesto."
         />
-        <CampoTexto
-          id="competencia-descripcion"
-          etiqueta="Descripción"
-          maxLength={255}
-          value={datos.descripcion}
-          onChange={cambiar("descripcion")}
-          error={errores.descripcion}
-        />
+        <CampoAreaTexto {...propsCampo("descripcion")} filas={2} maxLength={255} ayuda="Opcional." />
       </form>
     </Modal>
   );

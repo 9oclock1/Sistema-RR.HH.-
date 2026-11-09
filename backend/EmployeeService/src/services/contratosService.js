@@ -107,6 +107,11 @@ const listarHistorial = async ({ id_empleado }) => {
   return contratosModel.listarHistorial(pool, id_empleado);
 };
 
+const listarVigentes = async ({ desde, hasta }) => {
+  const versiones = await contratosModel.listarVigentesEnRango(pool, desde, hasta);
+  return versiones.map((v) => ({ ...v, haber_mensual_pactado: Number(v.haber_mensual_pactado) }));
+};
+
 const obtenerCatalogos = async () => ({
   ...(await contratosModel.listarCatalogos(pool)),
   tipos_modificacion: TIPOS_MODIFICACION,
@@ -123,4 +128,4 @@ const obtenerDocumento = async (idContrato) => {
   return { ruta, nombre: contrato.documento_nombre_original, tipoMime: contrato.documento_tipo_mime };
 };
 
-module.exports = { registrarModificacion, listarHistorial, obtenerCatalogos, obtenerDocumento };
+module.exports = { registrarModificacion, listarHistorial, listarVigentes, obtenerCatalogos, obtenerDocumento };

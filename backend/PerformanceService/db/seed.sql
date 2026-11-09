@@ -19,6 +19,9 @@
 --                                                                        133 ENVIADA (no se recuerda), 134 PENDIENTE ya recordada (no se repite)
 --   "Evaluación de temporada baja" (activo, venció ayer)              -> 135 PENDIENTE, 136 BORRADOR, 137 ENVIADA: el job debe cerrarlo
 --                                                                        y dejar 135 y 136 como VENCIDA sin tocar 137
+-- KAN-26 (historial de desempeño del evaluado 31):
+--   "Evaluación de desempeño 2025-S2" (cerrado)                      -> 138 ENVIADA (72.22)
+--   "Evaluación de desempeño 2026-S1" (cerrado)                      -> además de la 125, la 139 de otro evaluador (85.00)
 -- La plantilla tiene 6 preguntas con pesos que suman 100; la pregunta 95 es opcional.
 BEGIN;
 -- Réplica mínima de EmployeeDB.
@@ -716,6 +719,192 @@ FROM (
                 'f0000000-0000-4000-8000-000000000096'::uuid,
                 3
             )
+    ) AS r (id_evaluacion, id_pregunta, valor)
+    JOIN PREGUNTAS_EVALUACION p ON p.id_pregunta = r.id_pregunta
+    JOIN NIVELES_ESCALA n ON n.id_escala = p.id_escala
+    AND n.valor = r.valor ON CONFLICT DO NOTHING;
+INSERT INTO COMPETENCIAS (
+        id_competencia,
+        id_tipo_competencia,
+        nombre,
+        descripcion
+    )
+VALUES (
+        'f0000000-0000-4000-8000-000000000104',
+        2,
+        'Cumplimiento de metas',
+        'Logro de los objetivos operativos asignados al puesto'
+    ) ON CONFLICT DO NOTHING;
+INSERT INTO PLANTILLAS_EVALUACION (
+        id_plantilla,
+        id_departamento_destino,
+        id_empleado_creador,
+        nombre,
+        objetivo,
+        vigencia_desde,
+        vigencia_hasta
+    )
+VALUES (
+        'f0000000-0000-4000-8000-000000000052',
+        'f0000000-0000-4000-8000-000000000002',
+        'f0000000-0000-4000-8000-000000000023'::uuid,
+        'Evaluación de personal administrativo',
+        'Medir el trabajo en equipo y el cumplimiento de metas del personal administrativo.',
+        '2027-01-01',
+        '2027-12-31'
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000053',
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000023'::uuid,
+        'Evaluación de personal de tienda',
+        'Medir la atención al cliente del personal de tienda durante la gestión 2027.',
+        '2027-01-01',
+        '2027-12-31'
+    ) ON CONFLICT DO NOTHING;
+INSERT INTO VERSIONES_PLANTILLA (
+        id_version,
+        id_plantilla,
+        id_estado_version,
+        numero_version
+    )
+VALUES (
+        'f0000000-0000-4000-8000-000000000062',
+        'f0000000-0000-4000-8000-000000000052',
+        1,
+        1
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000063',
+        'f0000000-0000-4000-8000-000000000053',
+        1,
+        1
+    ) ON CONFLICT DO NOTHING;
+INSERT INTO SECCIONES_PLANTILLA (id_seccion, id_version, id_competencia, orden)
+VALUES (
+        'f0000000-0000-4000-8000-000000000074',
+        'f0000000-0000-4000-8000-000000000062',
+        'f0000000-0000-4000-8000-000000000102',
+        1
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000075',
+        'f0000000-0000-4000-8000-000000000062',
+        'f0000000-0000-4000-8000-000000000103',
+        2
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000076',
+        'f0000000-0000-4000-8000-000000000062',
+        'f0000000-0000-4000-8000-000000000104',
+        3
+    ) ON CONFLICT DO NOTHING;
+-- KAN-26: compromisos de desarrollo de la evaluación enviada 125 (ids fijos para no duplicar al repetir).
+INSERT INTO COMPROMISOS_DESARROLLO (id_compromiso, id_evaluacion, descripcion, fecha_objetivo)
+VALUES (
+        'f0000000-0000-4000-8000-000000000131',
+        'f0000000-0000-4000-8000-000000000125',
+        'Completar el curso interno de manejo de reclamos complejos.',
+        '2026-09-30'
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000132',
+        'f0000000-0000-4000-8000-000000000125',
+        'Acompañar a un compañero nuevo durante su primer mes en tienda.',
+        '2026-12-15'
+    ) ON CONFLICT DO NOTHING;
+-- Consulta de evaluaciones individuales: historial del evaluado 1 en dos periodos.
+--   Periodo 2025-S2, ciclo cerrado: 138 ENVIADA (72.22).
+--   Ciclo 2026-S1 (cerrado): además de la 125 (87.78), la 139 de un segundo evaluador (85.00).
+--   Consolidado 2026-S1 = (87.78 + 85.00) / 2 = 86.39, variación +14.17 respecto de 2025-S2.
+INSERT INTO PERIODOS_EVALUACION (id_periodo, nombre, fecha_inicio, fecha_fin)
+VALUES (
+        'f0000000-0000-4000-8000-000000000043',
+        '2025-S2',
+        '2025-07-01',
+        '2025-12-31'
+    ) ON CONFLICT DO NOTHING;
+INSERT INTO CICLOS_EVALUACION (
+        id_ciclo,
+        id_version,
+        id_periodo,
+        id_estado_ciclo,
+        id_empleado_creador,
+        nombre,
+        fecha_inicio,
+        fecha_limite,
+        cerrado_en
+    )
+VALUES (
+        'f0000000-0000-4000-8000-000000000118',
+        'f0000000-0000-4000-8000-000000000061',
+        'f0000000-0000-4000-8000-000000000043',
+        3,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
+        'Evaluación de desempeño 2025-S2',
+        '2025-12-01',
+        '2025-12-20',
+        '2025-12-22 08:00:00-04'
+    ) ON CONFLICT DO NOTHING;
+INSERT INTO EVALUACIONES (
+        id_evaluacion,
+        id_ciclo,
+        id_empleado_evaluado,
+        id_empleado_evaluador,
+        id_departamento,
+        id_sucursal,
+        id_estado_evaluacion,
+        puntaje_final,
+        fortalezas,
+        aspectos_mejora,
+        comentarios_generales,
+        enviada_en
+    )
+VALUES (
+        'f0000000-0000-4000-8000-000000000138',
+        'f0000000-0000-4000-8000-000000000118',
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        3,
+        72.22,
+        'Buena disposición para aprender.',
+        'Puntualidad y resolución de reclamos.',
+        'Primer semestre en tienda: base sólida para crecer.',
+        '2025-12-18 10:00:00-04'
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000139',
+        'f0000000-0000-4000-8000-000000000112',
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000022'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        3,
+        85.00,
+        'Colabora con el equipo en horas de alta demanda.',
+        NULL,
+        'Desempeño consistente durante el semestre.',
+        '2026-07-01 17:00:00-04'
+    ) ON CONFLICT DO NOTHING;
+-- 138: (20·80 + 15·60 + 15·60 + 20·80 + 20·75) / 90 = 72.22. 139: (20·80 + 15·80 + 15·60 + 20·100 + 10·80 + 20·100) / 100 = 85.00.
+INSERT INTO RESPUESTAS_EVALUACION (id_evaluacion, id_pregunta, id_nivel)
+SELECT r.id_evaluacion,
+    r.id_pregunta,
+    n.id_nivel
+FROM (
+        VALUES ('f0000000-0000-4000-8000-000000000138'::uuid, 'f0000000-0000-4000-8000-000000000091'::uuid, 4),
+            ('f0000000-0000-4000-8000-000000000138'::uuid, 'f0000000-0000-4000-8000-000000000092'::uuid, 3),
+            ('f0000000-0000-4000-8000-000000000138'::uuid, 'f0000000-0000-4000-8000-000000000093'::uuid, 3),
+            ('f0000000-0000-4000-8000-000000000138'::uuid, 'f0000000-0000-4000-8000-000000000094'::uuid, 4),
+            ('f0000000-0000-4000-8000-000000000138'::uuid, 'f0000000-0000-4000-8000-000000000096'::uuid, 3),
+            ('f0000000-0000-4000-8000-000000000139'::uuid, 'f0000000-0000-4000-8000-000000000091'::uuid, 4),
+            ('f0000000-0000-4000-8000-000000000139'::uuid, 'f0000000-0000-4000-8000-000000000092'::uuid, 4),
+            ('f0000000-0000-4000-8000-000000000139'::uuid, 'f0000000-0000-4000-8000-000000000093'::uuid, 3),
+            ('f0000000-0000-4000-8000-000000000139'::uuid, 'f0000000-0000-4000-8000-000000000094'::uuid, 5),
+            ('f0000000-0000-4000-8000-000000000139'::uuid, 'f0000000-0000-4000-8000-000000000095'::uuid, 4),
+            ('f0000000-0000-4000-8000-000000000139'::uuid, 'f0000000-0000-4000-8000-000000000096'::uuid, 4)
     ) AS r (id_evaluacion, id_pregunta, valor)
     JOIN PREGUNTAS_EVALUACION p ON p.id_pregunta = r.id_pregunta
     JOIN NIVELES_ESCALA n ON n.id_escala = p.id_escala

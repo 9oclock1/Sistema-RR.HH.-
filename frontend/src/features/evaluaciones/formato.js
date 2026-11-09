@@ -75,3 +75,15 @@ export function describirAvance({
     return `${progreso.respondidas} de ${progreso.total} preguntas`;
   return `${progreso.obligatorias_respondidas} de ${progreso.obligatorias_total} obligatorias`;
 }
+
+// Gráfico de evolución: posición horizontal (en %) de cada periodo; uno solo queda centrado.
+const MARGEN_GRAFICO_X = 8;
+export const posicionX = (indice, total) =>
+  total <= 1 ? 50 : MARGEN_GRAFICO_X + (indice * (100 - 2 * MARGEN_GRAFICO_X)) / (total - 1);
+
+export function describirVariacion(variacion) {
+  if (variacion === null || variacion === undefined) return "Primer periodo registrado";
+  if (variacion === 0) return "Sin cambio respecto al periodo anterior";
+  const signo = variacion > 0 ? "+" : "−";
+  return `${signo}${formatearPuntaje(Math.abs(variacion))} respecto al periodo anterior`;
+}

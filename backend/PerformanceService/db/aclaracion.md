@@ -20,6 +20,18 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 - Backend: solo se editan versiones en `BORRADOR`, y para cambiar una publicada se copia su estructura a una versión nueva.
 - Backend: al publicar se verifica que la suma de `peso_porcentual` de todas las preguntas de la versión sea 100.
 
+### Diseño de plantillas
+
+- Al crear una plantilla se crea en la misma transacción su versión 1 en `BORRADOR`.
+- La duplicidad se compara con `lower(btrim(nombre))`, el área y el rango de vigencia (`[desde, hasta]` inclusivo): "Evaluación Cajeros" y " evaluación cajeros " son el mismo nombre. El mismo nombre y área en periodos que no se cruzan sí se permite. La base responde con el error `23P01` y el backend lo convierte en una alerta de duplicidad (409).
+- `nombre` y `objetivo` no pueden ser solo espacios (`chk_plantilla_nombre`, `chk_plantilla_objetivo`).
+- Backend: la cabecera (nombre, área, objetivo y vigencia) se bloquea cuando alguna versión de la plantilla ya fue publicada, y una plantilla que alguna vez se publicó no se elimina.
+- Backend: al publicar se valida que la cabecera esté completa, que la vigencia no haya terminado, que la versión tenga al menos una sección con una competencia activa, que cada sección tenga criterios y cada criterio al menos una pregunta, y que los pesos sumen 100. Al publicar una versión nueva, la publicada anterior pasa a `ARCHIVADA`.
+- Backend: la estructura de un borrador se guarda completa con `PUT /plantillas/:id/versiones/:idVersion/estructura` (secciones, criterios y preguntas con su peso y su escala). Un borrador puede quedar con los pesos desbalanceados; la respuesta trae el `balance` (suma, diferencia y si suma 100) y el desbalance recién bloquea la publicación.
+- Backend: no se crea una versión nueva de una plantilla cuya vigencia ya terminó. La cabecera no se puede cambiar después de publicar, así que esa versión nunca podría publicarse; hay que crear una plantilla nueva.
+- Backend: eliminar un borrador que nunca se publicó borra en cascada preguntas, criterios, secciones y versiones.
+- Backend: una plantilla tiene a lo sumo un borrador a la vez.
+
 ## Competencias y escalas
 
 - `COMPETENCIAS` es un catálogo común a todas las plantillas: permite comparar una misma competencia entre versiones y ciclos. Cada sección de una versión usa una competencia, que es de tipo competencia laboral o factor operativo.
@@ -63,10 +75,27 @@ Dentro de la base de datos se encuentran las siguientes observaciones que deben 
 - El resultado se redondea a 2 decimales y se congela al enviar. Ejemplo del seed (evaluación `…0125`): `(20×100 + 15×80 + 15×80 + 20×100 + 20×75) / 90 = 87.78`.
 - El desglose por criterio o competencia usa la misma fórmula, pero solo con las preguntas de ese criterio o competencia.
 
+### Retroalimentación cualitativa final (KAN-26)
+
+- `fortalezas`, `aspectos_mejora` y `comentarios_generales` de `EVALUACIONES` son opcionales; un texto vacío se guarda como NULL.
+- Cada compromiso de `COMPROMISOS_DESARROLLO` tiene descripción y fecha objetivo obligatorias. Al guardar, la lista enviada reemplaza a la anterior.
+- Backend: solo el evaluador la registra, y solo cuando ya respondió todas las preguntas obligatorias. La fecha objetivo no puede ser anterior a hoy (hora de Bolivia).
+- Backend: al enviar la evaluación la retroalimentación queda congelada. El colaborador evaluado la consulta en `GET /evaluaciones/mis-resultados[/:id]`, que solo muestra evaluaciones `ENVIADA` y no tiene escritura.
+
+### Consulta de evaluaciones individuales e historial de desempeño
+
+- `GET /evaluaciones/historial/:idEmpleado` devuelve el consolidado del colaborador. Solo cuenta evaluaciones `ENVIADA` de ciclos `CERRADO`: mientras el ciclo sigue activo, otro evaluador todavía puede enviar y el consolidado cambiaría.
+- Puntaje del ciclo: promedio simple de los `puntaje_final` de sus evaluaciones enviadas (un colaborador puede tener varios evaluadores en un ciclo). El desglose por competencia promedia el puntaje de cada competencia entre esas evaluaciones, agrupando por `id_competencia` del catálogo.
+- La evolución agrupa los ciclos por `PERIODOS_EVALUACION` en orden cronológico; si un periodo tiene varios ciclos, su puntaje es el promedio de ellos. Cada punto trae la variación respecto al periodo anterior.
+- La retroalimentación se muestra por evaluación (cada evaluador con sus textos y compromisos), no se mezcla.
+- RBAC: el colaborador solo consulta su propio historial (`X-Empleado-Id` = `:idEmpleado`). Consultar a otra persona exige `X-Rol` de RRHH (`admin` o `gerente`); cualquier otro rol recibe 403 sin que se lean datos. RRHH recibe 404 si el colaborador no está en la réplica de `EMPLEADOS`.
+- Promedios redondeados a 2 decimales, calculados en centésimas.
+
 ## Datos de prueba
 
 - `seed.sql` carga datos ficticios para probar KAN-24: una plantilla publicada con 6 preguntas (pesos que suman 100 y una opcional), tres ciclos y seis evaluaciones en distintos estados. Para KAN-23 agrega cuatro ciclos con sus evaluaciones: dos `PROGRAMADO` (uno que inicia en 15 días y otro que inicia hoy, para probar la activación), un `ACTIVO` que vence en 3 días (con evaluaciones pendientes, en borrador, enviada y ya recordada, y con dos evaluadores distintos) y un `ACTIVO` que venció ayer (para probar el cierre). Estas fechas usan el día de La Paz, no el del servidor de Postgres. No se ejecuta al crear la base ni está montado en `docker-compose.yml`; se corre a mano después de que `init.sql` y `catalogos.sql` crearon la base, y se puede repetir sin duplicar filas.
 - Los empleados del seed son réplicas con los mismos ids que `backend/EmployeeService/db/seed.sql`, que hay que cargar primero: así las bandejas y los ciclos hablan de las mismas personas. Los usuarios de prueba para ver la bandeja y programar ciclos son Marcela Quiroga (evaluadora, Sopocachi) y Jorge Mamani (Miraflores). Ambos seeds son SQL puro y se pueden volver a ejecutar sin duplicar datos; el proceso de ciclos cambia los estados de los datos (activa, recuerda y cierra), así que para repetir la demostración desde cero hay que recrear la base con `docker compose down -v`.
+- Historial del evaluado 31 (Carlos Rojas, KAN-26): periodo `2025-S2` (ciclo cerrado, evaluación `…0138`, 72.22) y periodo `2026-S1` con dos evaluadores (`…0125` 87.78 y `…0139` 85.00, consolidado 86.39).
 
 ## Integración con CRM
 

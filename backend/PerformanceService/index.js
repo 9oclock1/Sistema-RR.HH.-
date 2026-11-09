@@ -2,7 +2,9 @@ const express = require("express");
 const cors = require("cors");
 const pool = require("./src/config/db");
 const evaluacionesRoutes = require("./src/routes/evaluacionesRoutes");
-const plantillasRoutes = require("./src/routes/plantillas.routes");
+const plantillasRoutes = require("./src/routes/plantillasRoutes");
+const competenciasRoutes = require("./src/routes/competenciasRoutes");
+const escalasRoutes = require("./src/routes/escalasRoutes");
 const quejasRoutes = require("./src/routes/quejasRoutes");
 const ciclosRoutes = require("./src/routes/ciclosRoutes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
@@ -41,6 +43,8 @@ app.get("/health", async (req, res) => {
 app.use(evaluacionesRoutes);
 app.use(plantillasRoutes);
 app.use(quejasRoutes);
+app.use(competenciasRoutes);
+app.use(escalasRoutes);
 app.use(ciclosRoutes);
 app.use(manejadorErrores);
 

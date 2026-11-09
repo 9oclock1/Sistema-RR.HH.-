@@ -9,6 +9,8 @@ router.use(exigirRol('admin', 'gerente'));
 
 router.get('/', contratosController.listarHistorial);
 router.get('/catalogos', contratosController.obtenerCatalogos);
+// Versiones vigentes de todo el personal en un rango, para la planilla mensual (CompensationService).
+router.get('/vigentes', contratosController.listarVigentes);
 router.post('/modificaciones', documentoContratoUpload, contratosController.registrarModificacion);
 router.get('/:id/documento', contratosController.descargarDocumento);
 

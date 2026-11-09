@@ -144,6 +144,238 @@ CREATE TABLE BONOS_CONDICION (
 );
 CREATE INDEX idx_bonos_condicion_proceso ON BONOS_CONDICION (id_proceso);
 CREATE INDEX idx_bonos_condicion_empleado ON BONOS_CONDICION (id_empleado);
+-- Tabla: PLANILLAS
+-- Planilla mensual (periodo AAAA-MM): BORRADOR → APROBADA → CERRADA. Fuera de borrador no se edita ni se
+-- elimina, ni cambia su detalle: lo valida el servicio (sin triggers, por decisión del equipo).
+-- datos_hasta: último día consolidado; en el mes en curso llega hasta ayer y solo se aprueba el mes completo.
+-- Contabilidad y Pagos confirman por separado; con ambas confirmaciones la planilla se cierra.
+CREATE TABLE PLANILLAS (
+    id_planilla UUID NOT NULL DEFAULT gen_random_uuid(),
+    periodo char(7) NOT NULL,
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    datos_hasta date NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'BORRADOR',
+    advertencias text[] NOT NULL DEFAULT '{}',
+    generada_por UUID NOT NULL,
+    generada_por_nombre varchar(150) NOT NULL,
+    generada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    aprobada_por UUID NULL,
+    aprobada_por_nombre varchar(150) NULL,
+    aprobada_en TIMESTAMPTZ NULL,
+    estado_contabilidad varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    estado_pagos varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    -- Respuesta de cada sistema: número de asiento u orden si confirmó, motivo si rechazó.
+    referencia_contabilidad varchar(60) NULL,
+    motivo_contabilidad varchar(255) NULL,
+    respondida_contabilidad_en TIMESTAMPTZ NULL,
+    referencia_pagos varchar(60) NULL,
+    motivo_pagos varchar(255) NULL,
+    respondida_pagos_en TIMESTAMPTZ NULL,
+    cerrada_en TIMESTAMPTZ NULL,
+    CONSTRAINT PLANILLAS_pk PRIMARY KEY (id_planilla),
+    CONSTRAINT uq_planilla_periodo UNIQUE (periodo),
+    CONSTRAINT chk_planilla_estado CHECK (estado IN ('BORRADOR', 'APROBADA', 'CERRADA')),
+    CONSTRAINT chk_planilla_fechas CHECK (fecha_fin >= fecha_inicio AND datos_hasta BETWEEN fecha_inicio AND fecha_fin),
+    CONSTRAINT chk_planilla_aprobacion CHECK (
+        (estado = 'BORRADOR') = (aprobada_en IS NULL)
+        AND (aprobada_en IS NULL) = (aprobada_por IS NULL)
+        AND (aprobada_por IS NULL) = (aprobada_por_nombre IS NULL)
+    ),
+    CONSTRAINT chk_planilla_mes_completo CHECK (estado = 'BORRADOR' OR datos_hasta = fecha_fin),
+    CONSTRAINT chk_planilla_integraciones CHECK (
+        estado_contabilidad IN ('PENDIENTE', 'CONFIRMADA', 'RECHAZADA')
+        AND estado_pagos IN ('PENDIENTE', 'CONFIRMADA', 'RECHAZADA')
+    ),
+    CONSTRAINT chk_planilla_cierre CHECK (
+        (estado = 'CERRADA') = (cerrada_en IS NOT NULL)
+        AND (estado <> 'CERRADA' OR (estado_contabilidad = 'CONFIRMADA' AND estado_pagos = 'CONFIRMADA'))
+    ),
+    -- Un borrador no se envió: no tiene respuestas.
+    CONSTRAINT chk_planilla_respuestas CHECK (
+        (estado <> 'BORRADOR' OR (estado_contabilidad = 'PENDIENTE' AND estado_pagos = 'PENDIENTE'))
+        AND (estado_contabilidad = 'PENDIENTE') = (respondida_contabilidad_en IS NULL)
+        AND (estado_contabilidad = 'RECHAZADA') = (motivo_contabilidad IS NOT NULL)
+        AND (referencia_contabilidad IS NULL OR estado_contabilidad = 'CONFIRMADA')
+        AND (estado_pagos = 'PENDIENTE') = (respondida_pagos_en IS NULL)
+        AND (estado_pagos = 'RECHAZADA') = (motivo_pagos IS NOT NULL)
+        AND (referencia_pagos IS NULL OR estado_pagos = 'CONFIRMADA')
+    )
+);
+-- Tabla: PLANILLA_EMPLEADOS
+-- Novedades del mes consolidadas por colaborador. Nombre, cargo, área y haber son copia al generar.
+-- haber_mensual: haber del contrato (promedio por días si cambió en el mes). dias_contrato: 30 si el contrato
+-- cubre el mes; si no, los días cubiertos. dias_pagados descuenta faltas injustificadas y licencias sin goce.
+CREATE TABLE PLANILLA_EMPLEADOS (
+    id_planilla_empleado UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    nombre_empleado varchar(150) NOT NULL,
+    numero_documento varchar(20) NULL,
+    cargo varchar(100) NULL,
+    area varchar(100) NULL,
+    sucursal varchar(100) NULL,
+    id_contrato UUID NOT NULL,
+    numero_contrato varchar(40) NOT NULL,
+    haber_mensual numeric(12,2) NOT NULL,
+    contrato_desde date NOT NULL,
+    contrato_hasta date NOT NULL,
+    dias_contrato smallint NOT NULL,
+    faltas_injustificadas smallint NOT NULL DEFAULT 0,
+    dias_licencia_sin_goce smallint NOT NULL DEFAULT 0,
+    dias_licencia_con_goce smallint NOT NULL DEFAULT 0,
+    dias_pagados smallint NOT NULL,
+    atrasos smallint NOT NULL DEFAULT 0,
+    minutos_atraso int NOT NULL DEFAULT 0,
+    minutos_extra_habil int NOT NULL DEFAULT 0,
+    minutos_extra_domingo int NOT NULL DEFAULT 0,
+    minutos_extra_feriado int NOT NULL DEFAULT 0,
+    minutos_extra_nocturnos int NOT NULL DEFAULT 0,
+    minutos_domingo int NOT NULL DEFAULT 0,
+    minutos_feriado int NOT NULL DEFAULT 0,
+    minutos_descanso int NOT NULL DEFAULT 0,
+    minutos_nocturnos int NOT NULL DEFAULT 0,
+    observaciones text[] NOT NULL DEFAULT '{}',
+    -- Resultado del cálculo (detalle en CALCULOS_PLANILLA). El líquido puede quedar negativo: es una alerta.
+    total_ganado numeric(12,2) NOT NULL DEFAULT 0,
+    total_descuentos numeric(12,2) NOT NULL DEFAULT 0,
+    liquido_pagable numeric(12,2) NOT NULL DEFAULT 0,
+    total_aportes numeric(12,2) NOT NULL DEFAULT 0,
+    -- Inconsistencias del cálculo: con alguna, la planilla no se aprueba.
+    alertas text[] NOT NULL DEFAULT '{}',
+    CONSTRAINT PLANILLA_EMPLEADOS_pk PRIMARY KEY (id_planilla_empleado),
+    CONSTRAINT uq_planilla_empleado UNIQUE (id_planilla, id_empleado),
+    CONSTRAINT fk_planilla_empleado_planilla FOREIGN KEY (id_planilla)
+        REFERENCES PLANILLAS (id_planilla) ON DELETE CASCADE,
+    CONSTRAINT chk_planilla_empleado_haber CHECK (haber_mensual > 0),
+    CONSTRAINT chk_planilla_empleado_contrato CHECK (contrato_hasta >= contrato_desde),
+    CONSTRAINT chk_planilla_empleado_dias CHECK (
+        dias_contrato BETWEEN 1 AND 30 AND dias_pagados BETWEEN 0 AND dias_contrato
+        AND faltas_injustificadas >= 0 AND dias_licencia_sin_goce >= 0 AND dias_licencia_con_goce >= 0
+    ),
+    CONSTRAINT chk_planilla_empleado_minutos CHECK (
+        atrasos >= 0 AND minutos_atraso >= 0 AND minutos_extra_habil >= 0 AND minutos_extra_domingo >= 0
+        AND minutos_extra_feriado >= 0 AND minutos_extra_nocturnos >= 0 AND minutos_domingo >= 0
+        AND minutos_feriado >= 0 AND minutos_descanso >= 0 AND minutos_nocturnos >= 0
+    ),
+    CONSTRAINT chk_planilla_empleado_totales CHECK (
+        total_ganado >= 0 AND total_descuentos >= 0 AND total_aportes >= 0
+        AND liquido_pagable = total_ganado - total_descuentos
+    )
+);
+-- Tabla: NOVEDADES_PLANILLA
+-- Rubros variables de un colaborador en la planilla (bonos por condiciones especiales), con la vigencia del
+-- concepto que les dio el valor. monto NULL: porcentaje que se calcula sobre el haber básico.
+CREATE TABLE NOVEDADES_PLANILLA (
+    id_novedad UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla_empleado UUID NOT NULL,
+    origen varchar(15) NOT NULL,
+    id_vigencia UUID NOT NULL,
+    codigo varchar(20) NOT NULL,
+    nombre varchar(80) NOT NULL,
+    forma_calculo varchar(12) NOT NULL,
+    cantidad smallint NOT NULL,
+    factor numeric(10,6) NOT NULL,
+    valor numeric(12,4) NOT NULL,
+    monto numeric(12,2) NULL,
+    detalle varchar(400) NULL,
+    CONSTRAINT NOVEDADES_PLANILLA_pk PRIMARY KEY (id_novedad),
+    CONSTRAINT fk_novedad_planilla_empleado FOREIGN KEY (id_planilla_empleado)
+        REFERENCES PLANILLA_EMPLEADOS (id_planilla_empleado) ON DELETE CASCADE,
+    -- Un concepto usado en una planilla no se puede eliminar, solo inactivar.
+    CONSTRAINT fk_novedad_planilla_vigencia FOREIGN KEY (id_vigencia) REFERENCES VIGENCIAS_CONCEPTO (id_vigencia),
+    CONSTRAINT chk_novedad_planilla_origen CHECK (origen IN ('BONO_CONDICION')),
+    CONSTRAINT chk_novedad_planilla_forma CHECK (forma_calculo IN ('MONTO_FIJO', 'PORCENTAJE')),
+    CONSTRAINT chk_novedad_planilla_valores CHECK (cantidad > 0 AND factor > 0 AND valor > 0 AND (monto IS NULL OR monto >= 0)),
+    CONSTRAINT chk_novedad_planilla_monto CHECK ((forma_calculo = 'MONTO_FIJO') = (monto IS NOT NULL))
+);
+CREATE INDEX idx_novedades_planilla_empleado ON NOVEDADES_PLANILLA (id_planilla_empleado);
+-- Tabla: CALCULOS_PLANILLA
+-- Detalle del cálculo de cada colaborador: un renglón por concepto, con la vigencia que dio el valor, la base,
+-- la cantidad (días u horas) y el resultado redondeado a centavos. Los totales del colaborador son su suma.
+-- El bono de antigüedad (escala de KAN-70) y las cuotas de préstamos (KAN-65) no salen de una vigencia de concepto.
+CREATE TABLE CALCULOS_PLANILLA (
+    id_calculo UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla_empleado UUID NOT NULL,
+    id_vigencia UUID NULL,
+    orden smallint NOT NULL,
+    tipo varchar(10) NOT NULL,
+    codigo varchar(20) NOT NULL,
+    nombre varchar(80) NOT NULL,
+    forma_calculo varchar(12) NOT NULL,
+    base numeric(12,2) NULL,
+    cantidad numeric(10,2) NULL,
+    valor numeric(12,4) NOT NULL,
+    resultado numeric(12,2) NOT NULL,
+    detalle varchar(250) NULL,
+    CONSTRAINT CALCULOS_PLANILLA_pk PRIMARY KEY (id_calculo),
+    CONSTRAINT uq_calculo_orden UNIQUE (id_planilla_empleado, orden),
+    CONSTRAINT fk_calculo_planilla_empleado FOREIGN KEY (id_planilla_empleado)
+        REFERENCES PLANILLA_EMPLEADOS (id_planilla_empleado) ON DELETE CASCADE,
+    -- Un concepto usado en una planilla no se puede eliminar, solo inactivar.
+    CONSTRAINT fk_calculo_vigencia FOREIGN KEY (id_vigencia) REFERENCES VIGENCIAS_CONCEPTO (id_vigencia),
+    CONSTRAINT chk_calculo_tipo CHECK (tipo IN ('INGRESO', 'DESCUENTO', 'APORTE')),
+    CONSTRAINT chk_calculo_forma CHECK (forma_calculo IN ('MONTO_FIJO', 'PORCENTAJE')),
+    CONSTRAINT chk_calculo_origen CHECK (id_vigencia IS NOT NULL OR codigo IN ('BONO-ANTIGUEDAD', 'CUOTA-PRESTAMO')),
+    CONSTRAINT chk_calculo_valores CHECK (valor > 0 AND resultado >= 0 AND (base IS NULL OR base >= 0) AND (cantidad IS NULL OR cantidad >= 0))
+);
+CREATE INDEX idx_calculos_planilla_empleado ON CALCULOS_PLANILLA (id_planilla_empleado);
+-- Tabla: EVENTOS_SALIENTES
+-- Bandeja de salida (outbox): el evento se guarda en la misma transacción que la aprobación y se envía
+-- después al broker, con reintentos, hasta que se entrega. id_evento es el id_mensaje del mensaje enviado.
+-- destino: CONTABILIDAD (asiento de la planilla, grupo D) o PAGOS (orden de dispersión, grupo A).
+CREATE TABLE EVENTOS_SALIENTES (
+    id_evento UUID NOT NULL DEFAULT gen_random_uuid(),
+    topico varchar(60) NOT NULL,
+    tipo_evento varchar(60) NOT NULL,
+    id_planilla UUID NULL,
+    destino varchar(15) NULL,
+    carga JSONB NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    intentos smallint NOT NULL DEFAULT 0,
+    ultimo_error varchar(255) NULL,
+    proximo_intento_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    entregado_en TIMESTAMPTZ NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT EVENTOS_SALIENTES_pk PRIMARY KEY (id_evento),
+    CONSTRAINT fk_evento_planilla FOREIGN KEY (id_planilla) REFERENCES PLANILLAS (id_planilla),
+    CONSTRAINT chk_evento_estado CHECK (estado IN ('PENDIENTE', 'ENTREGADO', 'FALLIDO')),
+    CONSTRAINT chk_evento_intentos CHECK (intentos >= 0),
+    CONSTRAINT chk_evento_entrega CHECK ((estado = 'ENTREGADO') = (entregado_en IS NOT NULL)),
+    CONSTRAINT chk_evento_destino CHECK (destino IN ('CONTABILIDAD', 'PAGOS')),
+    CONSTRAINT chk_evento_planilla_destino CHECK ((id_planilla IS NULL) = (destino IS NULL))
+);
+CREATE INDEX idx_eventos_salientes_pendientes ON EVENTOS_SALIENTES (estado, proximo_intento_en);
+CREATE INDEX idx_eventos_salientes_planilla ON EVENTOS_SALIENTES (id_planilla, destino, creado_en);
+-- Tabla: EVENTOS_ENTRANTES
+-- Bandeja de entrada: confirmaciones de Contabilidad y Pagos. id_mensaje (del remitente) evita procesar dos veces
+-- el mismo mensaje. RECIBIDO: en proceso o esperando reintento; PROCESADO: aplicado a la planilla; IGNORADO: no
+-- cambia nada (por ejemplo, ya estaba confirmada); FALLIDO: inválido o sin procesar tras varios intentos (cola de
+-- mensajes fallidos, se puede reprocesar). id_planilla solo se guarda si la planilla existe.
+CREATE TABLE EVENTOS_ENTRANTES (
+    id_evento_entrante UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_mensaje varchar(100) NOT NULL,
+    topico varchar(60) NOT NULL,
+    tipo_evento varchar(60) NOT NULL,
+    origen varchar(10) NULL,
+    id_planilla UUID NULL,
+    destino varchar(15) NULL,
+    carga JSONB NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'RECIBIDO',
+    intentos smallint NOT NULL DEFAULT 0,
+    detalle varchar(255) NULL,
+    recibido_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    procesado_en TIMESTAMPTZ NULL,
+    CONSTRAINT EVENTOS_ENTRANTES_pk PRIMARY KEY (id_evento_entrante),
+    CONSTRAINT uq_evento_entrante_mensaje UNIQUE (id_mensaje),
+    CONSTRAINT fk_evento_entrante_planilla FOREIGN KEY (id_planilla) REFERENCES PLANILLAS (id_planilla),
+    CONSTRAINT chk_evento_entrante_estado CHECK (estado IN ('RECIBIDO', 'PROCESADO', 'IGNORADO', 'FALLIDO')),
+    CONSTRAINT chk_evento_entrante_destino CHECK (destino IN ('CONTABILIDAD', 'PAGOS')),
+    CONSTRAINT chk_evento_entrante_intentos CHECK (intentos >= 0),
+    CONSTRAINT chk_evento_entrante_procesado CHECK ((estado IN ('PROCESADO', 'IGNORADO')) = (procesado_en IS NOT NULL))
+);
+CREATE INDEX idx_eventos_entrantes_estado ON EVENTOS_ENTRANTES (estado, recibido_en);
+CREATE INDEX idx_eventos_entrantes_planilla ON EVENTOS_ENTRANTES (id_planilla);
 -- datos iniciales
 -- Aportes de ley sobre el total ganado (Ley 065 de Pensiones y seguridad social de corto plazo).
 -- Cuentas contables referenciales: ajustar al plan de cuentas de Contabilidad.
@@ -181,4 +413,157 @@ JOIN (VALUES
     ('SIP-RIESGO-PROF', 1.71),
     ('PRO-VIVIENDA', 2.00),
     ('SIP-SOLIDARIO-PAT', 3.00)
+) AS v (codigo, valor) USING (codigo);
+
+-- tablas
+-- Tabla: PRESTAMOS
+-- Anticipos de sueldo y préstamos otorgados a un colaborador, con su plan de cuotas.
+-- id_empleado referencia a EMPLOYEES (EmployeeDB): sin FK por ser otro servicio, se valida en el backend.
+-- liquido_pagable_referencial y porcentaje_cuota quedan fijos al registrar: conservan la base que se usó
+-- para aprobar el préstamo, aunque el sueldo del colaborador cambie después.
+CREATE TABLE PRESTAMOS (
+    id_prestamo UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    tipo varchar(10) NOT NULL,
+    monto numeric(12,2) NOT NULL,
+    numero_cuotas smallint NOT NULL,
+    mes_inicio date NOT NULL,
+    motivo varchar(250) NULL,
+    liquido_pagable_referencial numeric(12,2) NOT NULL,
+    porcentaje_cuota numeric(5,2) NOT NULL,
+    saldo_pendiente numeric(12,2) NOT NULL,
+    estado varchar(12) NOT NULL DEFAULT 'ACTIVO',
+    registrado_por varchar(80) NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PRESTAMOS_pk PRIMARY KEY (id_prestamo),
+    CONSTRAINT chk_prestamo_tipo CHECK (tipo IN ('ANTICIPO', 'PRESTAMO')),
+    CONSTRAINT chk_prestamo_monto CHECK (monto > 0),
+    CONSTRAINT chk_prestamo_cuotas CHECK (numero_cuotas BETWEEN 1 AND 60),
+    CONSTRAINT chk_prestamo_liquido CHECK (liquido_pagable_referencial > 0),
+    CONSTRAINT chk_prestamo_saldo CHECK (saldo_pendiente >= 0),
+    CONSTRAINT chk_prestamo_estado CHECK (estado IN ('ACTIVO', 'COMPLETADO', 'CANCELADO')),
+    CONSTRAINT chk_prestamo_mes_inicio CHECK (mes_inicio = date_trunc('month', mes_inicio)::date)
+);
+CREATE INDEX idx_prestamos_empleado ON PRESTAMOS (id_empleado);
+-- Tabla: CUOTAS_PRESTAMO
+-- Plan de cuotas de cada préstamo: una fila por mes de descuento, con su estado de pago.
+-- periodo = primer día del mes en que la cuota se descuenta en la planilla.
+CREATE TABLE CUOTAS_PRESTAMO (
+    id_cuota UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_prestamo UUID NOT NULL,
+    numero_cuota smallint NOT NULL,
+    periodo date NOT NULL,
+    monto numeric(12,2) NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    pagada_en TIMESTAMPTZ NULL,
+    CONSTRAINT CUOTAS_PRESTAMO_pk PRIMARY KEY (id_cuota),
+    CONSTRAINT fk_cuota_prestamo FOREIGN KEY (id_prestamo)
+        REFERENCES PRESTAMOS (id_prestamo) ON DELETE CASCADE,
+    CONSTRAINT chk_cuota_monto CHECK (monto > 0),
+    CONSTRAINT chk_cuota_estado CHECK (estado IN ('PENDIENTE', 'PAGADA')),
+    CONSTRAINT chk_cuota_pago CHECK ((estado = 'PAGADA') = (pagada_en IS NOT NULL)),
+    CONSTRAINT chk_cuota_periodo CHECK (periodo = date_trunc('month', periodo)::date),
+    CONSTRAINT uq_cuota_prestamo_numero UNIQUE (id_prestamo, numero_cuota),
+    CONSTRAINT uq_cuota_prestamo_periodo UNIQUE (id_prestamo, periodo)
+);
+-- La planilla de un periodo consulta todas las cuotas pendientes de ese mes, de todos los préstamos.
+CREATE INDEX idx_cuotas_periodo_estado ON CUOTAS_PRESTAMO (periodo, estado);
+
+-- Tabla: VIGENCIAS_ESCALA_ANTIGUEDAD
+-- Versiones de la tabla legal de escalas de antigüedad (RF-50). Una vigencia nueva cierra la anterior sin
+-- modificar sus tramos, así los bonos ya calculados en planillas anteriores conservan el porcentaje histórico.
+CREATE TABLE VIGENCIAS_ESCALA_ANTIGUEDAD (
+    id_vigencia UUID NOT NULL DEFAULT gen_random_uuid(),
+    vigente_desde date NOT NULL,
+    vigente_hasta date NULL,
+    motivo varchar(250) NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT VIGENCIAS_ESCALA_ANTIGUEDAD_pk PRIMARY KEY (id_vigencia),
+    CONSTRAINT chk_escala_fechas CHECK (vigente_hasta IS NULL OR vigente_hasta >= vigente_desde),
+    CONSTRAINT ex_escala_sin_solapamiento EXCLUDE USING gist (
+        daterange(vigente_desde, vigente_hasta, '[]') WITH &&
+    )
+);
+-- Tabla: TRAMOS_ANTIGUEDAD
+-- Tramos de años de servicio y su porcentaje de bono, dentro de una vigencia de la escala legal.
+-- anios_hasta NULL = sin tope (el tramo más alto de la escala).
+CREATE TABLE TRAMOS_ANTIGUEDAD (
+    id_tramo UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_vigencia UUID NOT NULL,
+    anios_desde smallint NOT NULL,
+    anios_hasta smallint NULL,
+    porcentaje numeric(5,2) NOT NULL,
+    CONSTRAINT TRAMOS_ANTIGUEDAD_pk PRIMARY KEY (id_tramo),
+    CONSTRAINT fk_tramo_vigencia FOREIGN KEY (id_vigencia)
+        REFERENCES VIGENCIAS_ESCALA_ANTIGUEDAD (id_vigencia) ON DELETE CASCADE,
+    CONSTRAINT chk_tramo_anios_desde CHECK (anios_desde >= 0),
+    CONSTRAINT chk_tramo_rango CHECK (anios_hasta IS NULL OR anios_hasta >= anios_desde),
+    CONSTRAINT chk_tramo_porcentaje CHECK (porcentaje > 0 AND porcentaje <= 100),
+    CONSTRAINT uq_tramo_vigencia_desde UNIQUE (id_vigencia, anios_desde)
+);
+CREATE INDEX idx_tramos_vigencia ON TRAMOS_ANTIGUEDAD (id_vigencia);
+
+-- El bono de antigüedad es un ingreso de la planilla (RF-50, criterio 1); su porcentaje no es fijo por
+-- vigencia de concepto sino que depende del tramo de años de servicio, por lo que no lleva VIGENCIAS_CONCEPTO.
+INSERT INTO CONCEPTOS_PLANILLA (codigo, nombre, descripcion, tipo, forma_calculo, base_calculo, es_de_ley,
+                                cuenta_contable_codigo, cuenta_contable_nombre)
+VALUES ('BONO-ANTIGUEDAD', 'Bono de antigüedad', 'Se calcula según los años de servicio y la escala legal vigente.',
+        'INGRESO', 'PORCENTAJE', 'HABER_BASICO', TRUE, '5.1.1.05', 'Bono de antigüedad');
+
+-- datos iniciales
+-- Escala de referencia: ajustar a la tabla legal vigente desde la pantalla de parametrización (RF-50, criterio 3).
+WITH vigencia AS (
+    INSERT INTO VIGENCIAS_ESCALA_ANTIGUEDAD (vigente_desde, motivo)
+    VALUES (DATE '2026-01-01', 'Escala de referencia inicial, pendiente de validar por Administración')
+    RETURNING id_vigencia
+)
+INSERT INTO TRAMOS_ANTIGUEDAD (id_vigencia, anios_desde, anios_hasta, porcentaje)
+SELECT v.id_vigencia, t.anios_desde, t.anios_hasta, t.porcentaje
+FROM vigencia v
+JOIN (VALUES
+    (2, 4, 5.00),
+    (5, 7, 11.00),
+    (8, 10, 18.00),
+    (11, 14, 26.00),
+    (15, 19, 34.00),
+    (20, 24, 42.00),
+    (25, NULL, 50.00)
+) AS t (anios_desde, anios_hasta, porcentaje) ON TRUE;
+
+-- Conceptos que calcula la planilla con las novedades del mes (KAN-64). El valor de cada vigencia es el
+-- porcentaje que aplica el servicio: haber básico por días pagados, recargo de horas extra, pago adicional de
+-- domingos, feriados y descansos trabajados, recargo nocturno y Aporte Nacional Solidario por tramo
+-- (sobre el excedente de Bs 13.000, 25.000 y 35.000 del total ganado, Ley 065).
+WITH conceptos AS (
+    INSERT INTO CONCEPTOS_PLANILLA (codigo, nombre, descripcion, tipo, forma_calculo, base_calculo, es_de_ley,
+                                    cuenta_contable_codigo, cuenta_contable_nombre)
+    VALUES
+        ('HABER-BASICO', 'Haber básico', 'Porcentaje del haber mensual por los días pagados del mes (sobre 30).',
+         'INGRESO', 'PORCENTAJE', 'HABER_BASICO', TRUE, '5.1.1.01', 'Sueldos y salarios'),
+        ('HORAS-EXTRA', 'Horas extraordinarias', 'Recargo sobre el valor de la hora (haber mensual / 240) por cada hora extra aprobada.',
+         'INGRESO', 'PORCENTAJE', 'HABER_BASICO', TRUE, '5.1.1.02', 'Horas extraordinarias'),
+        ('DOMINICAL', 'Domingos, feriados y descansos trabajados', 'Pago adicional sobre el valor de la hora por las horas ordinarias trabajadas en domingo, feriado o día de descanso.',
+         'INGRESO', 'PORCENTAJE', 'HABER_BASICO', TRUE, '5.1.1.03', 'Dominicales y feriados trabajados'),
+        ('RECARGO-NOCTURNO', 'Recargo nocturno', 'Recargo sobre el valor de la hora por las horas trabajadas entre las 20:00 y las 06:00.',
+         'INGRESO', 'PORCENTAJE', 'HABER_BASICO', TRUE, '5.1.1.04', 'Recargo nocturno'),
+        ('ANS-13000', 'Aporte nacional solidario (excedente de Bs 13.000)', 'Sobre la parte del total ganado que supera Bs 13.000.',
+         'DESCUENTO', 'PORCENTAJE', 'TOTAL_GANADO', TRUE, '2.1.3.01', 'Aportes laborales por pagar'),
+        ('ANS-25000', 'Aporte nacional solidario (excedente de Bs 25.000)', 'Sobre la parte del total ganado que supera Bs 25.000.',
+         'DESCUENTO', 'PORCENTAJE', 'TOTAL_GANADO', TRUE, '2.1.3.01', 'Aportes laborales por pagar'),
+        ('ANS-35000', 'Aporte nacional solidario (excedente de Bs 35.000)', 'Sobre la parte del total ganado que supera Bs 35.000.',
+         'DESCUENTO', 'PORCENTAJE', 'TOTAL_GANADO', TRUE, '2.1.3.01', 'Aportes laborales por pagar')
+    RETURNING id_concepto, codigo
+)
+INSERT INTO VIGENCIAS_CONCEPTO (id_concepto, valor, vigente_desde)
+SELECT c.id_concepto, v.valor, DATE '2026-01-01'
+FROM conceptos c
+JOIN (VALUES
+    ('HABER-BASICO', 100.00),
+    ('HORAS-EXTRA', 100.00),
+    ('DOMINICAL', 100.00),
+    ('RECARGO-NOCTURNO', 25.00),
+    ('ANS-13000', 1.00),
+    ('ANS-25000', 5.00),
+    ('ANS-35000', 10.00)
 ) AS v (codigo, valor) USING (codigo);

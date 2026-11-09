@@ -3,6 +3,13 @@ const cors = require("cors");
 const pool = require("./src/config/db");
 const conceptosRoutes = require("./src/routes/conceptos.routes");
 const condicionesRoutes = require("./src/routes/condiciones.routes");
+const anticiposRoutes = require("./src/routes/anticipos.routes");
+const antiguedadRoutes = require("./src/routes/antiguedad.routes");
+const planillasRoutes = require("./src/routes/planillas.routes");
+const confirmacionesRoutes = require("./src/routes/confirmaciones.routes");
+const mensajesPublicadosRoutes = require("./src/routes/mensajesPublicados.routes");
+const { iniciarDespachador } = require("./src/services/eventos.service");
+const { iniciarConsumidor } = require("./src/services/confirmaciones.service");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 
 const app = express();
@@ -36,8 +43,16 @@ app.get("/health", async (req, res) => {
 
 app.use(conceptosRoutes);
 app.use(condicionesRoutes);
+app.use(anticiposRoutes);
+app.use(antiguedadRoutes);
+app.use(planillasRoutes);
+app.use(confirmacionesRoutes);
+app.use(mensajesPublicadosRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`CompensationService corriendo en http://0.0.0.0:${PORT}`);
+  // Bandeja de salida (planilla aprobada) y confirmaciones de Contabilidad y Pagos por Pub/Sub.
+  iniciarDespachador();
+  iniciarConsumidor();
 });

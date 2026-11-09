@@ -1,6 +1,6 @@
 const pool = require("../config/db");
 const { ESTADO_EVALUACION } = require("../utils/evaluaciones");
-const { ESTADO_VERSION } = require("../utils/catalogos");
+const { ESTADO_VERSION } = require("../utils/plantillas");
 
 async function obtenerVersion(idVersion, db = pool) {
   const { rows } = await db.query(

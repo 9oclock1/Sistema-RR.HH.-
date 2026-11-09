@@ -9,6 +9,23 @@ router.get(
   identificarEmpleado,
   controlador.listarCiclos,
 );
+// KAN-26: resultados del colaborador evaluado (solo lectura). Van antes de /evaluaciones/:idEvaluacion.
+router.get(
+  "/evaluaciones/mis-resultados",
+  identificarEmpleado,
+  controlador.listarMisResultados,
+);
+router.get(
+  "/evaluaciones/mis-resultados/:idEvaluacion",
+  identificarEmpleado,
+  controlador.obtenerMiResultado,
+);
+// Historial consolidado de un colaborador (RBAC: el propio, o cualquiera si el rol es de RRHH).
+router.get(
+  "/evaluaciones/historial/:idEmpleado",
+  identificarEmpleado,
+  controlador.obtenerHistorialDesempeno,
+);
 router.get(
   "/evaluaciones",
   identificarEmpleado,
@@ -28,6 +45,11 @@ router.post(
   "/evaluaciones/:idEvaluacion/envio",
   identificarEmpleado,
   controlador.enviar,
+);
+router.put(
+  "/evaluaciones/:idEvaluacion/retroalimentacion",
+  identificarEmpleado,
+  controlador.guardarRetroalimentacion,
 );
 
 module.exports = router;

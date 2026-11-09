@@ -1,81 +1,94 @@
-import { ClipboardList, CopyPlus, Eye, Pencil, Trash2 } from "lucide-react";
+import { Link } from "react-router";
+import { ClipboardList, ListTree, Pencil, Trash2 } from "lucide-react";
 import { Boton, EstadoVacio, Etiqueta, Tabla, TextoTruncado } from "../../components/ui";
-import { ESTADOS, formatearFecha, formatearPorcentaje } from "./plantilla";
+import { ESTADOS_PLANTILLA, esEditable, formatearVigencia } from "./formato";
+import { rutaPlantilla } from "./ruta";
 
-// Cada fila es una versión de una plantilla.
-const COLUMNAS = ({ onAbrir, onNuevaVersion, onEliminar }) => [
+const COLUMNAS = ({ onEditar, onEliminar }) => [
   {
-    clave: "nombre",
-    titulo: "Nombre",
-    celda: (version) => (
-      <button type="button" className="plantillas-enlace ds-foco" onClick={() => onAbrir(version)}>
-        <TextoTruncado>{version.nombre}</TextoTruncado>
-      </button>
+    clave: "plantilla",
+    titulo: "Plantilla",
+    ancho: "34%",
+    celda: (p) => (
+      <div className="pl-celda">
+        <Link to={rutaPlantilla(p.id_plantilla)} className="pl-enlace ds-foco">
+          <TextoTruncado className="pl-celda__principal">{p.nombre}</TextoTruncado>
+        </Link>
+        <TextoTruncado className="pl-sutil">{p.objetivo}</TextoTruncado>
+      </div>
     ),
   },
-  { clave: "departamento", titulo: "Área", ancho: "14%", celda: (version) => <TextoTruncado>{version.departamento}</TextoTruncado> },
+  {
+    clave: "area",
+    titulo: "Área destino",
+    ancho: "18%",
+    celda: (p) => <TextoTruncado>{p.area.nombre}</TextoTruncado>,
+  },
   {
     clave: "vigencia",
     titulo: "Vigencia",
-    ancho: "17%",
-    celda: (version) => `${formatearFecha(version.vigencia_desde)} – ${formatearFecha(version.vigencia_hasta)}`,
+    ancho: "20%",
+    celda: (p) => <span className="pl-vigencia">{formatearVigencia(p.vigencia_desde, p.vigencia_hasta)}</span>,
   },
-  { clave: "numero_version", titulo: "Versión", ancho: "8%", alinear: "fin", celda: (version) => `v${version.numero_version}` },
   {
     clave: "estado",
     titulo: "Estado",
-    ancho: "11%",
-    celda: (version) => <Etiqueta tono={ESTADOS[version.estado].tono}>{ESTADOS[version.estado].etiqueta}</Etiqueta>,
+    ancho: "14%",
+    celda: (p) => {
+      const estado = ESTADOS_PLANTILLA[p.estado_codigo];
+      return (
+        <div className="pl-celda">
+          <Etiqueta tono={estado.tono}>{estado.texto}</Etiqueta>
+          <span className="pl-sutil">
+            Versión {p.version_actual.numero_version}
+            {p.fue_publicada && p.estado_codigo === "BORRADOR" && " · hay una publicada"}
+          </span>
+        </div>
+      );
+    },
   },
-  { clave: "total_preguntas", titulo: "Preguntas", ancho: "9%", alinear: "fin" },
   {
-    clave: "suma_pesos",
-    titulo: "Suma de pesos",
-    ancho: "11%",
+    clave: "secciones",
+    titulo: "Secciones",
+    ancho: "8%",
     alinear: "fin",
-    celda: (version) =>
-      version.balanceado ? (
-        formatearPorcentaje(version.suma_pesos)
-      ) : (
-        <Etiqueta tono="aviso" title="Debe sumar 100 % para publicar">
-          {formatearPorcentaje(version.suma_pesos)}
-        </Etiqueta>
-      ),
+    celda: (p) => <span className="pl-numero">{p.secciones_total}</span>,
   },
   {
     clave: "acciones",
     titulo: <span className="ds-solo-lector">Acciones</span>,
-    celda: (version) => {
-      const esBorrador = version.estado === "BORRADOR";
-      const nombre = `${version.nombre} v${version.numero_version}`;
+    celda: (p) => {
+      const accion = esEditable(p) ? "Configurar secciones" : "Ver estructura";
       return (
-        <div className="plantillas-acciones">
+        <div className="pl-acciones">
           <Boton
+            as={Link}
+            to={rutaPlantilla(p.id_plantilla)}
             variante="sutil"
             soloIcono
-            icono={esBorrador ? Pencil : Eye}
-            aria-label={`${esBorrador ? "Editar" : "Ver"} ${nombre}`}
-            title={esBorrador ? "Editar" : "Ver"}
-            onClick={() => onAbrir(version)}
+            icono={ListTree}
+            aria-label={`${accion} de ${p.nombre}`}
+            title={accion}
           />
-          {esBorrador ? (
-            <Boton
-              variante="sutil"
-              soloIcono
-              icono={Trash2}
-              aria-label={`Eliminar ${nombre}`}
-              title="Eliminar borrador"
-              onClick={() => onEliminar(version)}
-            />
-          ) : (
-            <Boton
-              variante="sutil"
-              soloIcono
-              icono={CopyPlus}
-              aria-label={`Crear nueva versión de ${nombre}`}
-              title="Crear nueva versión"
-              onClick={() => onNuevaVersion(version)}
-            />
+          {esEditable(p) && (
+            <>
+              <Boton
+                variante="sutil"
+                soloIcono
+                icono={Pencil}
+                aria-label={`Editar ${p.nombre}`}
+                title="Editar datos"
+                onClick={() => onEditar(p)}
+              />
+              <Boton
+                variante="sutil"
+                soloIcono
+                icono={Trash2}
+                aria-label={`Eliminar ${p.nombre}`}
+                title="Eliminar"
+                onClick={() => onEliminar(p)}
+              />
+            </>
           )}
         </div>
       );
@@ -83,24 +96,17 @@ const COLUMNAS = ({ onAbrir, onNuevaVersion, onEliminar }) => [
   },
 ];
 
-export default function TablaPlantillas({ plantillas, cargando, accionVacia, ...acciones }) {
+export default function TablaPlantillas({ plantillas, cargando, vacio, ...acciones }) {
   return (
     <Tabla
-      className="plantillas-tabla"
+      className="pl-tabla"
       descripcion="Plantillas de evaluación"
       columnas={COLUMNAS(acciones)}
       filas={plantillas}
-      claveFila="id_version"
+      claveFila="id_plantilla"
       cargando={cargando}
-      filasCargando={3}
-      vacio={
-        <EstadoVacio
-          icono={ClipboardList}
-          titulo="Aún no hay plantillas de evaluación"
-          mensaje="Cree una plantilla con sus secciones por competencia, criterios, preguntas ponderadas y escalas de valoración."
-          accion={accionVacia}
-        />
-      }
+      filasCargando={4}
+      vacio={vacio ?? <EstadoVacio icono={ClipboardList} titulo="Aún no hay plantillas" />}
     />
   );
 }

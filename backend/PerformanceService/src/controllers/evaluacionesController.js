@@ -20,4 +20,36 @@ async function enviar(req, res) {
   res.json(await servicio.enviar(req.idEmpleado, req.params.idEvaluacion));
 }
 
-module.exports = { listarEvaluaciones, listarCiclos, obtenerFormulario, guardarRespuestas, enviar };
+async function guardarRetroalimentacion(req, res) {
+  res.json(await servicio.guardarRetroalimentacion(req.idEmpleado, req.params.idEvaluacion, req.body));
+}
+
+async function listarMisResultados(req, res) {
+  res.json(await servicio.listarMisResultados(req.idEmpleado));
+}
+
+async function obtenerMiResultado(req, res) {
+  res.json(await servicio.obtenerMiResultado(req.idEmpleado, req.params.idEvaluacion));
+}
+
+async function obtenerHistorialDesempeno(req, res) {
+  res.json(
+    await servicio.obtenerHistorialDesempeno({
+      idSolicitante: req.idEmpleado,
+      rol: req.get("X-Rol")?.trim().toLowerCase() || null,
+      idColaborador: req.params.idEmpleado,
+    }),
+  );
+}
+
+module.exports = {
+  obtenerHistorialDesempeno,
+  listarEvaluaciones,
+  listarCiclos,
+  obtenerFormulario,
+  guardarRespuestas,
+  enviar,
+  guardarRetroalimentacion,
+  listarMisResultados,
+  obtenerMiResultado,
+};

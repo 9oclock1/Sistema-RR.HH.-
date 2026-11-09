@@ -358,8 +358,10 @@ CREATE TABLE PLANTILLAS_EVALUACION (
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT PLANTILLAS_EVALUACION_pk PRIMARY KEY (id_plantilla),
     CONSTRAINT chk_plantilla_vigencia CHECK (vigencia_hasta >= vigencia_desde),
+    CONSTRAINT chk_plantilla_nombre CHECK (btrim(nombre) <> ''),
+    CONSTRAINT chk_plantilla_objetivo CHECK (btrim(objetivo) <> ''),
     CONSTRAINT ex_plantilla_nombre_area_vigencia EXCLUDE USING gist (
-        nombre WITH =,
+        lower(btrim(nombre)) WITH =,
         id_departamento_destino WITH =,
         daterange(vigencia_desde, vigencia_hasta, '[]') WITH &&
     )

@@ -1,12 +1,12 @@
 const modelo = require("../models/ciclosModel");
 const { hoy } = require("../models/evaluacionesModel");
 const { enTransaccion } = require("../config/transaccion");
-const empleados = require("./empleados.service");
+const empleados = require("./empleadosService");
 const jerarquia = require("./jerarquiaExterna");
 const { ErrorApp } = require("../utils/errores");
 const { conLimite } = require("../utils/concurrencia");
 const { UUID_RE } = require("../utils/formatos");
-const { ESTADO_VERSION } = require("../utils/catalogos");
+const { ESTADO_VERSION } = require("../utils/plantillas");
 const { nombreCompleto } = require("../utils/evaluaciones");
 const { validarCiclo, validarVistaPrevia, verificarFechas } = require("../utils/ciclos");
 const { resolverAsignaciones } = require("../utils/asignacionCiclo");

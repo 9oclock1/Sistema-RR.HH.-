@@ -20,7 +20,7 @@ require.cache[rutaTransaccion] = {
 
 const pool = require("../config/db");
 const modelo = require("../models/ciclosModel");
-const empleadosService = require("../services/empleados.service");
+const empleadosService = require("../services/empleadosService");
 const jerarquia = require("../services/jerarquiaExterna");
 const servicio = require("../services/ciclosService");
 const { ErrorApp } = require("../utils/errores");
