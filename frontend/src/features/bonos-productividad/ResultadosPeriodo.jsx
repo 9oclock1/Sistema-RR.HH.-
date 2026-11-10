@@ -4,6 +4,7 @@ import { listarBonos, procesarPeriodo } from "../../api/bonosProductividad";
 import { Alerta, Boton, CampoTexto, Etiqueta, EstadoVacio, Tabla, useAvisos } from "../../components/ui";
 import { formatearValor } from "../conceptos/formato";
 import { TIPOS_META, formatearMes, formatearPorcentaje, mesActual, mesAnterior } from "./formato";
+import SolicitudCierre from "./SolicitudCierre";
 
 const PERIODO_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -112,6 +113,7 @@ export default function ResultadosPeriodo({ hayReglas }) {
         Aplica las reglas activas del periodo a las métricas de ventas recibidas de Marketplace y Ventas. Se procesa
         automáticamente al recibir el cierre de ventas del periodo; use este botón si cambió una regla después.
       </p>
+      <SolicitudCierre periodo={periodo} valido={valido} />
 
       {errorAlProcesar && (
         <Alerta tono="peligro" role="alert" titulo="No se pudo procesar el periodo" onCerrar={() => setErrorProceso(null)}>

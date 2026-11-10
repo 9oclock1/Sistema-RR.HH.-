@@ -25,3 +25,13 @@ export const listarEventosVentas = (estado) =>
   solicitar(`${RUTA}/eventos${estado ? `?estado=${encodeURIComponent(estado)}` : ""}`);
 
 export const reprocesarEventoVentas = (id) => solicitar(`${RUTA}/eventos/${id}/reprocesar`, { metodo: "POST" });
+
+export const obtenerSolicitudCierre = (periodo) =>
+  solicitar(`${RUTA}/solicitudes-cierre?periodo=${encodeURIComponent(periodo)}`);
+
+export const solicitarCierreVentas = (periodo, { idEmpleado, rol }) =>
+  solicitar(`${RUTA}/solicitudes-cierre`, {
+    metodo: "POST",
+    cuerpo: { periodo },
+    cabeceras: { ...(idEmpleado && { "X-Empleado-Id": idEmpleado }), "X-Rol": rol },
+  });
