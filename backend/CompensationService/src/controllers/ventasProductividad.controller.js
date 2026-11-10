@@ -40,7 +40,7 @@ async function eliminarRegla(req, res) {
 }
 
 async function procesar(req, res) {
-  res.json(await servicio.procesar(req.body));
+  res.json(await servicio.procesar(req.body, identidad(req)));
 }
 
 async function listarBonos(req, res) {

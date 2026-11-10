@@ -6,6 +6,7 @@ const controlador = require("../controllers/bonificaciones.controller");
 const router = Router();
 
 router.get("/bonificaciones/auditoria", controlador.auditoria);
+router.get("/bonificaciones/sucursales/:sucursal", controlador.historialPorSucursal);
 router.get("/bonificaciones/empleados/:idEmpleado", controlador.historial);
 
 module.exports = router;

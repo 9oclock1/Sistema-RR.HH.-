@@ -1,11 +1,15 @@
-// Historial y auditoría de bonificaciones (RF-53, KAN-73). Hoy la única fuente de bonos por colaborador es
-// CONDICION (bonos_condicion, KAN-72); tipo_bono queda listo para otras fuentes que persistan bonos por
-// colaborador en el futuro.
+// Historial y auditoría de bonificaciones (RF-53, KAN-73). CONDICION (bonos_condicion, KAN-72) y PRODUCTIVIDAD
+// (bonos_productividad, KAN-71) se reemplazan por completo en cada reproceso y se auditan (quién, cuándo, valor
+// anterior). ANTIGUEDAD (KAN-70) solo aparece en el historial: no se persiste por colaborador fuera de la
+// planilla ya calculada, así que no hay nada que auditar ni diferenciar entre reprocesos.
 const { ErrorApp } = require("./errores");
 const { UUID_RE } = require("./formatos");
 const { TIPOS_CONDICION } = require("./condiciones");
 
-const TIPOS_BONO = ["CONDICION"];
+// Fuentes que se auditan (reemplazo completo en cada reproceso, con valor anterior que conservar).
+const TIPOS_BONO = ["CONDICION", "PRODUCTIVIDAD"];
+// Fuentes que puede mostrar el historial de un colaborador: las auditadas más ANTIGUEDAD, de solo lectura.
+const FUENTES_HISTORIAL = [...TIPOS_BONO, "ANTIGUEDAD"];
 const ACCIONES = ["ALTA", "MODIFICACION", "ANULACION"];
 const PERIODO_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 // Temporal (ver controladores de confirmaciones/planillas): mientras no haya autenticación real, el Auditor
@@ -33,10 +37,21 @@ function validarFiltros({ periodo, tipo } = {}) {
   return { periodo: periodo ?? null, tipo: tipo ?? null };
 }
 
+// Para la auditoría (RF-53, criterio 2): solo las fuentes que se reemplazan en cada reproceso y se auditan.
 function validarTipoBono(tipo_bono) {
   if (tipo_bono !== undefined && !TIPOS_BONO.includes(tipo_bono)) {
     throw new ErrorApp(400, "Filtros inválidos", [
       { campo: "tipo_bono", mensaje: `Use uno de: ${TIPOS_BONO.join(", ")}.` },
+    ]);
+  }
+  return tipo_bono ?? null;
+}
+
+// Para el historial (RF-53, criterio 1): además de las auditadas, admite ANTIGUEDAD (solo lectura, sin auditoría).
+function validarFuenteHistorial(tipo_bono) {
+  if (tipo_bono !== undefined && !FUENTES_HISTORIAL.includes(tipo_bono)) {
+    throw new ErrorApp(400, "Filtros inválidos", [
+      { campo: "tipo_bono", mensaje: `Use uno de: ${FUENTES_HISTORIAL.join(", ")}.` },
     ]);
   }
   return tipo_bono ?? null;
@@ -59,23 +74,27 @@ function identidadAuditoria({ idEmpleado, rol } = {}) {
   };
 }
 
-// Misma condición, colaborador, vigencia y asignación: identifica "el mismo bono" entre dos reprocesos,
-// aunque cada reproceso le asigne un id_bono nuevo (bonos_condicion se reemplaza por completo, ver
-// reemplazarProceso).
-const claveBono = (b) => `${b.id_condicion}|${b.id_empleado}|${b.id_vigencia}|${b.id_asignacion ?? ""}`;
+// Identifica "el mismo bono" entre dos reprocesos, aunque cada reproceso le asigne un id_bono nuevo (bonos_condicion
+// y bonos_productividad se reemplazan por completo, ver reemplazarProceso y aplicarReglas). CONDICION: condición,
+// colaborador y asignación (NO la vigencia: una condición con una vigencia nueva sigue siendo el mismo bono, con
+// un valor distinto, y debe quedar como MODIFICACION en vez de ANULACION + ALTA). PRODUCTIVIDAD: colaborador y
+// regla (no hay condición ni asignación).
+const claveBono = (b, tipoBono) =>
+  tipoBono === "PRODUCTIVIDAD" ? `${b.id_empleado}|${b.id_regla}` : `${b.id_condicion}|${b.id_empleado}|${b.id_asignacion ?? ""}`;
 
 const igual = (a, b) => a === b || (a === null && b === null) || (a == null && b == null);
 
 // Compara los bonos de un reproceso con los del anterior y devuelve solo las filas de auditoría de lo que
 // realmente cambió (RF-53, criterio 2): altas, anulaciones y modificaciones de valor, monto o factor. Un
 // reproceso que no cambia nada (el caso más común: se vuelve a generar la planilla del mes) no genera ruido.
-function diffBonos(anteriores, nuevos) {
-  const porClaveAnterior = new Map(anteriores.map((b) => [claveBono(b), b]));
-  const porClaveNueva = new Map(nuevos.map((b) => [claveBono(b), b]));
+function diffBonos(anteriores, nuevos, tipoBono = "CONDICION") {
+  const clave = (b) => claveBono(b, tipoBono);
+  const porClaveAnterior = new Map(anteriores.map((b) => [clave(b), b]));
+  const porClaveNueva = new Map(nuevos.map((b) => [clave(b), b]));
   const filas = [];
 
-  for (const [clave, nuevo] of porClaveNueva) {
-    const anterior = porClaveAnterior.get(clave);
+  for (const [c, nuevo] of porClaveNueva) {
+    const anterior = porClaveAnterior.get(c);
     if (!anterior) {
       filas.push({ bono: nuevo, accion: "ALTA" });
     } else if (
@@ -86,20 +105,23 @@ function diffBonos(anteriores, nuevos) {
       filas.push({ bono: nuevo, anterior, accion: "MODIFICACION" });
     }
   }
-  for (const [clave, anterior] of porClaveAnterior) {
-    if (!porClaveNueva.has(clave)) filas.push({ bono: anterior, accion: "ANULACION" });
+  for (const [c, anterior] of porClaveAnterior) {
+    if (!porClaveNueva.has(c)) filas.push({ bono: anterior, accion: "ANULACION" });
   }
   return filas;
 }
 
 // Fila lista para insertar en AUDITORIA_BONIFICACIONES.
-function filaAuditoria({ bono, anterior, accion }, { periodo, realizado_por, realizado_por_rol }) {
+function filaAuditoria({ bono, anterior, accion }, { periodo, realizado_por, realizado_por_rol, tipoBono }) {
   const actual = accion === "ANULACION" ? null : bono;
   const previo = accion === "ALTA" ? null : (anterior ?? bono);
+  const origen =
+    tipoBono === "PRODUCTIVIDAD"
+      ? { id_condicion: null, id_asignacion: null, id_regla: bono.id_regla }
+      : { id_condicion: bono.id_condicion, id_asignacion: bono.id_asignacion ?? null, id_regla: null };
   return {
-    tipo_bono: "CONDICION",
-    id_condicion: bono.id_condicion,
-    id_asignacion: bono.id_asignacion ?? null,
+    tipo_bono: tipoBono,
+    ...origen,
     periodo,
     id_empleado: bono.id_empleado,
     nombre_empleado: bono.nombre_empleado,
@@ -116,9 +138,11 @@ function filaAuditoria({ bono, anterior, accion }, { periodo, realizado_por, rea
 }
 
 // Filas de auditoría para un reproceso: compara y arma cada fila en un solo paso.
-function filasDeAuditoria({ anteriores, nuevos, periodo, identidad }) {
+function filasDeAuditoria({ anteriores, nuevos, periodo, identidad, tipoBono = "CONDICION" }) {
   const { realizado_por, realizado_por_rol } = identidadAuditoria(identidad);
-  return diffBonos(anteriores, nuevos).map((cambio) => filaAuditoria(cambio, { periodo, realizado_por, realizado_por_rol }));
+  return diffBonos(anteriores, nuevos, tipoBono).map((cambio) =>
+    filaAuditoria(cambio, { periodo, realizado_por, realizado_por_rol, tipoBono })
+  );
 }
 
 // CSV con BOM y separador ";" (Excel en español), igual que los reportes de Asistencia.
@@ -134,14 +158,17 @@ function aCsv(columnas, filas) {
 
 module.exports = {
   TIPOS_BONO,
+  FUENTES_HISTORIAL,
   ACCIONES,
   ROLES_AUDITORIA,
   validarIdEmpleado,
   validarFiltros,
   validarTipoBono,
+  validarFuenteHistorial,
   validarAuditor,
   claveBono,
   diffBonos,
+  filaAuditoria,
   filasDeAuditoria,
   aCsv,
 };

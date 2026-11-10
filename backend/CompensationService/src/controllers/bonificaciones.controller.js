@@ -22,8 +22,12 @@ async function historial(req, res) {
   enviar(res, await servicio.historial(req.query, req.params.idEmpleado, identidad(req)));
 }
 
+async function historialPorSucursal(req, res) {
+  enviar(res, await servicio.historialPorSucursal({ ...req.query, sucursal: req.params.sucursal }, identidad(req)));
+}
+
 async function auditoria(req, res) {
   enviar(res, await servicio.auditoria(req.query, identidad(req)));
 }
 
-module.exports = { historial, auditoria };
+module.exports = { historial, historialPorSucursal, auditoria };

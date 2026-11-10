@@ -676,16 +676,19 @@ VALUES ('BONO-PRODUCTIVIDAD', 'Bono de productividad',
         'INGRESO', 'MONTO_FIJO', NULL, FALSE, '5.1.1.06', 'Bono de productividad');
 
 -- Tabla: AUDITORIA_BONIFICACIONES
--- Auditoría de altas, modificaciones y anulaciones de bonos (RF-53, KAN-73). bonos_condicion se reemplaza por
--- completo en cada reproceso del periodo (ver reemplazarProceso), así que esta tabla es la única que conserva
--- quién cambió qué y cuál era el valor anterior: el servicio compara los bonos del proceso anterior con los
--- nuevos (misma condición, colaborador, vigencia y asignación) y solo registra una fila cuando algo cambió.
--- tipo_bono queda listo para otras fuentes de bono (hoy solo CONDICION persiste bonos por colaborador).
+-- Auditoría de altas, modificaciones y anulaciones de bonos (RF-53, KAN-73). bonos_condicion y bonos_productividad
+-- se reemplazan por completo en cada reproceso del periodo (ver reemplazarProceso y aplicarReglas), así que esta
+-- tabla es la única que conserva quién cambió qué y cuál era el valor anterior: el servicio compara los bonos del
+-- proceso anterior con los nuevos y solo registra una fila cuando algo cambió. CONDICION se identifica por
+-- condición + colaborador + asignación (id_vigencia no entra en la clave: una condición con nueva vigencia sigue
+-- siendo el mismo bono, solo cambia su valor); PRODUCTIVIDAD se identifica por colaborador + regla. El bono de
+-- antigüedad (KAN-70) no se audita aquí: no se persiste por colaborador, solo queda en CALCULOS_PLANILLA.
 CREATE TABLE AUDITORIA_BONIFICACIONES (
     id_auditoria UUID NOT NULL DEFAULT gen_random_uuid(),
     tipo_bono varchar(20) NOT NULL,
     id_condicion UUID NULL,
     id_asignacion UUID NULL,
+    id_regla UUID NULL,
     periodo char(7) NOT NULL,
     id_empleado UUID NOT NULL,
     nombre_empleado varchar(150) NOT NULL,
@@ -703,7 +706,12 @@ CREATE TABLE AUDITORIA_BONIFICACIONES (
     CONSTRAINT fk_auditoria_condicion FOREIGN KEY (id_condicion) REFERENCES CONDICIONES_ESPECIALES (id_condicion),
     CONSTRAINT fk_auditoria_asignacion FOREIGN KEY (id_asignacion)
         REFERENCES ASIGNACIONES_CONDICION (id_asignacion) ON DELETE SET NULL,
-    CONSTRAINT chk_auditoria_tipo_bono CHECK (tipo_bono IN ('CONDICION')),
+    CONSTRAINT fk_auditoria_regla FOREIGN KEY (id_regla) REFERENCES REGLAS_BONO_PRODUCTIVIDAD (id_regla),
+    CONSTRAINT chk_auditoria_tipo_bono CHECK (tipo_bono IN ('CONDICION', 'PRODUCTIVIDAD')),
+    CONSTRAINT chk_auditoria_origen CHECK (
+        (tipo_bono = 'CONDICION' AND id_regla IS NULL)
+        OR (tipo_bono = 'PRODUCTIVIDAD' AND id_condicion IS NULL AND id_asignacion IS NULL)
+    ),
     CONSTRAINT chk_auditoria_accion CHECK (accion IN ('ALTA', 'MODIFICACION', 'ANULACION')),
     -- Alta: solo hay valor nuevo. Anulación: solo hay valor anterior. Modificación: hay ambos.
     CONSTRAINT chk_auditoria_valores CHECK (
