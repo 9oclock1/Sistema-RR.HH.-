@@ -264,13 +264,14 @@ CREATE TABLE PLANILLA_EMPLEADOS (
     )
 );
 -- Tabla: NOVEDADES_PLANILLA
--- Rubros variables de un colaborador en la planilla (bonos por condiciones especiales), con la vigencia del
--- concepto que les dio el valor. monto NULL: porcentaje que se calcula sobre el haber básico.
+-- Rubros variables de un colaborador en la planilla (bonos por condiciones especiales y por productividad), con la
+-- vigencia del concepto que les dio el valor. monto NULL: porcentaje que se calcula sobre el haber básico.
+-- El bono de productividad (KAN-71) toma su valor de la regla del periodo, no de una vigencia de concepto.
 CREATE TABLE NOVEDADES_PLANILLA (
     id_novedad UUID NOT NULL DEFAULT gen_random_uuid(),
     id_planilla_empleado UUID NOT NULL,
     origen varchar(15) NOT NULL,
-    id_vigencia UUID NOT NULL,
+    id_vigencia UUID NULL,
     codigo varchar(20) NOT NULL,
     nombre varchar(80) NOT NULL,
     forma_calculo varchar(12) NOT NULL,
@@ -284,7 +285,8 @@ CREATE TABLE NOVEDADES_PLANILLA (
         REFERENCES PLANILLA_EMPLEADOS (id_planilla_empleado) ON DELETE CASCADE,
     -- Un concepto usado en una planilla no se puede eliminar, solo inactivar.
     CONSTRAINT fk_novedad_planilla_vigencia FOREIGN KEY (id_vigencia) REFERENCES VIGENCIAS_CONCEPTO (id_vigencia),
-    CONSTRAINT chk_novedad_planilla_origen CHECK (origen IN ('BONO_CONDICION')),
+    CONSTRAINT chk_novedad_planilla_origen CHECK (origen IN ('BONO_CONDICION', 'PRODUCTIVIDAD')),
+    CONSTRAINT chk_novedad_planilla_vigencia CHECK ((id_vigencia IS NULL) = (origen = 'PRODUCTIVIDAD')),
     CONSTRAINT chk_novedad_planilla_forma CHECK (forma_calculo IN ('MONTO_FIJO', 'PORCENTAJE')),
     CONSTRAINT chk_novedad_planilla_valores CHECK (cantidad > 0 AND factor > 0 AND valor > 0 AND (monto IS NULL OR monto >= 0)),
     CONSTRAINT chk_novedad_planilla_monto CHECK ((forma_calculo = 'MONTO_FIJO') = (monto IS NOT NULL))
@@ -293,7 +295,8 @@ CREATE INDEX idx_novedades_planilla_empleado ON NOVEDADES_PLANILLA (id_planilla_
 -- Tabla: CALCULOS_PLANILLA
 -- Detalle del cálculo de cada colaborador: un renglón por concepto, con la vigencia que dio el valor, la base,
 -- la cantidad (días u horas) y el resultado redondeado a centavos. Los totales del colaborador son su suma.
--- El bono de antigüedad (escala de KAN-70) y las cuotas de préstamos (KAN-65) no salen de una vigencia de concepto.
+-- El bono de antigüedad (escala de KAN-70), el de productividad (regla de KAN-71) y las cuotas de préstamos (KAN-65)
+-- no salen de una vigencia de concepto.
 CREATE TABLE CALCULOS_PLANILLA (
     id_calculo UUID NOT NULL DEFAULT gen_random_uuid(),
     id_planilla_empleado UUID NOT NULL,
@@ -316,7 +319,7 @@ CREATE TABLE CALCULOS_PLANILLA (
     CONSTRAINT fk_calculo_vigencia FOREIGN KEY (id_vigencia) REFERENCES VIGENCIAS_CONCEPTO (id_vigencia),
     CONSTRAINT chk_calculo_tipo CHECK (tipo IN ('INGRESO', 'DESCUENTO', 'APORTE')),
     CONSTRAINT chk_calculo_forma CHECK (forma_calculo IN ('MONTO_FIJO', 'PORCENTAJE')),
-    CONSTRAINT chk_calculo_origen CHECK (id_vigencia IS NOT NULL OR codigo IN ('BONO-ANTIGUEDAD', 'CUOTA-PRESTAMO')),
+    CONSTRAINT chk_calculo_origen CHECK (id_vigencia IS NOT NULL OR codigo IN ('BONO-ANTIGUEDAD', 'BONO-PRODUCTIVIDAD', 'CUOTA-PRESTAMO')),
     CONSTRAINT chk_calculo_valores CHECK (valor > 0 AND resultado >= 0 AND (base IS NULL OR base >= 0) AND (cantidad IS NULL OR cantidad >= 0))
 );
 CREATE INDEX idx_calculos_planilla_empleado ON CALCULOS_PLANILLA (id_planilla_empleado);
@@ -567,6 +570,110 @@ JOIN (VALUES
     ('ANS-25000', 5.00),
     ('ANS-35000', 10.00)
 ) AS v (codigo, valor) USING (codigo);
+
+-- Tabla: REGLAS_BONO_PRODUCTIVIDAD
+-- Reglas configurables de bonos variables por cumplimiento de metas (RF-51, KAN-71): venta, puntualidad o
+-- desempeño en caja. Una regla activa por tipo de meta y periodo; "puntualidad" y "desempeño en caja" quedan
+-- definidas aquí para cuando existan esas métricas, pero hoy solo Ventas y Marketing publica datos.
+CREATE TABLE REGLAS_BONO_PRODUCTIVIDAD (
+    id_regla UUID NOT NULL DEFAULT gen_random_uuid(),
+    periodo date NOT NULL,
+    tipo_meta varchar(20) NOT NULL,
+    umbral_cumplimiento numeric(6,2) NOT NULL,
+    forma_calculo varchar(12) NOT NULL,
+    valor numeric(12,4) NOT NULL,
+    esta_activa boolean NOT NULL DEFAULT TRUE,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT REGLAS_BONO_PRODUCTIVIDAD_pk PRIMARY KEY (id_regla),
+    CONSTRAINT uq_regla_periodo_tipo UNIQUE (periodo, tipo_meta),
+    CONSTRAINT chk_regla_tipo_meta CHECK (tipo_meta IN ('VENTAS', 'PUNTUALIDAD', 'DESEMPENO_CAJA')),
+    CONSTRAINT chk_regla_forma CHECK (forma_calculo IN ('MONTO_FIJO', 'PORCENTAJE')),
+    CONSTRAINT chk_regla_umbral CHECK (umbral_cumplimiento > 0),
+    CONSTRAINT chk_regla_valor CHECK (valor > 0),
+    CONSTRAINT chk_regla_periodo_dia CHECK (EXTRACT(DAY FROM periodo) = 1)
+);
+CREATE INDEX idx_reglas_bono_periodo ON REGLAS_BONO_PRODUCTIVIDAD (periodo);
+
+-- Tabla: EVENTOS_VENTAS_ENTRANTES
+-- Bandeja de entrada del cierre de ventas del periodo publicado por Ventas y Marketing (grupo E). id_mensaje
+-- (del remitente) evita procesar dos veces el mismo mensaje (RF-51, criterio 4). RECIBIDO: en proceso o
+-- esperando reintento; PROCESADO: las métricas quedaron registradas; IGNORADO: mensaje repetido o que no es
+-- para RRHH; FALLIDO: inválido o sin procesar tras varios intentos (cola de mensajes fallidos, se reprocesa).
+CREATE TABLE EVENTOS_VENTAS_ENTRANTES (
+    id_evento_entrante UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_mensaje varchar(100) NOT NULL,
+    topico varchar(60) NOT NULL,
+    tipo_evento varchar(60) NOT NULL,
+    periodo date NULL,
+    carga JSONB NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'RECIBIDO',
+    intentos smallint NOT NULL DEFAULT 0,
+    detalle varchar(255) NULL,
+    recibido_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    procesado_en TIMESTAMPTZ NULL,
+    CONSTRAINT EVENTOS_VENTAS_ENTRANTES_pk PRIMARY KEY (id_evento_entrante),
+    CONSTRAINT uq_evento_venta_mensaje UNIQUE (id_mensaje),
+    CONSTRAINT chk_evento_venta_estado CHECK (estado IN ('RECIBIDO', 'PROCESADO', 'IGNORADO', 'FALLIDO')),
+    CONSTRAINT chk_evento_venta_intentos CHECK (intentos >= 0),
+    CONSTRAINT chk_evento_venta_procesado CHECK ((estado IN ('PROCESADO', 'IGNORADO')) = (procesado_en IS NOT NULL))
+);
+CREATE INDEX idx_eventos_venta_estado ON EVENTOS_VENTAS_ENTRANTES (estado, recibido_en);
+
+-- Tabla: METRICAS_VENTAS_PERIODO
+-- Ventas cerradas y cumplimiento de cuota de cada vendedor y cajero del periodo, tal como las publica
+-- Ventas y Marketing. Una fila por colaborador y periodo; el evento que la trajo queda para trazabilidad.
+-- Un periodo reenviado (no duplicado, un id_mensaje nuevo con una corrección) reemplaza la fila anterior.
+CREATE TABLE METRICAS_VENTAS_PERIODO (
+    id_metrica UUID NOT NULL DEFAULT gen_random_uuid(),
+    periodo date NOT NULL,
+    id_empleado UUID NOT NULL,
+    rol varchar(20) NOT NULL,
+    monto_ventas numeric(14,2) NOT NULL,
+    cuota_asignada numeric(14,2) NOT NULL,
+    porcentaje_cumplimiento numeric(7,2) NOT NULL,
+    id_evento_entrante UUID NOT NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT METRICAS_VENTAS_PERIODO_pk PRIMARY KEY (id_metrica),
+    CONSTRAINT uq_metrica_periodo_empleado UNIQUE (periodo, id_empleado),
+    CONSTRAINT fk_metrica_evento FOREIGN KEY (id_evento_entrante)
+        REFERENCES EVENTOS_VENTAS_ENTRANTES (id_evento_entrante),
+    CONSTRAINT chk_metrica_rol CHECK (rol IN ('VENDEDOR', 'CAJERO')),
+    CONSTRAINT chk_metrica_monto CHECK (monto_ventas >= 0),
+    CONSTRAINT chk_metrica_cuota CHECK (cuota_asignada > 0),
+    CONSTRAINT chk_metrica_cumplimiento CHECK (porcentaje_cumplimiento >= 0)
+);
+CREATE INDEX idx_metricas_ventas_periodo ON METRICAS_VENTAS_PERIODO (periodo);
+
+-- Tabla: BONOS_PRODUCTIVIDAD
+-- Bono asignado a un colaborador que superó el umbral de la regla vigente de su periodo (RF-51, criterio 3).
+-- El motor reemplaza estos bonos al reprocesar el periodo, igual que BONOS_CONDICION.
+CREATE TABLE BONOS_PRODUCTIVIDAD (
+    id_bono UUID NOT NULL DEFAULT gen_random_uuid(),
+    periodo date NOT NULL,
+    id_empleado UUID NOT NULL,
+    id_regla UUID NOT NULL,
+    id_metrica UUID NOT NULL,
+    porcentaje_cumplimiento numeric(7,2) NOT NULL,
+    valor numeric(12,4) NOT NULL,
+    monto numeric(12,2) NULL,
+    generado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT BONOS_PRODUCTIVIDAD_pk PRIMARY KEY (id_bono),
+    CONSTRAINT uq_bono_productividad UNIQUE (periodo, id_empleado, id_regla),
+    CONSTRAINT fk_bono_regla FOREIGN KEY (id_regla) REFERENCES REGLAS_BONO_PRODUCTIVIDAD (id_regla),
+    CONSTRAINT fk_bono_metrica FOREIGN KEY (id_metrica) REFERENCES METRICAS_VENTAS_PERIODO (id_metrica),
+    CONSTRAINT chk_bono_monto CHECK (monto IS NULL OR monto > 0)
+);
+CREATE INDEX idx_bonos_productividad_periodo ON BONOS_PRODUCTIVIDAD (periodo);
+
+-- El bono de productividad es un ingreso de la planilla (RF-51); el monto fijo o el porcentaje sobre el haber
+-- básico lo define la regla vigente del periodo (REGLAS_BONO_PRODUCTIVIDAD), no una vigencia manual de este
+-- concepto, igual que BONO-ANTIGUEDAD.
+INSERT INTO CONCEPTOS_PLANILLA (codigo, nombre, descripcion, tipo, forma_calculo, base_calculo, es_de_ley,
+                                cuenta_contable_codigo, cuenta_contable_nombre)
+VALUES ('BONO-PRODUCTIVIDAD', 'Bono de productividad',
+        'Se calcula según el cumplimiento de metas de venta, puntualidad o desempeño en caja del periodo.',
+        'INGRESO', 'MONTO_FIJO', NULL, FALSE, '5.1.1.06', 'Bono de productividad');
 
 -- Tabla: AUDITORIA_BONIFICACIONES
 -- Auditoría de altas, modificaciones y anulaciones de bonos (RF-53, KAN-73). bonos_condicion se reemplaza por

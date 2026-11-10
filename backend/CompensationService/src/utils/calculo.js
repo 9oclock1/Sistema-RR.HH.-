@@ -14,6 +14,7 @@ const CALCULADOS = {
   DOMINICAL: "DOMINICAL",
   NOCTURNO: "RECARGO-NOCTURNO",
   ANTIGUEDAD: "BONO-ANTIGUEDAD",
+  PRODUCTIVIDAD: "BONO-PRODUCTIVIDAD",
 };
 const CUOTA = "CUOTA-PRESTAMO";
 // Aporte Nacional Solidario (Ley 065): cada tramo se aplica sobre lo que el total ganado supera su umbral.

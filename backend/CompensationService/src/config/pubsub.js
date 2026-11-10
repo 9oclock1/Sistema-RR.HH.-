@@ -1,7 +1,7 @@
 const { PubSub } = require("@google-cloud/pubsub");
 
 // Con PUBSUB_EMULATOR_HOST usa el emulador local; si no, la cuenta de servicio de GOOGLE_APPLICATION_CREDENTIALS.
-// Sin ninguna de las dos, los eventos quedan pendientes en la base.
+// Sin ninguna de las dos, los eventos salientes quedan pendientes en la base y los consumidores no se inician.
 const configurado = () => Boolean(process.env.PUBSUB_EMULATOR_HOST || process.env.GOOGLE_APPLICATION_CREDENTIALS);
 
 let cliente = null;

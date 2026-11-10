@@ -71,9 +71,35 @@ async function ultimosDePlanilla(db, idPlanilla) {
   return Object.fromEntries(rows.map((r) => [r.destino, r]));
 }
 
+async function bloquearClave(cliente, clave) {
+  await cliente.query("SELECT pg_advisory_xact_lock(hashtext($1))", [clave]);
+}
+
+async function ultimoPorPeriodo(db, tipoEvento, periodo) {
+  const { rows } = await db.query(
+    `SELECT ${COLUMNAS}
+     FROM eventos_salientes
+     WHERE tipo_evento = $1 AND carga->'datos'->>'periodo' = $2
+     ORDER BY creado_en DESC, id_evento
+     LIMIT 1`,
+    [tipoEvento, periodo]
+  );
+  return rows[0] ?? null;
+}
+
 async function obtener(db, id) {
   const { rows } = await db.query(`SELECT ${COLUMNAS} FROM eventos_salientes WHERE id_evento = $1`, [id]);
   return rows[0];
 }
 
-module.exports = { registrar, reservarPendientes, marcarEntregado, marcarError, reencolar, ultimosDePlanilla, obtener };
+module.exports = {
+  registrar,
+  reservarPendientes,
+  marcarEntregado,
+  marcarError,
+  reencolar,
+  ultimosDePlanilla,
+  bloquearClave,
+  ultimoPorPeriodo,
+  obtener,
+};

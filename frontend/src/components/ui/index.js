@@ -15,6 +15,7 @@ export { default as GrupoRadios } from "./GrupoRadios";
 export { default as LineaTiempo } from "./LineaTiempo";
 export { default as Modal, ModalConfirmacion } from "./Modal";
 export { default as Paginacion } from "./Paginacion";
+export { default as Pasos } from "./Pasos";
 export { default as Pestanas } from "./Pestanas";
 export { default as ProveedorAvisos } from "./ProveedorAvisos";
 export { useAvisos } from "./avisos";

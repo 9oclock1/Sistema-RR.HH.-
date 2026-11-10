@@ -1,50 +1,27 @@
 -- Datos de prueba de PerformanceDB
 -- Requiere init.sql y catalogos.sql, que se cargan solos al crear la base.
--- NO formatear con un formateador de SQL: los comandos de psql (\set, \if, \else, \endif) deben ir
--- cada uno en su propia línea y el formateador los une y rompe el archivo.
+-- Es SQL puro (sin comandos de psql): se puede correr desde SQLTools, DBeaver o psql.
 -- Uso (PowerShell):
 --   Get-Content backend/PerformanceService/db/seed.sql | docker exec -i rrhh-postgres psql -U adminRRHH -d PerformanceDB
---
--- Para que la bandeja salga con TU usuario de prueba del portal, pasa su id_empleado (el de
--- EmployeeService) como evaluador. Las demás variables son opcionales:
---   ... psql -U adminRRHH -d PerformanceDB -v id_evaluador=<uuid> -v id_evaluado_1=<uuid> ...
--- Variables: id_evaluador, id_evaluador_2, id_creador, id_evaluado_1 .. id_evaluado_4.
+-- Los ids de personas, áreas y sucursales son los mismos de EmployeeService/db/seed.sql (cárguelo primero):
+--   evaluadores 21 (Marcela Quiroga, Sopocachi) y 22 (Jorge Mamani, Miraflores), creador 23, evaluados 31 a 34.
+-- Las fechas de los ciclos se calculan respecto de hoy en La Paz cada vez que se ejecuta.
 -- Los nombres de los empleados son de demostración; el servicio los actualiza desde EmployeeService.
 --
 -- Qué queda cargado (el evaluador es id_evaluador salvo la evaluación 124):
 --   Ciclo "Evaluación de desempeño 2026-S2" (activo)       -> 121 PENDIENTE, 122 BORRADOR (3 respuestas), 124 de otro evaluador
 --   Ciclo "Evaluación de personal nuevo 2026" (activo)     -> 123 PENDIENTE, con una fecha límite más cercana
 --   Ciclo "Evaluación de desempeño 2026-S1" (cerrado)      -> 125 ENVIADA (puntaje 87.78), 126 VENCIDA
+-- Ciclos de KAN-23 (programación, recordatorios y cierre):
+--   "Evaluación de fin de año 2026" (programado, inicia en 15 días)   -> 127, 128 PENDIENTE: aún no aparecen en la bandeja
+--   "Evaluación de inducción 2026" (programado, inicia hoy)           -> 129 PENDIENTE: el job debe activarlo
+--   "Evaluación de campaña de fin de año" (activo, vence en 3 días)   -> 130 PENDIENTE, 131 BORRADOR, 132 PENDIENTE de otro evaluador,
+--                                                                        133 ENVIADA (no se recuerda), 134 PENDIENTE ya recordada (no se repite)
+--   "Evaluación de temporada baja" (activo, venció ayer)              -> 135 PENDIENTE, 136 BORRADOR, 137 ENVIADA: el job debe cerrarlo
+--                                                                        y dejar 135 y 136 como VENCIDA sin tocar 137
+-- Historial de desempeño del evaluado 31 (KAN-26):
+--   "Evaluación de desempeño 2025-S2" (cerrado) -> 138 ENVIADA (72.22); además 139 ENVIADA (85.00) de otro evaluador en 2026-S1
 -- La plantilla tiene 6 preguntas con pesos que suman 100; la pregunta 95 es opcional.
-\set ON_ERROR_STOP on
-\if :{?id_evaluador}
-\else
-  \set id_evaluador 'f0000000-0000-4000-8000-000000000021'
-\endif
-\if :{?id_evaluador_2}
-\else
-  \set id_evaluador_2 'f0000000-0000-4000-8000-000000000022'
-\endif
-\if :{?id_creador}
-\else
-  \set id_creador 'f0000000-0000-4000-8000-000000000023'
-\endif
-\if :{?id_evaluado_1}
-\else
-  \set id_evaluado_1 'f0000000-0000-4000-8000-000000000031'
-\endif
-\if :{?id_evaluado_2}
-\else
-  \set id_evaluado_2 'f0000000-0000-4000-8000-000000000032'
-\endif
-\if :{?id_evaluado_3}
-\else
-  \set id_evaluado_3 'f0000000-0000-4000-8000-000000000033'
-\endif
-\if :{?id_evaluado_4}
-\else
-  \set id_evaluado_4 'f0000000-0000-4000-8000-000000000034'
-\endif
 BEGIN;
 -- Réplica mínima de EmployeeDB.
 INSERT INTO DEPARTAMENTOS (id_departamento, nombre)
@@ -66,18 +43,18 @@ VALUES (
         'Miraflores'
     ) ON CONFLICT DO NOTHING;
 INSERT INTO EMPLEADOS (id_empleado, nombres, apellidos)
-VALUES (:'id_evaluador'::uuid, 'Marcela', 'Quiroga Peña'),
+VALUES ('f0000000-0000-4000-8000-000000000021'::uuid, 'Marcela', 'Quiroga Peña'),
     (
-        :'id_evaluador_2'::uuid,
+        'f0000000-0000-4000-8000-000000000022'::uuid,
         'Jorge',
         'Mamani Condori'
     ),
-    (:'id_creador'::uuid, 'Andrea', 'Salazar Vega'),
-    (:'id_evaluado_1'::uuid, 'Carlos', 'Rojas Vargas'),
-    (:'id_evaluado_2'::uuid, 'Lucía', 'Flores Choque'),
-    (:'id_evaluado_3'::uuid, 'Diego', 'Quispe Mamani'),
+    ('f0000000-0000-4000-8000-000000000023'::uuid, 'Andrea', 'Salazar Vega'),
+    ('f0000000-0000-4000-8000-000000000031'::uuid, 'Carlos', 'Rojas Vargas'),
+    ('f0000000-0000-4000-8000-000000000032'::uuid, 'Lucía', 'Flores Choque'),
+    ('f0000000-0000-4000-8000-000000000033'::uuid, 'Diego', 'Quispe Mamani'),
     (
-        :'id_evaluado_4'::uuid,
+        'f0000000-0000-4000-8000-000000000034'::uuid,
         'Paola',
         'Gutiérrez Limachi'
     ) ON CONFLICT DO NOTHING;
@@ -131,7 +108,7 @@ INSERT INTO PLANTILLAS_EVALUACION (
 VALUES (
         'f0000000-0000-4000-8000-000000000051',
         'f0000000-0000-4000-8000-000000000001',
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de personal de tienda',
         'Medir la atención al cliente, el trabajo en equipo y la puntualidad del personal de tienda.',
         '2026-01-01',
@@ -149,7 +126,7 @@ VALUES (
         'f0000000-0000-4000-8000-000000000061',
         'f0000000-0000-4000-8000-000000000051',
         2,
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         1,
         '2026-01-10 09:00:00-04'
     ) ON CONFLICT DO NOTHING;
@@ -289,7 +266,7 @@ VALUES (
         'f0000000-0000-4000-8000-000000000061',
         'f0000000-0000-4000-8000-000000000042',
         2,
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de desempeño 2026-S2',
         CURRENT_DATE - 20,
         CURRENT_DATE + 25,
@@ -300,7 +277,7 @@ VALUES (
         'f0000000-0000-4000-8000-000000000061',
         'f0000000-0000-4000-8000-000000000042',
         2,
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de personal nuevo 2026',
         CURRENT_DATE - 10,
         CURRENT_DATE + 7,
@@ -311,7 +288,7 @@ VALUES (
         'f0000000-0000-4000-8000-000000000061',
         'f0000000-0000-4000-8000-000000000041',
         3,
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de desempeño 2026-S1',
         '2026-06-01',
         '2026-07-03',
@@ -335,8 +312,8 @@ VALUES -- Ciclo S2 activo: PENDIENTE del evaluador.
     (
         'f0000000-0000-4000-8000-000000000121',
         'f0000000-0000-4000-8000-000000000111',
-        :'id_evaluado_1'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         1,
@@ -350,8 +327,8 @@ VALUES -- Ciclo S2 activo: PENDIENTE del evaluador.
     (
         'f0000000-0000-4000-8000-000000000122',
         'f0000000-0000-4000-8000-000000000111',
-        :'id_evaluado_2'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000032'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         2,
@@ -365,8 +342,8 @@ VALUES -- Ciclo S2 activo: PENDIENTE del evaluador.
     (
         'f0000000-0000-4000-8000-000000000123',
         'f0000000-0000-4000-8000-000000000113',
-        :'id_evaluado_3'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000033'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000012',
         1,
@@ -380,8 +357,8 @@ VALUES -- Ciclo S2 activo: PENDIENTE del evaluador.
     (
         'f0000000-0000-4000-8000-000000000124',
         'f0000000-0000-4000-8000-000000000111',
-        :'id_evaluado_4'::uuid,
-        :'id_evaluador_2'::uuid,
+        'f0000000-0000-4000-8000-000000000034'::uuid,
+        'f0000000-0000-4000-8000-000000000022'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000012',
         1,
@@ -395,8 +372,8 @@ VALUES -- Ciclo S2 activo: PENDIENTE del evaluador.
     (
         'f0000000-0000-4000-8000-000000000125',
         'f0000000-0000-4000-8000-000000000112',
-        :'id_evaluado_1'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         3,
@@ -410,8 +387,8 @@ VALUES -- Ciclo S2 activo: PENDIENTE del evaluador.
     (
         'f0000000-0000-4000-8000-000000000126',
         'f0000000-0000-4000-8000-000000000112',
-        :'id_evaluado_2'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000032'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         4,
@@ -419,6 +396,207 @@ VALUES -- Ciclo S2 activo: PENDIENTE del evaluador.
         NULL,
         NULL,
         NULL,
+        NULL
+    ) ON CONFLICT DO NOTHING;
+-- KAN-23: ciclos programados y activos para probar la activación, los recordatorios y el cierre automático.
+INSERT INTO CICLOS_EVALUACION (
+        id_ciclo,
+        id_version,
+        id_periodo,
+        id_estado_ciclo,
+        id_empleado_creador,
+        nombre,
+        fecha_inicio,
+        fecha_limite,
+        cerrado_en
+    )
+VALUES (
+        'f0000000-0000-4000-8000-000000000114',
+        'f0000000-0000-4000-8000-000000000061',
+        'f0000000-0000-4000-8000-000000000042',
+        1,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
+        'Evaluación de fin de año 2026',
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date + 15,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date + 45,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000115',
+        'f0000000-0000-4000-8000-000000000061',
+        'f0000000-0000-4000-8000-000000000042',
+        1,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
+        'Evaluación de inducción 2026',
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date + 30,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000116',
+        'f0000000-0000-4000-8000-000000000061',
+        'f0000000-0000-4000-8000-000000000042',
+        2,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
+        'Evaluación de campaña de fin de año',
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date - 27,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date + 3,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000117',
+        'f0000000-0000-4000-8000-000000000061',
+        'f0000000-0000-4000-8000-000000000042',
+        2,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
+        'Evaluación de temporada baja',
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date - 40,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')::date - 1,
+        NULL
+    ) ON CONFLICT DO NOTHING;
+INSERT INTO EVALUACIONES (
+        id_evaluacion,
+        id_ciclo,
+        id_empleado_evaluado,
+        id_empleado_evaluador,
+        id_departamento,
+        id_sucursal,
+        id_estado_evaluacion,
+        puntaje_final,
+        enviada_en,
+        recordatorio_enviado_en
+    )
+VALUES
+    (
+        'f0000000-0000-4000-8000-000000000127',
+        'f0000000-0000-4000-8000-000000000114',
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        1,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000128',
+        'f0000000-0000-4000-8000-000000000114',
+        'f0000000-0000-4000-8000-000000000032'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        1,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000129',
+        'f0000000-0000-4000-8000-000000000115',
+        'f0000000-0000-4000-8000-000000000033'::uuid,
+        'f0000000-0000-4000-8000-000000000022'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000012',
+        1,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000130',
+        'f0000000-0000-4000-8000-000000000116',
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        1,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000131',
+        'f0000000-0000-4000-8000-000000000116',
+        'f0000000-0000-4000-8000-000000000032'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        2,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000132',
+        'f0000000-0000-4000-8000-000000000116',
+        'f0000000-0000-4000-8000-000000000033'::uuid,
+        'f0000000-0000-4000-8000-000000000022'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000012',
+        1,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000133',
+        'f0000000-0000-4000-8000-000000000116',
+        'f0000000-0000-4000-8000-000000000034'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000012',
+        3,
+        87.78,
+        CURRENT_TIMESTAMP - INTERVAL '2 days',
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000134',
+        'f0000000-0000-4000-8000-000000000116',
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000022'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        1,
+        NULL,
+        NULL,
+        CURRENT_TIMESTAMP - INTERVAL '1 day'
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000135',
+        'f0000000-0000-4000-8000-000000000117',
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        1,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000136',
+        'f0000000-0000-4000-8000-000000000117',
+        'f0000000-0000-4000-8000-000000000032'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000011',
+        2,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'f0000000-0000-4000-8000-000000000137',
+        'f0000000-0000-4000-8000-000000000117',
+        'f0000000-0000-4000-8000-000000000033'::uuid,
+        'f0000000-0000-4000-8000-000000000022'::uuid,
+        'f0000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-8000-000000000012',
+        3,
+        87.78,
+        CURRENT_TIMESTAMP - INTERVAL '4 days',
         NULL
     ) ON CONFLICT DO NOTHING;
 -- Respuestas: se indica el valor del nivel y se busca el id_nivel de la escala de cada pregunta.
@@ -468,6 +646,77 @@ FROM (
                 'f0000000-0000-4000-8000-000000000125'::uuid,
                 'f0000000-0000-4000-8000-000000000096'::uuid,
                 3
+            ),
+            -- KAN-23: 131 y 136 (BORRADOR) con dos respuestas; 133 y 137 (ENVIADA) con las mismas respuestas que la 125.
+            (
+                'f0000000-0000-4000-8000-000000000131'::uuid,
+                'f0000000-0000-4000-8000-000000000091'::uuid,
+                4
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000131'::uuid,
+                'f0000000-0000-4000-8000-000000000092'::uuid,
+                3
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000136'::uuid,
+                'f0000000-0000-4000-8000-000000000091'::uuid,
+                2
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000136'::uuid,
+                'f0000000-0000-4000-8000-000000000093'::uuid,
+                3
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000133'::uuid,
+                'f0000000-0000-4000-8000-000000000091'::uuid,
+                5
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000133'::uuid,
+                'f0000000-0000-4000-8000-000000000092'::uuid,
+                4
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000133'::uuid,
+                'f0000000-0000-4000-8000-000000000093'::uuid,
+                4
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000133'::uuid,
+                'f0000000-0000-4000-8000-000000000094'::uuid,
+                5
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000133'::uuid,
+                'f0000000-0000-4000-8000-000000000096'::uuid,
+                3
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000137'::uuid,
+                'f0000000-0000-4000-8000-000000000091'::uuid,
+                5
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000137'::uuid,
+                'f0000000-0000-4000-8000-000000000092'::uuid,
+                4
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000137'::uuid,
+                'f0000000-0000-4000-8000-000000000093'::uuid,
+                4
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000137'::uuid,
+                'f0000000-0000-4000-8000-000000000094'::uuid,
+                5
+            ),
+            (
+                'f0000000-0000-4000-8000-000000000137'::uuid,
+                'f0000000-0000-4000-8000-000000000096'::uuid,
+                3
             )
     ) AS r (id_evaluacion, id_pregunta, valor)
     JOIN PREGUNTAS_EVALUACION p ON p.id_pregunta = r.id_pregunta
@@ -497,7 +746,7 @@ INSERT INTO PLANTILLAS_EVALUACION (
 VALUES (
         'f0000000-0000-4000-8000-000000000052',
         'f0000000-0000-4000-8000-000000000002',
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de personal administrativo',
         'Medir el trabajo en equipo y el cumplimiento de metas del personal administrativo.',
         '2027-01-01',
@@ -506,7 +755,7 @@ VALUES (
     (
         'f0000000-0000-4000-8000-000000000053',
         'f0000000-0000-4000-8000-000000000001',
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de personal de tienda',
         'Medir la atención al cliente del personal de tienda durante la gestión 2027.',
         '2027-01-01',
@@ -564,8 +813,8 @@ VALUES (
         '2026-12-15'
     ) ON CONFLICT DO NOTHING;
 -- Consulta de evaluaciones individuales: historial del evaluado 1 en dos periodos.
---   Periodo 2025-S2, ciclo cerrado: 127 ENVIADA (72.22).
---   Ciclo 2026-S1 (cerrado): además de la 125 (87.78), la 128 de un segundo evaluador (85.00).
+--   Periodo 2025-S2, ciclo cerrado 118: 138 ENVIADA (72.22).
+--   Ciclo 2026-S1 (cerrado): además de la 125 (87.78), la 139 de un segundo evaluador (85.00).
 --   Consolidado 2026-S1 = (87.78 + 85.00) / 2 = 86.39, variación +14.17 respecto de 2025-S2.
 INSERT INTO PERIODOS_EVALUACION (id_periodo, nombre, fecha_inicio, fecha_fin)
 VALUES (
@@ -586,11 +835,11 @@ INSERT INTO CICLOS_EVALUACION (
         cerrado_en
     )
 VALUES (
-        'f0000000-0000-4000-8000-000000000114',
+        'f0000000-0000-4000-8000-000000000118',
         'f0000000-0000-4000-8000-000000000061',
         'f0000000-0000-4000-8000-000000000043',
         3,
-        :'id_creador'::uuid,
+        'f0000000-0000-4000-8000-000000000023'::uuid,
         'Evaluación de desempeño 2025-S2',
         '2025-12-01',
         '2025-12-20',
@@ -611,10 +860,10 @@ INSERT INTO EVALUACIONES (
         enviada_en
     )
 VALUES (
-        'f0000000-0000-4000-8000-000000000127',
-        'f0000000-0000-4000-8000-000000000114',
-        :'id_evaluado_1'::uuid,
-        :'id_evaluador'::uuid,
+        'f0000000-0000-4000-8000-000000000138',
+        'f0000000-0000-4000-8000-000000000118',
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000021'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         3,
@@ -625,10 +874,10 @@ VALUES (
         '2025-12-18 10:00:00-04'
     ),
     (
-        'f0000000-0000-4000-8000-000000000128',
+        'f0000000-0000-4000-8000-000000000139',
         'f0000000-0000-4000-8000-000000000112',
-        :'id_evaluado_1'::uuid,
-        :'id_evaluador_2'::uuid,
+        'f0000000-0000-4000-8000-000000000031'::uuid,
+        'f0000000-0000-4000-8000-000000000022'::uuid,
         'f0000000-0000-4000-8000-000000000001',
         'f0000000-0000-4000-8000-000000000011',
         3,
@@ -638,23 +887,23 @@ VALUES (
         'Desempeño consistente durante el semestre.',
         '2026-07-01 17:00:00-04'
     ) ON CONFLICT DO NOTHING;
--- 127: (20·80 + 15·60 + 15·60 + 20·80 + 20·75) / 90 = 72.22. 128: (20·80 + 15·80 + 15·60 + 20·100 + 10·80 + 20·100) / 100 = 85.00.
+-- 138: (20·80 + 15·60 + 15·60 + 20·80 + 20·75) / 90 = 72.22. 139: (20·80 + 15·80 + 15·60 + 20·100 + 10·80 + 20·100) / 100 = 85.00.
 INSERT INTO RESPUESTAS_EVALUACION (id_evaluacion, id_pregunta, id_nivel)
 SELECT r.id_evaluacion,
     r.id_pregunta,
     n.id_nivel
 FROM (
-        VALUES ('f0000000-0000-4000-8000-000000000127'::uuid, 'f0000000-0000-4000-8000-000000000091'::uuid, 4),
-            ('f0000000-0000-4000-8000-000000000127'::uuid, 'f0000000-0000-4000-8000-000000000092'::uuid, 3),
-            ('f0000000-0000-4000-8000-000000000127'::uuid, 'f0000000-0000-4000-8000-000000000093'::uuid, 3),
-            ('f0000000-0000-4000-8000-000000000127'::uuid, 'f0000000-0000-4000-8000-000000000094'::uuid, 4),
-            ('f0000000-0000-4000-8000-000000000127'::uuid, 'f0000000-0000-4000-8000-000000000096'::uuid, 3),
-            ('f0000000-0000-4000-8000-000000000128'::uuid, 'f0000000-0000-4000-8000-000000000091'::uuid, 4),
-            ('f0000000-0000-4000-8000-000000000128'::uuid, 'f0000000-0000-4000-8000-000000000092'::uuid, 4),
-            ('f0000000-0000-4000-8000-000000000128'::uuid, 'f0000000-0000-4000-8000-000000000093'::uuid, 3),
-            ('f0000000-0000-4000-8000-000000000128'::uuid, 'f0000000-0000-4000-8000-000000000094'::uuid, 5),
-            ('f0000000-0000-4000-8000-000000000128'::uuid, 'f0000000-0000-4000-8000-000000000095'::uuid, 4),
-            ('f0000000-0000-4000-8000-000000000128'::uuid, 'f0000000-0000-4000-8000-000000000096'::uuid, 4)
+        VALUES ('f0000000-0000-4000-8000-000000000138'::uuid, 'f0000000-0000-4000-8000-000000000091'::uuid, 4),
+            ('f0000000-0000-4000-8000-000000000138'::uuid, 'f0000000-0000-4000-8000-000000000092'::uuid, 3),
+            ('f0000000-0000-4000-8000-000000000138'::uuid, 'f0000000-0000-4000-8000-000000000093'::uuid, 3),
+            ('f0000000-0000-4000-8000-000000000138'::uuid, 'f0000000-0000-4000-8000-000000000094'::uuid, 4),
+            ('f0000000-0000-4000-8000-000000000138'::uuid, 'f0000000-0000-4000-8000-000000000096'::uuid, 3),
+            ('f0000000-0000-4000-8000-000000000139'::uuid, 'f0000000-0000-4000-8000-000000000091'::uuid, 4),
+            ('f0000000-0000-4000-8000-000000000139'::uuid, 'f0000000-0000-4000-8000-000000000092'::uuid, 4),
+            ('f0000000-0000-4000-8000-000000000139'::uuid, 'f0000000-0000-4000-8000-000000000093'::uuid, 3),
+            ('f0000000-0000-4000-8000-000000000139'::uuid, 'f0000000-0000-4000-8000-000000000094'::uuid, 5),
+            ('f0000000-0000-4000-8000-000000000139'::uuid, 'f0000000-0000-4000-8000-000000000095'::uuid, 4),
+            ('f0000000-0000-4000-8000-000000000139'::uuid, 'f0000000-0000-4000-8000-000000000096'::uuid, 4)
     ) AS r (id_evaluacion, id_pregunta, valor)
     JOIN PREGUNTAS_EVALUACION p ON p.id_pregunta = r.id_pregunta
     JOIN NIVELES_ESCALA n ON n.id_escala = p.id_escala

@@ -104,11 +104,13 @@ function detalleBono(b) {
     const jornadas = b.cantidad === 1 ? "1 jornada" : `${b.cantidad} jornadas`;
     return `${jornadas}: ${b.fechas.map(fechaCorta).join(", ")}`;
   }
+  // RF-51 (KAN-71): cumplimiento de la meta de ventas, puntualidad o desempeño en caja del periodo.
+  if (b.origen === "PRODUCTIVIDAD") return `${b.cumplimiento}% de cumplimiento de la meta`;
   return b.cantidad === 1 ? "1 día asignado" : `${b.cantidad} días asignados`;
 }
 
 const novedadDeBono = (b) => ({
-  origen: "BONO_CONDICION",
+  origen: b.origen === "PRODUCTIVIDAD" ? "PRODUCTIVIDAD" : "BONO_CONDICION",
   id_vigencia: b.id_vigencia,
   codigo: b.condicion.codigo,
   nombre: b.condicion.nombre,

@@ -1,8 +1,10 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, SquareKanban, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, SquareKanban, Target, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
+import CiclosEvaluacionPage from "../features/ciclos-evaluacion/CiclosEvaluacionPage";
+import { RUTA_CICLOS } from "../features/ciclos-evaluacion/ciclo";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
 import MisResultadosPage from "../features/evaluaciones/MisResultadosPage";
 import { RUTA_EVALUACIONES, RUTA_MIS_RESULTADOS } from "../features/evaluaciones/ruta";
@@ -26,6 +28,7 @@ import NotificacionesPage from "../features/notificaciones/NotificacionesPage";
 import CargosList from "../features/Cargos/CargosList";
 import ConceptosPage from "../features/conceptos/ConceptosPage";
 import CondicionesPage from "../features/condiciones/CondicionesPage";
+import BonosProductividadPage from "../features/bonos-productividad/BonosProductividadPage";
 import PlanillaMensualPage from "../features/planillas/PlanillaMensualPage";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import ContratosView from "../features/Contratos/ContratosView";
@@ -302,6 +305,14 @@ export const SECCIONES = [
         roles: ["admin"],
         pagina: AntiguedadPage,
       },
+      {
+        ruta: "/planillas/bonos-productividad",
+        etiqueta: "Bonos por productividad",
+        descripcion: "Bonos variables por cumplimiento de metas de venta, puntualidad o desempeño en caja, con las ventas reales del periodo.",
+        icono: Target,
+        roles: ["admin"],
+        pagina: BonosProductividadPage,
+      },
     ],
   },
   {
@@ -379,6 +390,15 @@ export const SECCIONES = [
         icono: ClipboardList,
         roles: ["admin"],
         pagina: PlantillasEvaluacionPage,
+      },
+      {
+        ruta: RUTA_CICLOS,
+        parametroOpcional: "idCiclo",
+        etiqueta: "Ciclos de evaluación",
+        descripcion: "Programación de ciclos por periodo, con asignación de evaluadores por área o sucursal y fecha límite.",
+        icono: CalendarRange,
+        roles: ["admin"],
+        pagina: CiclosEvaluacionPage,
       },
       {
         ruta: RUTA_EVALUACIONES,
