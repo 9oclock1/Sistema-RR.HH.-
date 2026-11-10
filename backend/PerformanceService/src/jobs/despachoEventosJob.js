@@ -1,4 +1,5 @@
 const { despachar } = require("../services/despachoEventosService");
+const { reanudarRecibidos } = require("../services/consumidorCrmService");
 
 const INTERVALO_POR_DEFECTO_MS = 15000;
 
@@ -18,6 +19,10 @@ function iniciarDespachoEventos() {
       await despachar();
     } catch (error) {
       console.error("[eventos] Error al despachar los eventos salientes:", error.message);
+    }
+    try {
+      // Retoma las respuestas del CRM que quedaron a medias si el servicio se reinició.
+      await reanudarRecibidos();
     } finally {
       ocupado = false;
     }

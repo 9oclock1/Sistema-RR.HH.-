@@ -44,5 +44,15 @@ router.post(
   soloAdministrador,
   controlador.reintentarSolicitudCrm,
 );
+// Mensajes de métricas que llegaron del CRM. ?estado=RECIBIDO|PROCESADO|EN_DLQ (la cola de errores).
+router.get("/desempeno/mensajes-crm", consultaRrhh, controlador.listarMensajesCrm);
+// Simula la llegada de un mensaje del CRM (duplicados, datos inválidos…) sin pasar por Pub/Sub.
+router.post("/desempeno/mensajes-crm/simulacion", soloAdministrador, controlador.simularMensajeCrm);
+// Vuelve a procesar un mensaje que quedó en la cola de errores.
+router.post(
+  "/desempeno/mensajes-crm/:idMensaje/reprocesar",
+  soloAdministrador,
+  controlador.reprocesarMensajeCrm,
+);
 
 module.exports = router;

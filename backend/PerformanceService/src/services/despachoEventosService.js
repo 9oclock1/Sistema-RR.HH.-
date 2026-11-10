@@ -1,7 +1,9 @@
 const modelo = require("../models/eventosSalientesModel");
 const pubsub = require("../config/pubsub");
 const jerarquia = require("./jerarquiaExterna");
+const { simularRespuesta } = require("./consumidorCrmService");
 const mensajesPublicados = require("../utils/mensajesPublicados");
+const { simulacionActiva } = require("../utils/metricasCrm");
 const {
   MAXIMO_INTENTOS,
   topicoRrhh,
@@ -61,6 +63,14 @@ async function publicar(cliente, evento, mensaje) {
     `[eventos] Solicitud de métricas del ciclo ${evento.id_ciclo} publicada en ${topico} (mensaje ${idPubSub}, ` +
       `${mensaje.datos.colaboradores.length} colaborador(es)).`,
   );
+
+  // Publicar es lo único que exige el docente: la respuesta del CRM se simula. Va aparte y sin esperarla, así un
+  // problema al procesarla nunca deshace una publicación que Pub/Sub ya confirmó.
+  if (simulacionActiva()) {
+    simularRespuesta(mensaje).catch((error) =>
+      console.error(`[crm] No se pudo simular la respuesta del CRM al ciclo ${evento.id_ciclo}:`, error.message),
+    );
+  }
 }
 
 // Arma el mensaje del evento y lo publica. `obtenerPersonal` consulta una sola vez a EmployeeService por vuelta.

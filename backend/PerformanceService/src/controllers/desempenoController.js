@@ -1,4 +1,5 @@
 const servicio = require("../services/desempenoService");
+const consumidor = require("../services/consumidorCrmService");
 
 async function listarCiclos(req, res) {
   res.json(await servicio.listarCiclos());
@@ -24,6 +25,19 @@ async function reintentarSolicitudCrm(req, res) {
   res.json(await servicio.reintentarSolicitudCrm(req.params.idCiclo));
 }
 
+async function listarMensajesCrm(req, res) {
+  res.json(await consumidor.listarMensajes(req.query));
+}
+
+async function reprocesarMensajeCrm(req, res) {
+  res.json(await consumidor.reprocesarMensaje(req.params.idMensaje));
+}
+
+async function simularMensajeCrm(req, res) {
+  const recibido = await consumidor.simularLlegada(req.body);
+  res.status(recibido.duplicado ? 200 : 202).json(recibido);
+}
+
 module.exports = {
   listarCiclos,
   obtenerConsolidado,
@@ -31,4 +45,7 @@ module.exports = {
   obtenerColaboradores,
   actualizarUmbral,
   reintentarSolicitudCrm,
+  listarMensajesCrm,
+  reprocesarMensajeCrm,
+  simularMensajeCrm,
 };

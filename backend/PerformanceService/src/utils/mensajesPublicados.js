@@ -6,11 +6,13 @@ const CAPACIDAD = 100;
 const mensajes = [];
 let secuencia = 0;
 
-function registrar({ topico, idPubSub, atributos, cuerpo }) {
+// `direccion` es "publicado" (lo que RRHH envía) o "recibido" (lo que llega del CRM; hoy es una respuesta simulada).
+function registrar({ topico, idPubSub, atributos, cuerpo, direccion = "publicado" }) {
   secuencia += 1;
   mensajes.push({
     secuencia,
     servicio: SERVICIO,
+    direccion,
     publicado_en: new Date().toISOString(),
     topico,
     id_pubsub: idPubSub,

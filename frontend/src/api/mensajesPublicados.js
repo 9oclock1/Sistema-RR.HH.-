@@ -15,10 +15,15 @@ const cursores = new Map();
 let iniciado = false;
 
 function mostrar(publicado) {
+  // Lo que RRHH publica sale hacia el tópico; la respuesta del CRM (simulada) llega desde el suyo.
+  const recibido = publicado.direccion === "recibido";
+  const tipo = publicado.atributos?.tipo ?? "mensaje";
   console.groupCollapsed(
-    `[Pub/Sub] ${publicado.servicio} → ${publicado.topico} · ${publicado.atributos?.tipo ?? "mensaje"}`,
+    recibido
+      ? `[Pub/Sub] ${publicado.topico} → ${publicado.servicio} (respuesta simulada del CRM) · ${tipo}`
+      : `[Pub/Sub] ${publicado.servicio} → ${publicado.topico} · ${tipo}`,
   );
-  console.log("Publicado en:", publicado.publicado_en);
+  console.log(recibido ? "Recibido en:" : "Publicado en:", publicado.publicado_en);
   console.log("ID Pub/Sub:", publicado.id_pubsub);
   console.log("Atributos:", publicado.atributos);
   console.log("Mensaje:", publicado.mensaje);
