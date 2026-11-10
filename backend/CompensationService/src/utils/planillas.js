@@ -110,7 +110,7 @@ function detalleBono(b) {
 }
 
 const novedadDeBono = (b) => ({
-  origen: "BONO_CONDICION",
+  origen: b.origen === "PRODUCTIVIDAD" ? "PRODUCTIVIDAD" : "BONO_CONDICION",
   id_vigencia: b.id_vigencia,
   codigo: b.condicion.codigo,
   nombre: b.condicion.nombre,
