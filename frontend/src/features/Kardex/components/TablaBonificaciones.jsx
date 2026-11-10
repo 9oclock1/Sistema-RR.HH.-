@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Download, Gift } from 'lucide-react';
 import { exportarHistorialBonos, listarHistorialBonos } from '../../../api/bonificaciones';
 import { Alerta, Boton, CampoTexto, Etiqueta, EstadoVacio, Selector, Tabla, useAvisos } from '../../../components/ui';
@@ -9,7 +9,12 @@ import { Celda } from './comunes';
 
 const fechaCorta = (fecha) => fecha.slice(5).split('-').reverse().join('/');
 
+// Las tres fuentes del historial (RF-53): condición (KAN-72), productividad (KAN-71) y antigüedad (KAN-70,
+// de solo lectura, sin su propia vigencia de concepto). El "tipo" que filtra por trasnoche/feriado/asignación
+// solo tiene sentido para CONDICION; para las otras dos se usa el filtro de fuente (tipo_bono).
 const detalle = (bono) => {
+  if (bono.tipo_bono === 'PRODUCTIVIDAD') return `${bono.porcentaje_cumplimiento}% de cumplimiento de la meta`;
+  if (bono.tipo_bono === 'ANTIGUEDAD') return bono.detalle ?? 'Según la escala de antigüedad vigente';
   if (bono.origen === 'DETECCION') {
     const jornadas = bono.cantidad === 1 ? '1 jornada' : `${bono.cantidad} jornadas`;
     return `${jornadas}: ${(bono.fechas ?? []).map(fechaCorta).join(', ')}`;
@@ -17,30 +22,40 @@ const detalle = (bono) => {
   return bono.cantidad === 1 ? '1 día asignado' : `${bono.cantidad} días asignados`;
 };
 
+const bonoRegla = (bono) => {
+  if (bono.tipo_bono === 'PRODUCTIVIDAD') {
+    return (
+      <Celda
+        principal={<Etiqueta tono="info">Productividad</Etiqueta>}
+        secundario={`Regla de ${bono.regla.tipo_meta.toLowerCase()}`}
+      />
+    );
+  }
+  if (bono.tipo_bono === 'ANTIGUEDAD') {
+    return <Celda principal={<Etiqueta tono="morado">Antigüedad</Etiqueta>} secundario="Escala legal vigente" />;
+  }
+  return (
+    <Celda
+      principal={
+        <Etiqueta tono={TIPOS_CONDICION[bono.condicion.tipo_condicion]?.tono}>
+          {TIPOS_CONDICION[bono.condicion.tipo_condicion]?.etiqueta ?? bono.condicion.tipo_condicion}
+        </Etiqueta>
+      }
+      secundario={`${bono.condicion.codigo} · ${bono.condicion.nombre}`}
+    />
+  );
+};
+
+const valorDe = (bono) => {
+  if (bono.tipo_bono !== 'CONDICION') return bono.monto === null ? `${bono.valor}%` : `Bs ${Number(bono.valor).toFixed(2)}`;
+  return describirValor(bono.valor, bono.monto === null ? 'PORCENTAJE' : 'MONTO_FIJO', bono.condicion.tipo_condicion);
+};
+
 const COLUMNAS = [
   { clave: 'periodo', titulo: 'Periodo', ancho: '12%', celda: (b) => b.periodo },
-  {
-    clave: 'condicion',
-    titulo: 'Bono (regla)',
-    ancho: '26%',
-    celda: (b) => (
-      <Celda
-        principal={
-          <Etiqueta tono={TIPOS_CONDICION[b.condicion.tipo_condicion]?.tono}>
-            {TIPOS_CONDICION[b.condicion.tipo_condicion]?.etiqueta ?? b.condicion.tipo_condicion}
-          </Etiqueta>
-        }
-        secundario={`${b.condicion.codigo} · ${b.condicion.nombre}`}
-      />
-    ),
-  },
-  { clave: 'detalle', titulo: 'Detalle', ancho: '28%', celda: (b) => detalle(b) },
-  {
-    clave: 'valor',
-    titulo: 'Valor',
-    ancho: '16%',
-    celda: (b) => describirValor(b.valor, b.monto === null ? 'PORCENTAJE' : 'MONTO_FIJO', b.condicion.tipo_condicion),
-  },
+  { clave: 'condicion', titulo: 'Bono (regla)', ancho: '26%', celda: bonoRegla },
+  { clave: 'detalle', titulo: 'Detalle', ancho: '28%', celda: detalle },
+  { clave: 'valor', titulo: 'Valor', ancho: '16%', celda: valorDe },
   {
     clave: 'monto',
     titulo: 'Monto',
@@ -50,36 +65,44 @@ const COLUMNAS = [
   },
 ];
 
+const FUENTES = [
+  { valor: 'CONDICION', etiqueta: 'Condición especial' },
+  { valor: 'PRODUCTIVIDAD', etiqueta: 'Productividad' },
+  { valor: 'ANTIGUEDAD', etiqueta: 'Antigüedad' },
+];
+
 export default function TablaBonificaciones({ idEmpleado, nombre }) {
   const rol = useRol();
   const idUsuario = useUsuario();
   const avisar = useAvisos();
   const [periodo, setPeriodo] = useState('');
   const [tipo, setTipo] = useState('');
-  const [bonos, setBonos] = useState(null);
-  const [error, setError] = useState(null);
+  const [tipoBono, setTipoBono] = useState('');
+  const [resultado, setResultado] = useState({ clave: null });
   const [intento, setIntento] = useState(0);
   const [exportando, setExportando] = useState(false);
   const identidad = { idEmpleado: idUsuario, rol };
+  const filtros = { ...(periodo && { periodo }), ...(tipo && { tipo }), ...(tipoBono && { tipo_bono: tipoBono }) };
+  const clave = JSON.stringify({ idEmpleado, filtros, intento });
 
   useEffect(() => {
     let vigente = true;
-    setBonos(null);
-    setError(null);
-    const filtros = { ...(periodo && { periodo }), ...(tipo && { tipo }) };
     listarHistorialBonos(idEmpleado, filtros, identidad)
-      .then((lista) => vigente && setBonos(lista))
-      .catch((e) => vigente && setError(e));
+      .then((datos) => vigente && setResultado({ clave, datos }))
+      .catch((error) => vigente && setResultado({ clave, error }));
     return () => {
       vigente = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idEmpleado, periodo, tipo, intento]);
+  }, [clave]);
+
+  const vista = resultado.clave === clave ? resultado : {};
+  const bonos = vista.datos ?? null;
+  const error = vista.error ?? null;
 
   const exportar = async () => {
     setExportando(true);
     try {
-      const filtros = { ...(periodo && { periodo }), ...(tipo && { tipo }) };
       const archivo = await exportarHistorialBonos(idEmpleado, filtros, identidad);
       guardarComo(archivo, `bonificaciones-${nombre.replace(/\s+/g, '-').toLowerCase()}.csv`);
     } catch (e) {
@@ -96,13 +119,23 @@ export default function TablaBonificaciones({ idEmpleado, nombre }) {
       <div className="kardex-seccion__acciones kardex-bonos-filtros">
         <CampoTexto id="bonos-periodo" etiqueta="Periodo" type="month" value={periodo} onChange={(e) => setPeriodo(e.target.value)} />
         <Selector
-          id="bonos-tipo"
-          etiqueta="Tipo de condición"
-          value={tipo}
-          onChange={(e) => setTipo(e.target.value)}
+          id="bonos-fuente"
+          etiqueta="Tipo de bono"
+          value={tipoBono}
+          onChange={(e) => setTipoBono(e.target.value)}
           textoVacio="Todos"
-          opciones={Object.entries(TIPOS_CONDICION).map(([valor, t]) => ({ valor, etiqueta: t.etiqueta }))}
+          opciones={FUENTES}
         />
+        {tipoBono === 'CONDICION' || tipoBono === '' ? (
+          <Selector
+            id="bonos-tipo"
+            etiqueta="Tipo de condición"
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value)}
+            textoVacio="Todos"
+            opciones={Object.entries(TIPOS_CONDICION).map(([valor, t]) => ({ valor, etiqueta: t.etiqueta }))}
+          />
+        ) : null}
         <Boton variante="sutil" icono={Download} cargando={exportando} disabled={!bonos || bonos.length === 0} onClick={exportar}>
           Exportar CSV
         </Boton>
@@ -134,7 +167,7 @@ export default function TablaBonificaciones({ idEmpleado, nombre }) {
             <EstadoVacio
               icono={Gift}
               titulo="Sin bonificaciones registradas"
-              mensaje="Este colaborador no tiene bonos por condiciones especiales en el periodo consultado."
+              mensaje="Este colaborador no tiene bonos registrados en el periodo consultado."
             />
           }
         />
