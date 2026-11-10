@@ -31,7 +31,7 @@ La base no usa triggers, procedimientos almacenados ni vistas (decisión del equ
 - `EVENTOS_VENTAS_ENTRANTES` es la bandeja de entrada del cierre de ventas del periodo que publica Ventas y Marketing (grupo E) por Pub/Sub: `id_mensaje` (del remitente) evita procesar dos veces el mismo mensaje (criterio 4). Mismo patrón RECIBIDO/PROCESADO/IGNORADO/FALLIDO que una bandeja de salida, pero de entrada.
 - `METRICAS_VENTAS_PERIODO` guarda una fila por colaborador y periodo (clave `periodo, id_empleado`); un cierre reenviado con un `id_mensaje` nuevo (una corrección, no un duplicado) reemplaza la fila anterior del colaborador.
 - El motor (servicio) se ejecuta en la misma transacción que registra las métricas: aplica cada regla activa del periodo a sus métricas y reemplaza los bonos anteriores del periodo en `BONOS_PRODUCTIVIDAD` (solo a quienes superan el umbral, criterio 3). También se puede volver a ejecutar manualmente si una regla cambia después del cierre.
-- `BONO-PRODUCTIVIDAD` es un concepto de ingreso sin vigencia manual (como `BONO-ANTIGUEDAD`): el monto fijo o el porcentaje sobre el haber básico lo define la regla vigente del periodo, y llega a la planilla como bono (igual que `BONOS_CONDICION`).
+- `BONO-PRODUCTIVIDAD` es un concepto de ingreso sin vigencia manual (como `BONO-ANTIGUEDAD`): el monto fijo o el porcentaje sobre el haber básico lo define la regla vigente del periodo, y llega a la planilla como bono (igual que `BONOS_CONDICION`). En `NOVEDADES_PLANILLA` va con `origen` `PRODUCTIVIDAD` y sin vigencia (`chk_novedad_planilla_vigencia`), y en `CALCULOS_PLANILLA` también sin vigencia (`chk_calculo_origen`). Su cuenta contable es 5.1.1.06 (referencial).
 
 ## Integración con Ventas y Marketing (E)
 

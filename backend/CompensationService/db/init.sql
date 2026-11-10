@@ -247,13 +247,14 @@ CREATE TABLE PLANILLA_EMPLEADOS (
     )
 );
 -- Tabla: NOVEDADES_PLANILLA
--- Rubros variables de un colaborador en la planilla (bonos por condiciones especiales), con la vigencia del
--- concepto que les dio el valor. monto NULL: porcentaje que se calcula sobre el haber básico.
+-- Rubros variables de un colaborador en la planilla (bonos por condiciones especiales y por productividad), con la
+-- vigencia del concepto que les dio el valor. monto NULL: porcentaje que se calcula sobre el haber básico.
+-- El bono de productividad (KAN-71) toma su valor de la regla del periodo, no de una vigencia de concepto.
 CREATE TABLE NOVEDADES_PLANILLA (
     id_novedad UUID NOT NULL DEFAULT gen_random_uuid(),
     id_planilla_empleado UUID NOT NULL,
     origen varchar(15) NOT NULL,
-    id_vigencia UUID NOT NULL,
+    id_vigencia UUID NULL,
     codigo varchar(20) NOT NULL,
     nombre varchar(80) NOT NULL,
     forma_calculo varchar(12) NOT NULL,
@@ -267,7 +268,8 @@ CREATE TABLE NOVEDADES_PLANILLA (
         REFERENCES PLANILLA_EMPLEADOS (id_planilla_empleado) ON DELETE CASCADE,
     -- Un concepto usado en una planilla no se puede eliminar, solo inactivar.
     CONSTRAINT fk_novedad_planilla_vigencia FOREIGN KEY (id_vigencia) REFERENCES VIGENCIAS_CONCEPTO (id_vigencia),
-    CONSTRAINT chk_novedad_planilla_origen CHECK (origen IN ('BONO_CONDICION')),
+    CONSTRAINT chk_novedad_planilla_origen CHECK (origen IN ('BONO_CONDICION', 'PRODUCTIVIDAD')),
+    CONSTRAINT chk_novedad_planilla_vigencia CHECK ((id_vigencia IS NULL) = (origen = 'PRODUCTIVIDAD')),
     CONSTRAINT chk_novedad_planilla_forma CHECK (forma_calculo IN ('MONTO_FIJO', 'PORCENTAJE')),
     CONSTRAINT chk_novedad_planilla_valores CHECK (cantidad > 0 AND factor > 0 AND valor > 0 AND (monto IS NULL OR monto >= 0)),
     CONSTRAINT chk_novedad_planilla_monto CHECK ((forma_calculo = 'MONTO_FIJO') = (monto IS NOT NULL))
@@ -276,7 +278,8 @@ CREATE INDEX idx_novedades_planilla_empleado ON NOVEDADES_PLANILLA (id_planilla_
 -- Tabla: CALCULOS_PLANILLA
 -- Detalle del cálculo de cada colaborador: un renglón por concepto, con la vigencia que dio el valor, la base,
 -- la cantidad (días u horas) y el resultado redondeado a centavos. Los totales del colaborador son su suma.
--- El bono de antigüedad (escala de KAN-70) y las cuotas de préstamos (KAN-65) no salen de una vigencia de concepto.
+-- El bono de antigüedad (escala de KAN-70), el de productividad (regla de KAN-71) y las cuotas de préstamos (KAN-65)
+-- no salen de una vigencia de concepto.
 CREATE TABLE CALCULOS_PLANILLA (
     id_calculo UUID NOT NULL DEFAULT gen_random_uuid(),
     id_planilla_empleado UUID NOT NULL,
@@ -299,7 +302,7 @@ CREATE TABLE CALCULOS_PLANILLA (
     CONSTRAINT fk_calculo_vigencia FOREIGN KEY (id_vigencia) REFERENCES VIGENCIAS_CONCEPTO (id_vigencia),
     CONSTRAINT chk_calculo_tipo CHECK (tipo IN ('INGRESO', 'DESCUENTO', 'APORTE')),
     CONSTRAINT chk_calculo_forma CHECK (forma_calculo IN ('MONTO_FIJO', 'PORCENTAJE')),
-    CONSTRAINT chk_calculo_origen CHECK (id_vigencia IS NOT NULL OR codigo IN ('BONO-ANTIGUEDAD', 'CUOTA-PRESTAMO')),
+    CONSTRAINT chk_calculo_origen CHECK (id_vigencia IS NOT NULL OR codigo IN ('BONO-ANTIGUEDAD', 'BONO-PRODUCTIVIDAD', 'CUOTA-PRESTAMO')),
     CONSTRAINT chk_calculo_valores CHECK (valor > 0 AND resultado >= 0 AND (base IS NULL OR base >= 0) AND (cantidad IS NULL OR cantidad >= 0))
 );
 CREATE INDEX idx_calculos_planilla_empleado ON CALCULOS_PLANILLA (id_planilla_empleado);
@@ -615,7 +618,8 @@ CREATE INDEX idx_bonos_productividad_periodo ON BONOS_PRODUCTIVIDAD (periodo);
 -- El bono de productividad es un ingreso de la planilla (RF-51); el monto fijo o el porcentaje sobre el haber
 -- básico lo define la regla vigente del periodo (REGLAS_BONO_PRODUCTIVIDAD), no una vigencia manual de este
 -- concepto, igual que BONO-ANTIGUEDAD.
-INSERT INTO CONCEPTOS_PLANILLA (codigo, nombre, descripcion, tipo, forma_calculo, base_calculo, es_de_ley)
+INSERT INTO CONCEPTOS_PLANILLA (codigo, nombre, descripcion, tipo, forma_calculo, base_calculo, es_de_ley,
+                                cuenta_contable_codigo, cuenta_contable_nombre)
 VALUES ('BONO-PRODUCTIVIDAD', 'Bono de productividad',
         'Se calcula según el cumplimiento de metas de venta, puntualidad o desempeño en caja del periodo.',
-        'INGRESO', 'MONTO_FIJO', NULL, FALSE);
+        'INGRESO', 'MONTO_FIJO', NULL, FALSE, '5.1.1.06', 'Bono de productividad');
