@@ -3,7 +3,8 @@ const { MODULO_EXTERNO } = require("../utils/ciclos");
 const { ESTADO_MENSAJE } = require("../utils/metricasCrm");
 
 const COLUMNAS = `m.id_mensaje, m.id_mensaje_externo, m.tipo_evento, m.carga, m.intentos, m.ultimo_error,
-                  m.recibido_en, m.procesado_en, m.id_estado_mensaje, ce.codigo AS estado`;
+                  m.recibido_en, m.procesado_en, m.id_estado_mensaje, ce.codigo AS estado,
+                  (SELECT count(*)::int FROM metricas_crm mc WHERE mc.id_mensaje = m.id_mensaje) AS metricas`;
 
 // Guarda lo que llegó del CRM. Si ese `id_mensaje_externo` ya estaba registrado es una segunda entrega del mismo
 // mensaje (Pub/Sub entrega al menos una vez): se devuelve el original con duplicado = true y no se toca nada.
@@ -87,8 +88,7 @@ async function reabrir(idMensaje, db = pool) {
 
 async function listar({ idEstado = null, limite = 100 } = {}, db = pool) {
   const { rows } = await db.query(
-    `SELECT ${COLUMNAS},
-            (SELECT count(*)::int FROM metricas_crm mc WHERE mc.id_mensaje = m.id_mensaje) AS metricas
+    `SELECT ${COLUMNAS}
      FROM mensajes_entrantes m JOIN catalogos_estado_mensaje ce ON ce.id_estado_mensaje = m.id_estado_mensaje
      WHERE ($1::smallint IS NULL OR m.id_estado_mensaje = $1)
      ORDER BY m.recibido_en DESC, m.id_mensaje
