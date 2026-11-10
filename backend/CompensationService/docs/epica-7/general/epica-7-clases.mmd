@@ -1,0 +1,131 @@
+%%{init: {"theme": "neutral"}}%%
+classDiagram
+    direction LR
+
+    class ConceptoPlanilla {
+        <<KAN-62>>
+        +id_concepto
+        +codigo
+        +nombre
+        +tipo: INGRESO|DESCUENTO|APORTE
+        +forma_calculo: MONTO_FIJO|PORCENTAJE
+        +base_calculo: HABER_BASICO|TOTAL_GANADO
+        +es_de_ley
+        +cuenta_contable_codigo
+        +cuenta_contable_nombre
+        +esta_activo
+    }
+
+    class VigenciaConcepto {
+        <<KAN-62>>
+        +id_vigencia
+        +valor
+        +vigente_desde
+        +vigente_hasta
+    }
+
+    class Planilla {
+        <<KAN-63>>
+        +id_planilla
+        +periodo
+        +datos_hasta
+        +estado: BORRADOR|APROBADA|CERRADA
+        +estado_contabilidad
+        +estado_pagos
+        +generada_por
+        +aprobada_por
+        +cerrada_en
+    }
+
+    class PlanillaEmpleado {
+        <<KAN-63·KAN-64>>
+        +id_planilla_empleado
+        +haber_mensual
+        +dias_pagados
+        +total_ganado
+        +total_descuentos
+        +liquido_pagable
+        +alertas[]
+    }
+
+    class NovedadPlanilla {
+        <<KAN-64>>
+        +origen: BONO_CONDICION
+        +forma_calculo
+        +valor
+        +monto
+    }
+
+    class CalculoPlanilla {
+        <<KAN-64>>
+        +orden
+        +tipo
+        +codigo
+        +base
+        +cantidad
+        +valor
+        +resultado
+    }
+
+    class EventoSaliente {
+        <<KAN-63·outbox>>
+        +id_evento
+        +topico
+        +tipo_evento
+        +destino: CONTABILIDAD|PAGOS
+        +estado: PENDIENTE|ENTREGADO|FALLIDO
+        +intentos
+    }
+
+    class EventoEntrante {
+        <<KAN-63·confirmaciones>>
+        +id_mensaje
+        +origen
+        +destino
+        +estado: RECIBIDO|PROCESADO|IGNORADO|FALLIDO
+        +intentos
+    }
+
+    class Prestamo {
+        <<KAN-65>>
+        +id_prestamo
+        +tipo: ANTICIPO|PRESTAMO
+        +monto
+        +numero_cuotas
+        +liquido_pagable_referencial
+        +porcentaje_cuota
+        +saldo_pendiente
+        +estado: ACTIVO|COMPLETADO|CANCELADO
+    }
+
+    class CuotaPrestamo {
+        <<KAN-65>>
+        +numero_cuota
+        +periodo
+        +monto
+        +estado: PENDIENTE|PAGADA
+    }
+
+    class Empleado {
+        <<EmployeeService>>
+        +id_empleado
+        +nombre_completo
+        +fecha_ingreso
+    }
+
+    ConceptoPlanilla "1" *-- "many" VigenciaConcepto : vigencias
+    VigenciaConcepto ..> CalculoPlanilla : valor usado en renglon
+    VigenciaConcepto ..> NovedadPlanilla : valor usado en bono
+
+    Planilla "1" *-- "many" PlanillaEmpleado : empleados del periodo
+    PlanillaEmpleado "1" *-- "many" CalculoPlanilla : desglose del calculo
+    PlanillaEmpleado "1" *-- "many" NovedadPlanilla : bonos de condicion (Epica 8)
+    Planilla "1" *-- "0..2" EventoSaliente : asiento y orden de pago
+    EventoEntrante ..> Planilla : confirma u observa
+    EventoEntrante ..> EventoSaliente : responde al envio
+
+    Prestamo "1" *-- "many" CuotaPrestamo : plan de cuotas
+    CuotaPrestamo ..> CalculoPlanilla : descuenta como CUOTA-PRESTAMO
+    PlanillaEmpleado ..> Empleado : id_empleado sin FK
+
+    note for PlanillaEmpleado "El bono de antiguedad (BONO-ANTIGUEDAD) lo calcula la Epica 8\ncon la escala de TRAMOS_ANTIGUEDAD; aqui solo llega como un\nrenglon mas de CalculoPlanilla, sin vigencia de concepto."

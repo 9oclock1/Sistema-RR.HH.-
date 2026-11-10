@@ -1,0 +1,44 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    participant Service as planillas.service
+    participant Calculo as utils/calculo.calcularEmpleado
+    participant Conceptos as CONCEPTOS_PLANILLA vigentes
+    participant Consistencia as validarConsistencia
+    actor Contador
+    participant Pantalla as DetalleColaboradorModal.jsx
+
+    note over Service,Calculo: KAN-64 criterio 1: total ganado = haber basico + antiguedad + horas extra + recargos + bonos + ingresos generales
+    Service->>Calculo: calcularEmpleado(fila, conceptos)
+    Calculo->>Conceptos: HABER-BASICO, HORAS-EXTRA, DOMINICAL, RECARGO-NOCTURNO
+    alt falta un concepto activo con valor en el mes
+        Calculo-->>Service: alerta "Falta el concepto X activo con valor en el mes"
+    else
+        Calculo->>Calculo: renglon por hora extra, dominical y nocturno (valor_hora = haber/240)
+        Calculo->>Calculo: + bono de antiguedad (fila.antiguedad, calculado en planillas.service con la escala de Epica 8)
+        Calculo->>Calculo: + bonos por condicion especial (novedades, Epica 8) y conceptos generales de INGRESO
+    end
+
+    note over Calculo,Consistencia: KAN-64 criterio 2: descuentos de ley (aportes, retenciones) + cuotas de prestamo + Aporte Nacional Solidario por tramo
+    Calculo->>Calculo: descuentos generales + ANS-13000/25000/35000 sobre el excedente + CUOTA-PRESTAMO (KAN-65)
+    Calculo->>Calculo: liquido_pagable = total_ganado - total_descuentos
+    Calculo->>Calculo: aportes patronales (no se descuentan al colaborador)
+
+    note over Calculo,Consistencia: KAN-64 criterio 3: liquido negativo o totales que no cuadran bloquean la aprobacion
+    Calculo->>Consistencia: validarConsistencia(renglones, totales, fila)
+    alt liquido_pagable < 0
+        Consistencia-->>Calculo: alerta "El liquido pagable es negativo"
+    else alt la suma de renglones no cuadra con los totales
+        Consistencia-->>Calculo: alerta "Los totales no cuadran con el detalle del calculo"
+    else dias pagados > 0 pero total ganado es 0
+        Consistencia-->>Calculo: alerta "El total ganado es cero aunque tiene dias pagados"
+    else sin inconsistencias
+        Consistencia-->>Calculo: []
+    end
+    Calculo-->>Service: { renglones, total_ganado, total_descuentos, liquido_pagable, total_aportes, alertas }
+
+    note over Contador,Pantalla: KAN-64 criterio 4: el Contador abre el detalle y ve cada concepto con su base y su resultado
+    Contador->>Pantalla: abre el detalle de un colaborador
+    Pantalla->>Pantalla: lista calculo.ingresos / descuentos / aportes (CALCULOS_PLANILLA)
+
+    note over Service: Al aprobar: si algun colaborador quedo con alertas, planillas.service.aprobar() responde 409 y no aprueba

@@ -1,0 +1,39 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    participant Planillas as planillas.service (KAN-63)
+    participant AnticiposM as anticipos.model
+    participant Calculo as utils/calculo.renglonCuota
+    participant DB as CUOTAS_PRESTAMO / CALCULOS_PLANILLA
+    actor Contador
+    participant Pantalla as AnticiposPage.jsx
+    participant AnticiposS as anticipos.service
+    participant Utils as utils/anticipos.validarOrdenCierre
+    participant PRESTAMOS as PRESTAMOS
+
+    note over Planillas,DB: AC3 · Al generar la planilla, cada cuota PENDIENTE del mes se incluye como deduccion
+    Planillas->>AnticiposM: listarCuotasDelPeriodo(primer dia del periodo)
+    AnticiposM->>DB: SELECT CUOTAS_PRESTAMO WHERE periodo = :mes AND estado='PENDIENTE'
+    DB-->>Planillas: cuotas pendientes por colaborador
+    Planillas->>Calculo: renglonCuota(cuota) por cada prestamo del colaborador
+    Calculo-->>Planillas: renglon DESCUENTO "CUOTA-PRESTAMO" (sin id_vigencia)
+    Planillas->>DB: CALCULOS_PLANILLA incluye el renglon en PLANILLA_EMPLEADOS
+
+    note over Contador,PRESTAMOS: AC4 - una vez cerrada la planilla del periodo (ver sec-05), el Contador cierra el periodo de prestamos.<br/>No es automatico, es una accion aparte de anticipos.service (no la invoca confirmaciones.service)
+    Contador->>Pantalla: cierra el periodo de deducciones ya pagado
+    Pantalla->>AnticiposS: POST /anticipos/deducciones/cerrar { periodo }
+    AnticiposS->>AnticiposM: obtenerPeriodoPendienteMasAntiguo()
+    AnticiposS->>Utils: validarOrdenCierre(periodo, periodoPendienteMasAntiguo)
+    alt existe un periodo anterior con cuotas pendientes
+        Utils-->>AnticiposS: 409 cierre primero el periodo anterior (orden cronologico)
+    else periodo valido
+        AnticiposS->>AnticiposM: cerrarPeriodo(periodo)
+        AnticiposM->>DB: UPDATE CUOTAS_PRESTAMO SET estado='PAGADA', pagada_en WHERE periodo=:periodo
+        AnticiposM->>PRESTAMOS: saldo_pendiente -= monto de cada cuota pagada
+        alt saldo_pendiente llega a 0
+            AnticiposM->>PRESTAMOS: estado='COMPLETADO'
+        end
+        AnticiposS-->>Pantalla: { periodo, cuotas_cerradas }
+    end
+
+    note over AnticiposM: GET /anticipos/deducciones?periodo= deja revisar las cuotas del mes antes de cerrarlo

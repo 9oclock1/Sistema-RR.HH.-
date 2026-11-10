@@ -1,0 +1,73 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    actor Contador
+    participant Portal as Portal (frontend)
+    participant Planillas as planillas.service
+    participant Calculo as utils/calculo (KAN-64)
+    participant Externos as EmployeeService / AttendanceService
+    participant Prestamos as anticipos.service (KAN-65)
+    participant DB as CompensationDB
+    participant Outbox as eventos.service (outbox)
+    participant PubSub as Google Pub/Sub
+    actor Contabilidad
+    actor Pagos
+
+    rect rgb(235,245,255)
+    note over Contador,DB: KAN-62 · Conceptos de pago y deduccion
+    Contador->>Portal: crea o actualiza un concepto con su vigencia
+    Portal->>Planillas: POST /conceptos, POST /conceptos/:id/vigencias
+    Planillas->>DB: CONCEPTOS_PLANILLA, VIGENCIAS_CONCEPTO (cierra la vigencia anterior)
+    end
+
+    rect rgb(235,255,235)
+    note over Contador,Prestamos: KAN-65 · Anticipos y prestamos (previo al cierre del mes)
+    Contador->>Portal: registra un anticipo o prestamo
+    Portal->>Prestamos: POST /anticipos
+    Prestamos->>Externos: obtenerHaberVigente(id_empleado)
+    Prestamos->>Prestamos: calcularCuotas + validarTopeDescuento (20% del liquido)
+    Prestamos->>DB: PRESTAMOS, CUOTAS_PRESTAMO
+    end
+
+    rect rgb(255,245,230)
+    note over Contador,Calculo: KAN-63 + KAN-64 · Generacion de la planilla mensual
+    Contador->>Portal: genera la planilla del periodo
+    Portal->>Planillas: POST /planillas
+    Planillas->>Externos: personal, contratos, asistencia, horas extra, licencias
+    Planillas->>Prestamos: listarCuotasDelPeriodo(periodo)
+    Planillas->>Calculo: calcularEmpleado(fila, conceptos vigentes)
+    Calculo-->>Planillas: renglones, totales, alertas de inconsistencia
+    Planillas->>DB: PLANILLAS (BORRADOR), PLANILLA_EMPLEADOS, CALCULOS_PLANILLA, NOVEDADES_PLANILLA
+    end
+
+    rect rgb(255,235,235)
+    note over Contador,PubSub: KAN-63 · Aprobacion y publicacion asincrona
+    Contador->>Portal: aprueba la planilla (sin alertas, mes completo)
+    Portal->>Planillas: POST /planillas/:id/aprobar
+    Planillas->>DB: PLANILLAS.estado = APROBADA + EVENTOS_SALIENTES (asiento y orden de pago)
+    loop cada 5 segundos
+        Outbox->>DB: reservarPendientes()
+        Outbox->>PubSub: publishMessage (topico ucb-sis323-sub-f)
+    end
+    PubSub->>Contabilidad: PLANILLA_APROBADA_ASIENTO
+    PubSub->>Pagos: PLANILLA_APROBADA_ORDEN_PAGO
+    end
+
+    rect rgb(240,235,255)
+    note over Contabilidad,DB: KAN-63 · Confirmaciones y cierre
+    Contabilidad->>PubSub: CONFIRMACION_ASIENTO_PLANILLA
+    Pagos->>PubSub: CONFIRMACION_ORDEN_PAGO_PLANILLA
+    PubSub->>Planillas: confirmaciones.service.procesar()
+    Planillas->>DB: EVENTOS_ENTRANTES, PLANILLAS.estado_contabilidad / estado_pagos
+    alt ambas confirmadas
+        Planillas->>DB: PLANILLAS.estado = CERRADA
+    else alguna rechazada
+        Planillas->>Contador: queda APROBADA con motivo, se reenvia
+    end
+    end
+
+    rect rgb(235,255,235)
+    note over Contador,Prestamos: KAN-65 · Cierre del periodo de deducciones (accion aparte, no automatica)
+    Contador->>Prestamos: POST /anticipos/deducciones/cerrar { periodo }
+    Prestamos->>DB: CUOTAS_PRESTAMO.estado = PAGADA, PRESTAMOS.saldo_pendiente -= cuota
+    end

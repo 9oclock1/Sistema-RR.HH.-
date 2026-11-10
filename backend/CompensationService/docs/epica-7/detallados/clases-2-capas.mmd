@@ -1,0 +1,229 @@
+%%{init: {"theme": "neutral"}}%%
+classDiagram
+    direction TB
+
+    class ConceptosRoutes {
+        <<router>>
+        +GET /conceptos
+        +POST /conceptos
+        +GET /conceptos/:id
+        +PUT /conceptos/:id
+        +PATCH /conceptos/:id/estado
+        +DELETE /conceptos/:id
+        +POST /conceptos/:id/vigencias
+    }
+    class ConceptosController {
+        <<controller>>
+        +listar() +obtener() +crear()
+        +actualizar() +cambiarEstado()
+        +eliminar() +agregarVigencia()
+    }
+    class ConceptosService {
+        <<service>>
+        +crear() +actualizar() +cambiarEstado()
+        +eliminar() +agregarVigencia()
+    }
+    class ConceptosModel {
+        <<model>>
+        +listar() +obtener() +crear()
+        +bloquear() +ultimaVigencia()
+        +cerrarVigencia() +crearVigencia()
+    }
+    class UtilsConceptos {
+        <<logica pura>>
+        +validarConcepto() +validarEdicion()
+        +validarVigencia() +cierreDeUltima()
+    }
+
+    class PlanillasRoutes {
+        <<router>>
+        +GET /planillas
+        +POST /planillas
+        +GET /planillas/:id
+        +DELETE /planillas/:id
+        +POST /planillas/:id/aprobar
+        +POST /planillas/:id/integraciones/:destino/reenviar
+    }
+    class PlanillasController {
+        <<controller>>
+        +listar() +obtener() +generar()
+        +descartar() +aprobar() +reenviar()
+    }
+    class PlanillasService {
+        <<service>>
+        +generar() +descartar() +aprobar()
+        +reenviar() +registrarEnvio()
+        +responsableEn()
+    }
+    class PlanillasModel {
+        <<model>>
+        +conceptosVigentes() +bloquearPeriodo()
+        +crear() +reemplazar() +guardarEmpleados()
+        +aprobar() +responder() +cerrarSiConfirmada()
+        +reabrirIntegracion()
+    }
+    class UtilsPlanillas {
+        <<logica pura>>
+        +rangoPlanilla() +tramoSinConsolidar()
+        +validarResponsable() +consolidarPlanilla()
+        +consolidarEmpleado() +detalleBono()
+    }
+    class UtilsCalculo {
+        <<logica pura KAN-64>>
+        +calcularEmpleado() +antiguedadDelColaborador()
+        +validarConsistencia()
+    }
+    class UtilsIntegraciones {
+        <<logica pura>>
+        +armarMensaje() +armarAsiento()
+        +armarOrdenPago() +esConfirmacion()
+        +leerConfirmacion() +esperaReintento()
+    }
+
+    class AnticiposRoutes {
+        <<router>>
+        +GET /anticipos
+        +POST /anticipos
+        +GET /anticipos/:id
+        +GET /anticipos/deducciones
+        +POST /anticipos/deducciones/cerrar
+    }
+    class AnticiposController {
+        <<controller>>
+        +listar() +obtener() +crear()
+        +listarDeducciones() +cerrarPeriodo()
+    }
+    class AnticiposService {
+        <<service KAN-65>>
+        +crear() +listarDeducciones() +cerrarPeriodo()
+    }
+    class AnticiposModel {
+        <<model>>
+        +sumarComprometidoPorPeriodo() +crear()
+        +crearCuotas() +listarCuotasDelPeriodo()
+        +cerrarPeriodo() +obtenerPeriodoPendienteMasAntiguo()
+    }
+    class UtilsAnticipos {
+        <<logica pura>>
+        +validarDatosPrestamo() +calcularCuotas()
+        +validarTopeDescuento() +validarOrdenCierre()
+    }
+
+    class ConfirmacionesRoutes {
+        <<router>>
+        +GET /confirmaciones
+        +POST /confirmaciones/:id/reprocesar
+    }
+    class ConfirmacionesController {
+        <<controller>>
+        +listar() +reprocesar()
+    }
+    class ConfirmacionesService {
+        <<service>>
+        +procesar() +aplicar() +manejar()
+        +iniciarConsumidor() +reprocesar()
+    }
+    class ConfirmacionesModel {
+        <<model>>
+        +reclamar() +cerrar() +registrarFallo()
+        +reabrir() +devolverAFallido()
+    }
+
+    class EventosService {
+        <<service outbox>>
+        +despachar() +publicar()
+        +iniciarDespachador() +topicoPropio()
+    }
+    class EventosModel {
+        <<model>>
+        +registrar() +reservarPendientes()
+        +marcarEntregado() +marcarError() +reencolar()
+    }
+
+    class ExternosService {
+        <<cliente HTTP>>
+        +listarPersonal() +listarContratos()
+        +resumirAsistencia() +resumirHorasExtra()
+        +listarLicencias() +listarPeriodosHorasExtra()
+    }
+    class EmpleadosCliente {
+        <<cliente HTTP>>
+        +obtenerEmpleado() +listarEmpleados()
+        +obtenerHaberVigente()
+    }
+    class CondicionesService {
+        <<Epica 8>>
+        +procesar()
+    }
+    class AntiguedadService {
+        <<Epica 8>>
+        +obtenerEscalaVigente()
+    }
+    class PubSubConfig {
+        <<config>>
+        +obtenerCliente()
+    }
+    class TransaccionConfig {
+        <<config>>
+        +enTransaccion()
+    }
+    class EmployeeService {
+        <<sistema externo>>
+    }
+    class AttendanceService {
+        <<sistema externo>>
+    }
+    class Contabilidad {
+        <<sistema externo grupo D>>
+    }
+    class Pagos {
+        <<sistema externo grupo A>>
+    }
+
+    ConceptosRoutes --> ConceptosController
+    ConceptosController --> ConceptosService
+    ConceptosService --> ConceptosModel
+    ConceptosService --> UtilsConceptos
+    ConceptosService --> TransaccionConfig
+
+    PlanillasRoutes --> PlanillasController
+    PlanillasController --> PlanillasService
+    PlanillasService --> PlanillasModel
+    PlanillasService --> UtilsPlanillas
+    PlanillasService --> UtilsCalculo
+    PlanillasService --> UtilsIntegraciones
+    PlanillasService --> TransaccionConfig
+    PlanillasService --> ExternosService
+    PlanillasService --> EmpleadosCliente
+    PlanillasService --> CondicionesService
+    PlanillasService --> AntiguedadService
+    PlanillasService --> AnticiposModel : listarCuotasDelPeriodo
+    PlanillasService --> EventosModel : registra el envio en la misma transaccion
+
+    AnticiposRoutes --> AnticiposController
+    AnticiposController --> AnticiposService
+    AnticiposService --> AnticiposModel
+    AnticiposService --> UtilsAnticipos
+    AnticiposService --> EmpleadosCliente
+    AnticiposService --> TransaccionConfig
+
+    ConfirmacionesRoutes --> ConfirmacionesController
+    ConfirmacionesController --> ConfirmacionesService
+    ConfirmacionesService --> ConfirmacionesModel
+    ConfirmacionesService --> PlanillasModel : bloquear/responder/cerrarSiConfirmada
+    ConfirmacionesService --> EventosModel : obtener/ultimosDePlanilla
+    ConfirmacionesService --> AnticiposService : cerrarPeriodo (al cerrar la planilla)
+    ConfirmacionesService --> UtilsIntegraciones
+    ConfirmacionesService --> PubSubConfig
+    ConfirmacionesService --> TransaccionConfig
+
+    EventosService --> EventosModel
+    EventosService --> PubSubConfig
+
+    ExternosService --> EmployeeService
+    ExternosService --> AttendanceService
+    EmpleadosCliente --> EmployeeService
+    ConfirmacionesService ..> Contabilidad : escucha confirmaciones
+    ConfirmacionesService ..> Pagos : escucha confirmaciones
+    EventosService ..> Contabilidad : publica asiento
+    EventosService ..> Pagos : publica orden de pago

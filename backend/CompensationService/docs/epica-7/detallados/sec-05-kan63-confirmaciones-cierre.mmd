@@ -1,0 +1,49 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    actor Contabilidad
+    actor Pagos
+    participant PubSub as Pub/Sub (ucb-sis323-sub-d / -a)
+    participant Suscripcion as suscripcion propia (-rrhh-planillas)
+    participant Service as confirmaciones.service
+    participant Model as confirmaciones.model
+    participant PlanillasM as planillas.model
+    participant EventosM as eventos.model
+    participant DB as EVENTOS_ENTRANTES / PLANILLAS
+    participant AnticiposS as anticipos.service (KAN-65)
+
+    Contabilidad->>PubSub: CONFIRMACION_ASIENTO_PLANILLA { resultado, referencia|motivo }
+    Pagos->>PubSub: CONFIRMACION_ORDEN_PAGO_PLANILLA { resultado, referencia|motivo }
+    PubSub->>Suscripcion: entrega el mensaje (se crea la suscripcion si falta)
+    Suscripcion->>Service: manejar(mensaje, topico)
+    Service->>Service: procesar({ idMensaje, topico, cuerpo })
+    Service->>Model: reclamar(idMensaje, carga) -- uq(id_mensaje), descarta duplicados de Pub/Sub
+
+    alt mensaje ya reclamado (duplicado)
+        Model-->>Service: estado distinto de RECIBIDO
+        Service-->>Suscripcion: ack() sin reprocesar
+    else mensaje con datos invalidos
+        Service->>Model: cerrar(FALLIDO, detalle) -- no se reintenta
+        Service-->>Suscripcion: ack()
+    else mensaje valido
+        Service->>Service: aplicar(cliente, confirmacion) [SAVEPOINT]
+        Service->>PlanillasM: bloquear(id_planilla) FOR UPDATE
+        Service->>EventosM: obtener(id_mensaje_origen) + ultimosDePlanilla()
+        alt responde a un envio anterior o ya confirmada
+            Service->>Model: cerrar(IGNORADO)
+        else primera confirmacion de este destino
+            Service->>PlanillasM: responder(destino, resultado, referencia|motivo)
+            Service->>PlanillasM: cerrarSiConfirmada(id_planilla)
+            alt ambas integraciones CONFIRMADA
+                PlanillasM->>DB: UPDATE PLANILLAS SET estado='CERRADA', cerrada_en
+                Service->>AnticiposS: cerrarPeriodo(periodo) -- AC4 de KAN-65
+                AnticiposS->>DB: CUOTAS_PRESTAMO.estado='PAGADA', PRESTAMOS.saldo_pendiente -= cuota
+            else falta la otra confirmacion
+                PlanillasM-->>Service: sigue APROBADA
+            end
+            Service->>Model: cerrar(PROCESADO)
+        end
+        Service-->>Suscripcion: ack()
+    end
+
+    note over Service,Suscripcion: Error pasajero (BD caida, etc.) - nack() con espera creciente (2s, 4s, 8s), tras 5 intentos FALLIDO sin mas reintentos (cola en GET /confirmaciones?estado=FALLIDO, se reprocesa con POST /confirmaciones/:id/reprocesar)
