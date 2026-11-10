@@ -8,6 +8,8 @@ router.get("/bonos-productividad/bonos", controlador.listarBonos);
 router.post("/bonos-productividad/procesar", controlador.procesar);
 router.get("/bonos-productividad/eventos", controlador.listarEventos);
 router.post("/bonos-productividad/eventos/:id/reprocesar", controlador.reprocesarEvento);
+router.get("/bonos-productividad/solicitudes-cierre", controlador.obtenerSolicitudCierre);
+router.post("/bonos-productividad/solicitudes-cierre", controlador.solicitarCierre);
 
 router.get("/bonos-productividad", controlador.listarReglas);
 router.post("/bonos-productividad", controlador.crearRegla);

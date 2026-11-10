@@ -163,7 +163,48 @@ function cumpleUmbral(regla, metrica) {
   return metrica.porcentaje_cumplimiento >= Number(regla.umbral_cumplimiento);
 }
 
+const TIPO_SOLICITUD_CIERRE = "SOLICITUD_CIERRE_VENTAS_PERIODO";
+
+const ultimoDiaDelMes = (periodo) => {
+  const [anio, mes] = periodo.split("-").map(Number);
+  return new Date(Date.UTC(anio, mes, 0)).toISOString().slice(0, 10);
+};
+
+function armarSolicitudCierre({ idMensaje, fecha, periodo, solicitante, personal, topicoRespuesta }) {
+  const colaboradores = personal
+    .filter((e) => e.activo !== false)
+    .map((e) => ({
+      id_empleado: e.id_empleado,
+      nombre_completo: e.nombre_completo,
+      numero_documento: e.numero_documento ?? null,
+      cargo: e.cargo ?? null,
+      sucursal: e.sucursal ?? null,
+    }))
+    .sort((a, b) => String(a.nombre_completo).localeCompare(String(b.nombre_completo), "es"));
+  return {
+    encabezado: {
+      id_mensaje: idMensaje,
+      origen: { grupo: GRUPO_RRHH, modulo: "RRHH" },
+      destino: { grupo: GRUPO_VENTAS, modulo: "Ventas y Marketing" },
+      tipo: TIPO_SOLICITUD_CIERRE,
+      fecha,
+      version_esquema: 1,
+    },
+    datos: {
+      periodo,
+      fecha_inicio: `${periodo}-01`,
+      fecha_fin: ultimoDiaDelMes(periodo),
+      solicitada: { por: solicitante, en: fecha },
+      respuesta_esperada: { tipo: TIPO_EVENTO_CIERRE_VENTAS, topico: topicoRespuesta },
+      cantidad_colaboradores: colaboradores.length,
+      colaboradores,
+    },
+  };
+}
+
 module.exports = {
+  TIPO_SOLICITUD_CIERRE,
+  armarSolicitudCierre,
   TIPOS_META,
   FORMAS_CALCULO,
   ROLES_META,

@@ -135,7 +135,7 @@ Cada sistema responde en su propio tópico (`ucb-sis323-sub-d`, `ucb-sis323-sub-
 
 ## Integración con Ventas y Marketing (E)
 
-RRHH se suscribe (no publica) en `projects/project-a96e5fe1-5ba6-4698-a85/topics/ucb-sis323-sub-e`, con la
+RRHH pide el cierre del periodo publicando `SOLICITUD_CIERRE_VENTAS_PERIODO` en su tópico (ver abajo) y se suscribe a la respuesta en `projects/project-a96e5fe1-5ba6-4698-a85/topics/ucb-sis323-sub-e`, con la
 suscripción propia `ucb-sis323-sub-e<PUBSUB_SUFIJO_SUSCRIPCION_VENTAS>` (se crea si falta, ver
 `ventasProductividad.service.escuchar`). Mismo sobre común que el resto del ERP:
 
@@ -167,3 +167,33 @@ suscripción propia `ucb-sis323-sub-e<PUBSUB_SUFIJO_SUSCRIPCION_VENTAS>` (se cre
 - `EVENTOS_VENTAS_ENTRANTES` guarda cada mensaje una sola vez por `id_mensaje` (los duplicados de Pub/Sub no cambian nada, criterio 4). Un mensaje sin ningún colaborador válido (sobre inválido, periodo inválido, o los datos de todos los colaboradores inválidos) queda `FALLIDO` sin reintentos.
 - Un colaborador con datos inválidos (UUID mal formado, `rol` que no es `VENDEDOR`/`CAJERO`, número faltante o fuera de rango) o repetido en el mismo mensaje no descarta a los demás: ese colaborador queda fuera del cálculo y el motivo se anota en `detalle` del evento (consultable con `GET /bonos-productividad/eventos`), mientras el resto sí recibe su bono. Solo si ningún colaborador del mensaje es válido el evento completo queda `FALLIDO`.
 - Un error pasajero (la base, por ejemplo) se reintenta con nueva entrega (2 s, 4 s, 8 s… hasta 1 min) y tras 5 intentos queda `FALLIDO`: cola de mensajes fallidos con `GET /bonos-productividad/eventos?estado=FALLIDO` y `POST /bonos-productividad/eventos/:id/reprocesar`.
+
+### Solicitud del cierre de ventas: `SOLICITUD_CIERRE_VENTAS_PERIODO` (destino E)
+
+El Administrador la envía desde Bonos por productividad (`POST /bonos-productividad/solicitudes-cierre` con `{ periodo }`). Se guarda en `EVENTOS_SALIENTES` sin planilla ni destino de planilla (`id_planilla` y `destino` NULL) y el mismo despachador de la planilla aprobada la publica en el tópico de RRHH (`ucb-sis323-sub-f`), con los mismos reintentos. No se encola otra del mismo mes mientras la anterior siga pendiente; `GET /bonos-productividad/solicitudes-cierre?periodo=AAAA-MM` devuelve la última y su estado de envío.
+
+```json
+{
+  "encabezado": {
+    "id_mensaje": "uuid",
+    "origen": { "grupo": "F", "modulo": "RRHH" },
+    "destino": { "grupo": "E", "modulo": "Ventas y Marketing" },
+    "tipo": "SOLICITUD_CIERRE_VENTAS_PERIODO",
+    "fecha": "2026-11-09T14:00:00.000Z",
+    "version_esquema": 1
+  },
+  "datos": {
+    "periodo": "2026-10",
+    "fecha_inicio": "2026-10-01",
+    "fecha_fin": "2026-10-31",
+    "solicitada": { "por": { "id_empleado": "uuid", "nombre_completo": "…" }, "en": "2026-11-09T14:00:00.000Z" },
+    "respuesta_esperada": { "tipo": "CIERRE_VENTAS_PERIODO", "topico": "ucb-sis323-sub-e" },
+    "cantidad_colaboradores": 2,
+    "colaboradores": [
+      { "id_empleado": "uuid", "nombre_completo": "Ana Pérez", "numero_documento": "1234567", "cargo": "Cajero", "sucursal": "Sopocachi" }
+    ]
+  }
+}
+```
+
+- `colaboradores`: el personal activo de EmployeeService, para que Ventas relacione a sus vendedores y cajeros con el `id_empleado` de RRHH.

@@ -1,4 +1,18 @@
 const servicio = require("../services/ventasProductividad.service");
+const solicitudes = require("../services/solicitudesVentas.service");
+
+const identidad = (req) => ({
+  idEmpleado: req.get("X-Empleado-Id")?.trim() || null,
+  rol: req.get("X-Rol")?.trim() || null,
+});
+
+async function obtenerSolicitudCierre(req, res) {
+  res.json(await solicitudes.obtenerUltima(req.query));
+}
+
+async function solicitarCierre(req, res) {
+  res.status(201).json(await solicitudes.solicitar(req.body, identidad(req)));
+}
 
 async function listarReglas(req, res) {
   res.json(await servicio.listarReglas(req.query));
@@ -52,4 +66,6 @@ module.exports = {
   listarBonos,
   listarEventos,
   reprocesarEvento,
+  obtenerSolicitudCierre,
+  solicitarCierre,
 };
