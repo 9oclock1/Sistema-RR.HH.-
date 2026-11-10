@@ -69,9 +69,14 @@ async function asignacionesEnRango(desde, hasta) {
   return rows;
 }
 
-// Reprocesar un mes reemplaza sus bonos; el candado evita dos procesos del mismo mes a la vez.
-async function reemplazarProceso(cliente, { periodo, desde, hasta, jornadas }) {
+// El candado evita dos procesos del mismo mes a la vez; re-adquirirlo en la misma transacción no bloquea.
+async function adquirirCandadoPeriodo(cliente, periodo) {
   await cliente.query("SELECT pg_advisory_xact_lock(hashtext('procesos_condicion:' || $1))", [periodo]);
+}
+
+// Reprocesar un mes reemplaza sus bonos.
+async function reemplazarProceso(cliente, { periodo, desde, hasta, jornadas }) {
+  await adquirirCandadoPeriodo(cliente, periodo);
   await cliente.query("DELETE FROM procesos_condicion WHERE periodo = $1", [periodo]);
   const { rows } = await cliente.query(
     `INSERT INTO procesos_condicion (periodo, fecha_inicio, fecha_fin, jornadas_analizadas)
@@ -105,8 +110,10 @@ async function guardarBonos(cliente, idProceso, bonos) {
   }
 }
 
-async function obtenerProceso(periodo) {
-  const { rows } = await pool.query(
+// db: pool por defecto; dentro de una transacción (p. ej. para leer el proceso anterior antes de reemplazarlo)
+// se pasa el cliente de esa transacción.
+async function obtenerProceso(periodo, db = pool) {
+  const { rows } = await db.query(
     `SELECT id_proceso, periodo, fecha_inicio, fecha_fin, jornadas_analizadas, procesado_en
      FROM procesos_condicion WHERE periodo = $1`,
     [periodo]
@@ -114,8 +121,8 @@ async function obtenerProceso(periodo) {
   return rows[0];
 }
 
-async function listarBonos(idProceso) {
-  const { rows } = await pool.query(
+async function listarBonos(idProceso, db = pool) {
+  const { rows } = await db.query(
     `SELECT b.id_bono, b.id_condicion, b.id_vigencia, b.id_empleado, b.nombre_empleado, b.origen, b.id_asignacion,
             b.cantidad, to_json(b.fechas) AS fechas, b.factor, b.valor, b.monto,
             ce.tipo_condicion, c.codigo, c.nombre, c.forma_calculo, c.base_calculo,
@@ -204,6 +211,7 @@ module.exports = {
   eliminarAsignacion,
   activasConVigencias,
   asignacionesEnRango,
+  adquirirCandadoPeriodo,
   reemplazarProceso,
   guardarBonos,
   obtenerProceso,

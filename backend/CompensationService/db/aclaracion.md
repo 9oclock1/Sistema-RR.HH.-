@@ -13,6 +13,12 @@ La base no usa triggers, procedimientos almacenados ni vistas (decisión del equ
 
 - Un concepto usado (vigencias referenciadas por `BONOS_CONDICION` o `NOVEDADES_PLANILLA`) no se puede eliminar, solo inactivar (FK sin CASCADE).
 
+## Historial y auditoría de bonificaciones (RF-53, KAN-73)
+
+- `BONOS_CONDICION` ya es el historial por colaborador: `reemplazarProceso` solo borra los bonos del periodo que se reprocesa, los de otros periodos quedan. El endpoint `GET /bonificaciones/empleados/:idEmpleado` lee de ahí, con filtros por periodo, tipo de condición y sucursal (del colaborador en EmployeeService), y exporta a CSV con `?formato=csv`.
+- `AUDITORIA_BONIFICACIONES` registra lo que `BONOS_CONDICION` no puede, porque se reemplaza por completo en cada reproceso: quién, cuándo y el valor anterior de cada alta, modificación o anulación. Servicio: dentro de la misma transacción que reemplaza los bonos, se compara el proceso anterior del periodo con el nuevo (misma condición, colaborador, vigencia y asignación) y solo se guarda una fila si algo cambió (valor, monto o factor); un reproceso sin novedades no escribe nada.
+- `GET /bonificaciones/auditoria` exige un colaborador o un periodo (si no, la consulta no tiene cómo acotarse). Ambos endpoints de bonificaciones son solo para los roles `admin` o `auditor` (cabecera `X-Rol`, temporal hasta contar con autenticación).
+
 ## Planillas
 
 - Una planilla por mes (`periodo` AAAA-MM). Estados: `BORRADOR` → `APROBADA` → `CERRADA`.

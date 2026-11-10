@@ -175,6 +175,16 @@ async function metricasDelPeriodo(cliente, periodo) {
 
 // ---- Bonos de productividad generados por el motor ----
 
+// Bonos vigentes del periodo antes de reemplazarlos (RF-53, KAN-73): se lee dentro de la misma transacción
+// que el reemplazo, para comparar contra los nuevos y auditar lo que cambió.
+async function bonosDelPeriodo(cliente, periodo) {
+  const { rows } = await cliente.query(
+    "SELECT id_bono, id_empleado, id_regla, id_metrica, porcentaje_cumplimiento, valor, monto FROM bonos_productividad WHERE periodo = $1",
+    [periodo]
+  );
+  return rows;
+}
+
 async function reemplazarBonosDelPeriodo(cliente, periodo, bonos) {
   await cliente.query("DELETE FROM bonos_productividad WHERE periodo = $1", [periodo]);
   for (const b of bonos) {
@@ -219,6 +229,7 @@ module.exports = {
   devolverEventoAFallido,
   guardarMetricas,
   metricasDelPeriodo,
+  bonosDelPeriodo,
   reemplazarBonosDelPeriodo,
   listarBonosDelPeriodo,
 };

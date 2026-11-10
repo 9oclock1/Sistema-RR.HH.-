@@ -233,11 +233,13 @@ async function generar(datos = {}, identidad = {}) {
     externos.listarLicencias(rango.desde, rango.datos_hasta),
   ]);
   const nombreResponsable = responsableEn(personal, idResponsable);
-  // Los bonos por condiciones especiales y por productividad se vuelven a procesar para reflejar las
-  // jornadas, asignaciones y métricas de ventas actuales (RF-51).
+  // Los bonos por condiciones especiales y por productividad se vuelven a procesar para reflejar las jornadas,
+  // asignaciones y métricas de ventas actuales; la identidad queda en la auditoría de bonos (RF-53) como quien
+  // disparó el reproceso.
+  const identidadReproceso = { idEmpleado: idResponsable, rol: identidad.rol };
   const [{ bonos: bonosCondicion }, { bonos: bonosProductividadDelMes }] = await Promise.all([
-    condiciones.procesar({ periodo }),
-    bonosProductividad.procesar({ periodo }),
+    condiciones.procesar({ periodo }, identidadReproceso),
+    bonosProductividad.procesar({ periodo }, identidadReproceso),
   ]);
   const bonos = [...bonosCondicion, ...bonosProductividadDelMes];
 

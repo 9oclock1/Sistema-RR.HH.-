@@ -15,12 +15,14 @@ import {
   TextoTruncado,
 } from '../../components/ui';
 import { useRol } from '../../context/sesion';
+import { puedeAcceder } from '../../utils/permisos';
 import { useEmpleados } from '../Asignaciones/hooks/useEmpleados';
 import DatosPersonales from './components/DatosPersonales';
 import HistorialAsistencia from './components/HistorialAsistencia';
 import KardexResumen from './components/KardexResumen';
 import LineaTiempoContratos from './components/LineaTiempoContratos';
 import LineaTiempoTrayectoria from './components/LineaTiempoTrayectoria';
+import TablaBonificaciones from './components/TablaBonificaciones';
 import TablaCapacitaciones from './components/TablaCapacitaciones';
 import TablaMemorandums from './components/TablaMemorandums';
 import { useKardex } from './hooks/useKardex';
@@ -52,10 +54,12 @@ function Cargando() {
   );
 }
 
-function Expediente({ kardex }) {
+function Expediente({ kardex, rol }) {
   const [pestana, setPestana] = useState('datos');
   const { datos_personales: datos, contratos, memorandums, capacitaciones, trayectoria, asistencia } = kardex;
   const nombre = datos.nombre_completo;
+  // RF-53: el historial de bonificaciones es para el Administrador de RRHH o el Auditor, no para todo el que vea el Kardex.
+  const puedeVerBonos = puedeAcceder(rol, ['admin', 'auditor']);
 
   const pestanas = [
     { id: 'datos', etiqueta: 'Datos personales', contenido: <DatosPersonales datos={datos} /> },
@@ -91,6 +95,15 @@ function Expediente({ kardex }) {
       contador: asistencia.disponible ? asistencia.jornadas.length : undefined,
       contenido: <HistorialAsistencia asistencia={asistencia} nombre={nombre} />,
     },
+    ...(puedeVerBonos
+      ? [
+          {
+            id: 'bonificaciones',
+            etiqueta: 'Bonificaciones',
+            contenido: <TablaBonificaciones idEmpleado={kardex.id_empleado} nombre={nombre} />,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -169,7 +182,7 @@ export default function KardexView() {
       </Alerta>
     );
   } else {
-    contenido = <Expediente key={kardex.id_empleado} kardex={kardex} />;
+    contenido = <Expediente key={kardex.id_empleado} kardex={kardex} rol={rol} />;
   }
 
   return (

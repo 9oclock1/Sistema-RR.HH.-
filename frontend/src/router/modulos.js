@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, SquareKanban, Target, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
@@ -29,6 +29,8 @@ import CargosList from "../features/Cargos/CargosList";
 import ConceptosPage from "../features/conceptos/ConceptosPage";
 import CondicionesPage from "../features/condiciones/CondicionesPage";
 import BonosProductividadPage from "../features/bonos-productividad/BonosProductividadPage";
+import AuditoriaBonosPage from "../features/bonificaciones/AuditoriaBonosPage";
+import { RUTA_AUDITORIA_BONOS } from "../features/bonificaciones/auditoria";
 import PlanillaMensualPage from "../features/planillas/PlanillaMensualPage";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import ContratosView from "../features/Contratos/ContratosView";
@@ -312,6 +314,14 @@ export const SECCIONES = [
         icono: Target,
         roles: ["admin"],
         pagina: BonosProductividadPage,
+      },
+      {
+        ruta: RUTA_AUDITORIA_BONOS,
+        etiqueta: "Auditoría de bonificaciones",
+        descripcion: "Altas, modificaciones y anulaciones de bonos, y el historial por colaborador o por sucursal, con exportación.",
+        icono: ShieldCheck,
+        roles: ["admin", "auditor"],
+        pagina: AuditoriaBonosPage,
       },
     ],
   },

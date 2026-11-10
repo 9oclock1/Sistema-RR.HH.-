@@ -2,6 +2,7 @@ const pool = require("../config/db");
 const modelo = require("../models/ventasProductividad.model");
 const pubsub = require("../config/pubsub");
 const externos = require("./externos.service");
+const bonificaciones = require("./bonificaciones.service");
 const { enTransaccion } = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
@@ -100,12 +101,24 @@ async function eliminarRegla(id) {
   if (!eliminados) throw noEncontrada();
 }
 
+// Nombre del colaborador para la auditoría (RF-53, KAN-73): bonos_productividad no guarda nombre_empleado,
+// a diferencia de bonos_condicion.
+async function nombresDe(bonos) {
+  if (bonos.length === 0) return new Map();
+  const personal = await externos.listarPersonal();
+  const nombres = new Map(personal.map((e) => [String(e.id_empleado).toLowerCase(), e.nombre_completo]));
+  return new Map(bonos.map((b) => [b.id_empleado, nombres.get(String(b.id_empleado).toLowerCase()) ?? "Colaborador no registrado"]));
+}
+
 // RF-51, criterio 3: aplica las reglas activas del periodo a sus métricas y reemplaza los bonos anteriores.
-// Se llama tanto al terminar de registrar un cierre de ventas como al reprocesar manualmente el periodo.
-async function aplicarReglas(cliente, periodo) {
-  const [reglas, metricas] = await Promise.all([
+// Se llama tanto al terminar de registrar un cierre de ventas (sin identidad: lo dispara el consumidor de
+// Pub/Sub) como al reprocesar manualmente el periodo o al generar la planilla (RF-53, criterio 2: ambos casos
+// quedan en la auditoría de bonificaciones, igual que condiciones.service.procesar).
+async function aplicarReglas(cliente, periodo, identidad = {}) {
+  const [reglas, metricas, anteriores] = await Promise.all([
     modelo.reglasActivasDelPeriodo(cliente, periodo),
     modelo.metricasDelPeriodo(cliente, periodo),
+    modelo.bonosDelPeriodo(cliente, periodo),
   ]);
   const metricasPorTipo = { VENTAS: metricas }; // Puntualidad y desempeño en caja: sin fuente de métricas aún.
   const bonos = [];
@@ -124,6 +137,17 @@ async function aplicarReglas(cliente, periodo) {
     }
   }
   await modelo.reemplazarBonosDelPeriodo(cliente, periodo, bonos);
+
+  const nombres = await nombresDe([...anteriores, ...bonos]);
+  const conNombre = (b) => ({ ...b, nombre_empleado: nombres.get(b.id_empleado) });
+  await bonificaciones.registrarCambios(cliente, {
+    anteriores: anteriores.map(conNombre),
+    nuevos: bonos.map(conNombre),
+    periodo: periodo.slice(0, 7), // auditoria_bonificaciones.periodo es char(7) (AAAA-MM); aquí periodo es AAAA-MM-01.
+    identidad,
+    tipoBono: "PRODUCTIVIDAD",
+  });
+
   return bonos;
 }
 
@@ -143,11 +167,12 @@ function comoNovedad(b) {
 }
 
 // Se vuelve a procesar el periodo (por ejemplo, tras cambiar una regla) y entrega los bonos listos para la
-// planilla. Volver a procesar reemplaza los bonos anteriores del periodo.
-async function procesar({ periodo } = {}) {
+// planilla. Volver a procesar reemplaza los bonos anteriores del periodo. identidad: quién lo disparó (el
+// Administrador que reprocesa o quien genera la planilla), para la auditoría de bonos (RF-53, KAN-73).
+async function procesar({ periodo } = {}, identidad = {}) {
   const fecha = periodoAFecha(periodo);
   if (!fecha) throw new ErrorApp(400, "Periodo inválido", [{ campo: "periodo", mensaje: "Use el formato AAAA-MM." }]);
-  const bonos = await enTransaccion((cliente) => aplicarReglas(cliente, fecha));
+  const bonos = await enTransaccion((cliente) => aplicarReglas(cliente, fecha, identidad));
   return { periodo: fecha, bonos: bonos.map(comoNovedad) };
 }
 
