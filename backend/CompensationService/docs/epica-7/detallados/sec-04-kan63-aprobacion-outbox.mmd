@@ -1,0 +1,58 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    actor Contador
+    participant Pantalla as IntegracionesPlanilla.jsx
+    participant Gateway as API Gateway
+    participant Controller as planillas.controller
+    participant Service as planillas.service
+    participant Model as planillas.model
+    participant Integraciones as utils/integraciones
+    participant EventosM as eventos.model
+    participant DB as PLANILLAS / EVENTOS_SALIENTES
+    participant Despachador as eventos.service (cada 5s)
+    participant PubSub as Google Pub/Sub (ucb-sis323-sub-f)
+
+    Contador->>Pantalla: aprueba la planilla del mes
+    Pantalla->>Gateway: POST /api/comp/planillas/:id/aprobar
+    Gateway->>Controller: aprobar(id, identidad)
+    Controller->>Service: aprobar(id, identidad)
+    Service->>Model: bloquear(id) FOR UPDATE
+    alt estado distinto de BORRADOR
+        Model-->>Service: 409 ya fue aprobada
+    else alt datos_hasta < fecha_fin
+        Service-->>Controller: 409 vuelva a generarla cuando termine el mes
+    else alt sin colaboradores
+        Model-->>Service: 409 no tiene colaboradores
+    else alt algun colaborador con alertas (KAN-64)
+        Model-->>Service: 409 N colaboradores con alertas de inconsistencia
+    else aprobacion valida
+        Service->>Model: aprobar(id, { idEmpleado, nombre })
+        Model->>DB: UPDATE PLANILLAS SET estado='APROBADA', aprobada_por, aprobada_en
+        loop por cada destino (CONTABILIDAD, PAGOS)
+            Service->>Service: registrarEnvio(cliente, id, destino)
+            alt destino CONTABILIDAD y un concepto sin cuenta contable
+                Service-->>Controller: 409 el concepto X no tiene cuenta contable
+            else
+                Service->>Integraciones: armarAsiento() / armarOrdenPago()
+                Service->>EventosM: registrar(idEvento, topico, destino, carga)
+                EventosM->>DB: INSERT EVENTOS_SALIENTES (PENDIENTE) -- misma transaccion que la aprobacion
+            end
+        end
+        Service-->>Controller: planilla APROBADA con 2 envios PENDIENTES
+        Controller-->>Pantalla: 200
+    end
+
+    note over Despachador,PubSub: Patron outbox, criterio 5 - el evento ya quedo guardado, el despachador lo publica despues
+    loop cada 5 segundos
+        Despachador->>DB: reservarPendientes(lote=10)
+        Despachador->>PubSub: publishMessage(json=carga, attributes)
+        alt publicado
+            PubSub-->>Despachador: id de Pub/Sub
+            Despachador->>DB: marcarEntregado()
+        else Pub/Sub no responde o rechaza
+            Despachador->>DB: marcarError(espera creciente 30s..1h, o FALLIDO si es permanente)
+        end
+    end
+
+    note over Contador,Despachador: Si un envio queda FALLIDO, el Contador lo reenvia con POST /planillas/:id/integraciones/:destino/reenviar

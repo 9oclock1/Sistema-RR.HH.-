@@ -1,0 +1,55 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    actor Contador
+    participant Pantalla as ConceptosPage.jsx
+    participant Gateway as API Gateway
+    participant Controller as conceptos.controller
+    participant Service as conceptos.service
+    participant Utils as utils/conceptos
+    participant Model as conceptos.model
+    participant DB as CONCEPTOS_PLANILLA / VIGENCIAS_CONCEPTO
+
+    Contador->>Pantalla: crea un concepto (tipo, forma de calculo, cuenta contable)
+    Pantalla->>Gateway: POST /api/comp/conceptos
+    Gateway->>Controller: crear(req.body)
+    Controller->>Service: crear(datos)
+    Service->>Utils: validarConcepto(datos)
+    alt datos invalidos
+        Utils-->>Service: errores
+        Service-->>Controller: 400 Datos del concepto invalidos
+        Controller-->>Pantalla: 400
+    else validos
+        Utils-->>Service: { concepto, vigencia }
+        Service->>Model: crear(concepto) + crearVigencia(vigencia)
+        Model->>DB: INSERT (misma transaccion)
+        alt codigo duplicado (23505)
+            DB-->>Service: 409 Ya existe un concepto con ese codigo
+        else creado
+            DB-->>Service: ok
+            Service-->>Controller: 201 concepto con su vigencia activa
+            Controller-->>Pantalla: 201
+        end
+    end
+
+    note over Contador,DB: Registrar una nueva vigencia (AC3): la vigencia anterior se cierra sin perder su valor
+    Contador->>Pantalla: abre VigenciasModal y agrega un nuevo valor
+    Pantalla->>Gateway: POST /api/comp/conceptos/:id/vigencias
+    Gateway->>Controller: agregarVigencia(id, datos)
+    Controller->>Service: agregarVigencia(id, datos)
+    Service->>Model: bloquear(id) FOR UPDATE
+    alt concepto es BONO-ANTIGUEDAD
+        Service-->>Controller: 409 no admite vigencias manuales (lo administra Antiguedad, Epica 8)
+    else concepto normal
+        Service->>Utils: validarVigencia(datos) + cierreDeUltima(ultima, nueva)
+        Service->>Model: cerrarVigencia(ultima) + crearVigencia(nueva)
+        Model->>DB: UPDATE vigente_hasta + INSERT (misma transaccion)
+        alt se cruza con otra vigencia (23P01)
+            DB-->>Service: 409 La vigencia se cruza con otra del mismo concepto
+        else ok
+            DB-->>Service: ok
+            Service-->>Controller: 201 concepto con la nueva vigencia
+        end
+    end
+
+    note over Contador,DB: AC4: eliminar un concepto ya usado en una planilla solo lo inactiva (FK sin CASCADE, 23503)

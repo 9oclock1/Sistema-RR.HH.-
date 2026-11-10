@@ -1,0 +1,211 @@
+%%{init: {"theme": "neutral"}}%%
+classDiagram
+    direction TB
+
+    class CONCEPTOS_PLANILLA {
+        id_concepto UUID
+        codigo varchar(20)
+        nombre varchar(80)
+        tipo varchar(10)
+        forma_calculo varchar(12)
+        base_calculo varchar(15)
+        es_de_ley boolean
+        cuenta_contable_codigo varchar(20)
+        cuenta_contable_nombre varchar(80)
+        esta_activo boolean
+    }
+
+    class VIGENCIAS_CONCEPTO {
+        id_vigencia UUID
+        id_concepto UUID
+        valor numeric(12,4)
+        vigente_desde date
+        vigente_hasta date
+    }
+
+    class PLANILLAS {
+        id_planilla UUID
+        periodo char(7)
+        fecha_inicio date
+        fecha_fin date
+        datos_hasta date
+        estado varchar(10)
+        generada_por UUID
+        aprobada_por UUID
+        estado_contabilidad varchar(10)
+        estado_pagos varchar(10)
+        referencia_contabilidad varchar(60)
+        referencia_pagos varchar(60)
+        cerrada_en timestamptz
+    }
+
+    class PLANILLA_EMPLEADOS {
+        id_planilla_empleado UUID
+        id_planilla UUID
+        id_empleado UUID
+        id_contrato UUID
+        haber_mensual numeric(12,2)
+        dias_contrato smallint
+        dias_pagados smallint
+        faltas_injustificadas smallint
+        minutos_extra_habil int
+        minutos_extra_domingo int
+        minutos_extra_feriado int
+        minutos_domingo int
+        minutos_feriado int
+        minutos_descanso int
+        minutos_nocturnos int
+        total_ganado numeric(12,2)
+        total_descuentos numeric(12,2)
+        liquido_pagable numeric(12,2)
+        total_aportes numeric(12,2)
+        alertas text[]
+    }
+
+    class NOVEDADES_PLANILLA {
+        id_novedad UUID
+        id_planilla_empleado UUID
+        origen varchar(15)
+        id_vigencia UUID
+        codigo varchar(20)
+        forma_calculo varchar(12)
+        cantidad smallint
+        factor numeric(10,6)
+        valor numeric(12,4)
+        monto numeric(12,2)
+    }
+
+    class CALCULOS_PLANILLA {
+        id_calculo UUID
+        id_planilla_empleado UUID
+        id_vigencia UUID
+        orden smallint
+        tipo varchar(10)
+        codigo varchar(20)
+        forma_calculo varchar(12)
+        base numeric(12,2)
+        cantidad numeric(10,2)
+        valor numeric(12,4)
+        resultado numeric(12,2)
+    }
+
+    class EVENTOS_SALIENTES {
+        id_evento UUID
+        topico varchar(60)
+        tipo_evento varchar(60)
+        id_planilla UUID
+        destino varchar(15)
+        carga JSONB
+        estado varchar(10)
+        intentos smallint
+        proximo_intento_en timestamptz
+        entregado_en timestamptz
+    }
+
+    class EVENTOS_ENTRANTES {
+        id_evento_entrante UUID
+        id_mensaje varchar(100)
+        topico varchar(60)
+        tipo_evento varchar(60)
+        origen varchar(10)
+        id_planilla UUID
+        destino varchar(15)
+        carga JSONB
+        estado varchar(10)
+        intentos smallint
+    }
+
+    class PRESTAMOS {
+        id_prestamo UUID
+        id_empleado UUID
+        tipo varchar(10)
+        monto numeric(12,2)
+        numero_cuotas smallint
+        mes_inicio date
+        liquido_pagable_referencial numeric(12,2)
+        porcentaje_cuota numeric(5,2)
+        saldo_pendiente numeric(12,2)
+        estado varchar(12)
+    }
+
+    class CUOTAS_PRESTAMO {
+        id_cuota UUID
+        id_prestamo UUID
+        numero_cuota smallint
+        periodo date
+        monto numeric(12,2)
+        estado varchar(10)
+        pagada_en timestamptz
+    }
+
+    class TipoConcepto {
+        <<enumeration>>
+        INGRESO
+        DESCUENTO
+        APORTE
+    }
+
+    class FormaCalculo {
+        <<enumeration>>
+        MONTO_FIJO
+        PORCENTAJE
+    }
+
+    class EstadoPlanilla {
+        <<enumeration>>
+        BORRADOR
+        APROBADA
+        CERRADA
+    }
+
+    class EstadoIntegracion {
+        <<enumeration>>
+        PENDIENTE
+        CONFIRMADA
+        RECHAZADA
+    }
+
+    class EstadoEnvio {
+        <<enumeration>>
+        PENDIENTE
+        ENTREGADO
+        FALLIDO
+    }
+
+    class EstadoRecepcion {
+        <<enumeration>>
+        RECIBIDO
+        PROCESADO
+        IGNORADO
+        FALLIDO
+    }
+
+    class EstadoCuota {
+        <<enumeration>>
+        PENDIENTE
+        PAGADA
+    }
+
+    CONCEPTOS_PLANILLA "1" *-- "many" VIGENCIAS_CONCEPTO : vigente_desde/vigente_hasta sin solapamiento
+    CONCEPTOS_PLANILLA ..> TipoConcepto
+    CONCEPTOS_PLANILLA ..> FormaCalculo
+    VIGENCIAS_CONCEPTO ..> CALCULOS_PLANILLA : id_vigencia, sin CASCADE (no se borra si se usa)
+    VIGENCIAS_CONCEPTO ..> NOVEDADES_PLANILLA : id_vigencia (bonos de Epica 8)
+
+    PLANILLAS "1" *-- "many" PLANILLA_EMPLEADOS : ON DELETE CASCADE
+    PLANILLAS ..> EstadoPlanilla
+    PLANILLAS ..> EstadoIntegracion : estado_contabilidad / estado_pagos
+    PLANILLAS "1" *-- "0..2" EVENTOS_SALIENTES : asiento (D) y orden de pago (A)
+    PLANILLA_EMPLEADOS "1" *-- "many" CALCULOS_PLANILLA : ON DELETE CASCADE, uq(id_planilla_empleado, orden)
+    PLANILLA_EMPLEADOS "1" *-- "many" NOVEDADES_PLANILLA : ON DELETE CASCADE
+    EVENTOS_SALIENTES ..> EstadoEnvio
+    EVENTOS_ENTRANTES ..> EstadoRecepcion
+    EVENTOS_ENTRANTES ..> PLANILLAS : id_planilla (confirma la planilla que respondio)
+
+    PRESTAMOS "1" *-- "many" CUOTAS_PRESTAMO : ON DELETE CASCADE, uq(id_prestamo, periodo)
+    CUOTAS_PRESTAMO ..> EstadoCuota
+    CUOTAS_PRESTAMO ..> CALCULOS_PLANILLA : periodo pendiente -> renglon CUOTA-PRESTAMO sin id_vigencia
+
+    note for PLANILLA_EMPLEADOS "id_empleado, id_contrato, generada_por y aprobada_por referencian\nEmployeeDB sin FK (otro servicio): se validan en el backend.\nNombre, cargo, area, sucursal y haber se copian al generar."
+    note for CALCULOS_PLANILLA "chk_calculo_origen: id_vigencia es NULL solo para los codigos\nBONO-ANTIGUEDAD y CUOTA-PRESTAMO (no salen de una vigencia\nde concepto, los calcula la Epica 8 y KAN-65 respectivamente)."
+    note for PRESTAMOS "id_empleado referencia a EMPLOYEES (EmployeeDB) sin FK.\nliquido_pagable_referencial y porcentaje_cuota quedan fijos\nal registrar el prestamo, aunque el sueldo cambie despues."

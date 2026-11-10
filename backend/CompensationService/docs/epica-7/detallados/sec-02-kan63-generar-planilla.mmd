@@ -1,0 +1,54 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    actor Contador
+    participant Pantalla as PlanillaMensualPage.jsx
+    participant Gateway as API Gateway
+    participant Controller as planillas.controller
+    participant Service as planillas.service
+    participant Externos as externos.service
+    participant Condiciones as condiciones.service (Epica 8)
+    participant AnticiposM as anticipos.model
+    participant UtilsPlanillas as utils/planillas
+    participant Calculo as utils/calculo (KAN-64)
+    participant Model as planillas.model
+    participant DB as PLANILLAS / PLANILLA_EMPLEADOS
+
+    Contador->>Pantalla: genera la planilla del periodo (AAAA-MM)
+    Pantalla->>Gateway: POST /api/comp/planillas { periodo }
+    Gateway->>Controller: generar(req.body, identidad)
+    Controller->>Service: generar(datos, identidad)
+    Service->>Service: validarResponsable(identidad)
+    Service->>Externos: listarPeriodosHorasExtra()
+    alt horas extra sin consolidar en Asistencia
+        Service-->>Controller: 409 consolide primero las horas extra del tramo
+    else continua
+        par datos del mes
+            Service->>Externos: listarPersonal()
+            Service->>Externos: listarContratos(desde, hasta)
+            Service->>Externos: resumirAsistencia(desde, datos_hasta)
+            Service->>Externos: resumirHorasExtra(desde, datos_hasta)
+            Service->>Externos: listarLicencias(desde, datos_hasta)
+        end
+        Service->>Condiciones: procesar({ periodo }) - bonos por condiciones especiales
+        Condiciones-->>Service: bonos del periodo
+        Service->>UtilsPlanillas: consolidarPlanilla(personal, contratos, asistencia, horasExtra, licencias, bonos)
+        UtilsPlanillas-->>Service: empleados consolidados + advertencias
+        Service->>Model: conceptosVigentes(fecha de cierre)
+        Service->>AnticiposM: listarCuotasDelPeriodo(primer dia del mes)
+        Service->>Externos: fechasDeIngreso (EmployeeService, por colaborador)
+        loop por cada colaborador
+            Service->>Calculo: calcularEmpleado(fila, conceptos)
+            Calculo-->>Service: renglones, totales, alertas
+        end
+        Service->>Model: bloquearPeriodo(periodo) FOR UPDATE
+        alt ya existe una planilla APROBADA o CERRADA del periodo
+            Model-->>Service: 409 ya fue aprobada, no se puede volver a generar
+        else borrador nuevo o se reemplaza
+            Service->>Model: crear() / reemplazar() + guardarEmpleados()
+            Model->>DB: INSERT/UPDATE (misma transaccion)
+            DB-->>Service: id_planilla
+            Service-->>Controller: 201 (nueva) o 200 (borrador regenerado)
+            Controller-->>Pantalla: planilla en BORRADOR con totales y alertas
+        end
+    end

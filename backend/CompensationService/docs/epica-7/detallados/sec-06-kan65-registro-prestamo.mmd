@@ -1,0 +1,47 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    actor Contador
+    participant Pantalla as AnticipoFormulario.jsx
+    participant Gateway as API Gateway
+    participant Controller as anticipos.controller
+    participant Service as anticipos.service
+    participant Utils as utils/anticipos
+    participant EmpleadosCliente as empleados.cliente (EmployeeService)
+    participant Model as anticipos.model
+    participant DB as PRESTAMOS / CUOTAS_PRESTAMO
+
+    Contador->>Pantalla: registra un anticipo o prestamo (monto, cuotas, mes de inicio)
+    Pantalla->>Gateway: POST /api/comp/anticipos
+    Gateway->>Controller: crear(req.body)
+    Controller->>Service: crear(datos)
+    Service->>Utils: validarDatosPrestamo(datos)
+    alt datos invalidos
+        Utils-->>Service: 400 Datos del anticipo o prestamo invalidos
+    else datos validos
+        Service->>EmpleadosCliente: obtenerEmpleado(id_empleado)
+        alt colaborador no existe
+            EmpleadosCliente-->>Service: 404 El colaborador no existe
+        else
+            Service->>EmpleadosCliente: obtenerHaberVigente(id_empleado)
+            alt sin contrato vigente
+                EmpleadosCliente-->>Service: 409 no tiene un contrato vigente
+            else
+                Service->>Utils: calcularCuotas({ monto, numero_cuotas, mes_inicio })
+                Utils-->>Service: plan de cuotas (ultima cuota absorbe el redondeo)
+                Service->>Model: sumarComprometidoPorPeriodo(id_empleado)
+                Model-->>Service: cuotas ya comprometidas en otros prestamos activos, por periodo
+                Service->>Utils: validarTopeDescuento(cuotas, liquido_pagable, comprometido)
+                alt cuota maxima (sumada a lo ya comprometido) supera 20% del liquido
+                    Utils-->>Service: 400 La cuota supera el limite de descuento permitido
+                else dentro del tope
+                    Service->>Model: crear(prestamo con liquido_pagable_referencial y porcentaje_cuota fijos)
+                    Service->>Model: crearCuotas(cuotas)
+                    Model->>DB: INSERT PRESTAMOS + CUOTAS_PRESTAMO (misma transaccion)
+                    DB-->>Service: id_prestamo
+                    Service-->>Controller: 201 prestamo con su plan de cuotas
+                    Controller-->>Pantalla: 201
+                end
+            end
+        end
+    end
