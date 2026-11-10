@@ -1,6 +1,6 @@
 const pool = require("../config/db");
 const { ESTADO_EVALUACION, ESTADO_CICLO } = require("../utils/evaluaciones");
-const MODULO_EXTERNO = { CRM: 1 };
+const { MODULO_EXTERNO } = require("../utils/ciclos");
 
 const TIPO_EVENTO_METRICAS_CRM = "SOLICITUD_METRICAS_CRM";
 const ABIERTAS = `${ESTADO_EVALUACION.PENDIENTE}, ${ESTADO_EVALUACION.BORRADOR}`;

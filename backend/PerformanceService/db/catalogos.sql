@@ -26,7 +26,8 @@ ON CONFLICT DO NOTHING;
 INSERT INTO CATALOGOS_ESTADO_EVENTO (id_estado_evento, codigo, nombre)
 VALUES (1, 'PENDIENTE', 'Pendiente'),
     (2, 'ENTREGADO', 'Entregado'),
-    (3, 'FALLIDO', 'Fallido')
+    (3, 'FALLIDO', 'Fallido'),
+    (4, 'OMITIDO', 'Omitido')
 ON CONFLICT DO NOTHING;
 INSERT INTO CATALOGOS_ESTADO_MENSAJE (id_estado_mensaje, codigo, nombre)
 VALUES (1, 'RECIBIDO', 'Recibido'),

@@ -1,6 +1,9 @@
 const { ErrorApp } = require("./errores");
 const { UUID_RE } = require("./formatos");
 
+// Id fijo de CATALOGOS_MODULO_EXTERNO (catalogos.sql): destino de la solicitud de métricas al cerrar un ciclo.
+const MODULO_EXTERNO = { CRM: 1 };
+
 const MAX_NOMBRE = 120;
 const MAX_ELEMENTOS_ALCANCE = 500;
 
@@ -112,4 +115,4 @@ function verificarFechas({ fechaInicio, fechaLimite }, periodo, hoy) {
   return errores;
 }
 
-module.exports = { MAX_ELEMENTOS_ALCANCE, validarCiclo, validarVistaPrevia, verificarFechas };
+module.exports = { MODULO_EXTERNO, MAX_ELEMENTOS_ALCANCE, validarCiclo, validarVistaPrevia, verificarFechas };

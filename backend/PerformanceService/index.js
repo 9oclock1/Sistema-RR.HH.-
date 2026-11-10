@@ -7,8 +7,11 @@ const competenciasRoutes = require("./src/routes/competenciasRoutes");
 const escalasRoutes = require("./src/routes/escalasRoutes");
 const quejasRoutes = require("./src/routes/quejasRoutes");
 const ciclosRoutes = require("./src/routes/ciclosRoutes");
+const desempenoRoutes = require("./src/routes/desempenoRoutes");
+const mensajesPublicadosRoutes = require("./src/routes/mensajesPublicadosRoutes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 const { iniciarCronCiclos } = require("./src/jobs/ciclosEvaluacionCron");
+const { iniciarDespachoEventos } = require("./src/jobs/despachoEventosJob");
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -46,9 +49,12 @@ app.use(quejasRoutes);
 app.use(competenciasRoutes);
 app.use(escalasRoutes);
 app.use(ciclosRoutes);
+app.use(desempenoRoutes);
+app.use(mensajesPublicadosRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`PerformanceService corriendo en http://0.0.0.0:${PORT}`);
   iniciarCronCiclos();
+  iniciarDespachoEventos();
 });

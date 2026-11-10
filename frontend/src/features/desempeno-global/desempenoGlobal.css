@@ -1,0 +1,361 @@
+.dg-pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.dg-pagina .ds-encabezado {
+  margin-bottom: var(--space-2);
+}
+
+.dg-apilado {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.dg-sutil {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.dg-numero {
+  font-variant-numeric: tabular-nums;
+}
+
+.dg-celda {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.dg-subtitulo {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-semibold);
+}
+
+.dg-ciclo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+
+.dg-ciclo .ds-campo {
+  min-width: min(100%, 24rem);
+}
+
+.dg-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+
+.dg-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* Umbral de brecha */
+.dg-umbral {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-surface);
+}
+
+.dg-umbral--edicion {
+  align-items: flex-end;
+}
+
+.dg-umbral__texto {
+  margin: 0;
+  min-width: 0;
+}
+
+/* Indicadores */
+.dg-indicadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.dg-indicador {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.dg-indicador--brecha {
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.dg-indicador dt {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.dg-indicador dd {
+  margin: 0;
+}
+
+.dg-indicador__valor {
+  color: var(--color-text);
+  font-size: 28px;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.dg-indicador--brecha .dg-indicador__valor {
+  color: var(--color-danger-text);
+}
+
+/* Gráfico de barras */
+.dg-figura {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.dg-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+}
+
+.dg-leyenda__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dg-leyenda__linea {
+  width: 2px;
+  height: 14px;
+  background: var(--color-text);
+}
+
+.dg-leyenda__muestra {
+  width: 14px;
+  height: 8px;
+  border-radius: var(--radius-round);
+  background: var(--color-primary);
+}
+
+.dg-leyenda__muestra--brecha {
+  background: var(--color-danger);
+}
+
+.dg-barras {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dg-barra {
+  display: grid;
+  grid-template-columns: minmax(6rem, 12rem) minmax(0, 1fr) minmax(5.5rem, 9rem);
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.dg-barra__nombre {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+.dg-barra__pista {
+  position: relative;
+  display: block;
+  height: 14px;
+  border-radius: var(--radius-round);
+  background: var(--color-bg-neutral);
+}
+
+.dg-barra__relleno {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-round);
+  background: var(--color-primary);
+}
+
+.dg-barra--brecha .dg-barra__relleno {
+  background: var(--color-danger);
+}
+
+.dg-barra__umbral {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--color-text);
+  transform: translateX(-1px);
+}
+
+.dg-barra__valor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-medium);
+}
+
+.dg-barra--brecha .dg-barra__valor {
+  color: var(--color-danger-text);
+}
+
+.dg-barra__alerta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-small);
+}
+
+.dg-lista-brechas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.dg-tabla .ds-tabla {
+  min-width: 36rem;
+}
+
+.dg-tabla--ancha .ds-tabla {
+  min-width: 56rem;
+}
+
+/* Matriz de competencias */
+.dg-celda-puntaje {
+  display: inline-block;
+  min-width: 3.5rem;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-control);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.dg-celda-puntaje--brecha {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Colaboradores */
+.dg-puntaje {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dg-mini-barra {
+  display: inline-block;
+  width: 3.5rem;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-round);
+  background: var(--color-bg-neutral);
+}
+
+.dg-mini-barra__relleno {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-round);
+  background: var(--color-primary);
+}
+
+.dg-mini-barra__relleno--brecha {
+  background: var(--color-danger);
+}
+
+.dg-etiqueta-corta {
+  align-self: flex-start;
+}
+
+.dg-motivo {
+  color: var(--color-danger-text);
+  font-size: var(--font-size-small);
+  overflow-wrap: anywhere;
+}
+
+.dg-codigo {
+  font-family: var(--font-family-mono);
+}
+
+.dg-simulador {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-surface);
+}
+
+.dg-simulador > summary {
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium);
+}
+
+.dg-simulador > .dg-apilado {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.dg-area-json textarea {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+}
+
+@media (max-width: 40rem) {
+  .dg-barra {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--space-1);
+  }
+
+  .dg-barra__nombre {
+    grid-column: 1;
+  }
+
+  .dg-barra__valor {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .dg-barra__pista {
+    grid-column: 1 / -1;
+  }
+}

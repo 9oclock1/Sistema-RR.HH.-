@@ -1,10 +1,12 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import CiclosEvaluacionPage from "../features/ciclos-evaluacion/CiclosEvaluacionPage";
 import { RUTA_CICLOS } from "../features/ciclos-evaluacion/ciclo";
+import DesempenoGlobalPage from "../features/desempeno-global/DesempenoGlobalPage";
+import { RUTA_DESEMPENO_GLOBAL } from "../features/desempeno-global/desempenoGlobal";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
 import MisResultadosPage from "../features/evaluaciones/MisResultadosPage";
 import { RUTA_EVALUACIONES, RUTA_MIS_RESULTADOS } from "../features/evaluaciones/ruta";
@@ -409,6 +411,14 @@ export const SECCIONES = [
         icono: CalendarRange,
         roles: ["admin"],
         pagina: CiclosEvaluacionPage,
+      },
+      {
+        ruta: RUTA_DESEMPENO_GLOBAL,
+        etiqueta: "Resultados de desempeño",
+        descripcion: "Consolidado de ciclos cerrados por área, sucursal y competencia, con comparativa entre departamentos, brechas de productividad y métricas del CRM.",
+        icono: ChartColumn,
+        roles: ["gerente"],
+        pagina: DesempenoGlobalPage,
       },
       {
         ruta: RUTA_EVALUACIONES,

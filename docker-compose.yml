@@ -158,6 +158,7 @@ services:
       - ./backend/PerformanceService:/app
       - /app/node_modules
       - quejas_adjuntos:/app/uploads/quejas
+      - ./credentials:/credentials:ro
     depends_on:
       - postgres
     networks:
