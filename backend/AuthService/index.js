@@ -6,6 +6,11 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+// Sin este manejador, una conexión inactiva que se corta (por ejemplo, si se reinicia PostgreSQL) tumba el proceso.
+pool.on("error", (error) => {
+  console.error("Error inesperado en una conexión inactiva de PostgreSQL:", error.message);
+});
+
 app.use(cors());
 app.use(express.json());
 
