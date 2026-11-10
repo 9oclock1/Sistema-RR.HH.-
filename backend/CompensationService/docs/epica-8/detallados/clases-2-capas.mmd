@@ -1,0 +1,182 @@
+%%{init: {"theme": "neutral"}}%%
+classDiagram
+    direction TB
+
+    class AntiguedadRoutes {
+        <<router KAN-70>>
+        +GET /antiguedad/escalas
+        +GET /antiguedad/escalas/vigente
+        +POST /antiguedad/escalas
+        +GET /antiguedad/bono
+        +GET /antiguedad/bono/:idEmpleado
+    }
+    class AntiguedadController {
+        <<controller>>
+        +listarEscalas() +obtenerEscalaVigente()
+        +registrarVigencia() +calcularBono()
+        +calcularBonoPlanilla()
+    }
+    class AntiguedadService {
+        <<service>>
+        +registrarVigencia() +calcularBono()
+        +calcularBonoPlanilla()
+    }
+    class AntiguedadModel {
+        <<model>>
+        +listarVigencias() +listarTramos()
+        +obtenerVigenciaEnFecha() +ultimaVigencia()
+        +cerrarVigencia() +crearVigencia() +crearTramos()
+    }
+    class UtilsAntiguedad {
+        <<logica pura>>
+        +validarVigenciaEscala() +cierreDeUltimaVigencia()
+        +tramoParaAnios() +pisoBono()
+    }
+
+    class CondicionesRoutes {
+        <<router KAN-72>>
+        +GET/POST /condiciones
+        +GET /condiciones/bonos
+        +POST /condiciones/procesar
+        +POST /condiciones/:id/asignaciones
+    }
+    class CondicionesController {
+        <<controller>>
+        +listar() +crear() +procesar()
+        +asignar() +cambiarFinAsignacion()
+    }
+    class CondicionesService {
+        <<service>>
+        +crear() +procesar() +asignar()
+        +cambiarFinAsignacion()
+    }
+    class CondicionesModel {
+        <<model>>
+        +activasConVigencias() +asignacionesEnRango()
+        +adquirirCandadoPeriodo() +reemplazarProceso()
+        +guardarBonos() +listarBonos()
+    }
+    class UtilsCondiciones {
+        <<logica pura>>
+        +bonosDetectados() +bonosAsignados()
+        +rangoPeriodo() +validarAsignacion()
+    }
+
+    class BonosProductividadRoutes {
+        <<router KAN-71>>
+        +GET/POST /bonos-productividad
+        +POST /bonos-productividad/procesar
+        +GET /bonos-productividad/bonos
+        +GET /bonos-productividad/eventos
+        +POST /bonos-productividad/eventos/:id/reprocesar
+    }
+    class ProductividadController {
+        <<controller>>
+        +crearRegla() +procesar()
+        +listarBonos() +reprocesarEvento()
+    }
+    class ProductividadService {
+        <<service>>
+        +crearRegla() +aplicarReglas()
+        +procesar() +procesarEventoVentas()
+        +manejar() +iniciarConsumidor()
+        +reprocesarEvento()
+    }
+    class ProductividadModel {
+        <<model>>
+        +reglasActivasDelPeriodo() +reclamar()
+        +cerrar() +registrarFallo()
+        +guardarMetricas() +reemplazarBonosDelPeriodo()
+    }
+    class UtilsProductividad {
+        <<logica pura>>
+        +validarRegla() +esEventoVentas()
+        +leerEventoVentas() +cumpleUmbral()
+        +montoDeRegla() +esperaNuevaEntrega()
+    }
+
+    class BonificacionesRoutes {
+        <<router KAN-73>>
+        +GET /bonificaciones/auditoria
+        +GET /bonificaciones/empleados/:idEmpleado
+    }
+    class BonificacionesController {
+        <<controller>>
+        +historial() +auditoria()
+    }
+    class BonificacionesService {
+        <<service>>
+        +registrarCambios() +historial()
+        +auditoria()
+    }
+    class BonificacionesModel {
+        <<model>>
+        +registrarCambios() +historialPorEmpleado()
+        +listarAuditoria()
+    }
+    class UtilsBonificaciones {
+        <<logica pura>>
+        +validarAuditor() +filasDeAuditoria()
+        +validarFiltros() +aCsv()
+    }
+
+    class PlanillasService {
+        <<service Epica 7>>
+        +generar() +aprobar()
+    }
+    class PubSubConfig {
+        <<config>>
+        +obtenerCliente()
+    }
+    class ExternosService {
+        <<cliente HTTP>>
+        +listarPersonal() +listarJornadas()
+    }
+    class EmpleadosCliente {
+        <<cliente HTTP>>
+        +obtenerEmpleado() +obtenerHaberVigente()
+        +listarEmpleados()
+    }
+    class EmployeeService {
+        <<sistema externo>>
+    }
+    class VentasYMarketing {
+        <<sistema externo grupo E>>
+    }
+
+    AntiguedadRoutes --> AntiguedadController
+    AntiguedadController --> AntiguedadService
+    AntiguedadService --> AntiguedadModel
+    AntiguedadService --> UtilsAntiguedad
+    AntiguedadService --> EmpleadosCliente
+
+    CondicionesRoutes --> CondicionesController
+    CondicionesController --> CondicionesService
+    CondicionesService --> CondicionesModel
+    CondicionesService --> UtilsCondiciones
+    CondicionesService --> ExternosService
+    CondicionesService --> BonificacionesService : registrarCambios (KAN-73)
+    CondicionesService --> PlanillasService : lee estado BORRADOR
+
+    BonosProductividadRoutes --> ProductividadController
+    ProductividadController --> ProductividadService
+    ProductividadService --> ProductividadModel
+    ProductividadService --> UtilsProductividad
+    ProductividadService --> ExternosService
+    ProductividadService --> PubSubConfig
+
+    BonificacionesRoutes --> BonificacionesController
+    BonificacionesController --> BonificacionesService
+    BonificacionesService --> BonificacionesModel
+    BonificacionesService --> UtilsBonificaciones
+    BonificacionesService --> ExternosService : sucursalDe
+
+    PlanillasService --> AntiguedadService : calcularBonoPlanilla
+    PlanillasService --> CondicionesService : procesar
+    PlanillasService --> ProductividadService : procesar
+
+    EmpleadosCliente --> EmployeeService
+    ExternosService --> EmployeeService
+    ProductividadService ..> VentasYMarketing : escucha el cierre de ventas via Pub/Sub
+
+    note for ProductividadService "iniciarConsumidor() no arranca si no hay\nPUBSUB_EMULATOR_HOST ni credenciales de Google:\nlas rutas de reglas y resultados siguen funcionando igual."

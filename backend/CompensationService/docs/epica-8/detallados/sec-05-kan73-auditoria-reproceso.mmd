@@ -1,0 +1,25 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    actor Contador
+    participant Planillas as planillas.service (Epica 7)
+    participant Condiciones as condiciones.service
+    participant Bonificaciones as bonificaciones.service
+    participant DB as CompensationDB
+
+    rect rgb(235,245,255)
+    note over Contador,DB: Reproceso de condiciones dentro de la generacion de la planilla
+    Contador->>Planillas: POST /planillas (genera el mes)
+    Planillas->>Condiciones: procesar({periodo}, {idEmpleado: responsable, rol})
+    Condiciones->>DB: adquirirCandadoPeriodo(periodo) (bloquea otro reproceso del mismo mes)
+    Condiciones->>DB: obtenerProceso(periodo) + listarBonos(idProceso) -- anteriores
+    Condiciones->>Condiciones: recalcula bonosDetectados + bonosAsignados -- nuevos
+    Condiciones->>DB: reemplazarProceso + guardarBonos (DELETE/INSERT BONOS_CONDICION)
+    Condiciones->>Bonificaciones: registrarCambios({anteriores, nuevos, periodo, identidad})
+    Bonificaciones->>Bonificaciones: filasDeAuditoria compara anteriores vs nuevos por (id_condicion, id_empleado, fechas)
+    alt sin diferencias (reproceso sin novedades)
+        Bonificaciones-->>Condiciones: 0 filas, no escribe nada
+    else hay altas, modificaciones o anulaciones
+        Bonificaciones->>DB: INSERT AUDITORIA_BONIFICACIONES (accion, valor/monto anterior y nuevo, realizado_por)
+    end
+    end

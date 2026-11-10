@@ -1,0 +1,36 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    actor Administrador as Administrador de RRHH
+    participant Portal as Portal (frontend)
+    participant Antiguedad as antiguedad.service
+    participant Empleados as empleados.cliente (EmployeeService)
+    participant DB as CompensationDB
+
+    rect rgb(235,245,255)
+    note over Administrador,DB: Registrar una nueva vigencia de la escala legal
+    Administrador->>Portal: ingresa los tramos (anios_desde, anios_hasta, porcentaje) y la fecha desde
+    Portal->>Antiguedad: POST /antiguedad/escalas
+    Antiguedad->>Antiguedad: validarVigenciaEscala (tramos sin huecos ni cruces, solo el ultimo sin tope)
+    Antiguedad->>DB: ultimaVigencia() FOR UPDATE
+    Antiguedad->>Antiguedad: cierreDeUltimaVigencia (dia anterior, sin tocar sus tramos)
+    Antiguedad->>DB: INSERT VIGENCIAS_ESCALA_ANTIGUEDAD, TRAMOS_ANTIGUEDAD
+    end
+
+    rect rgb(235,255,235)
+    note over Administrador,DB: Calculo del bono para la planilla del periodo
+    Administrador->>Portal: genera la planilla o consulta el bono de un colaborador
+    Portal->>Antiguedad: GET /antiguedad/bono?periodo=... (todos) o /antiguedad/bono/:idEmpleado
+    Antiguedad->>Empleados: obtenerEmpleado(idEmpleado)
+    Antiguedad->>Antiguedad: aniosDeServicio(fecha_ingreso, periodo)
+    Antiguedad->>DB: obtenerVigenciaEnFecha(periodo)
+    Antiguedad->>Antiguedad: tramoParaAnios(tramos, aniosServicio)
+    alt antiguedad por debajo del primer tramo
+        Antiguedad-->>Portal: 409 ANTIGUEDAD_INSUFICIENTE (se omite sin interrumpir a los demas)
+    else sin contrato vigente
+        Antiguedad-->>Portal: 409 sin haber vigente
+    else tramo encontrado
+        Antiguedad->>Empleados: obtenerHaberVigente(idEmpleado, periodo)
+        Antiguedad-->>Portal: monto = haber_basico * porcentaje/100
+    end
+    end

@@ -1,0 +1,71 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    actor Administrador as Administrador de RRHH
+    actor VentasYMarketing as Ventas y Marketing (grupo E)
+    actor Auditor
+    participant Portal as Portal (frontend)
+    participant Antiguedad as antiguedad.service (KAN-70)
+    participant Condiciones as condiciones.service (KAN-72)
+    participant Productividad as ventasProductividad.service (KAN-71)
+    participant Bonificaciones as bonificaciones.service (KAN-73)
+    participant Planillas as planillas.service (Epica 7)
+    participant PubSub as Google Pub/Sub
+    participant DB as CompensationDB
+
+    rect rgb(235,245,255)
+    note over Administrador,DB: KAN-70 · Escala legal de antiguedad
+    Administrador->>Portal: registra una nueva vigencia de la escala con sus tramos
+    Portal->>Antiguedad: POST /antiguedad/escalas
+    Antiguedad->>DB: VIGENCIAS_ESCALA_ANTIGUEDAD, TRAMOS_ANTIGUEDAD (cierra la vigencia anterior)
+    end
+
+    rect rgb(235,255,235)
+    note over Administrador,DB: KAN-72 · Condiciones especiales y asignaciones
+    Administrador->>Portal: crea la condicion (trasnoche, feriado o asignacion) y asigna colaboradores
+    Portal->>Condiciones: POST /condiciones, POST /condiciones/:id/asignaciones
+    Condiciones->>DB: CONDICIONES_ESPECIALES, CONCEPTOS_PLANILLA, ASIGNACIONES_CONDICION
+    end
+
+    rect rgb(255,245,230)
+    note over Administrador,DB: KAN-71 · Reglas de bono por productividad
+    Administrador->>Portal: define la regla del periodo (tipo de meta, umbral, monto o porcentaje)
+    Portal->>Productividad: POST /bonos-productividad
+    Productividad->>DB: REGLAS_BONO_PRODUCTIVIDAD
+    end
+
+    rect rgb(255,235,235)
+    note over VentasYMarketing,DB: KAN-71 · Cierre de ventas del periodo (asincrono)
+    VentasYMarketing->>PubSub: CIERRE_VENTAS_PERIODO (topico ucb-sis323-sub-e)
+    PubSub->>Productividad: manejar(mensaje)
+    Productividad->>DB: reclamar en EVENTOS_VENTAS_ENTRANTES (descarta duplicados por id_mensaje)
+    Productividad->>DB: METRICAS_VENTAS_PERIODO
+    Productividad->>Productividad: aplicarReglas(periodo)
+    Productividad->>DB: BONOS_PRODUCTIVIDAD (reemplaza los del periodo)
+    end
+
+    rect rgb(240,235,255)
+    note over Administrador,Bonificaciones: KAN-63+64 · Generacion de la planilla (Epica 7, reprocesa Epica 8)
+    Administrador->>Portal: genera la planilla del mes
+    Portal->>Planillas: POST /planillas
+    par
+        Planillas->>Condiciones: procesar(periodo, identidad)
+        Condiciones->>DB: lee el proceso anterior y reemplaza BONOS_CONDICION
+        Condiciones->>Bonificaciones: registrarCambios(anteriores, nuevos)
+        Bonificaciones->>DB: AUDITORIA_BONIFICACIONES (solo si hay diferencias)
+    and
+        Planillas->>Productividad: procesar(periodo)
+    and
+        Planillas->>Antiguedad: calcularBonoPlanilla(periodo)
+        Antiguedad->>Antiguedad: tramoParaAnios segun la escala vigente
+    end
+    Planillas->>DB: PLANILLA_EMPLEADOS, CALCULOS_PLANILLA, NOVEDADES_PLANILLA (BONO-ANTIGUEDAD, BONO_CONDICION, PRODUCTIVIDAD)
+    end
+
+    rect rgb(235,255,255)
+    note over Auditor,DB: KAN-73 · Historial y auditoria de bonificaciones
+    Auditor->>Portal: abre el Kardex de un colaborador o la pantalla de auditoria
+    Portal->>Bonificaciones: GET /bonificaciones/empleados/:id o GET /bonificaciones/auditoria
+    Bonificaciones->>Bonificaciones: validarAuditor (X-Rol admin u auditor)
+    Bonificaciones->>DB: BONOS_CONDICION por colaborador, o AUDITORIA_BONIFICACIONES por filtros
+    end

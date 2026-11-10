@@ -1,0 +1,151 @@
+%%{init: {"theme": "neutral"}}%%
+classDiagram
+    direction TB
+
+    class VIGENCIAS_ESCALA_ANTIGUEDAD {
+        <<KAN-70>>
+        +id_vigencia UUID PK
+        +vigente_desde date
+        +vigente_hasta date NULL
+        +motivo varchar(250) NULL
+        EXCLUDE sin solapamiento de fechas
+    }
+    class TRAMOS_ANTIGUEDAD {
+        <<KAN-70>>
+        +id_tramo UUID PK
+        +id_vigencia UUID FK
+        +anios_desde smallint
+        +anios_hasta smallint NULL
+        +porcentaje numeric(5,2)
+        UNIQUE (id_vigencia, anios_desde)
+    }
+    VIGENCIAS_ESCALA_ANTIGUEDAD "1" *-- "many" TRAMOS_ANTIGUEDAD : ON DELETE CASCADE
+
+    class CONDICIONES_ESPECIALES {
+        <<KAN-72>>
+        +id_condicion UUID PK
+        +id_concepto UUID FK UNIQUE
+        +tipo_condicion varchar(10)
+        +minutos_nocturnos_minimos smallint NULL
+        CHECK solo TRASNOCHE tiene minutos
+    }
+    class ASIGNACIONES_CONDICION {
+        <<KAN-72>>
+        +id_asignacion UUID PK
+        +id_condicion UUID FK
+        +id_empleado UUID
+        +nombre_empleado varchar(150)
+        +area varchar(100) NULL
+        +vigente_desde date
+        +vigente_hasta date NULL
+        EXCLUDE sin solapamiento por condicion+empleado
+    }
+    class PROCESOS_CONDICION {
+        <<KAN-72>>
+        +id_proceso UUID PK
+        +periodo char(7) UNIQUE
+        +fecha_inicio date
+        +fecha_fin date
+        +jornadas_analizadas int
+    }
+    class BONOS_CONDICION {
+        <<KAN-72>>
+        +id_bono UUID PK
+        +id_proceso UUID FK
+        +id_condicion UUID FK
+        +id_vigencia UUID FK
+        +id_empleado UUID
+        +origen varchar(10)
+        +id_asignacion UUID FK NULL
+        +cantidad smallint
+        +fechas date_array
+        +factor numeric(10,6)
+        +valor numeric(12,4)
+        +monto numeric(12,2) NULL
+        CHECK origen IN (DETECCION, ASIGNACION)
+    }
+    CONDICIONES_ESPECIALES "1" *-- "many" ASIGNACIONES_CONDICION : ON DELETE CASCADE
+    PROCESOS_CONDICION "1" *-- "many" BONOS_CONDICION : ON DELETE CASCADE
+    BONOS_CONDICION --> CONDICIONES_ESPECIALES : fk_bono_condicion
+    BONOS_CONDICION --> ASIGNACIONES_CONDICION : fk_bono_asignacion ON DELETE SET NULL
+
+    class REGLAS_BONO_PRODUCTIVIDAD {
+        <<KAN-71>>
+        +id_regla UUID PK
+        +periodo date
+        +tipo_meta varchar(20)
+        +umbral_cumplimiento numeric(6,2)
+        +forma_calculo varchar(12)
+        +valor numeric(12,4)
+        +esta_activa boolean
+        UNIQUE (periodo, tipo_meta)
+        CHECK tipo_meta IN (VENTAS, PUNTUALIDAD, DESEMPENO_CAJA)
+    }
+    class EVENTOS_VENTAS_ENTRANTES {
+        <<KAN-71>>
+        +id_evento_entrante UUID PK
+        +id_mensaje varchar(100) UNIQUE
+        +topico varchar(60)
+        +periodo date NULL
+        +carga JSONB
+        +estado varchar(10)
+        +intentos smallint
+        CHECK estado IN (RECIBIDO,PROCESADO,IGNORADO,FALLIDO)
+    }
+    class METRICAS_VENTAS_PERIODO {
+        <<KAN-71>>
+        +id_metrica UUID PK
+        +periodo date
+        +id_empleado UUID
+        +rol varchar(20)
+        +monto_ventas numeric(14,2)
+        +cuota_asignada numeric(14,2)
+        +porcentaje_cumplimiento numeric(7,2)
+        +id_evento_entrante UUID FK
+        UNIQUE (periodo, id_empleado)
+    }
+    class BONOS_PRODUCTIVIDAD {
+        <<KAN-71>>
+        +id_bono UUID PK
+        +periodo date
+        +id_empleado UUID
+        +id_regla UUID FK
+        +id_metrica UUID FK
+        +porcentaje_cumplimiento numeric(7,2)
+        +valor numeric(12,4)
+        +monto numeric(12,2) NULL
+        UNIQUE (periodo, id_empleado, id_regla)
+    }
+    EVENTOS_VENTAS_ENTRANTES "1" *-- "many" METRICAS_VENTAS_PERIODO : fk_metrica_evento
+    METRICAS_VENTAS_PERIODO "1" --> "many" BONOS_PRODUCTIVIDAD : fk_bono_metrica
+    REGLAS_BONO_PRODUCTIVIDAD "1" --> "many" BONOS_PRODUCTIVIDAD : fk_bono_regla
+
+    class AUDITORIA_BONIFICACIONES {
+        <<KAN-73>>
+        +id_auditoria UUID PK
+        +tipo_bono varchar(20)
+        +id_condicion UUID FK NULL
+        +id_asignacion UUID FK NULL
+        +periodo char(7)
+        +id_empleado UUID
+        +accion varchar(15)
+        +valor_anterior numeric(12,4) NULL
+        +valor_nuevo numeric(12,4) NULL
+        +monto_anterior numeric(12,2) NULL
+        +monto_nuevo numeric(12,2) NULL
+        +realizado_por UUID NULL
+        +realizado_por_rol varchar(20) NULL
+        CHECK tipo_bono IN (CONDICION)
+        CHECK accion IN (ALTA,MODIFICACION,ANULACION)
+    }
+    CONDICIONES_ESPECIALES ..> AUDITORIA_BONIFICACIONES : fk_auditoria_condicion
+    ASIGNACIONES_CONDICION ..> AUDITORIA_BONIFICACIONES : fk_auditoria_asignacion ON DELETE SET NULL
+
+    class CONCEPTOS_PLANILLA {
+        <<Epica 7·KAN-62>>
+        +id_concepto UUID PK
+        +codigo varchar
+    }
+    CONDICIONES_ESPECIALES --> CONCEPTOS_PLANILLA : fk_condicion_concepto ON DELETE CASCADE
+
+    note for AUDITORIA_BONIFICACIONES "BONO-ANTIGUEDAD (KAN-70) y BONO-PRODUCTIVIDAD (KAN-71) se insertan\ncomo filas fijas de CONCEPTOS_PLANILLA via seed (sin fila en\nCONDICIONES_ESPECIALES): no tienen historial propio ni entran\nen esta auditoria, que solo cubre BONOS_CONDICION."

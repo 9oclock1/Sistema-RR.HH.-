@@ -1,0 +1,146 @@
+%%{init: {"theme": "neutral"}}%%
+classDiagram
+    direction LR
+
+    class VigenciaEscalaAntiguedad {
+        <<KAN-70>>
+        +id_vigencia
+        +vigente_desde
+        +vigente_hasta
+        +motivo
+    }
+
+    class TramoAntiguedad {
+        <<KAN-70>>
+        +anios_desde
+        +anios_hasta
+        +porcentaje
+    }
+
+    class CondicionEspecial {
+        <<KAN-72>>
+        +id_condicion
+        +tipo_condicion: TRASNOCHE|FERIADO|ASIGNACION
+        +minutos_nocturnos_minimos
+    }
+
+    class AsignacionCondicion {
+        <<KAN-72>>
+        +id_asignacion
+        +id_empleado
+        +area
+        +vigente_desde
+        +vigente_hasta
+    }
+
+    class ProcesoCondicion {
+        <<KAN-72>>
+        +id_proceso
+        +periodo
+        +jornadas_analizadas
+    }
+
+    class BonoCondicion {
+        <<KAN-72>>
+        +origen: DETECCION|ASIGNACION
+        +cantidad
+        +fechas[]
+        +factor
+        +valor
+        +monto
+    }
+
+    class ReglaBonoProductividad {
+        <<KAN-71>>
+        +id_regla
+        +periodo
+        +tipo_meta: VENTAS|PUNTUALIDAD|DESEMPENO_CAJA
+        +umbral_cumplimiento
+        +forma_calculo: MONTO_FIJO|PORCENTAJE
+        +valor
+        +esta_activa
+    }
+
+    class EventoVentasEntrante {
+        <<KAN-71·outbox entrante>>
+        +id_mensaje
+        +periodo
+        +estado: RECIBIDO|PROCESADO|IGNORADO|FALLIDO
+        +intentos
+    }
+
+    class MetricaVentasPeriodo {
+        <<KAN-71>>
+        +rol: VENDEDOR|CAJERO
+        +monto_ventas
+        +cuota_asignada
+        +porcentaje_cumplimiento
+    }
+
+    class BonoProductividad {
+        <<KAN-71>>
+        +porcentaje_cumplimiento
+        +valor
+        +monto
+    }
+
+    class AuditoriaBonificaciones {
+        <<KAN-73>>
+        +tipo_bono: CONDICION
+        +periodo
+        +accion: ALTA|MODIFICACION|ANULACION
+        +valor_anterior
+        +valor_nuevo
+        +monto_anterior
+        +monto_nuevo
+        +realizado_por
+        +realizado_por_rol
+    }
+
+    class ConceptoPlanilla {
+        <<Epica 7·KAN-62>>
+        +codigo: BONO-ANTIGUEDAD|BONO-PRODUCTIVIDAD|...
+        +tipo
+        +forma_calculo
+    }
+
+    class NovedadPlanilla {
+        <<Epica 7·KAN-64>>
+        +origen: BONO_CONDICION|PRODUCTIVIDAD
+        +forma_calculo
+        +valor
+        +monto
+    }
+
+    class CalculoPlanilla {
+        <<Epica 7·KAN-64>>
+        +codigo
+        +base
+        +valor
+        +resultado
+    }
+
+    class Empleado {
+        <<EmployeeService>>
+        +id_empleado
+        +fecha_ingreso
+    }
+
+    VigenciaEscalaAntiguedad "1" *-- "many" TramoAntiguedad : escala legal
+    TramoAntiguedad ..> CalculoPlanilla : porcentaje del renglon BONO-ANTIGUEDAD
+    Empleado ..> TramoAntiguedad : anios de servicio
+
+    CondicionEspecial "1" *-- "many" AsignacionCondicion
+    CondicionEspecial "1" --> "1" ConceptoPlanilla : id_concepto
+    ProcesoCondicion "1" *-- "many" BonoCondicion : reemplaza al reprocesar
+    BonoCondicion "0..1" --> "0..1" AsignacionCondicion : si origen = ASIGNACION
+    BonoCondicion ..> NovedadPlanilla : renglon del mes (KAN-63/64)
+    BonoCondicion "many" --> "many" AuditoriaBonificaciones : diff entre reprocesos
+
+    ReglaBonoProductividad "1" --> "many" BonoProductividad : regla vigente del periodo
+    EventoVentasEntrante "1" --> "many" MetricaVentasPeriodo : cierre de ventas
+    MetricaVentasPeriodo "1" --> "0..1" BonoProductividad : si supera el umbral
+    BonoProductividad ..> NovedadPlanilla : renglon BONO-PRODUCTIVIDAD (KAN-63/64)
+    BonoProductividad ..> ConceptoPlanilla : BONO-PRODUCTIVIDAD, sin vigencia manual
+
+    note for AuditoriaBonificaciones "Hoy solo registra bonos de condicion especial (KAN-72).\nLos bonos de antiguedad y productividad no tienen\nauditoria ni Kardex propios todavia."
