@@ -7,6 +7,7 @@ const SERVICIOS = [
   { nombre: "RecruitmentService", ruta: "/recr/mensajes-publicados" },
   { nombre: "AttendanceService", ruta: "/att/mensajes-publicados" },
   { nombre: "EmployeeService", ruta: "/empl/mensajes-publicados" },
+  { nombre: "PerformanceService", ruta: "/perf/mensajes-publicados" },
   { nombre: "CompensationService", ruta: "/comp/mensajes-publicados" },
 ];
 

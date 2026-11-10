@@ -1,5 +1,6 @@
 const modelo = require("../models/desempenoModel");
 const evaluaciones = require("../models/evaluacionesModel");
+const eventos = require("../models/eventosSalientesModel");
 const { ErrorApp } = require("../utils/errores");
 const { ESTADO_CICLO, ESTADO_EVALUACION } = require("../utils/evaluaciones");
 const { armarFormulario, calcularResultado } = require("../utils/formulario");
@@ -25,6 +26,17 @@ const describirCiclo = (ciclo) => ({
   fecha_limite: ciclo.fecha_limite,
   cerrado_en: ciclo.cerrado_en,
   umbral_brecha: ciclo.umbral_brecha,
+});
+
+// Estado de la solicitud de métricas al CRM: PENDIENTE (aún no sale), ENTREGADO (publicada en Pub/Sub), FALLIDO
+// (agotó los reintentos) u OMITIDO (no había cajeros ni asesores a quienes medir). `id_mensaje` es el del encabezado.
+const describirSolicitud = (solicitud) => ({
+  id_mensaje: solicitud.id_evento,
+  estado: solicitud.estado,
+  intentos: solicitud.intentos,
+  ultimo_error: solicitud.ultimo_error,
+  entregado_en: solicitud.entregado_en,
+  creado_en: solicitud.creado_en,
 });
 
 // El consolidado solo existe cuando el ciclo ya cerró: mientras siga activo otro evaluador todavía puede enviar
@@ -97,13 +109,7 @@ async function obtenerConsolidado(idPedido) {
     sucursales,
     competencias: resumirCompetencias(colaboradores, umbral),
     crm: {
-      solicitud: solicitud && {
-        estado: solicitud.estado,
-        intentos: solicitud.intentos,
-        ultimo_error: solicitud.ultimo_error,
-        entregado_en: solicitud.entregado_en,
-        creado_en: solicitud.creado_en,
-      },
+      solicitud: solicitud && describirSolicitud(solicitud),
       metricas_recibidas: metricas.length,
       ...resumirCrm(colaboradores),
     },
@@ -153,4 +159,24 @@ async function actualizarUmbral(idPedido, datos) {
   return ciclo;
 }
 
-module.exports = { listarCiclos, obtenerConsolidado, obtenerComparativa, obtenerColaboradores, actualizarUmbral };
+// Vuelve a poner en cola la solicitud de métricas que quedó FALLIDA: el despachador la publica en su siguiente vuelta.
+async function reintentarSolicitudCrm(idPedido) {
+  const ciclo = await obtenerCicloCerrado(idPedido);
+  const solicitud = await modelo.obtenerSolicitudCrm(ciclo.id_ciclo);
+  if (!solicitud) throw new ErrorApp(404, "El ciclo no tiene una solicitud de métricas para el CRM.");
+  if (!(await eventos.reencolar(solicitud.id_evento))) {
+    throw new ErrorApp(409, "Solo se puede reintentar una solicitud que quedó fallida.", [
+      { campo: "estado", mensaje: `La solicitud está ${solicitud.estado}.` },
+    ]);
+  }
+  return describirSolicitud(await modelo.obtenerSolicitudCrm(ciclo.id_ciclo));
+}
+
+module.exports = {
+  listarCiclos,
+  obtenerConsolidado,
+  obtenerComparativa,
+  obtenerColaboradores,
+  actualizarUmbral,
+  reintentarSolicitudCrm,
+};

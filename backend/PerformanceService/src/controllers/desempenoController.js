@@ -20,4 +20,15 @@ async function actualizarUmbral(req, res) {
   res.json(await servicio.actualizarUmbral(req.params.idCiclo, req.body));
 }
 
-module.exports = { listarCiclos, obtenerConsolidado, obtenerComparativa, obtenerColaboradores, actualizarUmbral };
+async function reintentarSolicitudCrm(req, res) {
+  res.json(await servicio.reintentarSolicitudCrm(req.params.idCiclo));
+}
+
+module.exports = {
+  listarCiclos,
+  obtenerConsolidado,
+  obtenerComparativa,
+  obtenerColaboradores,
+  actualizarUmbral,
+  reintentarSolicitudCrm,
+};
