@@ -1,0 +1,40 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    actor Administrador as Administrador de RRHH
+    participant Portal as Portal (frontend)
+    participant Condiciones as condiciones.service
+    participant Conceptos as conceptos.model
+    participant Externos as externos.service (AttendanceService/EmployeeService)
+    participant DB as CompensationDB
+
+    rect rgb(235,245,255)
+    note over Administrador,DB: Crear la condicion y, si es por asignacion, asignar colaboradores
+    Administrador->>Portal: crea la condicion (TRASNOCHE, FERIADO o ASIGNACION) con su valor
+    Portal->>Condiciones: POST /condiciones
+    Condiciones->>Conceptos: crear() + crearVigencia() (concepto de ingreso)
+    Condiciones->>DB: INSERT CONDICIONES_ESPECIALES
+    opt tipo_condicion = ASIGNACION
+        Administrador->>Portal: selecciona los colaboradores y el rango de fechas
+        Portal->>Condiciones: POST /condiciones/:id/asignaciones
+        Condiciones->>Externos: listarPersonal() (valida que existan)
+        Condiciones->>DB: asignacionesQueSeCruzan + INSERT ASIGNACIONES_CONDICION
+    end
+    end
+
+    rect rgb(235,255,235)
+    note over Administrador,DB: Procesar los bonos del mes (manual o disparado por KAN-63)
+    Administrador->>Portal: procesa el periodo
+    Portal->>Condiciones: POST /condiciones/procesar
+    Condiciones->>Condiciones: valida que la planilla del mes no este aprobada
+    Condiciones->>DB: activasConVigencias(rango)
+    alt hay condiciones detectables (TRASNOCHE/FERIADO)
+        Condiciones->>Externos: listarJornadas(desde, hasta)
+        Condiciones->>Condiciones: bonosDetectados (minutos nocturnos o feriado trabajado)
+    end
+    alt hay condiciones por ASIGNACION
+        Condiciones->>DB: asignacionesEnRango(desde, hasta)
+        Condiciones->>Condiciones: bonosAsignados (factor por dias asignados/dias del mes)
+    end
+    Condiciones->>DB: adquirirCandadoPeriodo + DELETE/INSERT PROCESOS_CONDICION, BONOS_CONDICION
+    end

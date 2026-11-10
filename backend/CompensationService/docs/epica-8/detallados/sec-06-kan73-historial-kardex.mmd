@@ -1,0 +1,33 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    actor Auditor
+    actor Administrador as Administrador de RRHH
+    participant Kardex as Kardex (EmployeeService, Epica 6)
+    participant Bonificaciones as bonificaciones.service
+    participant DB as CompensationDB
+
+    rect rgb(235,245,255)
+    note over Administrador,DB: Historial de bonificaciones de un colaborador (pestana del Kardex)
+    Administrador->>Kardex: abre el Kardex del colaborador
+    Kardex->>Bonificaciones: GET /bonificaciones/empleados/:idEmpleado (X-Rol, X-Empleado-Id)
+    Bonificaciones->>Bonificaciones: validarAuditor (403 si el rol no es admin ni auditor)
+    Bonificaciones->>DB: historialPorEmpleado (BONOS_CONDICION de todos los periodos ya procesados)
+    opt filtro por sucursal
+        Bonificaciones->>Bonificaciones: sucursalDe(idEmpleado) via externos.listarPersonal
+    end
+    Bonificaciones-->>Kardex: lista con periodo, condicion, monto/valor y cuenta contable
+    opt exportar
+        Administrador->>Kardex: pide el CSV
+        Kardex->>Bonificaciones: GET ...?formato=csv
+        Bonificaciones-->>Kardex: text/csv con Content-Disposition attachment
+    end
+    end
+
+    rect rgb(235,255,235)
+    note over Auditor,DB: Auditoria de altas, modificaciones y anulaciones
+    Auditor->>Bonificaciones: GET /bonificaciones/auditoria?periodo=... o ?id_empleado=...
+    Bonificaciones->>Bonificaciones: validarAuditor + exige colaborador o periodo (evita listar todo sin acotar)
+    Bonificaciones->>DB: listarAuditoria (AUDITORIA_BONIFICACIONES, hasta 500 filas, mas recientes primero)
+    Bonificaciones-->>Auditor: accion, valor/monto anterior y nuevo, quien y cuando
+    end

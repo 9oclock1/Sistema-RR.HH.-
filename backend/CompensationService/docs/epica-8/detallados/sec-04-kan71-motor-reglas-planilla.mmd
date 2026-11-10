@@ -1,0 +1,56 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    actor Administrador as Administrador de RRHH
+    actor Contador
+    participant Portal as Portal (frontend)
+    participant Productividad as ventasProductividad.service
+    participant Planillas as planillas.service (Epica 7)
+    participant DB as CompensationDB
+
+    rect rgb(235,245,255)
+    note over Administrador,DB: Definir o editar la regla del periodo
+    Administrador->>Portal: define tipo_meta, umbral_cumplimiento y forma_calculo (monto o %)
+    Portal->>Productividad: POST /bonos-productividad
+    Productividad->>Productividad: validarRegla (una regla activa por periodo y tipo_meta)
+    Productividad->>DB: INSERT REGLAS_BONO_PRODUCTIVIDAD
+    end
+
+    rect rgb(235,255,235)
+    note over Productividad,DB: aplicarReglas(periodo): motor de bonos
+    Productividad->>DB: reglasActivasDelPeriodo(periodo)
+    Productividad->>DB: metricasDelPeriodo(periodo)
+    loop por cada regla activa
+        loop por cada metrica de ese tipo_meta
+            Productividad->>Productividad: cumpleUmbral(regla, metrica)
+            opt supera el umbral_cumplimiento
+                Productividad->>Productividad: montoDeRegla (monto fijo, o % del haber en la planilla)
+            end
+        end
+    end
+    Productividad->>DB: reemplazarBonosDelPeriodo (DELETE + INSERT BONOS_PRODUCTIVIDAD)
+    end
+
+    rect rgb(255,245,230)
+    note over Contador,DB: Integracion con la planilla mensual (KAN-63)
+    Contador->>Portal: genera la planilla del mes
+    Portal->>Planillas: POST /planillas
+    Planillas->>Productividad: procesar({periodo})
+    Productividad-->>Planillas: bonos en formato NovedadPlanilla (origen PRODUCTIVIDAD, condicion BONO-PRODUCTIVIDAD)
+    Planillas->>Planillas: consolidarPlanilla incluye el renglon junto a BONO-ANTIGUEDAD y BONO_CONDICION
+    Planillas->>DB: NOVEDADES_PLANILLA, CALCULOS_PLANILLA
+    end
+
+    rect rgb(255,235,235)
+    note over Administrador,DB: Reprocesar un mensaje fallido de la cola
+    Administrador->>Portal: revisa la cola de mensajes fallidos y corrige el dato en Ventas
+    Portal->>Productividad: POST /bonos-productividad/eventos/:id/reprocesar
+    Productividad->>DB: reabrirEvento (FALLIDO vuelve a RECIBIDO)
+    Productividad->>Productividad: procesarEventoVentas con la misma carga guardada
+    alt se procesa correctamente
+        Productividad-->>Portal: evento PROCESADO
+    else vuelve a fallar
+        Productividad->>DB: devolverEventoAFallido
+        Productividad-->>Portal: 503, intente mas tarde
+    end
+    end
