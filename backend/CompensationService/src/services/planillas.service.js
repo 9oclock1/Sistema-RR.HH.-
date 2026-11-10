@@ -5,6 +5,7 @@ const eventos = require("../models/eventos.model");
 const { topicoPropio } = require("./eventos.service");
 const externos = require("./externos.service");
 const condiciones = require("./condiciones.service");
+const bonosProductividad = require("./ventasProductividad.service");
 const antiguedad = require("./antiguedad.service");
 const anticiposModelo = require("../models/anticipos.model");
 const empleadosCliente = require("../clients/empleados.cliente");
@@ -232,8 +233,13 @@ async function generar(datos = {}, identidad = {}) {
     externos.listarLicencias(rango.desde, rango.datos_hasta),
   ]);
   const nombreResponsable = responsableEn(personal, idResponsable);
-  // Los bonos por condiciones especiales se vuelven a procesar para reflejar las jornadas y asignaciones actuales.
-  const { bonos } = await condiciones.procesar({ periodo });
+  // Los bonos por condiciones especiales y por productividad se vuelven a procesar para reflejar las
+  // jornadas, asignaciones y métricas de ventas actuales (RF-51).
+  const [{ bonos: bonosCondicion }, { bonos: bonosProductividadDelMes }] = await Promise.all([
+    condiciones.procesar({ periodo }),
+    bonosProductividad.procesar({ periodo }),
+  ]);
+  const bonos = [...bonosCondicion, ...bonosProductividadDelMes];
 
   const consolidado = consolidarPlanilla({ personal, contratos, asistencia, horasExtra, licencias, bonos }, rango);
   const { advertencias } = consolidado;

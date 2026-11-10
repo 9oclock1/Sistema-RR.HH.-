@@ -10,7 +10,9 @@ const confirmacionesRoutes = require("./src/routes/confirmaciones.routes");
 const mensajesPublicadosRoutes = require("./src/routes/mensajesPublicados.routes");
 const { iniciarDespachador } = require("./src/services/eventos.service");
 const { iniciarConsumidor } = require("./src/services/confirmaciones.service");
+const ventasProductividadRoutes = require("./src/routes/ventasProductividad.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
+const ventasProductividad = require("./src/services/ventasProductividad.service");
 
 const app = express();
 const PORT = process.env.PORT || 3005;
@@ -48,6 +50,7 @@ app.use(antiguedadRoutes);
 app.use(planillasRoutes);
 app.use(confirmacionesRoutes);
 app.use(mensajesPublicadosRoutes);
+app.use(ventasProductividadRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {
@@ -56,3 +59,6 @@ app.listen(PORT, "0.0.0.0", () => {
   iniciarDespachador();
   iniciarConsumidor();
 });
+
+// RF-51: se suscribe al cierre de ventas del periodo publicado por Ventas y Marketing (grupo E).
+ventasProductividad.iniciarConsumidor();
