@@ -1,0 +1,44 @@
+%%{init: {"theme": "neutral"}}%%
+sequenceDiagram
+    autonumber
+    actor VentasYMarketing as Ventas y Marketing (grupo E)
+    participant PubSub as Google Pub/Sub (ucb-sis323-sub-e)
+    participant Productividad as ventasProductividad.service
+    participant DB as CompensationDB
+
+    rect rgb(255,245,230)
+    note over VentasYMarketing,DB: Entrega del cierre de ventas del periodo
+    VentasYMarketing->>PubSub: publica CIERRE_VENTAS_PERIODO con las metricas por colaborador
+    PubSub->>Productividad: manejar(mensaje) via la suscripcion ...-rrhh-productividad
+    Productividad->>Productividad: JSON.parse del cuerpo
+    alt no es JSON o no es un evento de ventas (esEventoVentas)
+        Productividad-->>PubSub: ack() e ignora
+    else es un cierre de ventas valido
+        Productividad->>DB: reclamar() INSERT ... ON CONFLICT DO NOTHING + SELECT FOR UPDATE por id_mensaje
+        alt el mensaje ya estaba PROCESADO o IGNORADO (reentrega duplicada)
+            Productividad-->>PubSub: ack() sin reprocesar (criterio 4)
+        else mensaje RECIBIDO (primera vez o reintento)
+            Productividad->>Productividad: leerEventoVentas (valida cada fila)
+            alt hay errores de formato
+                Productividad->>DB: cerrar(FALLIDO) sin reintentos
+                Productividad-->>PubSub: ack()
+            else lectura valida
+                Productividad->>DB: guardarMetricas() UPSERT METRICAS_VENTAS_PERIODO por (periodo, id_empleado)
+                Productividad->>Productividad: aplicarReglas(periodo) en la misma transaccion
+                Productividad->>DB: cerrar(PROCESADO), detalle de colaboradores omitidos si los hubo
+                Productividad-->>PubSub: ack() (omitidos quedan para que Ventas los corrija, sin bloquear a los demas)
+            end
+        end
+    end
+    end
+
+    rect rgb(255,235,235)
+    note over Productividad,DB: Error pasajero (por ejemplo, la base no responde)
+    Productividad->>DB: registrarFallo() incrementa intentos
+    alt intentos < MAXIMO_INTENTOS_ENTRADA
+        Productividad-->>PubSub: nack() con espera creciente (esperaNuevaEntrega)
+    else se agotaron los intentos
+        Productividad->>DB: estado = FALLIDO
+        Productividad-->>PubSub: ack() (queda en la cola de mensajes fallidos para reprocesar manualmente)
+    end
+    end
