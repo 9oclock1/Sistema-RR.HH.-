@@ -5,10 +5,11 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "test": "node --test tests/*.test.js src/tests/puntajePonderadoTest.js src/tests/guardadoParcialTest.js src/tests/envioEvaluacionTest.js src/tests/bandejaEvaluacionesTest.js src/tests/retroalimentacionTest.js src/tests/historialDesempenoTest.js src/tests/cifradoQuejasTest.js src/tests/codigoSeguimientoTest.js src/tests/validacionQuejaTest.js src/tests/limitarConsultasTest.js src/tests/limpiarAdjuntoTest.js src/tests/registroQuejaTest.js src/tests/derivacionQuejaTest.js src/tests/bandejaQuejasTest.js src/tests/seguimientoQuejaTest.js src/tests/historialQuejasTest.js src/tests/validacionPlantillaTest.js src/tests/cicloVidaPlantillaTest.js src/tests/unicidadPlantillaTest.js src/tests/estructuraPlantillaTest.js && node test/acceptance_criteria.test.js",
+    "test": "node --test tests/*.test.js src/tests/puntajePonderadoTest.js src/tests/guardadoParcialTest.js src/tests/envioEvaluacionTest.js src/tests/bandejaEvaluacionesTest.js src/tests/retroalimentacionTest.js src/tests/historialDesempenoTest.js src/tests/asignacionMasivaTest.js src/tests/recordatoriosCicloTest.js src/tests/cierreCicloTest.js src/tests/cifradoQuejasTest.js src/tests/codigoSeguimientoTest.js src/tests/validacionQuejaTest.js src/tests/limitarConsultasTest.js src/tests/limpiarAdjuntoTest.js src/tests/registroQuejaTest.js src/tests/derivacionQuejaTest.js src/tests/bandejaQuejasTest.js src/tests/seguimientoQuejaTest.js src/tests/historialQuejasTest.js src/tests/validacionPlantillaTest.js src/tests/cicloVidaPlantillaTest.js src/tests/unicidadPlantillaTest.js src/tests/estructuraPlantillaTest.js && node test/acceptance_criteria.test.js",
     "test:kan24": "node --test src/tests/puntajePonderadoTest.js src/tests/guardadoParcialTest.js src/tests/envioEvaluacionTest.js src/tests/bandejaEvaluacionesTest.js",
     "test:kan26": "node --test src/tests/retroalimentacionTest.js",
     "test:historial-desempeno": "node --test src/tests/historialDesempenoTest.js",
+    "test:kan23": "node --test src/tests/asignacionMasivaTest.js src/tests/recordatoriosCicloTest.js src/tests/cierreCicloTest.js",
     "test:calculo": "node --test src/tests/puntajePonderadoTest.js",
     "test:kan22": "node --test tests/*.test.js",
     "test:quejas": "node --test src/tests/cifradoQuejasTest.js src/tests/codigoSeguimientoTest.js src/tests/validacionQuejaTest.js src/tests/limitarConsultasTest.js src/tests/limpiarAdjuntoTest.js src/tests/registroQuejaTest.js src/tests/derivacionQuejaTest.js src/tests/bandejaQuejasTest.js src/tests/seguimientoQuejaTest.js src/tests/historialQuejasTest.js test/quejas.test.js test/casosQueja.test.js test/seguimientoQueja.test.js test/historialQueja.test.js",
@@ -28,6 +29,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "multer": "^2.5.0",
+    "node-cron": "^4.6.0",
     "pdf-lib": "^1.17.1",
     "pg": "^8.23.0",
     "sharp": "^0.35.5"

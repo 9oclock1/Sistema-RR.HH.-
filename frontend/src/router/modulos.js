@@ -3,6 +3,8 @@ import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsisten
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
+import CiclosEvaluacionPage from "../features/ciclos-evaluacion/CiclosEvaluacionPage";
+import { RUTA_CICLOS } from "../features/ciclos-evaluacion/ciclo";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
 import MisResultadosPage from "../features/evaluaciones/MisResultadosPage";
 import { RUTA_EVALUACIONES, RUTA_MIS_RESULTADOS } from "../features/evaluaciones/ruta";
@@ -379,6 +381,15 @@ export const SECCIONES = [
         icono: ClipboardList,
         roles: ["admin"],
         pagina: PlantillasEvaluacionPage,
+      },
+      {
+        ruta: RUTA_CICLOS,
+        parametroOpcional: "idCiclo",
+        etiqueta: "Ciclos de evaluación",
+        descripcion: "Programación de ciclos por periodo, con asignación de evaluadores por área o sucursal y fecha límite.",
+        icono: CalendarRange,
+        roles: ["admin"],
+        pagina: CiclosEvaluacionPage,
       },
       {
         ruta: RUTA_EVALUACIONES,
