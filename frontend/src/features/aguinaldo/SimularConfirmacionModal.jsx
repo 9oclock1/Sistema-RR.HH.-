@@ -8,8 +8,9 @@ const OPCIONES_RESULTADO = [
   { valor: "RECHAZADA", etiqueta: "Rechazada" },
 ];
 
-// Contabilidad y Pagos no existen en este sistema: en vez de esperar su respuesta por Pub/Sub, se simula
-// desde aquí con el mismo efecto que una confirmación real (RF-47, criterio 4).
+// Contabilidad y Pagos no existen en este sistema: en vez de esperar su respuesta de verdad, se simula
+// desde aquí. Se publica igual en Pub/Sub y se recibe por la suscripción real, con el mismo efecto que una
+// confirmación genuina (RF-47, criterio 4).
 export default function SimularConfirmacionModal({ nombreDestino, onConfirmar, onCerrar }) {
   const [resultado, setResultado] = useState("CONFIRMADA");
   const [referencia, setReferencia] = useState("");
@@ -48,8 +49,8 @@ export default function SimularConfirmacionModal({ nombreDestino, onConfirmar, o
     >
       <form id={ID_FORMULARIO} className="concepto-formulario" onSubmit={enviar} noValidate>
         <p className="concepto-nota">
-          {nombreDestino} no está implementado en este sistema: esto aplica la misma respuesta que enviaría de verdad,
-          sin pasar por el broker.
+          {nombreDestino} no está implementado en este sistema: esto publica en Pub/Sub la misma respuesta que
+          enviaría de verdad. Se aplicará en unos segundos, cuando RRHH la reciba por su suscripción.
         </p>
         {error && (
           <Alerta tono="peligro" role="alert" titulo="No se pudo aplicar la simulación">

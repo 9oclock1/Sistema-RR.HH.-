@@ -169,10 +169,10 @@ function armarOrdenPagoAguinaldo({ aguinaldo, empleados, concepto }) {
 }
 
 // ---- Simulación de la confirmación de Contabilidad o Pagos ----
-// Contabilidad y Pagos no existen en este sistema: en vez de esperar su respuesta por Pub/Sub, el
-// Administrador la simula desde la pantalla. Se arma el mismo mensaje que esos sistemas enviarían y se
-// aplica con confirmaciones.service.procesar, igual que si hubiera llegado de verdad (misma validación,
-// mismo registro en EVENTOS_ENTRANTES).
+// Contabilidad y Pagos no existen en este sistema: en vez de esperar su respuesta de verdad, el
+// Administrador la simula desde la pantalla. Se arma el mismo mensaje que esos sistemas enviarían y
+// aguinaldo.service lo PUBLICA en el tópico real de ese destino, para que la suscripción real lo reciba y
+// lo aplique igual que si hubiera llegado de verdad (misma validación, mismo registro en EVENTOS_ENTRANTES).
 const TIPO_CONFIRMACION_AGUINALDO = {
   CONTABILIDAD: "CONFIRMACION_ASIENTO_AGUINALDO",
   PAGOS: "CONFIRMACION_ORDEN_PAGO_AGUINALDO",

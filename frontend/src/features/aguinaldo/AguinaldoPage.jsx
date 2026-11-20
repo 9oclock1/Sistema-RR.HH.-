@@ -236,17 +236,25 @@ export default function AguinaldoPage() {
     }
   };
 
-  // Contabilidad y Pagos no existen en este sistema: se simula su respuesta en vez de esperarla por Pub/Sub.
+  // Contabilidad y Pagos no existen en este sistema: se simula su respuesta en vez de esperarla de verdad.
+  // El transporte sí es real (se publica en Pub/Sub y lo recibe la suscripción real), así que el aguinaldo
+  // se actualiza poco después, de forma asíncrona: se refresca al toque y de nuevo cuando llegue el próximo
+  // sondeo periódico, en vez de asumir que ya quedó confirmado al recibir la respuesta de este POST.
   const confirmarSimulacion = async (datos) => {
     const destino = simulando;
-    const actualizado = await simularConfirmacionAguinaldo(aguinaldo.id_aguinaldo, destino, datos, identidad);
-    setCarga({ gestion, aguinaldo: actualizado });
+    const idAguinaldo = aguinaldo.id_aguinaldo;
+    const ack = await simularConfirmacionAguinaldo(idAguinaldo, destino, datos, identidad);
     setSimulando(null);
     avisar({
-      tono: datos.resultado === "CONFIRMADA" ? "exito" : "aviso",
-      titulo: `${NOMBRE_DESTINO[destino]} ${datos.resultado === "CONFIRMADA" ? "confirmó" : "rechazó"} (simulado)`,
-      mensaje: `Aguinaldos de ${gestion}`,
+      tono: "info",
+      titulo: `Simulación de ${NOMBRE_DESTINO[destino]} enviada`,
+      mensaje: ack.mensaje || `Se aplicará en unos segundos. Aguinaldos de ${gestion}`,
     });
+    setTimeout(() => {
+      obtenerAguinaldo(idAguinaldo)
+        .then((nuevo) => setCarga((previa) => (previa?.aguinaldo?.id_aguinaldo === idAguinaldo ? { ...previa, aguinaldo: nuevo } : previa)))
+        .catch(() => {});
+    }, 2000);
   };
 
   const botonGenerar = (

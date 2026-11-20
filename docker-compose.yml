@@ -23,10 +23,11 @@ services:
       - rrhh-network
 
   # Emulador local de Pub/Sub (KAN-67 y similares): sin credenciales reales de GCP, CompensationService no
-  # puede publicar ni suscribirse de verdad. El emulador deja probar el envío real (y las suscripciones que
-  # dependan de otro módulo real, como Contabilidad o Pagos, se simulan desde la pantalla en vez de esperarlas
-  # aquí). No usar en producción. Tópico propio de RRHH (ucb-sis323-sub-f) se crea solo al arrancar
-  # CompensationService; para los demás, ver scripts/configurar-pubsub-emulador.sh.
+  # puede publicar ni suscribirse de verdad. El emulador deja probar el envío real; Contabilidad y Pagos no
+  # existen en este sistema, así que su confirmación se simula desde la pantalla, pero el transporte es real:
+  # se publica en su tópico y la suscripción real de CompensationService la recibe. No usar en producción.
+  # Los tópicos propios de RRHH (ucb-sis323-sub-f) y los de Contabilidad/Pagos (-d/-a) se crean solos al
+  # arrancar CompensationService; para el de Ventas y Marketing (-e), ver scripts/configurar-pubsub-emulador.sh.
   pubsub-emulator:
     image: google/cloud-sdk:emulators
     container_name: pubsub-emulator

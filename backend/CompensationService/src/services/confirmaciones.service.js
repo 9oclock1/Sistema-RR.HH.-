@@ -11,6 +11,7 @@ const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const { validarResponsable } = require("../utils/planillas");
 const {
+  DESTINOS,
   MAXIMO_INTENTOS_ENTRADA,
   esperaNuevaEntrega,
   esConfirmacion,
@@ -141,6 +142,23 @@ function topicosDeConfirmacion() {
     .filter(Boolean);
 }
 
+// El tópico donde Contabilidad o Pagos publicarían de verdad su confirmación (mismo tópico que escuchar()
+// suscribe). Lo usa la simulación de confirmación del aguinaldo (RF-47, KAN-67) para publicar ahí en vez de
+// aplicar el resultado en el proceso: así la suscripción real de este mismo servicio es la que lo recibe.
+const topicoDeDestino = (destino) => `ucb-sis323-sub-${DESTINOS[destino].grupo.toLowerCase()}`;
+
+// Solo para el emulador de desarrollo: crea el tópico si falta, para no depender de que alguien lo haya
+// provisionado a mano (scripts/configurar-pubsub-emulador.sh) antes de arrancar. Contra el proyecto real
+// nunca se llama (las credenciales de la app no deberían poder crear tópicos).
+async function asegurarTopicoEnEmulador(clientePubSub, topico) {
+  if (!process.env.PUBSUB_EMULATOR_HOST) return;
+  try {
+    await clientePubSub.topic(topico).get({ autoCreate: true });
+  } catch (error) {
+    console.error(`No se pudo asegurar el tópico ${topico} en el emulador:`, error.message);
+  }
+}
+
 async function escuchar(clientePubSub, topico) {
   const nombre = `${topico}${process.env.PUBSUB_SUFIJO_SUSCRIPCION || "-rrhh-planillas"}`;
   const volverAIntentar = () => setTimeout(() => escuchar(clientePubSub, topico), REINTENTO_SUSCRIPCION_MS).unref();
@@ -162,10 +180,13 @@ async function escuchar(clientePubSub, topico) {
   }
 }
 
-function iniciarConsumidor() {
+async function iniciarConsumidor() {
   const clientePubSub = pubsub.obtenerCliente();
   if (!clientePubSub) return;
-  for (const topico of topicosDeConfirmacion()) escuchar(clientePubSub, topico);
+  for (const topico of topicosDeConfirmacion()) {
+    await asegurarTopicoEnEmulador(clientePubSub, topico);
+    escuchar(clientePubSub, topico);
+  }
 }
 
 const formatear = (f) => ({
@@ -215,4 +236,4 @@ async function reprocesar(id, identidad = {}) {
   return formatear(await modelo.obtener(pool, id));
 }
 
-module.exports = { procesar, iniciarConsumidor, listar, reprocesar, ErrorPermanente };
+module.exports = { procesar, iniciarConsumidor, listar, reprocesar, ErrorPermanente, topicoDeDestino, asegurarTopicoEnEmulador };

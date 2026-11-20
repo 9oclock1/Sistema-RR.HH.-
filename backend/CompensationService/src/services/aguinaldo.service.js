@@ -7,11 +7,14 @@ const confirmaciones = require("./confirmaciones.service");
 const externos = require("./externos.service");
 const { responsableEn } = require("./planillas.service");
 const empleadosCliente = require("../clients/empleados.cliente");
+const pubsub = require("../config/pubsub");
+const mensajesPublicados = require("../utils/mensajesPublicados");
 const { enTransaccion } = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const { hoyLaPaz } = require("../utils/fechas");
 const { validarResponsable } = require("../utils/planillas");
+const { atributosDe } = require("../utils/integraciones");
 const {
   validarGestion,
   rangoGestion,
@@ -23,6 +26,17 @@ const {
   validarSimulacionConfirmacion,
   armarConfirmacionSimulada,
 } = require("../utils/aguinaldo");
+
+// Igual que la publicación real (eventos.service): sin tope, una llamada a Pub/Sub inalcanzable deja la
+// petición HTTP de simular colgada.
+const tiempoPublicacionMs = () => Number(process.env.PUBSUB_TIMEOUT_MS) || 15000;
+const conLimiteDeTiempo = (promesa) =>
+  Promise.race([
+    promesa,
+    new Promise((_, rechazar) =>
+      setTimeout(() => rechazar(new Error("Pub/Sub no respondió a tiempo")), tiempoPublicacionMs()).unref()
+    ),
+  ]);
 
 const noEncontrado = () => new ErrorApp(404, "Planilla de aguinaldos no encontrada");
 const nombreGestion = (gestion) => `aguinaldos de la gestión ${gestion}`;
@@ -274,10 +288,14 @@ async function reenviar(id, destinoRuta, identidad = {}) {
   return obtener(id);
 }
 
-// Contabilidad y Pagos no existen en este sistema: en vez de esperar su confirmación por Pub/Sub, el
-// Administrador la simula desde la pantalla. Se construye el mismo mensaje que ese sistema enviaría, con el
-// id_mensaje_origen del último envío real a ese destino, y se aplica con la misma lógica que una
-// confirmación real (confirmaciones.service.procesar), incluida la bandeja de EVENTOS_ENTRANTES.
+// Contabilidad y Pagos no existen en este sistema: en vez de esperar su confirmación de verdad, el
+// Administrador la simula desde la pantalla. Pero el transporte sí es real: se construye el mismo mensaje
+// que ese sistema enviaría (con el id_mensaje_origen del último envío real a ese destino) y se PUBLICA en
+// el tópico propio de ese destino (ucb-sis323-sub-d o -a); la suscripción real que ya mantiene abierta
+// confirmaciones.service.iniciarConsumidor() es la que la recibe y la aplica (misma validación, mismo
+// registro en EVENTOS_ENTRANTES que una confirmación genuina). Por eso esta llamada no devuelve el
+// aguinaldo actualizado: el cierre ocurre poco después, de forma asíncrona, cuando esa suscripción procesa
+// el mensaje.
 async function simularConfirmacion(id, destinoRuta, datos = {}, identidad = {}) {
   const idResponsable = validarResponsable(identidad);
   const destino = DESTINO_RUTA[destinoRuta];
@@ -293,6 +311,13 @@ async function simularConfirmacion(id, destinoRuta, datos = {}, identidad = {}) 
   if (!envio) {
     throw new ErrorApp(409, `Todavía no se registró el envío a ${NOMBRE_DESTINO[destino]}: no hay nada que confirmar.`);
   }
+  const clientePubSub = pubsub.obtenerCliente();
+  if (!clientePubSub) {
+    throw new ErrorApp(
+      503,
+      "Pub/Sub no está configurado en este ambiente: no se puede simular la confirmación. Configure el emulador o las credenciales."
+    );
+  }
   const { resultado, referencia, motivo } = validarSimulacionConfirmacion(datos);
   const idMensaje = randomUUID();
   const cuerpo = armarConfirmacionSimulada({
@@ -304,11 +329,22 @@ async function simularConfirmacion(id, destinoRuta, datos = {}, identidad = {}) 
     referencia,
     motivo,
   });
-  const resultadoProcesado = await confirmaciones.procesar({ idMensaje, topico: `simulado-${destinoRuta}`, cuerpo });
-  if (!resultadoProcesado.ack) {
-    throw new ErrorApp(503, "No se pudo aplicar la confirmación simulada. Intente de nuevo.");
+  const topico = confirmaciones.topicoDeDestino(destino);
+  const atributos = atributosDe(cuerpo);
+  await confirmaciones.asegurarTopicoEnEmulador(clientePubSub, topico);
+  let idPubSub;
+  try {
+    idPubSub = await conLimiteDeTiempo(clientePubSub.topic(topico).publishMessage({ json: cuerpo, attributes: atributos }));
+  } catch (error) {
+    throw new ErrorApp(503, `No se pudo publicar la confirmación simulada en ${topico}: ${error.message}`);
   }
-  return obtener(id);
+  mensajesPublicados.registrar({ topico, idPubSub, atributos, cuerpo });
+  return {
+    simulado: true,
+    topico,
+    id_pubsub: idPubSub,
+    mensaje: `Se publicó en ${topico} la confirmación simulada de ${NOMBRE_DESTINO[destino]}; se aplicará en unos segundos cuando RRHH la reciba por su suscripción.`,
+  };
 }
 
 module.exports = { listar, obtener, generar, descartar, aprobar, reenviar, simularConfirmacion };

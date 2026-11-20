@@ -1,10 +1,11 @@
 #!/bin/bash
 # Crea en el emulador local de Pub/Sub (servicio pubsub-emulator del docker-compose) los tópicos que los
-# consumidores de CompensationService intentan suscribir al arrancar (confirmaciones de Contabilidad/Pagos,
-# cierre de ventas de Ventas y Marketing). El tópico propio de RRHH (ucb-sis323-sub-f, el que de verdad se usa
-# para publicar) ya se crea solo cuando arranca CompensationService; este script es solo para que esos otros
-# consumidores no reintenten la suscripción cada 60 s por un tópico inexistente (ningún otro módulo existe en
-# este sistema para crearlo de verdad). No usar contra el proyecto real de GCP.
+# consumidores de CompensationService usan. El propio de RRHH (ucb-sis323-sub-f) y los de Contabilidad/Pagos
+# (-d/-a) ya se crean solos al arrancar CompensationService (eventos.service y confirmaciones.service); este
+# script sigue haciendo falta solo para el de Ventas y Marketing (-e, cierre de ventas), para que ese
+# consumidor no reintente la suscripción cada 60 s por un tópico inexistente (ningún otro módulo existe en
+# este sistema para crearlo de verdad). Volver a correrlo para los demás no hace daño. No usar contra el
+# proyecto real de GCP.
 set -e
 
 HOST="${PUBSUB_EMULATOR_HOST:-localhost:8085}"

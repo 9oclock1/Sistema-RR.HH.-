@@ -33,7 +33,7 @@ async function reenviar(req, res) {
 }
 
 async function simularConfirmacion(req, res) {
-  res.json(await servicio.simularConfirmacion(req.params.id, req.params.destino, req.body, identidad(req)));
+  res.status(202).json(await servicio.simularConfirmacion(req.params.id, req.params.destino, req.body, identidad(req)));
 }
 
 module.exports = { listar, obtener, generar, descartar, aprobar, reenviar, simularConfirmacion };
