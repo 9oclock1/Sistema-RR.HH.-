@@ -323,15 +323,100 @@ CREATE TABLE CALCULOS_PLANILLA (
     CONSTRAINT chk_calculo_valores CHECK (valor > 0 AND resultado >= 0 AND (base IS NULL OR base >= 0) AND (cantidad IS NULL OR cantidad >= 0))
 );
 CREATE INDEX idx_calculos_planilla_empleado ON CALCULOS_PLANILLA (id_planilla_empleado);
+
+-- Tabla: PLANILLA_AGUINALDO (RF-47, KAN-67)
+-- Cabecera de la planilla de aguinaldos de una gestión (1 de diciembre del año anterior al 30 de noviembre
+-- de `gestion`). Mismo ciclo de vida y las mismas integraciones asíncronas que PLANILLAS: BORRADOR →
+-- APROBADA (se publica el asiento y la orden de dispersión) → CERRADA (ambas confirmaciones llegaron).
+CREATE TABLE PLANILLA_AGUINALDO (
+    id_aguinaldo UUID NOT NULL DEFAULT gen_random_uuid(),
+    gestion smallint NOT NULL,
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'BORRADOR',
+    generada_por UUID NOT NULL,
+    generada_por_nombre varchar(150) NOT NULL,
+    generada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    aprobada_por UUID NULL,
+    aprobada_por_nombre varchar(150) NULL,
+    aprobada_en TIMESTAMPTZ NULL,
+    estado_contabilidad varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    referencia_contabilidad varchar(60) NULL,
+    motivo_contabilidad varchar(255) NULL,
+    respondida_contabilidad_en TIMESTAMPTZ NULL,
+    estado_pagos varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    referencia_pagos varchar(60) NULL,
+    motivo_pagos varchar(255) NULL,
+    respondida_pagos_en TIMESTAMPTZ NULL,
+    cerrada_en TIMESTAMPTZ NULL,
+    CONSTRAINT PLANILLA_AGUINALDO_pk PRIMARY KEY (id_aguinaldo),
+    CONSTRAINT uq_aguinaldo_gestion UNIQUE (gestion),
+    CONSTRAINT chk_aguinaldo_gestion CHECK (gestion BETWEEN 2000 AND 2100),
+    CONSTRAINT chk_aguinaldo_estado CHECK (estado IN ('BORRADOR', 'APROBADA', 'CERRADA')),
+    CONSTRAINT chk_aguinaldo_fechas CHECK (fecha_fin >= fecha_inicio),
+    CONSTRAINT chk_aguinaldo_aprobacion CHECK (
+        (estado = 'BORRADOR') = (aprobada_en IS NULL)
+        AND (aprobada_en IS NULL) = (aprobada_por IS NULL)
+        AND (aprobada_por IS NULL) = (aprobada_por_nombre IS NULL)
+    ),
+    CONSTRAINT chk_aguinaldo_integraciones CHECK (
+        estado_contabilidad IN ('PENDIENTE', 'CONFIRMADA', 'RECHAZADA')
+        AND estado_pagos IN ('PENDIENTE', 'CONFIRMADA', 'RECHAZADA')
+    ),
+    CONSTRAINT chk_aguinaldo_cierre CHECK (
+        (estado = 'CERRADA') = (cerrada_en IS NOT NULL)
+        AND (estado <> 'CERRADA' OR (estado_contabilidad = 'CONFIRMADA' AND estado_pagos = 'CONFIRMADA'))
+    ),
+    CONSTRAINT chk_aguinaldo_respuestas CHECK (
+        (estado <> 'BORRADOR' OR (estado_contabilidad = 'PENDIENTE' AND estado_pagos = 'PENDIENTE'))
+        AND (estado_contabilidad = 'PENDIENTE') = (respondida_contabilidad_en IS NULL)
+        AND (estado_contabilidad = 'RECHAZADA') = (motivo_contabilidad IS NOT NULL)
+        AND (referencia_contabilidad IS NULL OR estado_contabilidad = 'CONFIRMADA')
+        AND (estado_pagos = 'PENDIENTE') = (respondida_pagos_en IS NULL)
+        AND (estado_pagos = 'RECHAZADA') = (motivo_pagos IS NOT NULL)
+        AND (referencia_pagos IS NULL OR estado_pagos = 'CONFIRMADA')
+    )
+);
+-- Tabla: AGUINALDO_EMPLEADOS
+-- Un renglón por colaborador: el promedio de sus tres últimos sueldos y las duodécimas (meses y días
+-- comerciales de 30 días) trabajados en la gestión. Un colaborador con menos de 3 meses queda excluido con
+-- el motivo (criterio 2), en vez de con un monto en cero indistinguible de "no le corresponde nada".
+CREATE TABLE AGUINALDO_EMPLEADOS (
+    id_aguinaldo_empleado UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_aguinaldo UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    nombre_empleado varchar(150) NOT NULL,
+    numero_documento varchar(20) NULL,
+    fecha_ingreso date NOT NULL,
+    meses_trabajados smallint NOT NULL,
+    dias_trabajados smallint NOT NULL,
+    promedio_sueldo numeric(12,2) NOT NULL,
+    monto numeric(12,2) NOT NULL,
+    excluido boolean NOT NULL DEFAULT FALSE,
+    motivo_exclusion varchar(255) NULL,
+    CONSTRAINT AGUINALDO_EMPLEADOS_pk PRIMARY KEY (id_aguinaldo_empleado),
+    CONSTRAINT uq_aguinaldo_empleado UNIQUE (id_aguinaldo, id_empleado),
+    CONSTRAINT fk_aguinaldo_empleado_aguinaldo FOREIGN KEY (id_aguinaldo)
+        REFERENCES PLANILLA_AGUINALDO (id_aguinaldo) ON DELETE CASCADE,
+    CONSTRAINT chk_aguinaldo_empleado_exclusion CHECK (excluido = (motivo_exclusion IS NOT NULL)),
+    CONSTRAINT chk_aguinaldo_empleado_valores CHECK (
+        meses_trabajados >= 0 AND dias_trabajados BETWEEN 0 AND 29 AND promedio_sueldo >= 0 AND monto >= 0
+        AND (NOT excluido OR monto = 0)
+    )
+);
+CREATE INDEX idx_aguinaldo_empleados_aguinaldo ON AGUINALDO_EMPLEADOS (id_aguinaldo);
+
 -- Tabla: EVENTOS_SALIENTES
 -- Bandeja de salida (outbox): el evento se guarda en la misma transacción que la aprobación y se envía
 -- después al broker, con reintentos, hasta que se entrega. id_evento es el id_mensaje del mensaje enviado.
--- destino: CONTABILIDAD (asiento de la planilla, grupo D) o PAGOS (orden de dispersión, grupo A).
+-- destino: CONTABILIDAD (asiento, grupo D) o PAGOS (orden de dispersión, grupo A). id_planilla (planilla
+-- mensual) o id_aguinaldo (RF-47, KAN-67): nunca los dos, la misma bandeja sirve para ambas (criterio 5).
 CREATE TABLE EVENTOS_SALIENTES (
     id_evento UUID NOT NULL DEFAULT gen_random_uuid(),
     topico varchar(60) NOT NULL,
     tipo_evento varchar(60) NOT NULL,
     id_planilla UUID NULL,
+    id_aguinaldo UUID NULL,
     destino varchar(15) NULL,
     carga JSONB NOT NULL,
     estado varchar(10) NOT NULL DEFAULT 'PENDIENTE',
@@ -342,14 +427,17 @@ CREATE TABLE EVENTOS_SALIENTES (
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT EVENTOS_SALIENTES_pk PRIMARY KEY (id_evento),
     CONSTRAINT fk_evento_planilla FOREIGN KEY (id_planilla) REFERENCES PLANILLAS (id_planilla),
+    CONSTRAINT fk_evento_aguinaldo FOREIGN KEY (id_aguinaldo) REFERENCES PLANILLA_AGUINALDO (id_aguinaldo),
     CONSTRAINT chk_evento_estado CHECK (estado IN ('PENDIENTE', 'ENTREGADO', 'FALLIDO')),
     CONSTRAINT chk_evento_intentos CHECK (intentos >= 0),
     CONSTRAINT chk_evento_entrega CHECK ((estado = 'ENTREGADO') = (entregado_en IS NOT NULL)),
     CONSTRAINT chk_evento_destino CHECK (destino IN ('CONTABILIDAD', 'PAGOS')),
-    CONSTRAINT chk_evento_planilla_destino CHECK ((id_planilla IS NULL) = (destino IS NULL))
+    CONSTRAINT chk_evento_recurso_destino CHECK ((id_planilla IS NULL AND id_aguinaldo IS NULL) = (destino IS NULL)),
+    CONSTRAINT chk_evento_recurso_unico CHECK (NOT (id_planilla IS NOT NULL AND id_aguinaldo IS NOT NULL))
 );
 CREATE INDEX idx_eventos_salientes_pendientes ON EVENTOS_SALIENTES (estado, proximo_intento_en);
 CREATE INDEX idx_eventos_salientes_planilla ON EVENTOS_SALIENTES (id_planilla, destino, creado_en);
+CREATE INDEX idx_eventos_salientes_aguinaldo ON EVENTOS_SALIENTES (id_aguinaldo, destino, creado_en);
 -- Tabla: EVENTOS_ENTRANTES
 -- Bandeja de entrada: confirmaciones de Contabilidad y Pagos. id_mensaje (del remitente) evita procesar dos veces
 -- el mismo mensaje. RECIBIDO: en proceso o esperando reintento; PROCESADO: aplicado a la planilla; IGNORADO: no
@@ -362,6 +450,7 @@ CREATE TABLE EVENTOS_ENTRANTES (
     tipo_evento varchar(60) NOT NULL,
     origen varchar(10) NULL,
     id_planilla UUID NULL,
+    id_aguinaldo UUID NULL,
     destino varchar(15) NULL,
     carga JSONB NOT NULL,
     estado varchar(10) NOT NULL DEFAULT 'RECIBIDO',
@@ -372,13 +461,16 @@ CREATE TABLE EVENTOS_ENTRANTES (
     CONSTRAINT EVENTOS_ENTRANTES_pk PRIMARY KEY (id_evento_entrante),
     CONSTRAINT uq_evento_entrante_mensaje UNIQUE (id_mensaje),
     CONSTRAINT fk_evento_entrante_planilla FOREIGN KEY (id_planilla) REFERENCES PLANILLAS (id_planilla),
+    CONSTRAINT fk_evento_entrante_aguinaldo FOREIGN KEY (id_aguinaldo) REFERENCES PLANILLA_AGUINALDO (id_aguinaldo),
     CONSTRAINT chk_evento_entrante_estado CHECK (estado IN ('RECIBIDO', 'PROCESADO', 'IGNORADO', 'FALLIDO')),
     CONSTRAINT chk_evento_entrante_destino CHECK (destino IN ('CONTABILIDAD', 'PAGOS')),
     CONSTRAINT chk_evento_entrante_intentos CHECK (intentos >= 0),
-    CONSTRAINT chk_evento_entrante_procesado CHECK ((estado IN ('PROCESADO', 'IGNORADO')) = (procesado_en IS NOT NULL))
+    CONSTRAINT chk_evento_entrante_procesado CHECK ((estado IN ('PROCESADO', 'IGNORADO')) = (procesado_en IS NOT NULL)),
+    CONSTRAINT chk_evento_entrante_recurso_unico CHECK (NOT (id_planilla IS NOT NULL AND id_aguinaldo IS NOT NULL))
 );
 CREATE INDEX idx_eventos_entrantes_estado ON EVENTOS_ENTRANTES (estado, recibido_en);
 CREATE INDEX idx_eventos_entrantes_planilla ON EVENTOS_ENTRANTES (id_planilla);
+CREATE INDEX idx_eventos_entrantes_aguinaldo ON EVENTOS_ENTRANTES (id_aguinaldo);
 -- datos iniciales
 -- Aportes de ley sobre el total ganado (Ley 065 de Pensiones y seguridad social de corto plazo).
 -- Cuentas contables referenciales: ajustar al plan de cuentas de Contabilidad.
