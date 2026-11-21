@@ -790,3 +790,47 @@ CREATE TABLE DOCUMENTOS_DESVINCULACION (
     CONSTRAINT chk_doc_desv_mime CHECK (tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png')),
     CONSTRAINT chk_doc_desv_tamano CHECK (tamano_bytes > 0 AND tamano_bytes <= 5242880)
 );
+
+-- Sueldo promedio indemnizable (RF-55, KAN-75)
+
+-- Tabla: PROMEDIOS_INDEMNIZABLES
+-- Último cálculo del sueldo promedio indemnizable de cada proceso de liquidación (1 a 1).
+-- Recalcular mientras el proceso está abierto reemplaza este registro y su detalle.
+CREATE TABLE PROMEDIOS_INDEMNIZABLES (
+    id_proceso UUID NOT NULL,
+    periodo_limite char(7) NOT NULL,
+    meses_considerados smallint NOT NULL,
+    total_considerado numeric(12,2) NOT NULL,
+    promedio numeric(12,2) NOT NULL,
+    observaciones text[] NOT NULL DEFAULT '{}',
+    calculado_por UUID NULL,
+    calculado_por_rol varchar(20) NULL,
+    calculado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PROMEDIOS_INDEMNIZABLES_pk PRIMARY KEY (id_proceso),
+    CONSTRAINT fk_promedio_proceso FOREIGN KEY (id_proceso)
+        REFERENCES PROCESOS_DESVINCULACION (id_proceso) ON DELETE CASCADE,
+    CONSTRAINT chk_promedio_meses CHECK (meses_considerados BETWEEN 1 AND 3),
+    CONSTRAINT chk_promedio_total CHECK (total_considerado >= 0),
+    CONSTRAINT chk_promedio_valor CHECK (promedio >= 0)
+);
+
+-- Tabla: DETALLE_PROMEDIO_INDEMNIZABLE
+-- Meses considerados en el cálculo del sueldo promedio indemnizable. Guarda copia de dias_pagados,
+-- haber_mensual y total_ganado al momento del cálculo para fijar la base legal del finiquito.
+CREATE TABLE DETALLE_PROMEDIO_INDEMNIZABLE (
+    id_proceso UUID NOT NULL,
+    periodo char(7) NOT NULL,
+    id_planilla UUID NOT NULL,
+    id_planilla_empleado UUID NOT NULL,
+    dias_pagados smallint NOT NULL,
+    haber_mensual numeric(12,2) NOT NULL,
+    total_ganado numeric(12,2) NOT NULL,
+    CONSTRAINT DETALLE_PROMEDIO_INDEMNIZABLE_pk PRIMARY KEY (id_proceso, periodo),
+    CONSTRAINT fk_detalle_promedio FOREIGN KEY (id_proceso)
+        REFERENCES PROMEDIOS_INDEMNIZABLES (id_proceso) ON DELETE CASCADE,
+    CONSTRAINT fk_detalle_promedio_planilla FOREIGN KEY (id_planilla)
+        REFERENCES PLANILLAS (id_planilla),
+    CONSTRAINT fk_detalle_promedio_empleado FOREIGN KEY (id_planilla_empleado)
+        REFERENCES PLANILLA_EMPLEADOS (id_planilla_empleado),
+    CONSTRAINT chk_detalle_promedio_total_ganado CHECK (total_ganado >= 0)
+);

@@ -210,3 +210,10 @@ El Administrador la envía desde Bonos por productividad (`POST /bonos-productiv
 - `PROCESOS_DESVINCULACION` registra cada proceso de liquidación con sus datos históricos copiados al momento del registro (incluyendo `corresponde_desahucio`, que queda fijo aunque el catálogo cambie después), y `DOCUMENTOS_DESVINCULACION` almacena el respaldo binario en tabla aparte (1 a 1) para no sobrecargar los listados.
 - Se consideran procesos abiertos los que tienen estado `INICIADO` o `EN_CURSO`; el índice único parcial `uq_proceso_abierto_empleado` impide en base de datos que un mismo colaborador tenga dos procesos abiertos al mismo tiempo.
 - El servicio valida la existencia y estado activo del colaborador contra EmployeeService y lo pasa a estado `BAJA` dentro de la misma transacción en que registra el proceso.
+
+## Sueldo promedio indemnizable (RF-55, KAN-75)
+
+- **Regla de cálculo:** sobre un proceso de desvinculación abierto (`INICIADO` o `EN_CURSO`), toma las últimas planillas en estado `CERRADA` del colaborador hasta el mes de la `fecha_retiro` (máximo 3) y promedia su `total_ganado` en centavos con redondeo mitad hacia arriba. Si hay menos de 3 meses, promedia los disponibles y registra la observación; también advierte si falta el mes del retiro, si hay huecos entre los periodos o si algún mes tiene menos de 30 días pagados.
+- **Copia por mes:** `DETALLE_PROMEDIO_INDEMNIZABLE` guarda `dias_pagados`, `haber_mensual` y `total_ganado` al momento del cálculo para dejar fija la base legal del finiquito.
+- **Recálculo:** mientras el proceso siga abierto, volver a calcular reemplaza la cabecera en `PROMEDIOS_INDEMNIZABLES` y su detalle, útil cuando se cierra posteriormente la planilla del mes de retiro.
+- **Estado del proceso:** al realizar el primer cálculo, el proceso pasa automáticamente de `INICIADO` a `EN_CURSO`.
