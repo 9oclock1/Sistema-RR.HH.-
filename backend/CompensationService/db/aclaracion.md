@@ -4,7 +4,7 @@ La base no usa triggers, procedimientos almacenados ni vistas (decisión del equ
 
 ## Referencias a otros servicios (sin FK)
 
-- `id_empleado` de `ASIGNACIONES_CONDICION`, `BONOS_CONDICION`, `PLANILLA_EMPLEADOS`, `METRICAS_VENTAS_PERIODO` y `BONOS_PRODUCTIVIDAD` debería hacer referencia a id_empleado de EmployeeDB.
+- `id_empleado` de `ASIGNACIONES_CONDICION`, `BONOS_CONDICION`, `PLANILLA_EMPLEADOS`, `METRICAS_VENTAS_PERIODO`, `BONOS_PRODUCTIVIDAD` y `BOLETAS_PAGO` debería hacer referencia a id_empleado de EmployeeDB.
 - `generada_por` y `aprobada_por` de `PLANILLAS` deberían hacer referencia a id_empleado de EmployeeDB (el Administrador que actuó).
 - `id_contrato` de `PLANILLA_EMPLEADOS` debería hacer referencia a id_contrato de `CONTRATOS` en EmployeeDB (la última versión del contrato en el mes).
 - Nombre, cargo, área, sucursal y haber se copian al generar la planilla: no cambian si después cambian en EmployeeDB.
@@ -32,6 +32,13 @@ La base no usa triggers, procedimientos almacenados ni vistas (decisión del equ
 - Servicio: una integración rechazada deja la planilla `APROBADA`; se reenvía con un mensaje nuevo y vuelve a `PENDIENTE`. Una integración confirmada ya no cambia.
 - `EVENTOS_SALIENTES` es la bandeja de salida: el evento se guarda en la misma transacción que la aprobación y se envía después.
 - Servicio: no se aprueba si algún concepto con monto en la planilla no tiene cuenta contable (el asiento no se podría armar).
+
+## Boletas de pago (RF-46, KAN-66)
+
+- `BOLETAS_PAGO`: una boleta por colaborador y planilla `CERRADA` (`uq_boleta_planilla_empleado`, `uq_boleta_empleado_periodo`). Servicio: no se emite boleta de una planilla en borrador o aprobada.
+- El detalle no se copia: se lee de `PLANILLA_EMPLEADOS` y `CALCULOS_PLANILLA`, que en una planilla cerrada ya no cambian. Las FK sin `CASCADE` impiden borrar una planilla con boletas.
+- `hash_contenido` es el SHA-256 del contenido de la boleta al emitirla. Servicio: se vuelve a calcular en cada consulta y descarga; si no coincide, la boleta no se entrega (409).
+- `descargas` y `ultima_descarga_en` registran las descargas del PDF.
 
 ## Integración con Contabilidad (D) y Pagos (A)
 

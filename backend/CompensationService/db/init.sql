@@ -722,3 +722,31 @@ CREATE TABLE AUDITORIA_BONIFICACIONES (
 );
 CREATE INDEX idx_auditoria_empleado ON AUDITORIA_BONIFICACIONES (id_empleado, periodo);
 CREATE INDEX idx_auditoria_periodo_tipo ON AUDITORIA_BONIFICACIONES (periodo, tipo_bono);
+
+-- Tabla: BOLETAS_PAGO
+-- Boleta de pago emitida a un colaborador por cada planilla cerrada (RF-46, KAN-66). Solo se emite con la planilla
+-- CERRADA; su detalle es el de PLANILLA_EMPLEADOS y CALCULOS_PLANILLA, que ya no cambian.
+-- hash_contenido: SHA-256 del contenido de la boleta al emitirla. Se vuelve a calcular en cada descarga: si no
+-- coincide, la boleta no se entrega. Se imprime en el PDF como código de verificación.
+-- id_empleado referencia a EMPLEADOS (EmployeeDB): sin FK por ser otro servicio.
+CREATE TABLE BOLETAS_PAGO (
+    id_boleta UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla UUID NOT NULL,
+    id_planilla_empleado UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    periodo char(7) NOT NULL,
+    hash_contenido char(64) NOT NULL,
+    emitida_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    descargas int NOT NULL DEFAULT 0,
+    ultima_descarga_en TIMESTAMPTZ NULL,
+    CONSTRAINT BOLETAS_PAGO_pk PRIMARY KEY (id_boleta),
+    CONSTRAINT uq_boleta_planilla_empleado UNIQUE (id_planilla_empleado),
+    CONSTRAINT uq_boleta_empleado_periodo UNIQUE (id_empleado, periodo),
+    -- Sin borrado en cascada: una planilla con boletas emitidas no se elimina.
+    CONSTRAINT fk_boleta_planilla FOREIGN KEY (id_planilla) REFERENCES PLANILLAS (id_planilla),
+    CONSTRAINT fk_boleta_planilla_empleado FOREIGN KEY (id_planilla_empleado)
+        REFERENCES PLANILLA_EMPLEADOS (id_planilla_empleado),
+    CONSTRAINT chk_boleta_periodo CHECK (periodo ~ '^\d{4}-(0[1-9]|1[0-2])$'),
+    CONSTRAINT chk_boleta_hash CHECK (hash_contenido ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT chk_boleta_descargas CHECK (descargas >= 0 AND (descargas = 0) = (ultima_descarga_en IS NULL))
+);
