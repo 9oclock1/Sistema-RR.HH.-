@@ -1,0 +1,158 @@
+.boletas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.boleta-tabla .ds-tabla {
+  min-width: calc(var(--size-sidebar) * 3);
+}
+
+.boleta-periodo {
+  font-weight: var(--font-weight-medium);
+}
+
+.boleta-cifra {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.boleta-acciones {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.boleta-sutil {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+/* Vista previa (dentro del modal) */
+.boleta-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.boleta-datos,
+.boleta-verificacion {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+}
+
+.boleta-datos dt,
+.boleta-verificacion dt {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.boleta-datos dd,
+.boleta-verificacion dd {
+  margin: 0;
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.boleta-verificacion {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  padding-top: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.boleta-codigo {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  word-break: break-all;
+}
+
+.boleta-grupo {
+  display: flex;
+  flex-direction: column;
+}
+
+.boleta-grupo__titulo {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text);
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
+  font-weight: var(--font-weight-semibold);
+}
+
+.boleta-renglones {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.boleta-renglones li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.boleta-renglon__concepto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.boleta-total {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0;
+  padding-top: var(--space-2);
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.boleta-liquido {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: var(--border-width-strong) solid var(--color-primary);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-selected);
+  color: var(--color-text);
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
+  font-weight: var(--font-weight-semibold);
+}
+
+@media (max-width: 640px) {
+  /* En pantallas angostas: periodo, líquido pagable y acciones; el resto está en la vista previa. */
+  .boleta-tabla .ds-tabla {
+    min-width: 0;
+    table-layout: auto;
+  }
+
+  .boleta-tabla th:nth-child(2),
+  .boleta-tabla td:nth-child(2),
+  .boleta-tabla th:nth-child(3),
+  .boleta-tabla td:nth-child(3),
+  .boleta-tabla th:nth-child(5),
+  .boleta-tabla td:nth-child(5) {
+    display: none;
+  }
+
+  .boleta-datos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .boleta-verificacion {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
