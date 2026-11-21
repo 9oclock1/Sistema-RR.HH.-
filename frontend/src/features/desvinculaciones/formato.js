@@ -39,3 +39,35 @@ export function validarArchivoRespaldo(archivo) {
   if (archivo.size > MAX_MB * 1024 * 1024) return `«${archivo.name}» pesa más de ${MAX_MB} MB.`;
   return null;
 }
+
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function validarFormularioDesvinculacion(valores = {}) {
+  const errores = {};
+  if (!String(valores.id_empleado ?? "").trim()) {
+    errores.id_empleado = "Seleccione el colaborador.";
+  }
+  if (!String(valores.codigo_causal ?? "").trim()) {
+    errores.codigo_causal = "Seleccione la causal de desvinculación.";
+  }
+
+  const fecha = valores.fecha_retiro;
+  const hoy = hoyLaPaz();
+  if (typeof fecha !== "string" || !FECHA_RE.test(fecha)) {
+    errores.fecha_retiro = "Ingrese una fecha de retiro válida.";
+  } else if (fecha > hoy) {
+    errores.fecha_retiro = `No puede ser posterior a hoy (${hoy}).`;
+  }
+
+  const obs = typeof valores.observaciones === "string" ? valores.observaciones.trim() : "";
+  if (obs.length > 500) {
+    errores.observaciones = "Use hasta 500 caracteres.";
+  }
+
+  const errorArchivo = validarArchivoRespaldo(valores.documento);
+  if (errorArchivo) {
+    errores.documento = errorArchivo;
+  }
+
+  return errores;
+}

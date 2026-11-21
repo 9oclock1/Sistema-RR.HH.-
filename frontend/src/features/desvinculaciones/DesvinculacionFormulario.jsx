@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Alerta, Boton, CampoAreaTexto, CampoTexto, Modal, ModalConfirmacion, Selector } from "../../components/ui";
 import ZonaRespaldo from "./ZonaRespaldo";
-import { hoyLaPaz } from "./formato";
+import { hoyLaPaz, validarFormularioDesvinculacion } from "./formato";
 import useFormulario from "./useFormulario";
 
 const ETIQUETAS = {
@@ -25,7 +25,7 @@ const ID_FORMULARIO = "desvinculacion-formulario";
 export default function DesvinculacionFormulario({ empleados, causales, onGuardar, onCancelar }) {
   const [confirmacionAbierta, setConfirmacionAbierta] = useState(false);
 
-  const { valores, establecerCampo, enviar, enviando, propsCampo, resumen } = useFormulario({
+  const { valores, establecerCampo, marcarErrores, enviar, enviando, propsCampo, resumen } = useFormulario({
     inicial: INICIAL,
     etiquetas: ETIQUETAS,
     prefijo: "desv",
@@ -61,6 +61,11 @@ export default function DesvinculacionFormulario({ empleados, causales, onGuarda
 
   const manejarSubmit = (evento) => {
     evento.preventDefault();
+    const errores = validarFormularioDesvinculacion(valores);
+    if (Object.keys(errores).length > 0) {
+      marcarErrores(errores);
+      return;
+    }
     setConfirmacionAbierta(true);
   };
 

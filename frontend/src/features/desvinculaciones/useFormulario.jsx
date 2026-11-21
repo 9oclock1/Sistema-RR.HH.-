@@ -34,6 +34,11 @@ export default function useFormulario({ inicial, etiquetas, prefijo, onGuardar }
     limpiarErrorCampo(campo);
   };
 
+  const marcarErrores = (campos) => {
+    setError({ general: null, campos });
+    setEnviosFallidos((total) => total + 1);
+  };
+
   const enviar = async (valoresAEnviar = valores) => {
     setEnviando(true);
     setError(null);
@@ -91,5 +96,5 @@ export default function useFormulario({ inicial, etiquetas, prefijo, onGuardar }
     </Alerta>
   );
 
-  return { valores, setValores, cambiar, establecerCampo, enviar, enviando, propsCampo, resumen };
+  return { valores, setValores, cambiar, establecerCampo, marcarErrores, enviar, enviando, propsCampo, resumen };
 }
