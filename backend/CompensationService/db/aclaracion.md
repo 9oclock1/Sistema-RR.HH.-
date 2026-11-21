@@ -203,3 +203,10 @@ El Administrador la envía desde Bonos por productividad (`POST /bonos-productiv
 ```
 
 - `colaboradores`: el personal activo de EmployeeService, para que Ventas relacione a sus vendedores y cajeros con el `id_empleado` de RRHH.
+
+## Desvinculación (RF-54, KAN-74)
+
+- `CAUSALES_DESVINCULACION` es el catálogo de motivos formales de baja (`RENUNCIA`, `CONCLUSION_CONTRATO`, `DESPIDO_LEGAL`, `DESAHUCIO`) y define si corresponde pago de desahucio.
+- `PROCESOS_DESVINCULACION` registra cada proceso de liquidación con sus datos históricos copiados al momento del registro (incluyendo `corresponde_desahucio`, que queda fijo aunque el catálogo cambie después), y `DOCUMENTOS_DESVINCULACION` almacena el respaldo binario en tabla aparte (1 a 1) para no sobrecargar los listados.
+- Se consideran procesos abiertos los que tienen estado `INICIADO` o `EN_CURSO`; el índice único parcial `uq_proceso_abierto_empleado` impide en base de datos que un mismo colaborador tenga dos procesos abiertos al mismo tiempo.
+- El servicio valida la existencia y estado activo del colaborador contra EmployeeService y lo pasa a estado `BAJA` dentro de la misma transacción en que registra el proceso.
