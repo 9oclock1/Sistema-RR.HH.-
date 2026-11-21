@@ -60,4 +60,22 @@ async function obtenerHaberVigente(idEmpleado, fecha = hoyLaPaz()) {
   return vigente ? Number(vigente.haber_mensual_pactado) : null;
 }
 
-module.exports = { obtenerEmpleado, listarEmpleados, obtenerHaberVigente };
+// Llamada interna de servidor a servidor para pasar al colaborador a estado BAJA al registrar su desvinculación.
+async function darDeBaja(idEmpleado) {
+  let respuesta;
+  try {
+    respuesta = await fetch(`${URL_EMPLEADOS}/empleados/${encodeURIComponent(idEmpleado)}/baja`, {
+      method: "PATCH",
+      headers: { Accept: "application/json", "X-Rol": "admin" },
+      signal: AbortSignal.timeout(TIEMPO_ESPERA_MS),
+    });
+  } catch {
+    throw new ErrorApp(503, "No se pudo dar de baja al colaborador en EmployeeService. Intente nuevamente.");
+  }
+  if (!respuesta.ok) {
+    throw new ErrorApp(503, "No se pudo dar de baja al colaborador en EmployeeService. Intente nuevamente.");
+  }
+  return respuesta.json().catch(() => ({ id_empleado: idEmpleado }));
+}
+
+module.exports = { obtenerEmpleado, listarEmpleados, obtenerHaberVigente, darDeBaja };

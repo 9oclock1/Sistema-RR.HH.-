@@ -52,4 +52,13 @@ const listarMemorandums = async (idEmpleado) => {
   return memorandumsModel.listarPorEmpleado(pool, idEmpleado);
 };
 
-module.exports = { listarEmpleados, obtenerFicha, obtenerResumen, listarMemorandums, construirFicha, noEncontrado };
+const darDeBaja = async (idEmpleado) => {
+  const fila = await empleadosModel.darDeBaja(pool, idEmpleado);
+  if (!fila) throw noEncontrado();
+  return {
+    id_empleado: fila.id_empleado,
+    estado: { codigo: fila.estado_codigo, nombre: fila.estado_nombre },
+  };
+};
+
+module.exports = { listarEmpleados, obtenerFicha, obtenerResumen, listarMemorandums, construirFicha, noEncontrado, darDeBaja };
