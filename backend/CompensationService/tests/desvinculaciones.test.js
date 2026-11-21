@@ -7,6 +7,7 @@ const empleadosCliente = require("../src/clients/empleados.cliente");
 const servicio = require("../src/services/desvinculacionesService");
 const { ErrorApp } = require("../src/utils/errores");
 const { validarDatosDesvinculacion } = require("../src/utils/desvinculaciones");
+const exigirAdmin = require("../src/middlewares/exigirAdmin");
 const { hoyLaPaz, sumarDias } = require("../src/utils/fechas");
 
 const ID_EMPLEADO = "11111111-1111-1111-1111-111111111111";
@@ -266,5 +267,31 @@ describe("desvinculacionesService.registrar", () => {
       () => servicio.listarCausales({ rol: "empleado" }),
       (err) => err.estado === 403
     );
+  });
+});
+
+describe("exigirAdmin", () => {
+  test("sin X-Rol pasa a next un error con estado 403", () => {
+    let recibido;
+    exigirAdmin({ get: () => undefined }, {}, (err) => {
+      recibido = err;
+    });
+    assert.equal(recibido?.estado, 403);
+  });
+
+  test("con X-Rol supervisor pasa a next un error con estado 403", () => {
+    let recibido;
+    exigirAdmin({ get: (nombre) => (nombre === "X-Rol" ? "supervisor" : undefined) }, {}, (err) => {
+      recibido = err;
+    });
+    assert.equal(recibido?.estado, 403);
+  });
+
+  test("con X-Rol admin llama a next sin argumentos", () => {
+    let args;
+    exigirAdmin({ get: (nombre) => (nombre === "X-Rol" ? "admin" : undefined) }, {}, (...rest) => {
+      args = rest;
+    });
+    assert.deepEqual(args, []);
   });
 });
