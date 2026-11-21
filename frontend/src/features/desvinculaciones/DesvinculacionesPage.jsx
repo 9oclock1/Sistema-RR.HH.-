@@ -19,6 +19,7 @@ import {
 } from "../../components/ui";
 import { useRol, useUsuario } from "../../context/sesion";
 import DesvinculacionFormulario from "./DesvinculacionFormulario";
+import PromedioIndemnizableModal from "./PromedioIndemnizableModal";
 import TablaDesvinculaciones from "./TablaDesvinculaciones";
 import { ESTADOS, opciones } from "./formato";
 import "./desvinculaciones.css";
@@ -39,6 +40,7 @@ export default function DesvinculacionesPage() {
   const [filtros, setFiltros] = useState(FILTROS_VACIOS);
   const [formularioAbierto, setFormularioAbierto] = useState(false);
   const [descargandoId, setDescargandoId] = useState(null);
+  const [procesoPromedio, setProcesoPromedio] = useState(null);
 
   const cargar = useCallback(
     () =>
@@ -195,6 +197,7 @@ export default function DesvinculacionesPage() {
             vacio={vacio}
             onDescargar={descargar}
             descargandoId={descargandoId}
+            onVerPromedio={setProcesoPromedio}
           />
         </Tarjeta>
       )}
@@ -205,6 +208,15 @@ export default function DesvinculacionesPage() {
           causales={causales}
           onGuardar={guardar}
           onCancelar={() => setFormularioAbierto(false)}
+        />
+      )}
+
+      {procesoPromedio && (
+        <PromedioIndemnizableModal
+          proceso={procesoPromedio}
+          identidad={identidad}
+          onCerrar={() => setProcesoPromedio(null)}
+          onCalculado={cargar}
         />
       )}
     </section>
