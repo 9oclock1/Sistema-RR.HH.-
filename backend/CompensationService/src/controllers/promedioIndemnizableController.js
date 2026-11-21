@@ -9,4 +9,8 @@ async function calcular(req, res) {
   res.json(await servicio.calcular(req.params.id, identidad(req)));
 }
 
-module.exports = { calcular };
+async function obtener(req, res) {
+  res.json(await servicio.obtener(req.params.id, identidad(req)));
+}
+
+module.exports = { calcular, obtener };

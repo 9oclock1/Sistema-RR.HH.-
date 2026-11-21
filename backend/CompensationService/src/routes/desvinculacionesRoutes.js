@@ -13,6 +13,7 @@ router.get("/desvinculaciones", controlador.listar);
 router.post("/desvinculaciones", exigirAdmin, subirRespaldo, controlador.registrar);
 router.get("/desvinculaciones/:id", controlador.obtener);
 router.get("/desvinculaciones/:id/documento", controlador.descargarDocumento);
+router.get("/desvinculaciones/:id/promedio-indemnizable", promedio.obtener);
 router.post("/desvinculaciones/:id/promedio-indemnizable", promedio.calcular);
 
 module.exports = router;

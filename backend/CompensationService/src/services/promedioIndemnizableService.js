@@ -50,4 +50,25 @@ async function calcular(idProceso, identidad) {
   });
 }
 
-module.exports = { calcular };
+// AC3: devuelve el desglose mensual usado para calcular el sueldo promedio indemnizable.
+async function obtener(idProceso, identidad) {
+  validarAdmin(identidad);
+  if (!UUID_RE.test(idProceso ?? "")) throw noEncontrado();
+
+  const idNormalizado = idProceso.toLowerCase();
+  const proceso = await desvinculacionesModel.obtenerProceso(idNormalizado);
+  if (!proceso) throw noEncontrado();
+
+  const desglose = await modelo.obtenerDesglose(idNormalizado);
+  if (!desglose) {
+    throw new ErrorApp(
+      404,
+      "Aún no se calculó el sueldo promedio indemnizable de este proceso.",
+      undefined,
+      "PROMEDIO_NO_CALCULADO"
+    );
+  }
+  return desglose;
+}
+
+module.exports = { calcular, obtener };
