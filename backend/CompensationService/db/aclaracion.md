@@ -39,6 +39,8 @@ La base no usa triggers, procedimientos almacenados ni vistas (decisión del equ
 - El detalle no se copia: se lee de `PLANILLA_EMPLEADOS` y `CALCULOS_PLANILLA`, que en una planilla cerrada ya no cambian. Las FK sin `CASCADE` impiden borrar una planilla con boletas.
 - `hash_contenido` es el SHA-256 del contenido de la boleta al emitirla. Servicio: se vuelve a calcular en cada consulta y descarga; si no coincide, la boleta no se entrega (409).
 - `descargas` y `ultima_descarga_en` registran las descargas del PDF.
+- Servicio: la boleta se emite la primera vez que el colaborador consulta sus boletas (`GET /boletas`), para cada planilla cerrada que aún no la tenga; así también quedan cubiertas las planillas cerradas antes de esta historia. `GET /boletas/:id` devuelve el detalle y `GET /boletas/:id/pdf` el PDF.
+- Acceso (temporal, cabeceras `X-Empleado-Id` y `X-Rol` hasta contar con autenticación): sin colaborador, 401; cada colaborador ve solo sus boletas y la de otro responde 403; el rol `admin` (RRHH) puede ver cualquiera.
 
 ## Integración con Contabilidad (D) y Pagos (A)
 
