@@ -300,9 +300,13 @@ async function listarJornadas(filtros) {
 }
 
 const horas = (minutos) => (minutos / 60).toFixed(2).replace(".", ",");
+// Si el valor empieza con = + - @ (o tabulador), Excel lo interpreta como fórmula al abrir el CSV, nunca
+// como texto: un nombre con ese valor ejecutaría esa fórmula. El apóstrofo le dice que es texto literal;
+// es invisible al verlo y no afecta el valor.
 const celda = (valor) => {
   const texto = String(valor ?? "");
-  return /[";\n\r]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+  const segura = /^[=+\-@\t\r]/.test(texto) ? `'${texto}` : texto;
+  return /[";\n\r]/.test(segura) ? `"${segura.replace(/"/g, '""')}"` : segura;
 };
 
 // CSV para hojas de cálculo en español: separador punto y coma, decimales con coma y BOM para los acentos.
