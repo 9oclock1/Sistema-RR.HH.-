@@ -750,3 +750,71 @@ CREATE TABLE BOLETAS_PAGO (
     CONSTRAINT chk_boleta_hash CHECK (hash_contenido ~ '^[0-9a-f]{64}$'),
     CONSTRAINT chk_boleta_descargas CHECK (descargas >= 0 AND (descargas = 0) = (ultima_descarga_en IS NULL))
 );
+
+-- Desvinculación laboral (RF-54, KAN-74)
+
+-- Tabla: CAUSALES_DESVINCULACION
+-- Catálogo de causales legales de desvinculación laboral. Define si corresponde o no el pago de desahucio.
+CREATE TABLE CAUSALES_DESVINCULACION (
+    codigo varchar(25) NOT NULL,
+    nombre varchar(60) NOT NULL,
+    descripcion varchar(250) NULL,
+    corresponde_desahucio boolean NOT NULL,
+    esta_activo boolean NOT NULL DEFAULT TRUE,
+    orden smallint NOT NULL,
+    CONSTRAINT CAUSALES_DESVINCULACION_pk PRIMARY KEY (codigo),
+    CONSTRAINT uq_causal_nombre UNIQUE (nombre)
+);
+
+INSERT INTO CAUSALES_DESVINCULACION (codigo, nombre, descripcion, corresponde_desahucio, orden)
+VALUES
+    ('RENUNCIA', 'Renuncia voluntaria', 'Retiro por decisión voluntaria del colaborador; no corresponde pago de desahucio.', FALSE, 1),
+    ('CONCLUSION_CONTRATO', 'Conclusión de contrato', 'Finalización del plazo o de la obra convenida en el contrato; no corresponde pago de desahucio.', FALSE, 2),
+    ('DESPIDO_LEGAL', 'Despido legal (causa justificada)', 'Desvinculación por causa legal justificada; no corresponde pago de desahucio.', FALSE, 3),
+    ('DESAHUCIO', 'Desahucio', 'Retiro por decisión del empleador sin causa justificada; obliga a pagar el desahucio.', TRUE, 4)
+ON CONFLICT DO NOTHING;
+
+-- Tabla: PROCESOS_DESVINCULACION
+-- Un proceso de liquidación iniciado por la baja de un colaborador. nombre_empleado, fecha_ingreso y
+-- corresponde_desahucio se copian al registrar para conservar los datos históricos aunque cambien después.
+-- Procesos abiertos: estado INICIADO o EN_CURSO; el índice único parcial impide dos abiertos para un empleado.
+CREATE TABLE PROCESOS_DESVINCULACION (
+    id_proceso UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    nombre_empleado varchar(150) NOT NULL,
+    fecha_ingreso date NULL,
+    codigo_causal varchar(25) NOT NULL,
+    fecha_retiro date NOT NULL,
+    corresponde_desahucio boolean NOT NULL,
+    observaciones varchar(500) NULL,
+    estado varchar(12) NOT NULL DEFAULT 'INICIADO',
+    registrado_por UUID NULL,
+    registrado_por_rol varchar(20) NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PROCESOS_DESVINCULACION_pk PRIMARY KEY (id_proceso),
+    CONSTRAINT fk_proceso_causal FOREIGN KEY (codigo_causal)
+        REFERENCES CAUSALES_DESVINCULACION (codigo),
+    CONSTRAINT chk_proceso_estado CHECK (estado IN ('INICIADO', 'EN_CURSO', 'CERRADO', 'ANULADO')),
+    CONSTRAINT chk_proceso_fecha_retiro CHECK (fecha_ingreso IS NULL OR fecha_retiro >= fecha_ingreso)
+);
+CREATE UNIQUE INDEX uq_proceso_abierto_empleado ON PROCESOS_DESVINCULACION (id_empleado)
+    WHERE estado IN ('INICIADO', 'EN_CURSO');
+CREATE INDEX idx_procesos_desvinculacion_estado ON PROCESOS_DESVINCULACION (estado, creado_en);
+
+-- Tabla: DOCUMENTOS_DESVINCULACION
+-- Documento de respaldo (PDF, JPG o PNG, máx. 5 MB), 1 a 1 con el proceso. Se guarda aparte para no cargar
+-- el binario en los listados.
+CREATE TABLE DOCUMENTOS_DESVINCULACION (
+    id_proceso UUID NOT NULL,
+    nombre_archivo varchar(255) NOT NULL,
+    tipo_mime varchar(50) NOT NULL,
+    tamano_bytes integer NOT NULL,
+    contenido bytea NOT NULL,
+    subido_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT DOCUMENTOS_DESVINCULACION_pk PRIMARY KEY (id_proceso),
+    CONSTRAINT fk_doc_desv_proceso FOREIGN KEY (id_proceso)
+        REFERENCES PROCESOS_DESVINCULACION (id_proceso) ON DELETE CASCADE,
+    CONSTRAINT chk_doc_desv_mime CHECK (tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png')),
+    CONSTRAINT chk_doc_desv_tamano CHECK (tamano_bytes > 0 AND tamano_bytes <= 5242880)
+);

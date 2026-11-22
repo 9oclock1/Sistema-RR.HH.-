@@ -24,4 +24,12 @@ const listarMemorandums = async (req, res) => {
   res.status(200).json(await empleadosService.listarMemorandums(idEmpleado));
 };
 
-module.exports = { listarEmpleados, obtenerFicha, obtenerResumen, listarMemorandums };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const darDeBaja = async (req, res) => {
+  const rawId = typeof req.params.id === 'string' ? req.params.id.trim() : '';
+  if (!UUID_RE.test(rawId)) throw empleadosService.noEncontrado();
+  res.status(200).json(await empleadosService.darDeBaja(rawId.toLowerCase()));
+};
+
+module.exports = { listarEmpleados, obtenerFicha, obtenerResumen, listarMemorandums, darDeBaja };

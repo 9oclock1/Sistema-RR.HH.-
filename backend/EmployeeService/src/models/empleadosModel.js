@@ -133,4 +133,18 @@ const obtenerSupervisor = async (db, idEmpleado) => {
   return rows[0];
 };
 
-module.exports = { listar, bloquearPorId, obtenerFicha, obtenerResumen, obtenerSupervisor, actualizarAsignacionActual };
+const darDeBaja = async (db, idEmpleado) => {
+  const { rows } = await db.query(
+    `UPDATE empleados e
+        SET id_estado_empleado = ee.id_estado_empleado,
+            actualizado_en = CURRENT_TIMESTAMP
+       FROM estados_empleado ee
+      WHERE e.id_empleado = $1
+        AND ee.codigo = 'BAJA'
+     RETURNING e.id_empleado, ee.codigo AS estado_codigo, ee.nombre AS estado_nombre`,
+    [idEmpleado]
+  );
+  return rows[0] || null;
+};
+
+module.exports = { listar, bloquearPorId, obtenerFicha, obtenerResumen, obtenerSupervisor, actualizarAsignacionActual, darDeBaja };
