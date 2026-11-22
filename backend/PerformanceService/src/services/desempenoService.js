@@ -17,6 +17,17 @@ const {
   resumirCrm,
   listarColaboradores,
 } = require("../utils/desempeno");
+const {
+  validarFiltrosDashboard,
+  aplicarFiltros,
+  calcularPuntajePromedio,
+  calcularCumplimiento,
+  calcularHistograma,
+  armarRanking,
+  compararCiclos,
+  listarOpciones,
+  agruparPorCiclo,
+} = require("../utils/dashboardDesempeno");
 
 const describirCiclo = (ciclo) => ({
   id_ciclo: ciclo.id_ciclo,
@@ -150,6 +161,40 @@ async function obtenerColaboradores(idPedido, filtros = {}) {
   };
 }
 
+async function obtenerDashboard(consulta) {
+  const filtros = validarFiltrosDashboard(consulta);
+  const [cerrados, todas] = await Promise.all([
+    modelo.listarCiclosCerrados(),
+    modelo.listarEvaluacionesDeCiclosCerrados(),
+  ]);
+  const ciclo = filtros.ciclo ? await obtenerCicloCerrado(filtros.ciclo) : (cerrados[0] ?? null);
+  const filasCiclo = ciclo ? (agruparPorCiclo(todas).get(ciclo.id_ciclo) ?? []) : [];
+  const { departamento, sucursal } = filtros;
+  const filtradas = aplicarFiltros(filasCiclo, filtros);
+  const cronologicos = [...cerrados].reverse();
+
+  return {
+    ciclo: ciclo && describirCiclo(ciclo),
+    filtros: { departamento, sucursal },
+    opciones: {
+      departamentos: listarOpciones(filasCiclo, "id_departamento", "departamento"),
+      sucursales: listarOpciones(filasCiclo, "id_sucursal", "sucursal"),
+    },
+    kpis: {
+      puntaje_promedio: calcularPuntajePromedio(filtradas),
+      cumplimiento_evaluaciones: calcularCumplimiento(filtradas),
+    },
+    histograma: calcularHistograma(filtradas),
+    ranking_areas: armarRanking(aplicarFiltros(filasCiclo, { sucursal }), "id_departamento", "departamento"),
+    ranking_sucursales: armarRanking(aplicarFiltros(filasCiclo, { departamento }), "id_sucursal", "sucursal"),
+    comparativo_ciclos: compararCiclos(
+      cronologicos,
+      agruparPorCiclo(aplicarFiltros(todas, filtros)),
+      ciclo?.id_ciclo ?? null,
+    ),
+  };
+}
+
 // El administrador ajusta el umbral por debajo del cual un área se considera brecha en este ciclo.
 async function actualizarUmbral(idPedido, datos) {
   const idCiclo = validarIdCiclo(idPedido);
@@ -177,6 +222,7 @@ module.exports = {
   obtenerConsolidado,
   obtenerComparativa,
   obtenerColaboradores,
+  obtenerDashboard,
   actualizarUmbral,
   reintentarSolicitudCrm,
 };
