@@ -1,15 +1,11 @@
 const express = require("express");
 const cors = require("cors");
-const { Pool } = require("pg");
+const pool = require("./src/config/db");
+const authRoutes = require("./src/routes/auth.routes");
+const manejadorErrores = require("./src/middlewares/manejadorErrores");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-
-// Sin este manejador, una conexión inactiva que se corta (por ejemplo, si se reinicia PostgreSQL) tumba el proceso.
-pool.on("error", (error) => {
-  console.error("Error inesperado en una conexión inactiva de PostgreSQL:", error.message);
-});
 
 app.use(cors());
 app.use(express.json());
@@ -18,7 +14,6 @@ app.get("/", (req, res) => {
   res.json({ service: "AuthService", status: "Online", port: PORT });
 });
 
-// pruebita postgre
 app.get("/health", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW() as db_time");
@@ -38,16 +33,14 @@ app.get("/health", async (req, res) => {
   }
 });
 
-// pruebita endpoint
-app.post("/login", (req, res) => {
-  const { email } = req.body;
-  res.json({
-    message: "pruebita",
-    user: email || "admin@empresa.com",
-    token: "fake-jwt-token-123",
-  });
-});
+app.use(authRoutes);
+app.use(manejadorErrores);
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`AuthService corriendo en http://0.0.0.0:${PORT}`);
-});
+if (require.main === module) {
+  if (!process.env.JWT_SECRET) console.error("Falta JWT_SECRET: no se podrá iniciar sesión.");
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`AuthService corriendo en http://0.0.0.0:${PORT}`);
+  });
+}
+
+module.exports = app;
