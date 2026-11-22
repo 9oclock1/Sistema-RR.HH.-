@@ -98,20 +98,20 @@ function Contenido({ boleta }) {
 }
 
 // Vista previa de la boleta (criterio 2) con el mismo contenido verificado que el PDF.
-export default function VistaPreviaBoleta({ boleta, identidad, descargando, onDescargar, onCerrar }) {
+export default function VistaPreviaBoleta({ boleta, descargando, onDescargar, onCerrar }) {
   const [estado, setEstado] = useState({ id: null, detalle: null, error: null });
   const id = boleta?.id_boleta ?? null;
 
   useEffect(() => {
     if (!id) return undefined;
     let vigente = true;
-    obtenerBoleta(id, identidad)
+    obtenerBoleta(id)
       .then((detalle) => vigente && setEstado({ id, detalle, error: null }))
       .catch((error) => vigente && setEstado({ id, detalle: null, error }));
     return () => {
       vigente = false;
     };
-  }, [id, identidad]);
+  }, [id]);
 
   const actual = estado.id === id ? estado : { detalle: null, error: null };
   const cargando = Boolean(id) && !actual.detalle && !actual.error;

@@ -2,18 +2,12 @@ import { solicitar } from "./cliente";
 
 const RUTA = "/comp/boletas";
 
-// Temporal hasta contar con autenticación: quién consulta y con qué rol (RF-46, criterio 3).
-const cabeceras = ({ idEmpleado, rol }) => ({
-  ...(idEmpleado && { "X-Empleado-Id": idEmpleado }),
-  ...(rol && { "X-Rol": rol }),
-});
+// Exigen sesión real (RF-46, criterio 3): quién consulta sale del JWT de la cookie de sesión, no de cabeceras.
 
 // Boletas del colaborador, solo de planillas cerradas: [{ id_boleta, periodo, emitida_en, totales, ... }].
-export const listarMisBoletas = (identidad) => solicitar(RUTA, { cabeceras: cabeceras(identidad) });
+export const listarMisBoletas = () => solicitar(RUTA);
 
 // Detalle: { periodo, empleado, contrato, dias, ingresos, descuentos, aportes, totales, codigo_verificacion, ... }.
-export const obtenerBoleta = (id, identidad) => solicitar(`${RUTA}/${id}`, { cabeceras: cabeceras(identidad) });
+export const obtenerBoleta = (id) => solicitar(`${RUTA}/${id}`);
 
-// PDF por fetch (no por <a href>): así viajan las cabeceras que identifican a quien descarga.
-export const descargarBoleta = (id, identidad) =>
-  solicitar(`${RUTA}/${id}/pdf`, { cabeceras: cabeceras(identidad), respuestaBinaria: true });
+export const descargarBoleta = (id) => solicitar(`${RUTA}/${id}/pdf`, { respuestaBinaria: true });

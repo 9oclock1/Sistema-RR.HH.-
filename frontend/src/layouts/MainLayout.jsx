@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { House, Menu, Search } from "lucide-react";
+import { cerrarSesion, obtenerSesion } from "../api/auth";
 import { iniciarConsolaPubSub } from "../api/mensajesPublicados";
-import { Boton, ElementoNavegacion, Selector, useAvisos } from "../components/ui";
-import { cambiarRol, cambiarUsuario, useRol, useUsuario } from "../context/sesion";
+import { Boton, Casilla, ElementoNavegacion, Selector, useAvisos } from "../components/ui";
+import {
+  abrirInicioSesion,
+  cambiarRol,
+  cambiarUsuario,
+  fijarSesion,
+  useFormularioSesion,
+  useRol,
+  useSesion,
+  useUsuario,
+} from "../context/sesion";
 import { useEmpleados } from "../features/Asignaciones/hooks/useEmpleados";
 import CampanaNotificaciones from "../features/notificaciones/CampanaNotificaciones";
+import DialogoInicioSesion from "../features/sesion/DialogoInicioSesion";
 import { seccionesPara } from "../router/modulos";
 import { ROLES } from "../utils/permisos";
 import "./MainLayout.css";
@@ -65,6 +76,9 @@ export default function MainLayout() {
   const avisar = useAvisos();
   const rol = useRol();
   const usuario = useUsuario();
+  const sesion = useSesion();
+  const formularioSesion = useFormularioSesion();
+  const [cerrandoSesion, setCerrandoSesion] = useState(false);
   const empleados = useEmpleados();
 
   const consulta = normalizar(busqueda.trim());
@@ -76,6 +90,13 @@ export default function MainLayout() {
 
   useEffect(() => {
     iniciarConsolaPubSub();
+  }, []);
+
+  // Sesión real ya abierta (cookie de AuthService); sin ella el portal sigue con el usuario y el rol de prueba.
+  useEffect(() => {
+    obtenerSesion()
+      .then(({ usuario: activo }) => fijarSesion(activo))
+      .catch(() => fijarSesion(null));
   }, []);
 
   // Al cambiar de página, el foco pasa al contenido para los lectores de pantalla.
@@ -123,6 +144,25 @@ export default function MainLayout() {
     const nombre = empleados.empleados.find((e) => e.id_empleado === nuevo)?.nombre_completo;
     avisar({ tono: "info", titulo: "Usuario de prueba cambiado", mensaje: nombre ?? "Sin usuario" });
   };
+
+  const alternarSesion = async (evento) => {
+    if (evento.target.checked) {
+      abrirInicioSesion();
+      return;
+    }
+    setCerrandoSesion(true);
+    try {
+      await cerrarSesion();
+      fijarSesion(null);
+      avisar({ tono: "info", titulo: "Sesión cerrada", mensaje: "Vuelve el usuario y el rol de prueba." });
+    } catch (error) {
+      avisar({ tono: "peligro", titulo: "No se pudo cerrar la sesión", mensaje: error.message });
+    } finally {
+      setCerrandoSesion(false);
+    }
+  };
+
+  const nombreSesion = sesion && (empleados.empleados.find((e) => e.id_empleado === sesion.id_empleado)?.nombre_completo ?? sesion.correo);
 
   const alPresionarEnBusqueda = (evento) => {
     if (evento.key === "Enter" && resultados.length > 0) {
@@ -202,13 +242,29 @@ export default function MainLayout() {
         </nav>
 
         <div className="app-lateral__pie">
-          <Selector etiqueta="Rol de prueba" opciones={OPCIONES_ROL} value={rol} onChange={alCambiarRol} />
+          <Casilla
+            role="switch"
+            etiqueta="Inicio de sesión real"
+            ayuda={
+              sesion
+                ? `Sesión de ${nombreSesion} (${ROLES[sesion.rol]?.nombre ?? sesion.rol}). Desactívela para volver al usuario de prueba.`
+                : "Necesario para Mis boletas de pago. El resto funciona con el usuario de prueba."
+            }
+            checked={Boolean(sesion)}
+            onChange={alternarSesion}
+            disabled={sesion === undefined || cerrandoSesion}
+          />
+          <Selector etiqueta="Rol de prueba" opciones={OPCIONES_ROL} value={rol} onChange={alCambiarRol} disabled={Boolean(sesion)} />
           <Selector
             etiqueta="Usuario de prueba"
-            ayuda="Temporal hasta contar con inicio de sesión. Queda como autor de los registros."
+            ayuda={
+              sesion
+                ? "Fijados por la sesión iniciada."
+                : "Temporal hasta contar con inicio de sesión. Queda como autor de los registros."
+            }
             value={usuario ?? ""}
             onChange={alCambiarUsuario}
-            disabled={empleados.cargando || Boolean(empleados.error)}
+            disabled={empleados.cargando || Boolean(empleados.error) || Boolean(sesion)}
             textoVacio={empleados.cargando ? "Cargando…" : "Sin usuario"}
             opciones={empleados.empleados.map((e) => ({ valor: e.id_empleado, etiqueta: e.nombre_completo }))}
             error={empleados.error ? "No se pudieron cargar los empleados." : undefined}
@@ -217,6 +273,8 @@ export default function MainLayout() {
       </aside>
 
       {superpuesto && <div className="app-velo" aria-hidden="true" onClick={cerrarSuperpuesto} />}
+
+      <DialogoInicioSesion abierto={formularioSesion} onCerrar={() => abrirInicioSesion(false)} />
 
       <main id="contenido" ref={refContenido} tabIndex={-1} className="app-contenido" inert={superpuesto}>
         <Outlet />

@@ -68,6 +68,27 @@ function suscribir(avisar) {
   };
 }
 
-export const useRol = () => useSyncExternalStore(suscribir, () => rolActual);
+// Sesión real (AuthService, cookie HttpOnly). Mientras hay una, el rol y el usuario son los de la sesión; al cerrarla
+// vuelven los de prueba. undefined: aún no se consultó; null: sin sesión; si no, { id_empleado, correo, rol }.
+let sesionActual;
+let formularioAbierto = false;
 
-export const useUsuario = () => useSyncExternalStore(suscribir, leerUsuario);
+export function fijarSesion(usuario) {
+  sesionActual = usuario ?? null;
+  avisarOyentes();
+}
+
+export function abrirInicioSesion(abierto = true) {
+  formularioAbierto = abierto;
+  avisarOyentes();
+}
+
+export const useSesion = () => useSyncExternalStore(suscribir, () => sesionActual);
+
+export const useFormularioSesion = () => useSyncExternalStore(suscribir, () => formularioAbierto);
+
+const rolDeSesion = () => (esRol(sesionActual?.rol) ? sesionActual.rol : null);
+
+export const useRol = () => useSyncExternalStore(suscribir, () => rolDeSesion() ?? rolActual);
+
+export const useUsuario = () => useSyncExternalStore(suscribir, () => sesionActual?.id_empleado ?? leerUsuario());

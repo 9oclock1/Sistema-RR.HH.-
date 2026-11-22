@@ -30,7 +30,7 @@ export function describir(r) {
 
 // Mensaje para cada rechazo del servidor al descargar (la respuesta binaria no trae el texto del error).
 export function mensajeDescarga(error) {
-  if (error.estado === 401) return "Elija su usuario de prueba al pie de la barra lateral.";
+  if (error.estado === 401) return "Su sesión venció. Inicie sesión otra vez.";
   if (error.estado === 403) return "Solo puede consultar sus propias boletas de pago.";
   if (error.estado === 404) return "La boleta ya no está disponible.";
   if (error.estado === 409) return "La boleta no coincide con la planilla cerrada: comuníquese con RRHH.";

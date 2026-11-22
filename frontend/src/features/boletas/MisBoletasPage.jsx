@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { Download, Eye, ReceiptText, UserRound } from "lucide-react";
+import { Download, Eye, LogIn, ReceiptText } from "lucide-react";
 import { descargarBoleta, listarMisBoletas } from "../../api/boletas";
-import { Alerta, Boton, EncabezadoPagina, EstadoVacio, Tabla, Tarjeta, useAvisos } from "../../components/ui";
-import { useRol, useUsuario } from "../../context/sesion";
+import { Alerta, Boton, EncabezadoPagina, EstadoVacio, Esqueleto, Tabla, Tarjeta, useAvisos } from "../../components/ui";
+import { abrirInicioSesion, fijarSesion, useSesion } from "../../context/sesion";
 import { guardarComo } from "../Kardex/utils/descarga";
 import VistaPreviaBoleta from "./VistaPreviaBoleta";
 import { bs, fechaHora, mayuscula, mensajeDescarga, nombreMes } from "./formato";
@@ -54,9 +54,15 @@ function columnas({ abrir, descargar, descargando }) {
   ];
 }
 
-function ListaBoletas({ idEmpleado, rol }) {
+// 401: la sesión venció o se cerró en otra pestaña; la página vuelve a pedir inicio de sesión.
+const sinSesion = (error) => {
+  if (error?.estado !== 401) return false;
+  fijarSesion(null);
+  return true;
+};
+
+function ListaBoletas() {
   const avisar = useAvisos();
-  const identidad = useMemo(() => ({ idEmpleado, rol }), [idEmpleado, rol]);
   const [boletas, setBoletas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -65,14 +71,14 @@ function ListaBoletas({ idEmpleado, rol }) {
 
   const pedir = useCallback(
     () =>
-      listarMisBoletas(identidad)
+      listarMisBoletas()
         .then((lista) => {
           setBoletas(lista);
           setError(null);
         })
-        .catch(setError)
+        .catch((e) => sinSesion(e) || setError(e))
         .finally(() => setCargando(false)),
-    [identidad]
+    []
   );
 
   useEffect(() => {
@@ -87,10 +93,11 @@ function ListaBoletas({ idEmpleado, rol }) {
   const descargar = async (boleta) => {
     setDescargando(boleta.id_boleta);
     try {
-      guardarComo(await descargarBoleta(boleta.id_boleta, identidad), `boleta-de-pago_${boleta.periodo}.pdf`);
+      guardarComo(await descargarBoleta(boleta.id_boleta), `boleta-de-pago_${boleta.periodo}.pdf`);
       avisar({ tono: "exito", titulo: "Boleta descargada", mensaje: `Boleta de pago de ${nombreMes(boleta.periodo)}.` });
     } catch (e) {
       avisar({ tono: "peligro", titulo: "No se pudo descargar la boleta", mensaje: mensajeDescarga(e) });
+      sinSesion(e);
     } finally {
       setDescargando(null);
     }
@@ -133,7 +140,6 @@ function ListaBoletas({ idEmpleado, rol }) {
       )}
       <VistaPreviaBoleta
         boleta={abierta}
-        identidad={identidad}
         descargando={Boolean(abierta) && descargando === abierta.id_boleta}
         onDescargar={descargar}
         onCerrar={() => setAbierta(null)}
@@ -142,23 +148,27 @@ function ListaBoletas({ idEmpleado, rol }) {
   );
 }
 
-// RF-46: el colaborador consulta y descarga sus boletas de pago de las planillas cerradas.
+// RF-46: el colaborador consulta y descarga sus boletas de pago de las planillas cerradas. Exige sesión real.
 export default function MisBoletasPage() {
-  const idEmpleado = useUsuario();
-  const rol = useRol();
+  const sesion = useSesion();
 
   return (
     <section className="boletas" aria-labelledby="mis-boletas-titulo">
       <EncabezadoPagina migas={MIGAS} enlace={Link} titulo="Mis boletas de pago" idTitulo="mis-boletas-titulo" descripcion={DESCRIPCION} />
-      {idEmpleado ? (
-        <ListaBoletas key={idEmpleado} idEmpleado={idEmpleado} rol={rol} />
-      ) : (
+      {sesion === undefined && <Esqueleto forma="bloque" alto="calc(var(--size-row) * 4)" />}
+      {sesion === null && (
         <EstadoVacio
-          icono={UserRound}
-          titulo="Elija su usuario de prueba"
-          mensaje="Seleccione quién es en «Usuario de prueba», al pie de la barra lateral, para ver sus boletas."
+          icono={LogIn}
+          titulo="Inicie sesión para ver sus boletas"
+          mensaje="Sus boletas de pago solo se muestran con su propia cuenta, no con el usuario de prueba."
+          accion={
+            <Boton variante="primario" icono={LogIn} onClick={() => abrirInicioSesion()}>
+              Iniciar sesión
+            </Boton>
+          }
         />
       )}
+      {sesion && <ListaBoletas key={sesion.id_empleado} />}
     </section>
   );
 }
