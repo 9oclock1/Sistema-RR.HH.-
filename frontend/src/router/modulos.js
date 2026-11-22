@@ -6,6 +6,8 @@ import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacione
 import CiclosEvaluacionPage from "../features/ciclos-evaluacion/CiclosEvaluacionPage";
 import { RUTA_CICLOS } from "../features/ciclos-evaluacion/ciclo";
 import DashboardDesempenoPage from "../features/dashboard-desempeno/DashboardDesempenoPage";
+import DashboardQuejasPage from "../features/dashboard-quejas/DashboardQuejasPage";
+import { RUTA_DASHBOARD_QUEJAS } from "../features/dashboard-quejas/dashboardQuejas";
 import { RUTA_DASHBOARD_DESEMPENO } from "../features/dashboard-desempeno/dashboardDesempeno";
 import DesempenoGlobalPage from "../features/desempeno-global/DesempenoGlobalPage";
 import { RUTA_DESEMPENO_GLOBAL } from "../features/desempeno-global/desempenoGlobal";
@@ -496,6 +498,14 @@ export const SECCIONES = [
         icono: Gauge,
         roles: ["gerente"],
         pagina: DashboardDesempenoPage,
+      },
+      {
+        ruta: RUTA_DASHBOARD_QUEJAS,
+        etiqueta: "Dashboard de quejas",
+        descripcion: "Tasa de resolución y tiempo promedio de atención de las quejas internas, con tendencia mensual, incidencia por categoría, área y sucursal, y exportación a PDF.",
+        icono: MessageSquareWarning,
+        roles: ["admin"],
+        pagina: DashboardQuejasPage,
       },
     ],
   },
