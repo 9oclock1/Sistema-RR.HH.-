@@ -427,6 +427,7 @@ describe("permisos del módulo de desempeño (RBAC)", () => {
     ["get", "/desempeno/ciclos/:idCiclo/consolidado"],
     ["get", "/desempeno/ciclos/:idCiclo/comparativa"],
     ["get", "/desempeno/ciclos/:idCiclo/colaboradores"],
+    ["get", "/desempeno/dashboard"],
     ["get", "/desempeno/mensajes-crm"],
   ];
   const ACCIONES = [

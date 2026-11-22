@@ -1,10 +1,12 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, UserCheck, UserMinus, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, UserCheck, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
 import CiclosEvaluacionPage from "../features/ciclos-evaluacion/CiclosEvaluacionPage";
 import { RUTA_CICLOS } from "../features/ciclos-evaluacion/ciclo";
+import DashboardDesempenoPage from "../features/dashboard-desempeno/DashboardDesempenoPage";
+import { RUTA_DASHBOARD_DESEMPENO } from "../features/dashboard-desempeno/dashboardDesempeno";
 import DesempenoGlobalPage from "../features/desempeno-global/DesempenoGlobalPage";
 import DesvinculacionesPage from "../features/desvinculaciones/DesvinculacionesPage";
 import { RUTA_DESEMPENO_GLOBAL } from "../features/desempeno-global/desempenoGlobal";
@@ -504,6 +506,19 @@ export const SECCIONES = [
         icono: History,
         roles: ["admin", "auditor"],
         pagina: HistorialQuejasPage,
+      },
+    ],
+  },
+  {
+    titulo: "Dashboards",
+    modulos: [
+      {
+        ruta: RUTA_DASHBOARD_DESEMPENO,
+        etiqueta: "Dashboard de desempeño",
+        descripcion: "Indicadores de puntaje promedio, cumplimiento de evaluaciones y alto desempeño por ciclo, con histograma, ranking de áreas y comparativo entre ciclos.",
+        icono: Gauge,
+        roles: ["gerente"],
+        pagina: DashboardDesempenoPage,
       },
     ],
   },

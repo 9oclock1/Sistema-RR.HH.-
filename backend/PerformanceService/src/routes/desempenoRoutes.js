@@ -33,6 +33,7 @@ router.get(
   consultaRrhh,
   controlador.obtenerColaboradores,
 );
+router.get("/desempeno/dashboard", consultaRrhh, controlador.obtenerDashboard);
 router.put(
   "/desempeno/ciclos/:idCiclo/umbral",
   soloAdministrador,

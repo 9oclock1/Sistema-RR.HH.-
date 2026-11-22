@@ -17,6 +17,10 @@ async function obtenerColaboradores(req, res) {
   res.json(await servicio.obtenerColaboradores(req.params.idCiclo, req.query));
 }
 
+async function obtenerDashboard(req, res) {
+  res.json(await servicio.obtenerDashboard(req.query));
+}
+
 async function actualizarUmbral(req, res) {
   res.json(await servicio.actualizarUmbral(req.params.idCiclo, req.body));
 }
@@ -43,6 +47,7 @@ module.exports = {
   obtenerConsolidado,
   obtenerComparativa,
   obtenerColaboradores,
+  obtenerDashboard,
   actualizarUmbral,
   reintentarSolicitudCrm,
   listarMensajesCrm,
