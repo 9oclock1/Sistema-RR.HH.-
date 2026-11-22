@@ -16,19 +16,19 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio }) => [
   {
     clave: "causal",
     titulo: "Causal",
-    ancho: "22%",
+    ancho: "16%",
     celda: (p) => p.causal?.nombre ?? "—",
   },
   {
     clave: "fecha_retiro",
     titulo: "Fecha de retiro",
-    ancho: "13%",
+    ancho: "10%",
     celda: (p) => formatearFecha(p.fecha_retiro),
   },
   {
     clave: "desahucio",
     titulo: "Desahucio",
-    ancho: "20%",
+    ancho: "17%",
     celda: (p) => (
       <Etiqueta tono={p.corresponde_desahucio ? "aviso" : "neutral"}>
         {p.corresponde_desahucio ? "Corresponde desahucio" : "No corresponde desahucio"}
@@ -38,7 +38,7 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio }) => [
   {
     clave: "promedio_indemnizable",
     titulo: "Sueldo promedio",
-    ancho: "14%",
+    ancho: "11%",
     celda: (p) =>
       p.promedio_indemnizable ? (
         <div className="desv-nombre">
@@ -55,7 +55,7 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio }) => [
   {
     clave: "estado",
     titulo: "Estado",
-    ancho: "12%",
+    ancho: "9%",
     celda: (p) => {
       const cfg = ESTADOS[p.estado] ?? { etiqueta: p.estado, tono: "neutral" };
       return <Etiqueta tono={cfg.tono}>{cfg.etiqueta}</Etiqueta>;
@@ -64,7 +64,7 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio }) => [
   {
     clave: "creado_en",
     titulo: "Registrado",
-    ancho: "12%",
+    ancho: "9%",
     celda: (p) => formatearFechaHora(p.creado_en),
   },
   {

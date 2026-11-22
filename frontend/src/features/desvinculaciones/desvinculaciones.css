@@ -29,7 +29,7 @@
 }
 
 .desv-tabla .ds-tabla {
-  min-width: calc(var(--size-sidebar) * 3.5);
+  min-width: calc(var(--size-sidebar) * 4.5);
 }
 
 .desv-nombre {

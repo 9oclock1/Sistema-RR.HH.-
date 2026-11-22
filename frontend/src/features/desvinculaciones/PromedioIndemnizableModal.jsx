@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Calculator } from "lucide-react";
 import { calcularPromedioIndemnizable, obtenerPromedioIndemnizable } from "../../api/desvinculaciones";
-import { Alerta, Boton, Esqueleto, EstadoVacio, Modal, Tabla, useAvisos } from "../../components/ui";
+import { Alerta, Boton, Esqueleto, EstadoVacio, Modal, Tabla } from "../../components/ui";
 import { formatearBs, formatearFecha, formatearFechaHora, formatearPeriodo } from "./formato";
 
 const ESTADOS_ABIERTOS = new Set(["INICIADO", "EN_CURSO"]);
@@ -46,13 +46,14 @@ const COLUMNAS_DESGLOSE = [
 ];
 
 export default function PromedioIndemnizableModal({ proceso, identidad, onCerrar, onCalculado }) {
-  const avisar = useAvisos();
   const [cargando, setCargando] = useState(true);
   const [calculando, setCalculando] = useState(false);
   const [desglose, setDesglose] = useState(null);
   const [sinCalculo, setSinCalculo] = useState(false);
   const [errorCarga, setErrorCarga] = useState(null);
   const [errorCalculo, setErrorCalculo] = useState(null);
+  // El modal se abre en la capa superior y taparía un aviso flotante: la confirmación se muestra dentro del modal.
+  const [exitoCalculo, setExitoCalculo] = useState(null);
 
   const esAbierto = ESTADOS_ABIERTOS.has(proceso.estado);
 
@@ -91,17 +92,16 @@ export default function PromedioIndemnizableModal({ proceso, identidad, onCerrar
   const calcular = async () => {
     setCalculando(true);
     setErrorCalculo(null);
+    setExitoCalculo(null);
     try {
       const nuevo = await calcularPromedioIndemnizable(proceso.id_proceso, identidad);
       setDesglose(nuevo);
       setSinCalculo(false);
-      avisar({
-        tono: "exito",
-        titulo: "Sueldo promedio calculado",
-        mensaje: `${formatearBs(nuevo.promedio)} sobre ${nuevo.meses_considerados} ${
+      setExitoCalculo(
+        `${formatearBs(nuevo.promedio)} sobre ${nuevo.meses_considerados} ${
           nuevo.meses_considerados === 1 ? "mes" : "meses"
-        }.`,
-      });
+        }.`
+      );
       await onCalculado?.();
     } catch (error) {
       setErrorCalculo(error.message);
@@ -140,9 +140,9 @@ export default function PromedioIndemnizableModal({ proceso, identidad, onCerrar
 
         {cargando && (
           <div className="desv-esqueletos" aria-busy="true">
-            <Esqueleto forma="bloque" ancho="100%" alto="72px" />
+            <Esqueleto forma="bloque" ancho="100%" alto="calc(var(--size-row) * 2)" />
             <Esqueleto forma="texto" ancho="70%" />
-            <Esqueleto forma="bloque" ancho="100%" alto="140px" />
+            <Esqueleto forma="bloque" ancho="100%" alto="calc(var(--size-row) * 3.5)" />
           </div>
         )}
 
@@ -164,6 +164,12 @@ export default function PromedioIndemnizableModal({ proceso, identidad, onCerrar
         {!cargando && !errorCarga && errorCalculo && (
           <Alerta tono="peligro" role="alert" titulo="No se pudo calcular el sueldo promedio">
             {errorCalculo}
+          </Alerta>
+        )}
+
+        {!cargando && !errorCarga && exitoCalculo && (
+          <Alerta tono="exito" role="status" titulo="Sueldo promedio calculado">
+            {exitoCalculo}
           </Alerta>
         )}
 
