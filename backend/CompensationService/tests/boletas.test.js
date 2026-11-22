@@ -214,3 +214,13 @@ test("el PDF de una boleta con muchos conceptos continúa en otra página", asyn
   const paginas = pdf.toString("latin1").match(/\/Type \/Page\b/g).length;
   assert.ok(paginas >= 2);
 });
+
+test("una boleta de hasta 6 haberes, 5 descuentos y 4 aportes entra en una sola página con las firmas", async () => {
+  for (const [haberes, descuentos] of [[2, 4], [4, 4], [6, 5]]) {
+    const tipos = [...Array(haberes).fill("INGRESO"), ...Array(descuentos).fill("DESCUENTO"), ...Array(4).fill("APORTE")];
+    const renglones = tipos.map((tipo, i) => renglon(i + 1, tipo, `C-${i}`, 10, { detalle: "29 de 30 días" }));
+    const contenido = armarContenido(filaAna({ renglones }));
+    const { contenido: pdf } = await aPdf({ ...contenido, codigo_verificacion: calcularHash(contenido), emitida_en: new Date(), cerrada_en: new Date() });
+    assert.equal(pdf.toString("latin1").match(/\/Type \/Page\b/g).length, 1, `${haberes} haberes`);
+  }
+});
