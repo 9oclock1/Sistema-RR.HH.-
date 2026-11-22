@@ -94,3 +94,43 @@ INSERT INTO ASIGNACIONES_EMPLEADO (id_asignacion, id_empleado, id_cargo, id_sucu
   ('f0000000-0000-4000-8000-000000000753', 'f0000000-0000-4000-8000-000000000743', 'f0000000-0000-4000-8000-000000000105', 'f0000000-0000-4000-8000-000000000012', '2021-08-01')
 ON CONFLICT DO NOTHING;
 COMMIT;
+
+-- Convocatorias internas de ascenso de ejemplo (KAN-80, RF-60). Las fechas se calculan respecto del día en que se carga este archivo.
+--   801 vigente, publicada hace 5 días: Supervisor de Cajas (24 meses de antigüedad, nota 75), cierra en 25 días.
+--   802 vigente que cierra en 2 días: Jefe de Atención al Cliente (36 meses, nota 80).
+--   803 programada, empieza en 7 días: Analista de RR. HH. (12 meses, nota 70). Su notificación quedó FALLIDA para probar el reintento.
+--   804 cerrada hace 10 días (la cerró el job): Asesor de Atención (6 meses, nota 60).
+--   805 con la fecha de cierre vencida ayer pero aún marcada como abierta: el job diario la cierra y mientras tanto se informa como cerrada.
+--   806 vigente, la más exigente: Jefe de RR. HH. (60 meses, nota 85), publicada hoy.
+BEGIN;
+INSERT INTO CONVOCATORIAS_ASCENSO (
+  id_convocatoria, id_cargo, id_sucursal, id_empleado_publicador, titulo, descripcion_requisitos, meses_antiguedad_minima,
+  nota_minima_desempeno, fecha_inicio_postulacion, fecha_cierre_postulacion, esta_abierta, publicada_en, cerrada_en,
+  estado_notificacion, destinatarios_notificados, notificada_en, ultimo_error_notificacion
+) VALUES
+  ('f0000000-0000-4000-8000-000000000801', 'f0000000-0000-4000-8000-000000000104', 'f0000000-0000-4000-8000-000000000011', 'f0000000-0000-4000-8000-000000000023', 'Supervisor de Cajas - Sopocachi',
+   'Dos años como cajero, curso de liderazgo y manejo de arqueos de caja, sin llamadas de atención vigentes.', 24, 75.00,
+   CURRENT_DATE - 5, CURRENT_DATE + 25, TRUE, (CURRENT_DATE - 6)::timestamptz + interval '9 hours', NULL,
+   'ENTREGADA', 12, (CURRENT_DATE - 6)::timestamptz + interval '9 hours 1 minute', NULL),
+  ('f0000000-0000-4000-8000-000000000802', 'f0000000-0000-4000-8000-000000000103', 'f0000000-0000-4000-8000-000000000012', 'f0000000-0000-4000-8000-000000000023', 'Jefe de Atención al Cliente - Miraflores',
+   'Tres años como supervisor o asesor, experiencia dirigiendo equipos y resolviendo reclamos de clientes.', 36, 80.00,
+   CURRENT_DATE - 2, CURRENT_DATE + 2, TRUE, (CURRENT_DATE - 3)::timestamptz + interval '10 hours', NULL,
+   'ENTREGADA', 12, (CURRENT_DATE - 3)::timestamptz + interval '10 hours 1 minute', NULL),
+  ('f0000000-0000-4000-8000-000000000803', 'f0000000-0000-4000-8000-000000000102', 'f0000000-0000-4000-8000-000000000011', 'f0000000-0000-4000-8000-000000000023', 'Analista de Recursos Humanos - Sopocachi',
+   'Un año en el área de atención o administración, manejo de planillas y conocimiento de la normativa laboral.', 12, 70.00,
+   CURRENT_DATE + 7, CURRENT_DATE + 30, TRUE, CURRENT_DATE::timestamptz + interval '8 hours', NULL,
+   'FALLIDA', NULL, NULL, 'No se pudo contactar a NotificationService: fetch failed'),
+  ('f0000000-0000-4000-8000-000000000804', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', NULL, 'Asesor de Atención - Miraflores',
+   'Seis meses de antigüedad y buen trato con el cliente.', 6, 60.00,
+   CURRENT_DATE - 40, CURRENT_DATE - 10, FALSE, (CURRENT_DATE - 41)::timestamptz + interval '9 hours', (CURRENT_DATE - 9)::timestamptz + interval '0 hours 5 minutes',
+   'ENTREGADA', 12, (CURRENT_DATE - 41)::timestamptz + interval '9 hours 1 minute', NULL),
+  ('f0000000-0000-4000-8000-000000000805', 'f0000000-0000-4000-8000-000000000105', 'f0000000-0000-4000-8000-000000000011', 'f0000000-0000-4000-8000-000000000023', 'Cajero principal - Sopocachi',
+   'Un año como cajero y conocimiento del cierre diario de caja.', 12, 65.00,
+   CURRENT_DATE - 20, CURRENT_DATE - 1, TRUE, (CURRENT_DATE - 21)::timestamptz + interval '9 hours', NULL,
+   'ENTREGADA', 12, (CURRENT_DATE - 21)::timestamptz + interval '9 hours 1 minute', NULL),
+  ('f0000000-0000-4000-8000-000000000806', 'f0000000-0000-4000-8000-000000000101', 'f0000000-0000-4000-8000-000000000011', 'f0000000-0000-4000-8000-000000000023', 'Jefe de Recursos Humanos - Sopocachi',
+   'Cinco años en el área, experiencia en procesos de selección y liquidaciones, y título en administración o afín.', 60, 85.00,
+   CURRENT_DATE, CURRENT_DATE + 14, TRUE, now(), NULL,
+   'ENTREGADA', 12, now(), NULL)
+ON CONFLICT DO NOTHING;
+COMMIT;
