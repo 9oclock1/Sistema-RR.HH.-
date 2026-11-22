@@ -56,11 +56,9 @@ function armarContenido(fila) {
 
 const calcularHash = (contenido) => createHash("sha256").update(JSON.stringify(contenido)).digest("hex");
 
-// Quién consulta (temporal: cabeceras X-Empleado-Id y X-Rol hasta contar con autenticación).
+// Quién consulta: el colaborador y el rol del JWT de su sesión.
 function validarIdentidad({ idEmpleado, rol } = {}) {
-  if (!idEmpleado) {
-    throw new ErrorApp(401, "Identifíquese: elija su usuario de prueba al pie de la barra lateral.");
-  }
+  if (!idEmpleado) throw new ErrorApp(401, "Inicie sesión para continuar.");
   if (!UUID_RE.test(idEmpleado)) throw new ErrorApp(401, "El usuario indicado no es válido.");
   return { idEmpleado: idEmpleado.toLowerCase(), rol: (rol ?? "").trim().toLowerCase() };
 }

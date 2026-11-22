@@ -1,21 +1,17 @@
 const servicio = require("../services/boletas.service");
 
-// Temporal: el portal envía quién consulta (X-Empleado-Id) y su rol (X-Rol) hasta contar con autenticación.
-const identidad = (req) => ({
-  idEmpleado: req.get("X-Empleado-Id")?.trim() || null,
-  rol: req.get("X-Rol")?.trim() || null,
-});
+// req.identidad viene del JWT verificado por el middleware autenticar, no de cabeceras que envía el cliente.
 
 async function listar(req, res) {
-  res.json(await servicio.listar(identidad(req)));
+  res.json(await servicio.listar(req.identidad));
 }
 
 async function obtener(req, res) {
-  res.json(await servicio.obtener(req.params.id, identidad(req)));
+  res.json(await servicio.obtener(req.params.id, req.identidad));
 }
 
 async function descargarPdf(req, res) {
-  const { nombre, contenido } = await servicio.descargarPdf(req.params.id, identidad(req));
+  const { nombre, contenido } = await servicio.descargarPdf(req.params.id, req.identidad);
   res.set({
     "Content-Type": "application/pdf",
     "Content-Disposition": `attachment; filename="${nombre}"`,

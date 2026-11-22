@@ -40,7 +40,7 @@ La base no usa triggers, procedimientos almacenados ni vistas (decisión del equ
 - `hash_contenido` es el SHA-256 del contenido de la boleta al emitirla. Servicio: se vuelve a calcular en cada consulta y descarga; si no coincide, la boleta no se entrega (409).
 - `descargas` y `ultima_descarga_en` registran las descargas del PDF.
 - Servicio: la boleta se emite la primera vez que el colaborador consulta sus boletas (`GET /boletas`), para cada planilla cerrada que aún no la tenga; así también quedan cubiertas las planillas cerradas antes de esta historia. `GET /boletas/:id` devuelve el detalle y `GET /boletas/:id/pdf` el PDF.
-- Acceso (temporal, cabeceras `X-Empleado-Id` y `X-Rol` hasta contar con autenticación): sin colaborador, 401; cada colaborador ve solo sus boletas y la de otro responde 403; el rol `admin` (RRHH) puede ver cualquiera.
+- Acceso (JWT/RBAC): la identidad sale del JWT que firma AuthService al iniciar sesión (cookie `rrhh_sesion` o `Authorization: Bearer`), verificado con `JWT_SECRET` (el mismo de AuthService). Las cabeceras `X-Empleado-Id` y `X-Rol` se ignoran en estas rutas. Sin token, o con un token alterado o vencido, 401; cada colaborador ve solo sus boletas y la de otro responde 403; el rol `admin` (RRHH) del token puede ver cualquiera.
 
 ## Integración con Contabilidad (D) y Pagos (A)
 
