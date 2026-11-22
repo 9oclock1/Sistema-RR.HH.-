@@ -1,11 +1,3 @@
-/**
- * Levanta las rutas de desempeño en este mismo proceso contra la PerformanceDB de DATABASE_URL y valida con SQL real
- * el dashboard de KAN-94: KPI-07 y KPI-08 con su semáforo, el histograma, los rankings de áreas y sucursales, el
- * comparativo entre ciclos, los filtros y los permisos. Crea sus propios datos en 2032 («c9400000-…») y al terminar
- * borra solo esos. Requiere db/init.sql y db/catalogos.sql; sin base, se omite.
- * Con el sistema en Docker:
- *   docker compose exec performance-service npm run test:kan94:integracion
- */
 const { describe, it, before, after } = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
