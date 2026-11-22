@@ -387,6 +387,11 @@ CREATE TABLE AGUINALDO_EMPLEADOS (
     id_empleado UUID NOT NULL,
     nombre_empleado varchar(150) NOT NULL,
     numero_documento varchar(20) NULL,
+    -- Copia de EmployeeService al generar (igual que PLANILLA_EMPLEADOS): centro de costo para el reporte
+    -- contable consolidado (RF-49, KAN-69).
+    cargo varchar(100) NULL,
+    area varchar(100) NULL,
+    sucursal varchar(100) NULL,
     fecha_ingreso date NOT NULL,
     meses_trabajados smallint NOT NULL,
     dias_trabajados smallint NOT NULL,

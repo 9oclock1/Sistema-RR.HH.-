@@ -200,6 +200,34 @@ async function conceptosDeIntegracion(cliente, id) {
   return rows;
 }
 
+// Igual que conceptosDeIntegracion, pero separado por sucursal (centro de costo), para el reporte contable
+// consolidado (RF-49, KAN-69): no se usa para el asiento en sí (ese sigue siendo un solo total por cuenta).
+async function conceptosPorCentroDeCosto(cliente, id) {
+  const { rows } = await cliente.query(
+    `SELECT pe.sucursal, k.tipo, k.codigo, c.cuenta_contable_codigo AS cuenta_codigo, c.cuenta_contable_nombre AS cuenta_nombre,
+            SUM(k.resultado) AS monto
+     FROM calculos_planilla k
+     JOIN planilla_empleados pe USING (id_planilla_empleado)
+     LEFT JOIN vigencias_concepto v ON v.id_vigencia = k.id_vigencia
+     LEFT JOIN conceptos_planilla c ON c.id_concepto = v.id_concepto OR (k.id_vigencia IS NULL AND c.codigo = k.codigo)
+     WHERE pe.id_planilla = $1
+     GROUP BY pe.sucursal, k.tipo, k.codigo, c.cuenta_contable_codigo, c.cuenta_contable_nombre
+     ORDER BY pe.sucursal, k.tipo, k.codigo`,
+    [id]
+  );
+  return rows;
+}
+
+// Líquido pagable y aportes patronales (pasivos del asiento) por sucursal.
+async function pasivosPorCentroDeCosto(cliente, id) {
+  const { rows } = await cliente.query(
+    `SELECT sucursal, SUM(liquido_pagable) AS liquido_pagable, SUM(total_aportes) AS total_aportes, COUNT(*)::int AS colaboradores
+     FROM planilla_empleados WHERE id_planilla = $1 GROUP BY sucursal ORDER BY sucursal`,
+    [id]
+  );
+  return rows;
+}
+
 async function empleadosDeIntegracion(cliente, id) {
   const { rows } = await cliente.query(
     `SELECT id_empleado, nombre_empleado, numero_documento, total_ganado, total_descuentos, liquido_pagable, total_aportes
@@ -262,6 +290,8 @@ module.exports = {
   contarEmpleados,
   contarConAlertas,
   conceptosDeIntegracion,
+  conceptosPorCentroDeCosto,
+  pasivosPorCentroDeCosto,
   empleadosDeIntegracion,
   responder,
   cerrarSiConfirmada,

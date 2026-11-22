@@ -10,6 +10,7 @@ const aguinaldoRoutes = require("./src/routes/aguinaldo.routes");
 const confirmacionesRoutes = require("./src/routes/confirmaciones.routes");
 const bonificacionesRoutes = require("./src/routes/bonificaciones.routes");
 const mensajesPublicadosRoutes = require("./src/routes/mensajesPublicados.routes");
+const reporteContableRoutes = require("./src/routes/reporteContable.routes");
 const { iniciarDespachador } = require("./src/services/eventos.service");
 const { iniciarConsumidor } = require("./src/services/confirmaciones.service");
 const ventasProductividadRoutes = require("./src/routes/ventasProductividad.routes");
@@ -54,6 +55,7 @@ app.use(aguinaldoRoutes);
 app.use(confirmacionesRoutes);
 app.use(bonificacionesRoutes);
 app.use(mensajesPublicadosRoutes);
+app.use(reporteContableRoutes);
 app.use(ventasProductividadRoutes);
 app.use(manejadorErrores);
 

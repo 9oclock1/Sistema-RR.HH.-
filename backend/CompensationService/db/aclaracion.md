@@ -214,3 +214,12 @@ El Administrador la envía desde Bonos por productividad (`POST /bonos-productiv
 ```
 
 - `colaboradores`: el personal activo de EmployeeService, para que Ventas relacione a sus vendedores y cajeros con el `id_empleado` de RRHH.
+
+## Reporte contable consolidado (RF-49, KAN-69)
+
+`GET /reporte-contable/planilla/:periodo` (AAAA-MM) y `GET /reporte-contable/aguinaldo/:gestion` (año de cierre) devuelven, para UNA planilla ya no-borrador, los mismos gastos y pasivos que se le enviaron a Contabilidad, agrupados por cuenta contable **y** por centro de costo (sucursal del colaborador), más el estado de conciliación. Acepta `?formato=csv|pdf` para descargarlo (mismo contenido, usando `pdfkit` igual que `AttendanceService`; "csv" es el "Excel" del criterio 3: texto separado por `;`, con BOM y decimales con coma).
+
+- No reimplementa el cálculo: reutiliza `conceptosDeIntegracion`-style queries (`conceptosPorCentroDeCosto`/`pasivosPorCentroDeCosto` en `planillas.model.js`, `montosPorCentroDeCosto` en `aguinaldo.model.js`) y la misma `cuentaDe()` que arma el asiento real, así que el total del reporte **siempre** cuadra con lo que Contabilidad recibió (criterio 3); lo único nuevo es que separa cada renglón por sucursal en vez de un único total (`utils/integraciones.js#agruparPorCentroDeCosto`, `utils/aguinaldo.js#agruparAguinaldoPorCentroDeCosto`).
+- Centro de costo = la sucursal del colaborador al momento en que se generó la planilla/aguinaldo (copiada en `PLANILLA_EMPLEADOS.sucursal` / `AGUINALDO_EMPLEADOS.sucursal`, esta última agregada para esta tarea siguiendo el mismo patrón). Si un colaborador no tiene sucursal, su monto cae en el centro `(sin sucursal)` en vez de perderse.
+- Conciliación (criterio 2): es el mismo `estado_contabilidad`/`estado_pagos` de siempre, traducido a `registrado` (CONFIRMADA), `pendiente` (PENDIENTE) o `con_error` (RECHAZADA, con el motivo).
+- Se puede generar con la planilla/aguinaldo `APROBADA` (conciliación todavía pendiente) o `CERRADA`; en `BORRADOR` da 409, porque los montos aún pueden cambiar y no hay nada que conciliar.

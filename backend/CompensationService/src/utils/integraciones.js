@@ -147,6 +147,54 @@ function armarAsiento({ planilla, conceptos, empleados, glosa }) {
   };
 }
 
+const SIN_CUENTA = { codigo: "—", nombre: "(sin cuenta contable asignada)" };
+
+// Mismo criterio de armarAsiento (debe = gasto de INGRESO/APORTE, haber = DESCUENTO más los dos pasivos
+// agregados), pero separado por sucursal (centro de costo) en vez de un solo total: el reporte contable
+// consolidado (RF-49, KAN-69, criterio 1). `filasConceptos` viene de conceptosPorCentroDeCosto (o el
+// equivalente de aguinaldos) y `filasPasivos` de pasivosPorCentroDeCosto. Por diseño, cuentaDe() ya no debería
+// devolver null aquí (sinCuenta() lo bloquea al aprobar), pero si pasara no se descarta el monto: se agrupa
+// bajo SIN_CUENTA para que el total siga cuadrando con la planilla cerrada en vez de perderse en silencio.
+function agruparPorCentroDeCosto({ filasConceptos, filasPasivos }) {
+  const centros = new Map();
+  const centroDe = (sucursal) => {
+    const clave = sucursal || "(sin sucursal)";
+    if (!centros.has(clave)) centros.set(clave, { centro_costo: clave, renglones: new Map() });
+    return centros.get(clave);
+  };
+  const sumarA = (centro, cuenta, lado, cents) => {
+    if (cents <= 0) return;
+    const clave = `${lado}|${cuenta.codigo}`;
+    const renglon = centro.renglones.get(clave) ?? { cuenta, lado, cents: 0 };
+    renglon.cents += cents;
+    centro.renglones.set(clave, renglon);
+  };
+
+  for (const f of filasConceptos) {
+    const cents = centavos(f.monto);
+    const cuenta = cuentaDe(f) ?? SIN_CUENTA;
+    const centro = centroDe(f.sucursal);
+    if (f.tipo === "INGRESO" || f.tipo === "APORTE") sumarA(centro, cuenta, "debe", cents);
+    if (f.tipo === "DESCUENTO") sumarA(centro, cuenta, "haber", cents);
+  }
+  for (const p of filasPasivos) {
+    const centro = centroDe(p.sucursal);
+    sumarA(centro, CUENTAS.APORTES_PATRONALES_POR_PAGAR, "haber", centavos(p.total_aportes));
+    sumarA(centro, CUENTAS.SUELDOS_POR_PAGAR, "haber", centavos(p.liquido_pagable));
+  }
+
+  return [...centros.values()]
+    .map((centro) => {
+      const filas = [...centro.renglones.values()];
+      const renglones = filas
+        .sort((a, b) => (a.lado === b.lado ? a.cuenta.codigo.localeCompare(b.cuenta.codigo) : a.lado === "debe" ? -1 : 1))
+        .map((r) => ({ cuenta: r.cuenta, debe: r.lado === "debe" ? bs(r.cents) : 0, haber: r.lado === "haber" ? bs(r.cents) : 0 }));
+      const total = (lado) => bs(filas.filter((r) => r.lado === lado).reduce((t, r) => t + r.cents, 0));
+      return { centro_costo: centro.centro_costo, renglones, total_debe: total("debe"), total_haber: total("haber") };
+    })
+    .sort((a, b) => a.centro_costo.localeCompare(b.centro_costo, "es"));
+}
+
 // Orden de dispersión: el líquido de cada colaborador. Sin cuenta bancaria (no la guarda ningún servicio de RRHH):
 // Pagos identifica al colaborador por id y documento. Quien tiene líquido cero no entra.
 function armarOrdenPago({ planilla, empleados, concepto }) {
@@ -180,6 +228,10 @@ const TIPOS_CONFIRMACION = {
 };
 const CAMPO_ID_RECURSO = { PLANILLA: "id_planilla", AGUINALDO: "id_aguinaldo" };
 const RESULTADOS = ["CONFIRMADA", "RECHAZADA"];
+
+// Estado de conciliación del reporte contable (RF-49, KAN-69, criterio 2): el mismo estado_contabilidad/
+// estado_pagos de siempre, en el vocabulario del Contador.
+const ESTADO_CONCILIACION = { PENDIENTE: "pendiente", CONFIRMADA: "registrado", RECHAZADA: "con_error" };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Una confirmación que se procesa mal se reintenta así: 2 s, 4 s, 8 s… (máx. 1 min); tras 5 intentos queda FALLIDA.
@@ -233,6 +285,7 @@ module.exports = {
   CUENTAS,
   TIPOS_CONFIRMACION,
   RESULTADOS,
+  ESTADO_CONCILIACION,
   MAXIMO_INTENTOS_ENTRADA,
   esperaNuevaEntrega,
   esConfirmacion,
@@ -243,5 +296,7 @@ module.exports = {
   errorDePublicacion,
   sinCuenta,
   armarAsiento,
+  agruparPorCentroDeCosto,
   armarOrdenPago,
+  cuentaDe,
 };

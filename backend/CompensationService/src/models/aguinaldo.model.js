@@ -10,6 +10,9 @@ const COLUMNAS_EMPLEADO = [
   "id_empleado",
   "nombre_empleado",
   "numero_documento",
+  "cargo",
+  "area",
+  "sucursal",
   "fecha_ingreso",
   "meses_trabajados",
   "dias_trabajados",
@@ -66,11 +69,13 @@ async function reemplazar(cliente, id, c) {
   return true;
 }
 
+const marcadores = (cantidad, desde = 1) => Array.from({ length: cantidad }, (_, i) => `$${i + desde}`).join(", ");
+
 async function guardarEmpleados(cliente, idAguinaldo, empleados) {
   for (const e of empleados) {
     await cliente.query(
       `INSERT INTO aguinaldo_empleados (id_aguinaldo, ${COLUMNAS_EMPLEADO.join(", ")})
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+       VALUES ($1, ${marcadores(COLUMNAS_EMPLEADO.length, 2)})`,
       [idAguinaldo, ...COLUMNAS_EMPLEADO.map((c) => e[c])]
     );
   }
@@ -111,6 +116,17 @@ async function empleadosDeIntegracion(cliente, id) {
   const { rows } = await cliente.query(
     `SELECT id_empleado, nombre_empleado, numero_documento, monto
      FROM aguinaldo_empleados WHERE id_aguinaldo = $1 AND NOT excluido ORDER BY nombre_empleado`,
+    [id]
+  );
+  return rows;
+}
+
+// Monto del aguinaldo por sucursal (centro de costo), para el reporte contable consolidado (RF-49, KAN-69).
+async function montosPorCentroDeCosto(cliente, id) {
+  const { rows } = await cliente.query(
+    `SELECT sucursal, SUM(monto) AS monto, COUNT(*)::int AS colaboradores
+     FROM aguinaldo_empleados WHERE id_aguinaldo = $1 AND NOT excluido
+     GROUP BY sucursal ORDER BY sucursal`,
     [id]
   );
   return rows;
@@ -162,6 +178,7 @@ module.exports = {
   aprobar,
   contarEmpleados,
   empleadosDeIntegracion,
+  montosPorCentroDeCosto,
   responder,
   cerrarSiConfirmada,
   reabrirIntegracion,

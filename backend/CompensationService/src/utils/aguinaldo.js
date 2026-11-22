@@ -190,6 +190,27 @@ function validarSimulacionConfirmacion(datos = {}) {
   return { resultado: datos.resultado, referencia: referencia || null, motivo: datos.resultado === "RECHAZADA" ? motivo : null };
 }
 
+// Reporte contable consolidado por centro de costo (RF-49, KAN-69, criterio 1): el aguinaldo no tiene
+// descuentos ni aportes (es un monto neto), así que el asiento por sucursal es siempre el mismo par de
+// renglones que armarAsientoAguinaldo, solo que uno por sucursal en vez de un único total.
+// `filasPorCentro` viene de montosPorCentroDeCosto: [{ sucursal, monto, colaboradores }].
+function agruparAguinaldoPorCentroDeCosto(filasPorCentro) {
+  return filasPorCentro
+    .map((f) => {
+      const cents = centavos(f.monto);
+      return {
+        centro_costo: f.sucursal || "(sin sucursal)",
+        renglones: [
+          { cuenta: CUENTA_AGUINALDO, debe: bs(cents), haber: 0 },
+          { cuenta: CUENTAS.SUELDOS_POR_PAGAR, debe: 0, haber: bs(cents) },
+        ],
+        total_debe: bs(cents),
+        total_haber: bs(cents),
+      };
+    })
+    .sort((a, b) => a.centro_costo.localeCompare(b.centro_costo, "es"));
+}
+
 function armarConfirmacionSimulada({ idMensaje, idAguinaldo, idMensajeOrigen, destino, resultado, referencia, motivo }) {
   const { grupo, modulo } = DESTINOS_AGUINALDO[destino];
   return {
@@ -221,6 +242,8 @@ module.exports = {
   armarMensajeAguinaldo,
   armarAsientoAguinaldo,
   armarOrdenPagoAguinaldo,
+  agruparAguinaldoPorCentroDeCosto,
+  CUENTA_AGUINALDO,
   validarSimulacionConfirmacion,
   armarConfirmacionSimulada,
 };
