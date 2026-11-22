@@ -46,7 +46,7 @@ export default function HistogramaCalificaciones({ histograma, meta }) {
         ))}
       </ol>
       <p className="dd-sutil">
-        {pluralEvaluaciones(histograma.total)} enviadas, agrupadas en rangos de medio punto sobre la escala de 1 a 5.
+        {pluralEvaluaciones(histograma.total)} {histograma.total === 1 ? "enviada" : "enviadas"}, agrupadas en rangos de medio punto sobre la escala de 1 a 5.
       </p>
     </figure>
   );

@@ -148,7 +148,7 @@ describe("Dashboard de desempeño", () => {
       expect(kpis.getByText("Cerca de la meta")).toBeTruthy();
       expect(kpis.getByText("Meta: ≥ 3,50")).toBeTruthy();
       expect(kpis.getByText("Meta: ≥ 90,00 %")).toBeTruthy();
-      expect(kpis.getByText("8 de 9 enviadas · 1 vencidas")).toBeTruthy();
+      expect(kpis.getByText("8 de 9 enviadas · 1 vencida")).toBeTruthy();
     });
 
     it("un KPI que no cumple la meta se marca como «No cumple la meta»", async () => {
