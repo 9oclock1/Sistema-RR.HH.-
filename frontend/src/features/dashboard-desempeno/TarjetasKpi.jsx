@@ -1,5 +1,5 @@
 import { Etiqueta } from "../../components/ui";
-import { estadoSemaforo, formatearDecimal, formatearPorcentaje, porcentajeEnEscala } from "./dashboardDesempeno";
+import { estadoSemaforo, formatearDecimal, formatearPorcentaje, pluralEvaluaciones, porcentajeEnEscala } from "./dashboardDesempeno";
 
 function Medidor({ valor, minimo, maximo, meta, descripcion, variante }) {
   return (
@@ -49,8 +49,8 @@ function TarjetaKpi({ kpi, valor, unidad, meta, medidor, detalle }) {
 }
 
 export default function TarjetasKpi({ puntaje, cumplimiento }) {
-  const detallePuntaje = `${puntaje.evaluaciones_cerradas} evaluaciones cerradas · ${formatearDecimal(puntaje.puntaje_sobre_100)} sobre 100`;
-  const detalleCumplimiento = `${cumplimiento.evaluaciones_enviadas} de ${cumplimiento.evaluaciones_asignadas} enviadas · ${cumplimiento.evaluaciones_vencidas} vencidas`;
+  const detallePuntaje = `${pluralEvaluaciones(puntaje.evaluaciones_cerradas)} ${puntaje.evaluaciones_cerradas === 1 ? "cerrada" : "cerradas"} · ${formatearDecimal(puntaje.puntaje_sobre_100)} sobre 100`;
+  const detalleCumplimiento = `${cumplimiento.evaluaciones_enviadas} de ${cumplimiento.evaluaciones_asignadas} enviadas · ${cumplimiento.evaluaciones_vencidas} ${cumplimiento.evaluaciones_vencidas === 1 ? "vencida" : "vencidas"}`;
 
   return (
     <ul className="dd-kpis" aria-label="Indicadores del ciclo">
