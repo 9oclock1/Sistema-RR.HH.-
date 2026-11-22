@@ -10,8 +10,12 @@ const MEMBRETE = {
 // Mismos tonos que DESIGN.md.
 const COLOR = { primario: "#1868DB", texto: "#292A2E", secundario: "#505258", borde: "#DDDEE1", fondo: "#F8F8F8", resalte: "#E9F2FE" };
 const FUENTE = { normal: "Helvetica", negrita: "Helvetica-Bold", mono: "Courier" };
-const MARGEN = 48;
+const MARGEN = 36;
 const ALTO_PIE = 28;
+const ALTO_TITULO = 16;
+const ALTO_RENGLON = 24;
+const ALTO_TOTAL = 20;
+const ALTO_FIRMAS = 52;
 
 const numero = (valor, digitos = 2) =>
   Number(valor).toLocaleString("es-BO", { minimumFractionDigits: digitos, maximumFractionDigits: digitos });
@@ -42,12 +46,16 @@ function describir(r) {
 
 const anchoUtil = (doc) => doc.page.width - MARGEN * 2;
 
+const limite = (doc) => doc.page.height - MARGEN - ALTO_PIE - 8;
+
 // Abre una página nueva si lo que sigue no entra antes del pie. Devuelve la posición donde dibujar.
 function espacio(doc, y, alto) {
-  if (y + alto <= doc.page.height - MARGEN - ALTO_PIE - 8) return y;
+  if (y + alto <= limite(doc)) return y;
   doc.addPage();
   return MARGEN;
 }
+
+const altoGrupo = (renglones) => 4 + ALTO_TITULO + (renglones.length ? renglones.length * ALTO_RENGLON : 22) + ALTO_TOTAL;
 
 function dibujarEncabezado(doc, boleta) {
   const y = MARGEN;
@@ -57,7 +65,7 @@ function dibujarEncabezado(doc, boleta) {
   doc.font(FUENTE.normal).fontSize(9).fillColor(COLOR.secundario)
     .text(`Sueldos y salarios de ${nombreMes(boleta.periodo)}`, MARGEN, y + 20, { width: anchoUtil(doc), align: "right" });
   doc.moveTo(MARGEN, y + 40).lineTo(doc.page.width - MARGEN, y + 40).lineWidth(1).strokeColor(COLOR.primario).stroke();
-  doc.y = y + 52;
+  doc.y = y + 48;
 }
 
 // Datos del colaborador en dos columnas de etiqueta y valor.
@@ -77,12 +85,12 @@ function dibujarDatos(doc, boleta) {
   const inicio = doc.y;
   datos.forEach(([etiqueta, valor], i) => {
     const x = MARGEN + (i % 2) * anchoColumna;
-    const y = inicio + Math.floor(i / 2) * 26;
+    const y = inicio + Math.floor(i / 2) * 22;
     doc.font(FUENTE.normal).fontSize(7.5).fillColor(COLOR.secundario).text(etiqueta, x, y, { width: anchoColumna - 12, lineBreak: false });
     doc.font(FUENTE.negrita).fontSize(9).fillColor(COLOR.texto)
       .text(valor, x, y + 10, { width: anchoColumna - 12, lineBreak: false, ellipsis: true });
   });
-  doc.y = inicio + Math.ceil(datos.length / 2) * 26 + 8;
+  doc.y = inicio + Math.ceil(datos.length / 2) * 22 + 8;
 }
 
 // Renglones de un tipo con su total: concepto y descripción a la izquierda, importe a la derecha.
@@ -90,45 +98,45 @@ function dibujarGrupo(doc, titulo, renglones, etiquetaTotal, total, vacio) {
   const ancho = anchoUtil(doc);
   const anchoImporte = 110;
   // El título no queda solo al final de una página.
-  let y = espacio(doc, doc.y + 6, 18 + 30 + 24);
-  doc.rect(MARGEN, y, ancho, 18).fill(COLOR.fondo);
-  doc.font(FUENTE.negrita).fontSize(8.5).fillColor(COLOR.secundario).text(titulo, MARGEN + 6, y + 5, { lineBreak: false });
-  doc.text("Importe", MARGEN, y + 5, { width: ancho - 6, align: "right", lineBreak: false });
-  y += 18;
+  let y = espacio(doc, doc.y + 4, ALTO_TITULO + ALTO_RENGLON + ALTO_TOTAL);
+  doc.rect(MARGEN, y, ancho, ALTO_TITULO).fill(COLOR.fondo);
+  doc.font(FUENTE.negrita).fontSize(8.5).fillColor(COLOR.secundario).text(titulo, MARGEN + 6, y + 4, { lineBreak: false });
+  doc.text("Importe", MARGEN, y + 4, { width: ancho - 6, align: "right", lineBreak: false });
+  y += ALTO_TITULO;
   if (renglones.length === 0) {
     doc.font(FUENTE.normal).fontSize(8.5).fillColor(COLOR.secundario).text(vacio, MARGEN + 6, y + 6, { lineBreak: false });
     y += 22;
   }
   for (const r of renglones) {
-    y = espacio(doc, y, 30);
+    y = espacio(doc, y, ALTO_RENGLON);
     doc.font(FUENTE.normal).fontSize(9).fillColor(COLOR.texto)
-      .text(r.nombre, MARGEN + 6, y + 5, { width: ancho - anchoImporte - 12, lineBreak: false, ellipsis: true });
-    doc.text(bs(r.resultado), MARGEN, y + 5, { width: ancho - 6, align: "right", lineBreak: false });
+      .text(r.nombre, MARGEN + 6, y + 3, { width: ancho - anchoImporte - 12, lineBreak: false, ellipsis: true });
+    doc.text(bs(r.resultado), MARGEN, y + 3, { width: ancho - 6, align: "right", lineBreak: false });
     doc.font(FUENTE.normal).fontSize(7.5).fillColor(COLOR.secundario)
-      .text(describir(r), MARGEN + 6, y + 17, { width: ancho - anchoImporte - 12, lineBreak: false, ellipsis: true });
-    y += 30;
+      .text(describir(r), MARGEN + 6, y + 14, { width: ancho - anchoImporte - 12, lineBreak: false, ellipsis: true });
+    y += ALTO_RENGLON;
     doc.moveTo(MARGEN, y).lineTo(MARGEN + ancho, y).lineWidth(0.5).strokeColor(COLOR.borde).stroke();
   }
-  y = espacio(doc, y, 24);
-  doc.font(FUENTE.negrita).fontSize(9).fillColor(COLOR.texto).text(etiquetaTotal, MARGEN + 6, y + 6, { lineBreak: false });
-  doc.text(bs(total), MARGEN, y + 6, { width: ancho - 6, align: "right", lineBreak: false });
-  doc.y = y + 24;
+  y = espacio(doc, y, ALTO_TOTAL);
+  doc.font(FUENTE.negrita).fontSize(9).fillColor(COLOR.texto).text(etiquetaTotal, MARGEN + 6, y + 5, { lineBreak: false });
+  doc.text(bs(total), MARGEN, y + 5, { width: ancho - 6, align: "right", lineBreak: false });
+  doc.y = y + ALTO_TOTAL;
 }
 
 function dibujarLiquido(doc, totales) {
-  const y = espacio(doc, doc.y + 6, 56);
+  const y = espacio(doc, doc.y + 4, 50);
   const ancho = anchoUtil(doc);
   doc.rect(MARGEN, y, ancho, 34).fill(COLOR.resalte);
   doc.font(FUENTE.negrita).fontSize(11).fillColor(COLOR.texto).text("Líquido pagable", MARGEN + 10, y + 11, { lineBreak: false });
   doc.fillColor(COLOR.primario).text(bs(totales.liquido_pagable), MARGEN, y + 11, { width: ancho - 10, align: "right", lineBreak: false });
   doc.font(FUENTE.normal).fontSize(7.5).fillColor(COLOR.secundario)
     .text(`Total ganado ${bs(totales.total_ganado)} menos descuentos ${bs(totales.total_descuentos)}`, MARGEN, y + 40, { lineBreak: false });
-  doc.y = y + 56;
+  doc.y = y + 50;
 }
 
 function dibujarFirmas(doc) {
   const ancho = 180;
-  const y = espacio(doc, doc.y + 48, 20);
+  const y = espacio(doc, doc.y + ALTO_FIRMAS - 20, 20);
   [MARGEN + 20, doc.page.width - MARGEN - 20 - ancho].forEach((x, i) => {
     doc.moveTo(x, y).lineTo(x + ancho, y).lineWidth(0.5).strokeColor(COLOR.secundario).stroke();
     doc.font(FUENTE.normal).fontSize(8).fillColor(COLOR.secundario)
@@ -173,6 +181,11 @@ function aPdf(boleta) {
     dibujarGrupo(doc, "Haberes", boleta.ingresos, "Total ganado", totales.total_ganado, "Sin haberes en el mes.");
     dibujarGrupo(doc, "Descuentos", boleta.descuentos, "Total descuentos", totales.total_descuentos, "Sin descuentos en el mes.");
     dibujarLiquido(doc, totales);
+    // Las firmas no quedan solas en otra página: si no entran con los aportes, ambos pasan a la siguiente.
+    if (doc.y + altoGrupo(boleta.aportes) + ALTO_FIRMAS > limite(doc) && MARGEN + altoGrupo(boleta.aportes) + ALTO_FIRMAS <= limite(doc)) {
+      doc.addPage();
+      doc.y = MARGEN - 4;
+    }
     dibujarGrupo(
       doc,
       "Aportes patronales (a cargo del empleador, no se descuentan)",
