@@ -96,18 +96,35 @@ CREATE TABLE CONTRATOS (
 );
 -- Table: CONVOCATORIAS_ASCENSO
 CREATE TABLE CONVOCATORIAS_ASCENSO (
-    id_convocatoria UUID NOT NULL,
+    id_convocatoria UUID NOT NULL DEFAULT gen_random_uuid(),
     id_cargo UUID NOT NULL,
     id_sucursal UUID NOT NULL,
+    id_empleado_publicador UUID NULL,
     titulo varchar(120) NOT NULL,
     descripcion_requisitos text NOT NULL,
     meses_antiguedad_minima int NOT NULL DEFAULT 6,
-    nota_minima_desempeno numeric(4, 2) NOT NULL,
+    nota_minima_desempeno numeric(5, 2) NOT NULL,
     fecha_inicio_postulacion date NOT NULL,
     fecha_cierre_postulacion date NOT NULL,
     esta_abierta boolean NOT NULL DEFAULT true,
-    CONSTRAINT CONVOCATORIAS_ASCENSO_pk PRIMARY KEY (id_convocatoria)
+    publicada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    cerrada_en TIMESTAMPTZ NULL,
+    estado_notificacion varchar(15) NOT NULL DEFAULT 'PENDIENTE',
+    destinatarios_notificados int NULL,
+    notificada_en TIMESTAMPTZ NULL,
+    ultimo_error_notificacion varchar(300) NULL,
+    CONSTRAINT CONVOCATORIAS_ASCENSO_pk PRIMARY KEY (id_convocatoria),
+    CONSTRAINT chk_convocatoria_titulo CHECK (btrim(titulo) <> ''),
+    CONSTRAINT chk_convocatoria_requisitos CHECK (btrim(descripcion_requisitos) <> ''),
+    CONSTRAINT chk_convocatoria_antiguedad CHECK (meses_antiguedad_minima BETWEEN 0 AND 600),
+    CONSTRAINT chk_convocatoria_nota CHECK (nota_minima_desempeno BETWEEN 0 AND 100),
+    CONSTRAINT chk_convocatoria_fechas CHECK (fecha_cierre_postulacion >= fecha_inicio_postulacion),
+    CONSTRAINT chk_convocatoria_cierre CHECK (esta_abierta = (cerrada_en IS NULL)),
+    CONSTRAINT chk_convocatoria_notificacion CHECK (estado_notificacion IN ('PENDIENTE', 'ENTREGADA', 'FALLIDA')),
+    CONSTRAINT chk_convocatoria_notificacion_entrega CHECK ((estado_notificacion = 'ENTREGADA') = (notificada_en IS NOT NULL))
 );
+CREATE INDEX ix_convocatoria_vigencia ON CONVOCATORIAS_ASCENSO (esta_abierta, fecha_cierre_postulacion);
+CREATE INDEX ix_convocatoria_cargo ON CONVOCATORIAS_ASCENSO (id_cargo);
 -- Table: CURSOS_CAPACITACION
 CREATE TABLE CURSOS_CAPACITACION (
     id_curso UUID NOT NULL,
@@ -329,6 +346,9 @@ ADD CONSTRAINT CONVOCATORIAS_ASCENSO_CARGOS FOREIGN KEY (id_cargo) REFERENCES CA
 -- Reference: CONVOCATORIAS_ASCENSO_SUCURSALES (table: CONVOCATORIAS_ASCENSO)
 ALTER TABLE CONVOCATORIAS_ASCENSO
 ADD CONSTRAINT CONVOCATORIAS_ASCENSO_SUCURSALES FOREIGN KEY (id_sucursal) REFERENCES SUCURSALES (id_sucursal) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONVOCATORIAS_ASCENSO_EMPLEADOS_PUBLICADOR (table: CONVOCATORIAS_ASCENSO)
+ALTER TABLE CONVOCATORIAS_ASCENSO
+ADD CONSTRAINT CONVOCATORIAS_ASCENSO_EMPLEADOS_PUBLICADOR FOREIGN KEY (id_empleado_publicador) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- Reference: DEPARTAMENTOS_DEPARTAMENTOS (table: DEPARTAMENTOS)
 ALTER TABLE DEPARTAMENTOS
 ADD CONSTRAINT DEPARTAMENTOS_DEPARTAMENTOS FOREIGN KEY (id_departamento_padre) REFERENCES DEPARTAMENTOS (id_departamento) NOT DEFERRABLE INITIALLY IMMEDIATE;

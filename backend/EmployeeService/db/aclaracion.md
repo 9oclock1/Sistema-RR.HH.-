@@ -2,6 +2,17 @@
 
 Dentro de la base de datos se encuentra las siguientes observaciones que deben ser tomadas a consideración al momento de llenar los datos, ya que algunas cosas son unicas:
 
+## Convocatorias de ascenso (KAN-80, RF-60)
+
+- `CONVOCATORIAS_ASCENSO` publica un cargo del catálogo (`id_cargo`) en una sucursal, con sus requisitos (`descripcion_requisitos`, `meses_antiguedad_minima`, `nota_minima_desempeno` de 0 a 100) y el periodo de postulación. `id_empleado_publicador` guarda quién la publicó (queda en NULL si la petición no identificó al empleado).
+- La fecha de cierre no puede ser anterior a la de inicio (`chk_convocatoria_fechas`). `esta_abierta` y `cerrada_en` van juntas: una convocatoria cerrada siempre tiene su fecha de cierre y una abierta nunca (`chk_convocatoria_cierre`).
+- Backend: una convocatoria acepta postulaciones solo si `esta_abierta` y la fecha de hoy (America/La_Paz) está entre el inicio y el cierre, ambos inclusive. Aunque el job diario aún no la haya cerrado, una convocatoria con la fecha de cierre vencida se informa como cerrada.
+- Backend: al llegar la fecha de cierre, el job diario pone `esta_abierta` en FALSE y llena `cerrada_en`, así que deja de aceptar postulaciones sin intervención de RRHH.
+- Backend: solo los empleados activos (`ESTADOS_EMPLEADO.permite_acceso`) ven las convocatorias. RRHH (admin y gerente) ve todas, también las cerradas.
+- Backend: al publicar, solo se aceptan cargos activos del catálogo y sucursales existentes, con la fecha de cierre desde hoy en adelante.
+- La notificación a los empleados activos va por el comunicado institucional de NotificationService. `estado_notificacion` es `PENDIENTE` (todavía no se intentó), `ENTREGADA` (con `notificada_en` y `destinatarios_notificados`) o `FALLIDA` (con `ultimo_error_notificacion`). Publicar no falla si la notificación falla: RRHH la reintenta.
+- Si ya tiene una base creada con la tabla anterior, vuelva a crear `POSTULACIONES_ASCENSO` y `CONVOCATORIAS_ASCENSO` desde `init.sql` (estaban vacías) o recree el volumen de la base.
+
 ## Postulaciones de ascenso
 
 - Los campos id_convocatoria e id_empleado en su conjunto son unicos ya que no deben haber postulaciones duplicadas a la misma vacante.
