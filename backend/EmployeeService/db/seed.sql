@@ -104,3 +104,14 @@ INSERT INTO ASIGNACIONES_EMPLEADO (id_asignacion, id_empleado, id_cargo, id_sucu
   ('f0000000-0000-4000-8000-000000000754', 'f0000000-0000-4000-8000-000000000744', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000011', '2026-09-01')
 ON CONFLICT DO NOTHING;
 COMMIT;
+
+-- Colaboradora activa con planillas cerradas en CompensationService, para probar desde la pantalla el registro de su
+-- baja y el cálculo del sueldo promedio indemnizable (RF-54 y RF-55).
+BEGIN;
+INSERT INTO EMPLEADOS (id_empleado, numero_documento, nombres, primer_apellido, segundo_apellido, fecha_nacimiento, genero, telefono_celular, correo_personal, direccion_domicilio, fecha_ingreso, id_cargo_actual, id_sucursal_actual, id_estado_empleado) VALUES
+  ('f0000000-0000-4000-8000-000000000745', '7108745', 'Gabriela', 'Rocha', 'Mendoza', '1996-02-14', 'Femenino', '71008745', 'gabriela.rocha@correo.test', 'Zona Miraflores, La Paz', '2025-03-03', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', 1)
+ON CONFLICT DO NOTHING;
+INSERT INTO ASIGNACIONES_EMPLEADO (id_asignacion, id_empleado, id_cargo, id_sucursal, fecha_inicio) VALUES
+  ('f0000000-0000-4000-8000-000000000755', 'f0000000-0000-4000-8000-000000000745', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', '2025-03-03')
+ON CONFLICT DO NOTHING;
+COMMIT;
