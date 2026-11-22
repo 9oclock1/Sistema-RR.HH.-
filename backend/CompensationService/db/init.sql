@@ -790,3 +790,166 @@ CREATE TABLE DOCUMENTOS_DESVINCULACION (
     CONSTRAINT chk_doc_desv_mime CHECK (tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png')),
     CONSTRAINT chk_doc_desv_tamano CHECK (tamano_bytes > 0 AND tamano_bytes <= 5242880)
 );
+
+-- Tabla: PARAMETROS_TRIBUTARIOS
+CREATE TABLE PARAMETROS_TRIBUTARIOS (
+    id_parametro UUID NOT NULL DEFAULT gen_random_uuid(),
+    codigo varchar(30) NOT NULL,
+    nombre varchar(100) NOT NULL,
+    valor numeric(12,4) NOT NULL,
+    vigente_desde date NOT NULL,
+    vigente_hasta date NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PARAMETROS_TRIBUTARIOS_pk PRIMARY KEY (id_parametro),
+    CONSTRAINT chk_parametro_codigo CHECK (
+        codigo IN ('SALARIO_MINIMO_NACIONAL', 'MULTIPLO_MINIMO_NO_IMPONIBLE', 'ALICUOTA_RCIVA', 'ALICUOTA_CREDITO_FISCAL')
+    ),
+    CONSTRAINT chk_parametro_valor CHECK (valor > 0),
+    CONSTRAINT chk_parametro_fechas CHECK (vigente_hasta IS NULL OR vigente_hasta >= vigente_desde),
+    CONSTRAINT ex_parametro_sin_solapamiento EXCLUDE USING gist (
+        codigo WITH =,
+        daterange(vigente_desde, vigente_hasta, '[]') WITH &&
+    )
+);
+-- Tabla: ENTIDADES_APORTE
+CREATE TABLE ENTIDADES_APORTE (
+    codigo varchar(20) NOT NULL,
+    nombre varchar(100) NOT NULL,
+    formato_archivo varchar(4) NOT NULL,
+    orden smallint NOT NULL,
+    CONSTRAINT ENTIDADES_APORTE_pk PRIMARY KEY (codigo),
+    CONSTRAINT uq_entidad_aporte_orden UNIQUE (orden),
+    CONSTRAINT chk_entidad_aporte_formato CHECK (formato_archivo IN ('XLSX', 'TXT'))
+);
+-- Tabla: CONCEPTOS_ENTIDAD_APORTE
+CREATE TABLE CONCEPTOS_ENTIDAD_APORTE (
+    codigo_concepto varchar(20) NOT NULL,
+    codigo_entidad varchar(20) NOT NULL,
+    deduce_sueldo_neto boolean NOT NULL DEFAULT FALSE,
+    CONSTRAINT CONCEPTOS_ENTIDAD_APORTE_pk PRIMARY KEY (codigo_concepto),
+    CONSTRAINT fk_concepto_entidad_concepto FOREIGN KEY (codigo_concepto)
+        REFERENCES CONCEPTOS_PLANILLA (codigo),
+    CONSTRAINT fk_concepto_entidad_entidad FOREIGN KEY (codigo_entidad)
+        REFERENCES ENTIDADES_APORTE (codigo)
+);
+-- Tabla: CREDITOS_FISCALES_DECLARADOS
+CREATE TABLE CREDITOS_FISCALES_DECLARADOS (
+    id_credito UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    periodo char(7) NOT NULL,
+    monto_facturas numeric(12,2) NOT NULL DEFAULT 0,
+    saldo_anterior_favor numeric(12,2) NOT NULL DEFAULT 0,
+    declarado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT CREDITOS_FISCALES_DECLARADOS_pk PRIMARY KEY (id_credito),
+    CONSTRAINT uq_credito_empleado_periodo UNIQUE (id_empleado, periodo),
+    CONSTRAINT chk_credito_periodo CHECK (periodo ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
+    CONSTRAINT chk_credito_montos CHECK (monto_facturas >= 0 AND saldo_anterior_favor >= 0)
+);
+-- Tabla: PLANILLAS_TRIBUTARIAS
+CREATE TABLE PLANILLAS_TRIBUTARIAS (
+    id_planilla_tributaria UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla UUID NOT NULL,
+    periodo char(7) NOT NULL,
+    salario_minimo numeric(12,2) NOT NULL,
+    multiplo_minimo_no_imponible numeric(6,2) NOT NULL,
+    minimo_no_imponible numeric(12,2) NOT NULL,
+    alicuota_rciva numeric(7,4) NOT NULL,
+    alicuota_credito_fiscal numeric(7,4) NOT NULL,
+    cantidad_dependientes int NOT NULL DEFAULT 0,
+    total_sueldo_neto numeric(14,2) NOT NULL DEFAULT 0,
+    total_base_imponible numeric(14,2) NOT NULL DEFAULT 0,
+    total_impuesto_determinado numeric(14,2) NOT NULL DEFAULT 0,
+    total_credito_aplicado numeric(14,2) NOT NULL DEFAULT 0,
+    total_impuesto_retenido numeric(14,2) NOT NULL DEFAULT 0,
+    advertencias text[] NOT NULL DEFAULT '{}',
+    generada_por UUID NULL,
+    generada_por_nombre varchar(150) NULL,
+    generada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PLANILLAS_TRIBUTARIAS_pk PRIMARY KEY (id_planilla_tributaria),
+    CONSTRAINT uq_planilla_tributaria_planilla UNIQUE (id_planilla),
+    CONSTRAINT fk_planilla_tributaria_planilla FOREIGN KEY (id_planilla)
+        REFERENCES PLANILLAS (id_planilla) ON DELETE CASCADE,
+    CONSTRAINT chk_planilla_tributaria_parametros CHECK (
+        salario_minimo > 0 AND multiplo_minimo_no_imponible > 0 AND minimo_no_imponible > 0
+        AND alicuota_rciva > 0 AND alicuota_credito_fiscal > 0
+    ),
+    CONSTRAINT chk_planilla_tributaria_totales CHECK (
+        cantidad_dependientes >= 0 AND total_sueldo_neto >= 0 AND total_base_imponible >= 0
+        AND total_impuesto_determinado >= 0 AND total_credito_aplicado >= 0 AND total_impuesto_retenido >= 0
+        AND total_impuesto_determinado = total_credito_aplicado + total_impuesto_retenido
+    )
+);
+-- Tabla: RETENCIONES_RCIVA
+CREATE TABLE RETENCIONES_RCIVA (
+    id_retencion UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla_tributaria UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    nombre_empleado varchar(150) NOT NULL,
+    numero_documento varchar(20) NULL,
+    total_ganado numeric(12,2) NOT NULL,
+    aportes_laborales numeric(12,2) NOT NULL,
+    sueldo_neto numeric(12,2) NOT NULL,
+    base_imponible numeric(12,2) NOT NULL,
+    impuesto_determinado numeric(12,2) NOT NULL,
+    monto_facturas numeric(12,2) NOT NULL DEFAULT 0,
+    credito_fiscal_facturas numeric(12,2) NOT NULL DEFAULT 0,
+    saldo_anterior_favor numeric(12,2) NOT NULL DEFAULT 0,
+    credito_aplicado numeric(12,2) NOT NULL,
+    impuesto_retenido numeric(12,2) NOT NULL,
+    saldo_favor_siguiente numeric(12,2) NOT NULL,
+    CONSTRAINT RETENCIONES_RCIVA_pk PRIMARY KEY (id_retencion),
+    CONSTRAINT uq_retencion_empleado UNIQUE (id_planilla_tributaria, id_empleado),
+    CONSTRAINT fk_retencion_planilla_tributaria FOREIGN KEY (id_planilla_tributaria)
+        REFERENCES PLANILLAS_TRIBUTARIAS (id_planilla_tributaria) ON DELETE CASCADE,
+    CONSTRAINT chk_retencion_montos CHECK (
+        total_ganado >= 0 AND aportes_laborales >= 0 AND sueldo_neto >= 0 AND base_imponible >= 0
+        AND impuesto_determinado >= 0 AND monto_facturas >= 0 AND credito_fiscal_facturas >= 0
+        AND saldo_anterior_favor >= 0 AND credito_aplicado >= 0 AND impuesto_retenido >= 0 AND saldo_favor_siguiente >= 0
+    ),
+    CONSTRAINT chk_retencion_balance CHECK (
+        impuesto_determinado = credito_aplicado + impuesto_retenido
+        AND credito_fiscal_facturas + saldo_anterior_favor = credito_aplicado + saldo_favor_siguiente
+    )
+);
+-- Tabla: PLANILLAS_APORTES
+CREATE TABLE PLANILLAS_APORTES (
+    id_planilla_aportes UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla UUID NOT NULL,
+    periodo char(7) NOT NULL,
+    cantidad_empleados int NOT NULL DEFAULT 0,
+    total_laboral numeric(14,2) NOT NULL DEFAULT 0,
+    total_patronal numeric(14,2) NOT NULL DEFAULT 0,
+    advertencias text[] NOT NULL DEFAULT '{}',
+    generada_por UUID NULL,
+    generada_por_nombre varchar(150) NULL,
+    generada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PLANILLAS_APORTES_pk PRIMARY KEY (id_planilla_aportes),
+    CONSTRAINT uq_planilla_aportes_planilla UNIQUE (id_planilla),
+    CONSTRAINT fk_planilla_aportes_planilla FOREIGN KEY (id_planilla)
+        REFERENCES PLANILLAS (id_planilla) ON DELETE CASCADE,
+    CONSTRAINT chk_planilla_aportes_totales CHECK (cantidad_empleados >= 0 AND total_laboral >= 0 AND total_patronal >= 0)
+);
+-- Tabla: DETALLE_APORTES
+CREATE TABLE DETALLE_APORTES (
+    id_detalle UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla_aportes UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    nombre_empleado varchar(150) NOT NULL,
+    numero_documento varchar(20) NULL,
+    codigo_entidad varchar(20) NOT NULL,
+    tipo varchar(8) NOT NULL,
+    codigo_concepto varchar(20) NOT NULL,
+    nombre_concepto varchar(80) NOT NULL,
+    id_vigencia UUID NULL,
+    base numeric(12,2) NULL,
+    tasa numeric(12,4) NOT NULL,
+    monto numeric(12,2) NOT NULL,
+    CONSTRAINT DETALLE_APORTES_pk PRIMARY KEY (id_detalle),
+    CONSTRAINT fk_detalle_aportes_planilla FOREIGN KEY (id_planilla_aportes)
+        REFERENCES PLANILLAS_APORTES (id_planilla_aportes) ON DELETE CASCADE,
+    CONSTRAINT fk_detalle_aportes_entidad FOREIGN KEY (codigo_entidad) REFERENCES ENTIDADES_APORTE (codigo),
+    CONSTRAINT fk_detalle_aportes_vigencia FOREIGN KEY (id_vigencia) REFERENCES VIGENCIAS_CONCEPTO (id_vigencia),
+    CONSTRAINT chk_detalle_aportes_tipo CHECK (tipo IN ('LABORAL', 'PATRONAL')),
+    CONSTRAINT chk_detalle_aportes_valores CHECK (tasa > 0 AND monto >= 0 AND (base IS NULL OR base >= 0))
+);
+CREATE INDEX idx_detalle_aportes_entidad ON DETALLE_APORTES (id_planilla_aportes, codigo_entidad);
