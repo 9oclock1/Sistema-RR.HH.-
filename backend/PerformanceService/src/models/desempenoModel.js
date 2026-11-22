@@ -7,7 +7,7 @@ const { TIPO_EVENTO_METRICAS_CRM } = require("./procesoCiclosModel");
 async function listarCiclosCerrados(db = pool) {
   const { rows } = await db.query(
     `SELECT c.id_ciclo, c.nombre, c.fecha_inicio, c.fecha_limite, c.cerrado_en, c.umbral_brecha,
-            pe.id_periodo, pe.nombre AS periodo,
+            pe.id_periodo, pe.nombre AS periodo, pe.fecha_inicio AS periodo_desde, pe.fecha_fin AS periodo_hasta,
             count(e.id_evaluacion)::int AS evaluaciones,
             (count(e.id_evaluacion) FILTER (WHERE e.id_estado_evaluacion = ${ESTADO_EVALUACION.ENVIADA}))::int AS enviadas,
             (count(e.id_evaluacion) FILTER (WHERE e.id_estado_evaluacion = ${ESTADO_EVALUACION.VENCIDA}))::int AS vencidas
@@ -24,7 +24,7 @@ async function listarCiclosCerrados(db = pool) {
 async function obtenerCiclo(idCiclo, db = pool) {
   const { rows } = await db.query(
     `SELECT c.id_ciclo, c.nombre, c.id_estado_ciclo, c.fecha_inicio, c.fecha_limite, c.cerrado_en, c.umbral_brecha,
-            pe.id_periodo, pe.nombre AS periodo
+            pe.id_periodo, pe.nombre AS periodo, pe.fecha_inicio AS periodo_desde, pe.fecha_fin AS periodo_hasta
      FROM ciclos_evaluacion c
      JOIN periodos_evaluacion pe ON pe.id_periodo = c.id_periodo
      WHERE c.id_ciclo = $1`,
@@ -52,7 +52,7 @@ async function listarEvaluacionesDelCiclo(idCiclo, db = pool) {
 
 async function listarEvaluacionesDeCiclosCerrados(db = pool) {
   const { rows } = await db.query(
-    `SELECT e.id_ciclo, e.id_evaluacion, e.id_departamento, d.nombre AS departamento,
+    `SELECT e.id_ciclo, e.id_evaluacion, e.id_empleado_evaluado, e.id_departamento, d.nombre AS departamento,
             e.id_sucursal, s.nombre AS sucursal, e.id_estado_evaluacion, e.puntaje_final
      FROM evaluaciones e
      JOIN ciclos_evaluacion c ON c.id_ciclo = e.id_ciclo

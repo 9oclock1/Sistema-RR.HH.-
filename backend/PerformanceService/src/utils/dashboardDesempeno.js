@@ -5,6 +5,9 @@ const { promediar } = require("./historialDesempeno");
 
 const META_PUNTAJE_PROMEDIO = 3.5;
 const META_CUMPLIMIENTO = 90;
+// KPI-09: colaboradores con puntaje >= 4 (escala 1 a 5) sobre los colaboradores evaluados. Meta: >= 25 %.
+const META_ALTO_DESEMPENO = 25;
+const UMBRAL_ALTO_DESEMPENO = 4;
 const ESCALA = { minimo: 1, maximo: 5 };
 const DIVISOR_ESCALA = 20;
 const ANCHO_RANGO = 0.5;
@@ -107,6 +110,34 @@ function calcularCumplimiento(filas) {
   };
 }
 
+// KPI-09. Un colaborador evaluado es el que tiene al menos una evaluación enviada en el ciclo; si tiene varias
+// (por ejemplo, de dos evaluadores) cuenta una sola vez, con el promedio de sus evaluaciones enviadas. Su puntaje se
+// lleva a la escala 1 a 5 igual que el KPI-07, así el umbral de 4 es el mismo que ve el usuario en pantalla.
+function calcularAltoDesempeno(filas) {
+  const porColaborador = new Map();
+  for (const fila of enviadasDe(filas)) {
+    const clave = fila.id_empleado_evaluado ?? fila.id_evaluacion;
+    if (!porColaborador.has(clave)) porColaborador.set(clave, []);
+    porColaborador.get(clave).push(fila.puntaje_final);
+  }
+  const evaluados = porColaborador.size;
+  const altos = [...porColaborador.values()].filter(
+    (puntajes) => centesimas(enEscala(promediar(puntajes))) >= centesimas(UMBRAL_ALTO_DESEMPENO),
+  ).length;
+  const valor = evaluados === 0 ? null : aNumero(Math.round((altos * 10000) / evaluados));
+  return {
+    codigo: "KPI-09",
+    nombre: "Colaboradores de alto desempeño",
+    valor,
+    unidad: "%",
+    meta: META_ALTO_DESEMPENO,
+    umbral_puntaje: UMBRAL_ALTO_DESEMPENO,
+    colaboradores_alto_desempeno: altos,
+    colaboradores_evaluados: evaluados,
+    semaforo: semaforo(valor, META_ALTO_DESEMPENO),
+  };
+}
+
 function calcularHistograma(filas) {
   const enviadas = enviadasDe(filas);
   const rangos = Array.from({ length: RANGOS }, (_, indice) => {
@@ -180,6 +211,7 @@ function compararCiclos(ciclos, filasPorCiclo, idSeleccionado) {
     const filas = filasPorCiclo.get(ciclo.id_ciclo) ?? [];
     const puntaje = calcularPuntajePromedio(filas);
     const cumplimiento = calcularCumplimiento(filas);
+    const altoDesempeno = calcularAltoDesempeno(filas);
     const variacion = diferencia(puntaje.valor, anterior);
     if (puntaje.valor !== null) anterior = puntaje.valor;
     return {
@@ -192,6 +224,8 @@ function compararCiclos(ciclos, filasPorCiclo, idSeleccionado) {
       semaforo_puntaje: puntaje.semaforo,
       cumplimiento: cumplimiento.valor,
       semaforo_cumplimiento: cumplimiento.semaforo,
+      alto_desempeno: altoDesempeno.valor,
+      semaforo_alto_desempeno: altoDesempeno.semaforo,
       evaluaciones_enviadas: cumplimiento.evaluaciones_enviadas,
       evaluaciones_asignadas: cumplimiento.evaluaciones_asignadas,
       variacion,
@@ -220,6 +254,8 @@ function agruparPorCiclo(filas) {
 module.exports = {
   META_PUNTAJE_PROMEDIO,
   META_CUMPLIMIENTO,
+  META_ALTO_DESEMPENO,
+  UMBRAL_ALTO_DESEMPENO,
   ESCALA,
   enEscala,
   semaforo,
@@ -227,6 +263,7 @@ module.exports = {
   aplicarFiltros,
   calcularPuntajePromedio,
   calcularCumplimiento,
+  calcularAltoDesempeno,
   calcularHistograma,
   armarRanking,
   compararCiclos,

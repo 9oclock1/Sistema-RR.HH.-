@@ -24,7 +24,7 @@ const COLUMNAS = [
   {
     clave: "nombre",
     titulo: "Ciclo",
-    ancho: "30%",
+    ancho: "26%",
     celda: (ciclo) => (
       <div className="dd-celda">
         <TextoTruncado>{ciclo.nombre}</TextoTruncado>
@@ -38,14 +38,14 @@ const COLUMNAS = [
   {
     clave: "puntaje_promedio",
     titulo: "Puntaje promedio",
-    ancho: "20%",
+    ancho: "17%",
     alinear: "fin",
     celda: (ciclo) => <ValorConSemaforo valor={formatearDecimal(ciclo.puntaje_promedio)} codigo={ciclo.semaforo_puntaje} />,
   },
   {
     clave: "variacion",
     titulo: "Variación",
-    ancho: "15%",
+    ancho: "14%",
     alinear: "fin",
     celda: (ciclo) => {
       const tendencia = TENDENCIAS[ciclo.tendencia];
@@ -63,14 +63,23 @@ const COLUMNAS = [
   {
     clave: "cumplimiento",
     titulo: "Cumplimiento",
-    ancho: "20%",
+    ancho: "16%",
     alinear: "fin",
     celda: (ciclo) => <ValorConSemaforo valor={formatearPorcentaje(ciclo.cumplimiento)} codigo={ciclo.semaforo_cumplimiento} />,
   },
   {
+    clave: "alto_desempeno",
+    titulo: "Alto desempeño",
+    ancho: "15%",
+    alinear: "fin",
+    celda: (ciclo) => (
+      <ValorConSemaforo valor={formatearPorcentaje(ciclo.alto_desempeno)} codigo={ciclo.semaforo_alto_desempeno} />
+    ),
+  },
+  {
     clave: "evaluaciones",
     titulo: "Enviadas",
-    ancho: "15%",
+    ancho: "12%",
     alinear: "fin",
     celda: (ciclo) => (
       <span className="dd-numero">

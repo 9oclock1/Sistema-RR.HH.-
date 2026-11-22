@@ -2,9 +2,10 @@ import { useCallback, useState } from "react";
 import { Link } from "react-router";
 import { ChartColumn, RefreshCw } from "lucide-react";
 import { obtenerDashboardDesempeno } from "../../api/dashboardDesempeno";
+import { obtenerRotacionTemprana } from "../../api/rotacionTemprana";
 import { Alerta, Boton, EncabezadoPagina, EstadoVacio, Esqueleto, Selector, Tarjeta } from "../../components/ui";
 import { useRol } from "../../context/sesion";
-import { formatearMomento } from "../ciclos-evaluacion/ciclo";
+import { formatearDia, formatearMomento } from "../ciclos-evaluacion/ciclo";
 import useRecurso from "../quejas/casos/useRecurso";
 import ComparativoCiclos from "./ComparativoCiclos";
 import HistogramaCalificaciones from "./HistogramaCalificaciones";
@@ -33,6 +34,21 @@ export default function DashboardDesempenoPage() {
   const cargar = useCallback(() => obtenerDashboardDesempeno(rol, filtros), [rol, filtros]);
   const { datos, error, cargando, reintentar } = useRecurso(cargar);
 
+  // KPI-12: el periodo es el del ciclo elegido; área y sucursal, las mismas del resto del dashboard.
+  const desde = datos?.ciclo?.periodo?.desde;
+  const hasta = datos?.ciclo?.periodo?.hasta;
+  const { departamento, sucursal } = filtros;
+  const cargarRotacion = useCallback(
+    () => (desde && hasta ? obtenerRotacionTemprana(rol, { desde, hasta, departamento, sucursal }) : Promise.resolve(null)),
+    [rol, desde, hasta, departamento, sucursal],
+  );
+  const rotacion = useRecurso(cargarRotacion);
+
+  const actualizar = () => {
+    reintentar();
+    rotacion.reintentar();
+  };
+
   const cambiarFiltro = (evento) => setFiltros((actuales) => ({ ...actuales, [evento.target.name]: evento.target.value }));
 
   const ciclosElegibles = datos ? [...datos.comparativo_ciclos].reverse() : [];
@@ -44,9 +60,9 @@ export default function DashboardDesempenoPage() {
         enlace={Link}
         titulo="Dashboard de desempeño"
         idTitulo="dd-titulo"
-        descripcion="Indicadores consolidados del desempeño laboral por ciclo, área y sucursal: puntaje promedio, cumplimiento de evaluaciones, distribución de calificaciones y comparativo entre ciclos."
+        descripcion="Indicadores consolidados del desempeño laboral y la rotación temprana por ciclo, área y sucursal: puntaje promedio, cumplimiento de evaluaciones, alto desempeño, rotación temprana, distribución de calificaciones y comparativo entre ciclos."
         acciones={
-          <Boton icono={RefreshCw} onClick={reintentar} cargando={cargando && Boolean(datos)}>
+          <Boton icono={RefreshCw} onClick={actualizar} cargando={cargando && Boolean(datos)}>
             Actualizar
           </Boton>
         }
@@ -112,11 +128,17 @@ export default function DashboardDesempenoPage() {
             </div>
             <p className="dd-sutil">
               {datos.ciclo.nombre} · cerrado el {formatearMomento(datos.ciclo.cerrado_en)}
+              {desde && hasta && ` · La rotación temprana se calcula con el periodo ${datos.ciclo.periodo.nombre} (${formatearDia(desde)} al ${formatearDia(hasta)})`}
             </p>
           </Tarjeta>
 
           <div className={cargando ? "dd-apilado dd-actualizando" : "dd-apilado"}>
-            <TarjetasKpi puntaje={datos.kpis.puntaje_promedio} cumplimiento={datos.kpis.cumplimiento_evaluaciones} />
+            <TarjetasKpi
+              puntaje={datos.kpis.puntaje_promedio}
+              cumplimiento={datos.kpis.cumplimiento_evaluaciones}
+              altoDesempeno={datos.kpis.alto_desempeno}
+              rotacion={rotacion}
+            />
 
             <div className="dd-rejilla">
               <Tarjeta nivelTitulo={2} titulo="Distribución de calificaciones">

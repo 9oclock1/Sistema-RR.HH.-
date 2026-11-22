@@ -22,6 +22,7 @@ const {
   aplicarFiltros,
   calcularPuntajePromedio,
   calcularCumplimiento,
+  calcularAltoDesempeno,
   calcularHistograma,
   armarRanking,
   compararCiclos,
@@ -161,6 +162,13 @@ async function obtenerColaboradores(idPedido, filtros = {}) {
   };
 }
 
+// En el dashboard el periodo lleva sus fechas: el frontend las usa para pedir el KPI-12 (rotación temprana) del
+// mismo periodo a EmployeeService, así elegir un ciclo recalcula también ese indicador.
+const describirCicloDashboard = (ciclo) => {
+  const descripcion = describirCiclo(ciclo);
+  return { ...descripcion, periodo: { ...descripcion.periodo, desde: ciclo.periodo_desde, hasta: ciclo.periodo_hasta } };
+};
+
 async function obtenerDashboard(consulta) {
   const filtros = validarFiltrosDashboard(consulta);
   const [cerrados, todas] = await Promise.all([
@@ -174,7 +182,7 @@ async function obtenerDashboard(consulta) {
   const cronologicos = [...cerrados].reverse();
 
   return {
-    ciclo: ciclo && describirCiclo(ciclo),
+    ciclo: ciclo && describirCicloDashboard(ciclo),
     filtros: { departamento, sucursal },
     opciones: {
       departamentos: listarOpciones(filasCiclo, "id_departamento", "departamento"),
@@ -183,6 +191,7 @@ async function obtenerDashboard(consulta) {
     kpis: {
       puntaje_promedio: calcularPuntajePromedio(filtradas),
       cumplimiento_evaluaciones: calcularCumplimiento(filtradas),
+      alto_desempeno: calcularAltoDesempeno(filtradas),
     },
     histograma: calcularHistograma(filtradas),
     ranking_areas: armarRanking(aplicarFiltros(filasCiclo, { sucursal }), "id_departamento", "departamento"),

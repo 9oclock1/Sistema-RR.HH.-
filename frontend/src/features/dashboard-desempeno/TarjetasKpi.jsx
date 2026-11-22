@@ -1,4 +1,5 @@
 import { Etiqueta } from "../../components/ui";
+import { formatearDia } from "../ciclos-evaluacion/ciclo";
 import { estadoSemaforo, formatearDecimal, formatearPorcentaje, porcentajeEnEscala } from "./dashboardDesempeno";
 
 function Medidor({ valor, minimo, maximo, meta, descripcion, variante }) {
@@ -13,7 +14,7 @@ function Medidor({ valor, minimo, maximo, meta, descripcion, variante }) {
   );
 }
 
-function TarjetaKpi({ kpi, valor, unidad, meta, medidor, detalle }) {
+function TarjetaKpi({ kpi, valor, unidad, meta, medidor, detalle, children }) {
   const estado = estadoSemaforo(kpi.semaforo);
   const sinDatos = kpi.valor === null;
   return (
@@ -44,13 +45,45 @@ function TarjetaKpi({ kpi, valor, unidad, meta, medidor, detalle }) {
       />
       <p className="dd-sutil">Meta: {meta}</p>
       <p className="dd-sutil">{detalle}</p>
+      {children}
     </li>
   );
 }
 
-export default function TarjetasKpi({ puntaje, cumplimiento }) {
+const plural = (cantidad, singular, varios) => `${cantidad} ${cantidad === 1 ? singular : varios}`;
+
+// KPI-12 mientras carga o si EmployeeService no respondió: la tarjeta se muestra igual, sin valor ni semáforo.
+const ROTACION_SIN_DATOS = { codigo: "KPI-12", nombre: "Rotación temprana", valor: null, meta: 15, semaforo: null };
+
+function detalleRotacion({ datos, error }) {
+  if (error) return `No se pudo calcular: ${error.message}`;
+  if (!datos) return "Calculando con las altas y bajas del periodo…";
+  const periodo = `del ${formatearDia(datos.periodo.desde)} al ${formatearDia(datos.periodo.hasta)}`;
+  if (datos.valor === null) return `Sin ingresos ${periodo}: no hay base para calcularla`;
+  return `${plural(datos.bajas_tempranas, "baja", "bajas")} con menos de ${datos.dias_antiguedad_temprana} días sobre ${plural(datos.ingresos_periodo, "ingreso", "ingresos")} ${periodo}`;
+}
+
+function BajasTempranas({ bajas }) {
+  if (bajas.length === 0) return null;
+  return (
+    <details className="dd-kpi__desglose">
+      <summary>Ver las bajas tempranas</summary>
+      <ul>
+        {bajas.map((baja) => (
+          <li key={baja.id_empleado}>
+            {baja.nombre_completo} · {baja.area} · {baja.sucursal}: ingresó el {formatearDia(baja.fecha_ingreso)}, baja el{" "}
+            {formatearDia(baja.fecha_baja)} ({plural(baja.dias_antiguedad, "día", "días")})
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+export default function TarjetasKpi({ puntaje, cumplimiento, altoDesempeno, rotacion = { datos: null, error: null } }) {
   const detallePuntaje = `${puntaje.evaluaciones_cerradas} evaluaciones cerradas · ${formatearDecimal(puntaje.puntaje_sobre_100)} sobre 100`;
   const detalleCumplimiento = `${cumplimiento.evaluaciones_enviadas} de ${cumplimiento.evaluaciones_asignadas} enviadas · ${cumplimiento.evaluaciones_vencidas} vencidas`;
+  const kpiRotacion = rotacion.error || !rotacion.datos ? ROTACION_SIN_DATOS : rotacion.datos;
 
   return (
     <ul className="dd-kpis" aria-label="Indicadores del ciclo">
@@ -69,6 +102,28 @@ export default function TarjetasKpi({ puntaje, cumplimiento }) {
         medidor={{ minimo: 0, maximo: 100 }}
         detalle={cumplimiento.valor === null ? "Sin evaluaciones asignadas con estos filtros" : detalleCumplimiento}
       />
+      {altoDesempeno && (
+        <TarjetaKpi
+          kpi={altoDesempeno}
+          valor={formatearPorcentaje(altoDesempeno.valor)}
+          meta={`≥ ${formatearPorcentaje(altoDesempeno.meta)}`}
+          medidor={{ minimo: 0, maximo: 100 }}
+          detalle={
+            altoDesempeno.valor === null
+              ? "Sin colaboradores evaluados con estos filtros"
+              : `${altoDesempeno.colaboradores_alto_desempeno} de ${altoDesempeno.colaboradores_evaluados} colaboradores con puntaje ≥ ${formatearDecimal(altoDesempeno.umbral_puntaje)}`
+          }
+        />
+      )}
+      <TarjetaKpi
+        kpi={kpiRotacion}
+        valor={formatearPorcentaje(kpiRotacion.valor)}
+        meta={`≤ ${formatearPorcentaje(kpiRotacion.meta)}`}
+        medidor={{ minimo: 0, maximo: 100 }}
+        detalle={detalleRotacion(rotacion)}
+      >
+        {rotacion.datos && !rotacion.error && <BajasTempranas bajas={rotacion.datos.detalle_bajas_tempranas} />}
+      </TarjetaKpi>
     </ul>
   );
 }

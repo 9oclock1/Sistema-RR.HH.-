@@ -492,7 +492,7 @@ export const SECCIONES = [
       {
         ruta: RUTA_DASHBOARD_DESEMPENO,
         etiqueta: "Dashboard de desempeño",
-        descripcion: "Indicadores de puntaje promedio, cumplimiento de evaluaciones y alto desempeño por ciclo, con histograma, ranking de áreas y comparativo entre ciclos.",
+        descripcion: "Indicadores de puntaje promedio, cumplimiento de evaluaciones, alto desempeño y rotación temprana por ciclo, área y sucursal, con histograma, ranking de áreas y comparativo entre ciclos.",
         icono: Gauge,
         roles: ["gerente"],
         pagina: DashboardDesempenoPage,

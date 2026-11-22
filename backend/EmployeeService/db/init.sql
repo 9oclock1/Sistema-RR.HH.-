@@ -150,13 +150,18 @@ CREATE TABLE EMPLEADOS (
     correo_personal varchar(120) NOT NULL,
     direccion_domicilio varchar(255) NOT NULL,
     fecha_ingreso DATE NOT NULL,
+    -- Último día trabajado cuando el colaborador pasa a BAJA (KPI-12, rotación temprana). NULL mientras sigue en la empresa.
+    fecha_baja DATE NULL,
     id_cargo_actual UUID NOT NULL,
     id_sucursal_actual UUID NOT NULL,
     id_estado_empleado SMALLINT NOT NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT EMPLEADOS_pk PRIMARY KEY (id_empleado)
+    CONSTRAINT EMPLEADOS_pk PRIMARY KEY (id_empleado),
+    CONSTRAINT chk_empleado_fecha_baja CHECK (fecha_baja IS NULL OR fecha_baja >= fecha_ingreso)
 );
+CREATE INDEX idx_empleados_fecha_ingreso ON EMPLEADOS (fecha_ingreso);
+CREATE INDEX idx_empleados_fecha_baja ON EMPLEADOS (fecha_baja) WHERE fecha_baja IS NOT NULL;
 -- Table: ESTADOS_EMPLEADO
 CREATE TABLE ESTADOS_EMPLEADO (
     id_estado_empleado SMALLINT NOT NULL,

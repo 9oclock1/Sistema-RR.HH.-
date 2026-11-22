@@ -428,9 +428,9 @@ describe("servicio del dashboard de desempeño", () => {
   const ACTIVO = uuid("c", 14);
 
   const CERRADOS_DESC = [
-    { id_ciclo: T3, nombre: "Evaluación trimestral 2026-T3", periodo: "2026-T3", id_periodo: uuid("f", 3), cerrado_en: "2026-10-12T12:00:00.000Z", fecha_inicio: "2026-09-28", fecha_limite: "2026-10-10", umbral_brecha: 60, id_estado_ciclo: 3 },
-    { id_ciclo: T2, nombre: "Evaluación trimestral 2026-T2", periodo: "2026-T2", id_periodo: uuid("f", 2), cerrado_en: "2026-07-07T12:00:00.000Z", fecha_inicio: "2026-06-20", fecha_limite: "2026-07-05", umbral_brecha: 60, id_estado_ciclo: 3 },
-    { id_ciclo: T1, nombre: "Evaluación trimestral 2026-T1", periodo: "2026-T1", id_periodo: uuid("f", 1), cerrado_en: "2026-04-07T12:00:00.000Z", fecha_inicio: "2026-03-20", fecha_limite: "2026-04-05", umbral_brecha: 60, id_estado_ciclo: 3 },
+    { id_ciclo: T3, nombre: "Evaluación trimestral 2026-T3", periodo: "2026-T3", id_periodo: uuid("f", 3), periodo_desde: "2026-07-01", periodo_hasta: "2026-09-30", cerrado_en: "2026-10-12T12:00:00.000Z", fecha_inicio: "2026-09-28", fecha_limite: "2026-10-10", umbral_brecha: 60, id_estado_ciclo: 3 },
+    { id_ciclo: T2, nombre: "Evaluación trimestral 2026-T2", periodo: "2026-T2", id_periodo: uuid("f", 2), periodo_desde: "2026-04-01", periodo_hasta: "2026-06-30", cerrado_en: "2026-07-07T12:00:00.000Z", fecha_inicio: "2026-06-20", fecha_limite: "2026-07-05", umbral_brecha: 60, id_estado_ciclo: 3 },
+    { id_ciclo: T1, nombre: "Evaluación trimestral 2026-T1", periodo: "2026-T1", id_periodo: uuid("f", 1), periodo_desde: "2026-01-01", periodo_hasta: "2026-03-31", cerrado_en: "2026-04-07T12:00:00.000Z", fecha_inicio: "2026-03-20", fecha_limite: "2026-04-05", umbral_brecha: 60, id_estado_ciclo: 3 },
   ];
 
   const EVALUACIONES = [
@@ -611,7 +611,106 @@ describe("servicio del dashboard de desempeño", () => {
     const { ciclo } = await servicio.obtenerDashboard({ ciclo: T1 });
 
     assert.equal(ciclo.nombre, "Evaluación trimestral 2026-T1");
-    assert.deepEqual(ciclo.periodo, { id_periodo: uuid("f", 1), nombre: "2026-T1" });
+    assert.deepEqual(ciclo.periodo, { id_periodo: uuid("f", 1), nombre: "2026-T1", desde: "2026-01-01", hasta: "2026-03-31" });
     assert.equal(ciclo.cerrado_en, "2026-04-07T12:00:00.000Z");
+  });
+});
+
+describe("KPI-09: porcentaje de colaboradores de alto desempeño", () => {
+  const { calcularAltoDesempeno } = require("../utils/dashboardDesempeno");
+  const CICLO = uuid("c", 90);
+  const de = (colaborador, puntaje, estado = ENVIADA) => ({
+    ...evaluacion(CICLO, AREA.ATENCION, SUCURSAL.SOPOCACHI, estado, estado === ENVIADA ? puntaje : null),
+    id_empleado_evaluado: uuid("d", colaborador),
+  });
+
+  it("cuenta los colaboradores con puntaje >= 4 sobre los colaboradores evaluados", () => {
+    const kpi = calcularAltoDesempeno([de(1, 80), de(2, 95), de(3, 60), de(4, 70)]);
+
+    assert.equal(kpi.codigo, "KPI-09");
+    assert.equal(kpi.colaboradores_alto_desempeno, 2);
+    assert.equal(kpi.colaboradores_evaluados, 4);
+    assert.equal(kpi.valor, 50);
+    assert.equal(kpi.meta, 25);
+    assert.equal(kpi.semaforo, "VERDE");
+  });
+
+  it("el umbral de 4 se compara en la escala de 1 a 5 que ve el usuario: 79,90 vale 4,00 y 79,89 vale 3,99", () => {
+    assert.equal(calcularAltoDesempeno([de(1, 79.9)]).colaboradores_alto_desempeno, 1);
+    assert.equal(calcularAltoDesempeno([de(1, 79.89)]).colaboradores_alto_desempeno, 0);
+  });
+
+  it("un colaborador con varias evaluaciones cuenta una vez, con el promedio de sus evaluaciones enviadas", () => {
+    // Colaborador 1: (90 + 70) / 2 = 80 -> 4,00 (alto). Colaborador 2: (85 + 70) / 2 = 77,5 -> 3,88 (no).
+    const kpi = calcularAltoDesempeno([de(1, 90), de(1, 70), de(2, 85), de(2, 70)]);
+
+    assert.equal(kpi.colaboradores_evaluados, 2);
+    assert.equal(kpi.colaboradores_alto_desempeno, 1);
+    assert.equal(kpi.valor, 50);
+  });
+
+  it("las evaluaciones pendientes o vencidas no cuentan como colaboradores evaluados", () => {
+    const kpi = calcularAltoDesempeno([de(1, 90), de(2, null, PENDIENTE), de(3, null, VENCIDA), de(4, 50)]);
+
+    assert.equal(kpi.colaboradores_evaluados, 2);
+    assert.equal(kpi.valor, 50);
+  });
+
+  it("semáforo: verde desde 25 %, amarillo desde 22,5 % y rojo por debajo", () => {
+    // 1 de 4 = 25 %; 2 de 9 = 22,22 %; 9 de 40 = 22,5 %.
+    const cohorte = (altos, total) =>
+      Array.from({ length: total }, (_, i) => de(100 + i, i < altos ? 90 : 50));
+    assert.equal(calcularAltoDesempeno(cohorte(1, 4)).semaforo, "VERDE");
+    assert.equal(calcularAltoDesempeno(cohorte(9, 40)).semaforo, "AMARILLO");
+    assert.equal(calcularAltoDesempeno(cohorte(2, 9)).semaforo, "ROJO");
+  });
+
+  it("sin colaboradores evaluados no hay valor ni semáforo", () => {
+    const kpi = calcularAltoDesempeno([de(1, null, PENDIENTE)]);
+
+    assert.equal(kpi.valor, null);
+    assert.equal(kpi.semaforo, null);
+  });
+
+  it("el dashboard lo incluye en los KPI y en el comparativo, y lo recalcula con los filtros de área y sucursal", async () => {
+    const A = uuid("c", 91);
+    const B = uuid("c", 92);
+    const cerrados = [
+      { id_ciclo: B, nombre: "Ciclo B", periodo: "2026-S2", id_periodo: uuid("f", 92), periodo_desde: "2026-07-01", periodo_hasta: "2026-12-31", cerrado_en: "2026-10-12T12:00:00.000Z", id_estado_ciclo: 3 },
+      { id_ciclo: A, nombre: "Ciclo A", periodo: "2026-S1", id_periodo: uuid("f", 91), periodo_desde: "2026-01-01", periodo_hasta: "2026-06-30", cerrado_en: "2026-04-07T12:00:00.000Z", id_estado_ciclo: 3 },
+    ];
+    const fila = (ciclo, colaborador, area, sucursal, puntaje) => ({
+      ...evaluacion(ciclo, area, sucursal, ENVIADA, puntaje),
+      id_empleado_evaluado: uuid("d", colaborador),
+    });
+    const filas = [
+      fila(A, 1, AREA.ATENCION, SUCURSAL.SOPOCACHI, 50),
+      fila(A, 2, AREA.ATENCION, SUCURSAL.SOPOCACHI, 60),
+      fila(A, 3, AREA.RRHH, SUCURSAL.MIRAFLORES, 70),
+      fila(A, 4, AREA.RRHH, SUCURSAL.MIRAFLORES, 90),
+      fila(B, 1, AREA.ATENCION, SUCURSAL.SOPOCACHI, 85),
+      fila(B, 2, AREA.ATENCION, SUCURSAL.SOPOCACHI, 92),
+      fila(B, 3, AREA.RRHH, SUCURSAL.MIRAFLORES, 40),
+      fila(B, 4, AREA.RRHH, SUCURSAL.MIRAFLORES, 81),
+    ];
+    mock.method(desempenoModelo, "listarCiclosCerrados", async () => cerrados);
+    mock.method(desempenoModelo, "listarEvaluacionesDeCiclosCerrados", async () => filas);
+    mock.method(desempenoModelo, "obtenerCiclo", async (id) => cerrados.find((c) => c.id_ciclo === id) ?? null);
+
+    const ultimo = await servicio.obtenerDashboard({});
+    assert.equal(ultimo.kpis.alto_desempeno.valor, 75);
+    assert.equal(ultimo.kpis.alto_desempeno.semaforo, "VERDE");
+    assert.deepEqual(ultimo.ciclo.periodo, { id_periodo: uuid("f", 92), nombre: "2026-S2", desde: "2026-07-01", hasta: "2026-12-31" });
+    assert.deepEqual(
+      ultimo.comparativo_ciclos.map((c) => [c.nombre, c.alto_desempeno, c.semaforo_alto_desempeno]),
+      [["Ciclo A", 25, "VERDE"], ["Ciclo B", 75, "VERDE"]],
+    );
+
+    const atencionA = await servicio.obtenerDashboard({ ciclo: A, departamento: AREA.ATENCION });
+    assert.equal(atencionA.kpis.alto_desempeno.valor, 0);
+    assert.equal(atencionA.kpis.alto_desempeno.semaforo, "ROJO");
+
+    const miraflores = await servicio.obtenerDashboard({ ciclo: B, sucursal: SUCURSAL.MIRAFLORES });
+    assert.equal(miraflores.kpis.alto_desempeno.valor, 50);
   });
 });

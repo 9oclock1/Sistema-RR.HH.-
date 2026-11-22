@@ -4,12 +4,14 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ErrorApi } from "../../api/cliente";
 import { obtenerDashboardDesempeno } from "../../api/dashboardDesempeno";
+import { obtenerRotacionTemprana } from "../../api/rotacionTemprana";
 import ProveedorAvisos from "../../components/ui/ProveedorAvisos";
 import { cambiarRol } from "../../context/sesion";
 import DashboardDesempenoPage from "./DashboardDesempenoPage";
 import { describirVariacion, estadoSemaforo, formatearDecimal, formatearPorcentaje, formatearRango, porcentajeEnEscala } from "./dashboardDesempeno";
 
 vi.mock("../../api/dashboardDesempeno");
+vi.mock("../../api/rotacionTemprana");
 
 const ATENCION = "area-atencion";
 const RRHH = "area-rrhh";
@@ -52,6 +54,49 @@ const cumplimiento = (valor, semaforoKpi, cambios = {}) => ({
   ...cambios,
 });
 
+const altoDesempeno = (valor, semaforoKpi, cambios = {}) => ({
+  codigo: "KPI-09",
+  nombre: "Colaboradores de alto desempeño",
+  valor,
+  unidad: "%",
+  meta: 25,
+  umbral_puntaje: 4,
+  colaboradores_alto_desempeno: 3,
+  colaboradores_evaluados: 8,
+  semaforo: semaforoKpi,
+  ...cambios,
+});
+
+const rotacion = (valor, semaforoKpi, cambios = {}) => ({
+  codigo: "KPI-12",
+  nombre: "Rotación temprana",
+  valor,
+  unidad: "%",
+  meta: 15,
+  sentido_meta: "MAXIMO",
+  dias_antiguedad_temprana: 90,
+  periodo: { desde: "2026-07-01", hasta: "2026-12-31" },
+  ingresos_periodo: 7,
+  bajas_periodo: 2,
+  bajas_tempranas: 1,
+  semaforo: semaforoKpi,
+  detalle_bajas_tempranas: [
+    {
+      id_empleado: "emp-901",
+      nombre_completo: "Verónica Nina Huanca",
+      area: "Atención al cliente",
+      sucursal: "Sopocachi",
+      fecha_ingreso: "2026-07-10",
+      fecha_baja: "2026-09-01",
+      dias_antiguedad: 53,
+    },
+  ],
+  filtros: { departamento: null, sucursal: null },
+  ...cambios,
+});
+
+const ROTACION = rotacion(14.29, "VERDE");
+
 const grupo = (id, nombre, posicion, valor, cambios = {}) => ({
   id,
   nombre,
@@ -84,7 +129,7 @@ const TABLERO = {
   ciclo: {
     id_ciclo: T3,
     nombre: "Evaluación trimestral 2026-T3",
-    periodo: { id_periodo: "p-3", nombre: "2026-T3" },
+    periodo: { id_periodo: "p-3", nombre: "2026-S2", desde: "2026-07-01", hasta: "2026-12-31" },
     cerrado_en: "2026-10-12T12:00:00.000Z",
   },
   filtros: { departamento: null, sucursal: null },
@@ -98,7 +143,11 @@ const TABLERO = {
       { id: SOPOCACHI, nombre: "Sopocachi" },
     ],
   },
-  kpis: { puntaje_promedio: puntaje(3.57, "VERDE"), cumplimiento_evaluaciones: cumplimiento(88.89, "AMARILLO") },
+  kpis: {
+    puntaje_promedio: puntaje(3.57, "VERDE"),
+    cumplimiento_evaluaciones: cumplimiento(88.89, "AMARILLO"),
+    alto_desempeno: altoDesempeno(37.5, "VERDE"),
+  },
   histograma: { escala: { minimo: 1, maximo: 5 }, total: 8, rangos: rangos([0, 0, 0, 3, 1, 2, 0, 2]) },
   ranking_areas: [grupo(ATENCION, "Atención al cliente", 1, 3.73), grupo(RRHH, "Recursos Humanos", 2, 2.5)],
   ranking_sucursales: [grupo(SOPOCACHI, "Sopocachi", 1, 3.97), grupo(MIRAFLORES, "Miraflores", 2, 2.92)],
@@ -133,6 +182,8 @@ const tarjetasKpi = () => screen.getByRole("list", { name: "Indicadores del cicl
 describe("Dashboard de desempeño", () => {
   beforeEach(() => {
     cambiarRol("gerente");
+    obtenerRotacionTemprana.mockReset();
+    obtenerRotacionTemprana.mockResolvedValue(ROTACION);
   });
 
   describe("indicadores", () => {
@@ -140,11 +191,12 @@ describe("Dashboard de desempeño", () => {
       obtenerDashboardDesempeno.mockResolvedValue(TABLERO);
       montar();
 
-      await screen.findByText(/Puntaje promedio de desempeño/);
+      await screen.findByText("14,29 %");
       const kpis = within(tarjetasKpi());
       expect(kpis.getByText("3,57")).toBeTruthy();
       expect(kpis.getByText("88,89 %")).toBeTruthy();
-      expect(kpis.getByText("Cumple la meta")).toBeTruthy();
+      // KPI-07, KPI-09 y KPI-12 cumplen; el KPI-08 está cerca.
+      expect(kpis.getAllByText("Cumple la meta")).toHaveLength(3);
       expect(kpis.getByText("Cerca de la meta")).toBeTruthy();
       expect(kpis.getByText("Meta: ≥ 3,50")).toBeTruthy();
       expect(kpis.getByText("Meta: ≥ 90,00 %")).toBeTruthy();
@@ -167,10 +219,133 @@ describe("Dashboard de desempeño", () => {
       montar();
 
       await screen.findByText("Sin calificaciones para mostrar");
+      await screen.findByText("14,29 %");
       const kpis = within(tarjetasKpi());
       expect(kpis.getAllByText("—")).toHaveLength(2);
       expect(kpis.getAllByText("Sin datos").length).toBeGreaterThanOrEqual(2);
       expect(screen.getAllByText("Sin datos para el ranking")).toHaveLength(2);
+    });
+  });
+
+  describe("KPI-09 y KPI-12 (épica 13)", () => {
+    const TABLERO_S1 = {
+      ...TABLERO,
+      ciclo: { ...TABLERO.ciclo, id_ciclo: T2, periodo: { id_periodo: "p-1", nombre: "2026-S1", desde: "2026-01-01", hasta: "2026-06-30" } },
+    };
+
+    it("criterio 1: muestra el KPI-09 y el KPI-12 con su valor, su meta y su semáforo", async () => {
+      obtenerDashboardDesempeno.mockResolvedValue(TABLERO);
+      montar();
+
+      await screen.findByText("14,29 %");
+      const kpis = within(tarjetasKpi());
+      expect(kpis.getByText("Colaboradores de alto desempeño")).toBeTruthy();
+      expect(kpis.getByText("37,50 %")).toBeTruthy();
+      expect(kpis.getByText("Meta: ≥ 25,00 %")).toBeTruthy();
+      expect(kpis.getByText("3 de 8 colaboradores con puntaje ≥ 4,00")).toBeTruthy();
+      expect(kpis.getByText("Rotación temprana")).toBeTruthy();
+      expect(kpis.getByText("Meta: ≤ 15,00 %")).toBeTruthy();
+      expect(kpis.getByText(/^1 baja con menos de 90 días sobre 7 ingresos del /)).toBeTruthy();
+    });
+
+    it("criterio 1: el semáforo de rotación es rojo cuando supera la meta y amarillo cuando la supera por poco", async () => {
+      obtenerDashboardDesempeno.mockResolvedValue({
+        ...TABLERO,
+        kpis: { ...TABLERO.kpis, alto_desempeno: altoDesempeno(22.5, "AMARILLO") },
+      });
+      obtenerRotacionTemprana.mockResolvedValue(rotacion(50, "ROJO"));
+      montar();
+
+      await screen.findByText("50,00 %");
+      const kpis = within(tarjetasKpi());
+      expect(kpis.getByText("No cumple la meta")).toBeTruthy();
+      expect(kpis.getAllByText("Cerca de la meta")).toHaveLength(2); // KPI-08 y KPI-09
+    });
+
+    it("criterio 2: pide el KPI-12 con el periodo del ciclo y lo recalcula al filtrar por área, sucursal o ciclo", async () => {
+      obtenerDashboardDesempeno.mockImplementation(async (_rol, filtros) => (filtros.ciclo === T2 ? TABLERO_S1 : TABLERO));
+      montar();
+
+      await screen.findByText("14,29 %");
+      expect(obtenerRotacionTemprana).toHaveBeenCalledWith("gerente", {
+        desde: "2026-07-01",
+        hasta: "2026-12-31",
+        departamento: "",
+        sucursal: "",
+      });
+
+      await userEvent.selectOptions(screen.getByLabelText("Área"), RRHH);
+      await waitFor(() =>
+        expect(obtenerRotacionTemprana).toHaveBeenLastCalledWith("gerente", {
+          desde: "2026-07-01",
+          hasta: "2026-12-31",
+          departamento: RRHH,
+          sucursal: "",
+        }),
+      );
+
+      await userEvent.selectOptions(screen.getByLabelText("Sucursal"), MIRAFLORES);
+      await waitFor(() =>
+        expect(obtenerRotacionTemprana).toHaveBeenLastCalledWith("gerente", {
+          desde: "2026-07-01",
+          hasta: "2026-12-31",
+          departamento: RRHH,
+          sucursal: MIRAFLORES,
+        }),
+      );
+
+      await userEvent.selectOptions(screen.getByLabelText("Ciclo cerrado"), T2);
+      await waitFor(() =>
+        expect(obtenerRotacionTemprana).toHaveBeenLastCalledWith("gerente", {
+          desde: "2026-01-01",
+          hasta: "2026-06-30",
+          departamento: RRHH,
+          sucursal: MIRAFLORES,
+        }),
+      );
+      expect(await screen.findByText(/La rotación temprana se calcula con el periodo 2026-S1/)).toBeTruthy();
+    });
+
+    it("criterio 3: muestra qué bajas con menos de 90 días entraron al cálculo", async () => {
+      obtenerDashboardDesempeno.mockResolvedValue(TABLERO);
+      montar();
+
+      await userEvent.click(await screen.findByText("Ver las bajas tempranas"));
+      const baja = screen.getByText(/Verónica Nina Huanca/);
+      expect(baja.textContent).toContain("Atención al cliente");
+      expect(baja.textContent).toContain("Sopocachi");
+      expect(baja.textContent).toContain("53 días");
+    });
+
+    it("sin ingresos en el periodo muestra «Sin datos» en vez de un 0 %", async () => {
+      obtenerDashboardDesempeno.mockResolvedValue(TABLERO);
+      obtenerRotacionTemprana.mockResolvedValue(
+        rotacion(null, null, { ingresos_periodo: 0, bajas_tempranas: 0, detalle_bajas_tempranas: [] }),
+      );
+      montar();
+
+      expect(await screen.findByText(/^Sin ingresos del .*: no hay base para calcularla$/)).toBeTruthy();
+      expect(screen.queryByText("Ver las bajas tempranas")).toBeNull();
+    });
+
+    it("si EmployeeService no responde, el KPI-12 lo explica y el resto del dashboard sigue funcionando", async () => {
+      obtenerDashboardDesempeno.mockResolvedValue(TABLERO);
+      obtenerRotacionTemprana.mockRejectedValue(new ErrorApi(503, "No se pudo conectar con el servidor"));
+      montar();
+
+      expect(await screen.findByText("No se pudo calcular: No se pudo conectar con el servidor")).toBeTruthy();
+      expect(within(tarjetasKpi()).getByText("3,57")).toBeTruthy();
+      expect(screen.queryByText("No se pudo cargar el dashboard")).toBeNull();
+    });
+
+    it("«Actualizar» también vuelve a pedir el KPI-12", async () => {
+      obtenerDashboardDesempeno.mockResolvedValue(TABLERO);
+      montar();
+
+      await screen.findByText("14,29 %");
+      const antes = obtenerRotacionTemprana.mock.calls.length;
+      await userEvent.click(screen.getByRole("button", { name: "Actualizar" }));
+      await waitFor(() => expect(obtenerRotacionTemprana.mock.calls.length).toBeGreaterThan(antes));
     });
   });
 

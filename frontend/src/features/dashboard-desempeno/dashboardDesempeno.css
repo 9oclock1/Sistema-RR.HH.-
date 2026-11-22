@@ -76,6 +76,23 @@
   list-style: none;
 }
 
+/* KPI-12: quiénes son las bajas tempranas que entran al cálculo. */
+.dd-kpi__desglose {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.dd-kpi__desglose summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.dd-kpi__desglose ul {
+  margin: var(--space-1) 0 0;
+  padding-inline-start: var(--space-4);
+}
+
 .dd-kpi {
   display: flex;
   flex-direction: column;
