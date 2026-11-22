@@ -16,9 +16,11 @@ const capacitacionesRoutes = require("./src/routes/capacitaciones");
 const solicitudesServicioRoutes = require("./src/routes/solicitudesServicio");
 const contratosRoutes = require("./src/routes/contratos");
 const mensajesPublicadosRoutes = require("./src/routes/mensajesPublicados");
+const convocatoriasRoutes = require("./src/routes/convocatorias");
 const errorHandler = require("./src/middlewares/errorHandler");
 const acusesMemorandumJob = require("./src/jobs/acusesMemorandumJob"); // RF-39
 const { iniciarCronCertificaciones } = require("./src/jobs/certificacionesCron");
+const { iniciarCronCierreConvocatorias } = require("./src/jobs/cierreConvocatoriasCron");
 const { iniciarCronReintentosCompras, iniciarCronRespuestaCompras } = require("./src/jobs/solicitudesCompraCron");
 
 const app = express();
@@ -66,6 +68,7 @@ app.use("/capacitaciones", capacitacionesRoutes);
 app.use("/solicitudes-servicio", solicitudesServicioRoutes);
 app.use("/contratos", contratosRoutes);
 app.use("/mensajes-publicados", mensajesPublicadosRoutes);
+app.use("/convocatorias", convocatoriasRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: `Ruta no encontrada: ${req.method} ${req.originalUrl}` });
@@ -79,6 +82,7 @@ if (require.main === module) {
   });
   acusesMemorandumJob.iniciar(); // RF-39
   iniciarCronCertificaciones();
+  iniciarCronCierreConvocatorias();
   iniciarCronReintentosCompras();
   iniciarCronRespuestaCompras();
 }
