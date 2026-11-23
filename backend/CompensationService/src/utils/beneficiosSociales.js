@@ -17,7 +17,8 @@ const plural = (n, singular, varios) => `${n} ${n === 1 ? singular : varios}`;
 const diasEntre = (desde, hasta) =>
   Math.round((Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / DIA_MS);
 
-// Mismo día `n` meses después; si ese mes es más corto, el último día del mes.
+// Mismo día `n` meses después; si ese mes es más corto, el último día del mes
+// (ingreso el 31 de enero: el 28 de febrero completa el mes, a favor del trabajador).
 function sumarMesesCalendario(fecha, n) {
   const [anio, mes, dia] = fecha.split("-").map(Number);
   const indice = anio * 12 + (mes - 1) + n;
