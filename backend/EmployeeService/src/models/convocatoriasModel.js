@@ -1,3 +1,5 @@
+const { HOY_SQL } = require('../utils/fechas');
+
 const ESTADO_NOTIFICACION = { PENDIENTE: 'PENDIENTE', ENTREGADA: 'ENTREGADA', FALLIDA: 'FALLIDA' };
 const MAX_ERROR_NOTIFICACION = 300;
 
@@ -27,11 +29,11 @@ const SELECT_CONVOCATORIA = `
     cv.notificada_en,
     cv.ultimo_error_notificacion,
     CASE
-      WHEN NOT cv.esta_abierta OR cv.fecha_cierre_postulacion < CURRENT_DATE THEN 'CERRADA'
-      WHEN cv.fecha_inicio_postulacion > CURRENT_DATE THEN 'PROGRAMADA'
+      WHEN NOT cv.esta_abierta OR cv.fecha_cierre_postulacion < ${HOY_SQL} THEN 'CERRADA'
+      WHEN cv.fecha_inicio_postulacion > ${HOY_SQL} THEN 'PROGRAMADA'
       ELSE 'ABIERTA'
     END AS estado,
-    (cv.fecha_cierre_postulacion - CURRENT_DATE) AS dias_para_cierre
+    (cv.fecha_cierre_postulacion - ${HOY_SQL}) AS dias_para_cierre
   FROM convocatorias_ascenso cv
   JOIN cargos c ON c.id_cargo = cv.id_cargo
   JOIN departamentos d ON d.id_departamento = c.id_departamento
@@ -153,7 +155,7 @@ const buscarVigenteMismoPuesto = async (db, { idCargo, idSucursal }) => {
   const { rows } = await db.query(
     `SELECT id_convocatoria, titulo
        FROM convocatorias_ascenso
-      WHERE id_cargo = $1 AND id_sucursal = $2 AND esta_abierta AND fecha_cierre_postulacion >= CURRENT_DATE
+      WHERE id_cargo = $1 AND id_sucursal = $2 AND esta_abierta AND fecha_cierre_postulacion >= ${HOY_SQL}
       LIMIT 1`,
     [idCargo, idSucursal]
   );
@@ -224,7 +226,7 @@ const cerrarVencidas = async (db) => {
   const { rows } = await db.query(
     `UPDATE convocatorias_ascenso
      SET esta_abierta = FALSE, cerrada_en = CURRENT_TIMESTAMP
-     WHERE esta_abierta AND fecha_cierre_postulacion < CURRENT_DATE
+     WHERE esta_abierta AND fecha_cierre_postulacion < ${HOY_SQL}
      RETURNING id_convocatoria`
   );
   return rows.map((fila) => fila.id_convocatoria);
