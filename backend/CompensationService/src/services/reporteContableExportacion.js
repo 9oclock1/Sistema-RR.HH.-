@@ -1,13 +1,8 @@
+const ExcelJS = require("exceljs");
 const PDFDocument = require("pdfkit");
 
-// RF-49 (criterio 3): el reporte contable consolidado en CSV (hojas de cálculo) y PDF, con los mismos totales
-// que en pantalla, para que el Contador los adjunte a la conciliación con Contabilidad.
-//
-// El criterio dice "lo descarga en Excel": esto es CSV, no un .xlsx real. Es el mismo patrón que ya usa
-// AttendanceService para sus propios reportes (`;`, BOM y coma decimal para que Excel lo abra bien, sin
-// agregar una librería nueva como exceljs). Si el criterio exige el binario real, hay que decidir si vale
-// agregar esa dependencia solo para este reporte, o si el CSV (que ya funciona y es el patrón del repo)
-// alcanza para "Excel" en este contexto.
+// RF-49 (criterio 3): el reporte contable consolidado en Excel (.xlsx real, con exceljs) y PDF, con los
+// mismos totales que en pantalla, para que el Contador los adjunte a la conciliación con Contabilidad.
 
 const decimal = (valor) => Number(valor).toFixed(2).replace(".", ",");
 const ESTADO_CONCILIACION_TEXTO = { registrado: "Registrado", pendiente: "Pendiente", con_error: "Con error" };
@@ -22,37 +17,88 @@ const nombreArchivo = (reporte, extension) => {
 const tituloConciliacion = ({ estado, referencia, motivo }) =>
   [ESTADO_CONCILIACION_TEXTO[estado], referencia && `ref. ${referencia}`, motivo].filter(Boolean).join(" · ");
 
-// Si el valor empieza con = + - @ (o tabulador), Excel lo interpreta como fórmula al abrir el CSV, nunca
-// como texto: una sucursal o cuenta con ese nombre ejecutaría esa fórmula. El apóstrofo le dice que es
-// texto literal; es invisible al verlo y no afecta el valor.
-const celda = (valor) => {
-  const texto = String(valor ?? "");
-  const segura = /^[=+\-@\t\r]/.test(texto) ? `'${texto}` : texto;
-  return /[";\n\r]/.test(segura) ? `"${segura.replace(/"/g, '""')}"` : segura;
-};
+const COLUMNAS_XLSX = [
+  { header: "Sucursal", key: "sucursal", width: 20 },
+  { header: "Área", key: "area", width: 18 },
+  { header: "Cuenta", key: "cuenta", width: 12 },
+  { header: "Nombre de cuenta", key: "nombre_cuenta", width: 32 },
+  { header: "Debe", key: "debe", width: 14 },
+  { header: "Haber", key: "haber", width: 14 },
+];
+const FORMATO_MONTO = "#,##0.00";
+const NEGRITA = { bold: true };
+const FONDO_TOTAL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } };
 
-function aCsv(reporte) {
-  const linea = (valores) => valores.map(celda).join(";");
-  const contenido = [
-    linea(["Reporte contable consolidado"]),
-    linea([`Recurso: ${reporte.recurso === "PLANILLA" ? "Planilla mensual" : "Planilla de aguinaldos"}`]),
-    linea([`Periodo: ${identificador(reporte)}`]),
-    linea([`Estado: ${reporte.estado}`, `Colaboradores: ${reporte.colaboradores}`]),
-    linea(["Conciliación Contabilidad", tituloConciliacion(reporte.conciliacion.contabilidad)]),
-    linea(["Conciliación Pagos", tituloConciliacion(reporte.conciliacion.pagos)]),
-    "",
-    linea(["Centro de costo", "Cuenta", "Nombre de cuenta", "Debe", "Haber"]),
-  ];
+// Un .xlsx no tiene el problema de inyección de fórmulas del CSV: la celda lleva su tipo (texto, número)
+// como metadato explícito en el archivo, así que un string asignado con `.value = texto` siempre se muestra
+// literal en Excel, nunca se evalúa como fórmula aunque empiece con "=" (a diferencia de un CSV, donde Excel
+// decide el tipo de cada celda por su primer carácter al leerlo).
+async function aXlsx(reporte) {
+  const libro = new ExcelJS.Workbook();
+  libro.creator = "Sistema RR.HH.";
+  libro.created = new Date();
+  const hoja = libro.addWorksheet("Reporte contable", { views: [{ state: "frozen", ySplit: 9 }] });
+  hoja.columns = COLUMNAS_XLSX;
+
+  hoja.mergeCells("A1:F1");
+  hoja.getCell("A1").value = "Reporte contable consolidado";
+  hoja.getCell("A1").font = { bold: true, size: 14 };
+
+  const agregarFila = (etiqueta, valor) => {
+    const fila = hoja.addRow([etiqueta, valor]);
+    fila.getCell(1).font = NEGRITA;
+  };
+  agregarFila("Recurso", reporte.recurso === "PLANILLA" ? "Planilla mensual" : "Planilla de aguinaldos");
+  agregarFila("Periodo", identificador(reporte));
+  agregarFila("Estado", reporte.estado);
+  agregarFila("Colaboradores", reporte.colaboradores);
+  agregarFila("Conciliación Contabilidad", tituloConciliacion(reporte.conciliacion.contabilidad));
+  agregarFila("Conciliación Pagos", tituloConciliacion(reporte.conciliacion.pagos));
+  hoja.addRow([]);
+
+  const filaEncabezado = hoja.addRow(COLUMNAS_XLSX.map((c) => c.header));
+  filaEncabezado.eachCell((celda) => {
+    celda.font = NEGRITA;
+    celda.fill = FONDO_TOTAL;
+  });
+
   for (const centro of reporte.centros_costo) {
     for (const r of centro.renglones) {
-      contenido.push(
-        linea([centro.centro_costo, r.cuenta.codigo, r.cuenta.nombre, r.debe > 0 ? decimal(r.debe) : "", r.haber > 0 ? decimal(r.haber) : ""])
-      );
+      const fila = hoja.addRow({
+        sucursal: centro.sucursal,
+        area: centro.area,
+        cuenta: r.cuenta.codigo,
+        nombre_cuenta: r.cuenta.nombre,
+        debe: r.debe > 0 ? r.debe : null,
+        haber: r.haber > 0 ? r.haber : null,
+      });
+      fila.getCell("debe").numFmt = FORMATO_MONTO;
+      fila.getCell("haber").numFmt = FORMATO_MONTO;
     }
-    contenido.push(linea([`Total ${centro.centro_costo}`, "", "", decimal(centro.total_debe), decimal(centro.total_haber)]));
+    const filaTotal = hoja.addRow({
+      sucursal: `Total ${centro.centro_costo}`,
+      debe: centro.total_debe,
+      haber: centro.total_haber,
+    });
+    filaTotal.eachCell((celda) => {
+      celda.font = NEGRITA;
+      celda.fill = FONDO_TOTAL;
+    });
+    filaTotal.getCell("debe").numFmt = FORMATO_MONTO;
+    filaTotal.getCell("haber").numFmt = FORMATO_MONTO;
   }
-  contenido.push(linea(["TOTAL GENERAL", "", "", decimal(reporte.totales.total_debe), decimal(reporte.totales.total_haber)]));
-  return { nombre: nombreArchivo(reporte, "csv"), contenido: `﻿${contenido.join("\r\n")}\r\n` };
+
+  const filaGranTotal = hoja.addRow({
+    sucursal: "TOTAL GENERAL",
+    debe: reporte.totales.total_debe,
+    haber: reporte.totales.total_haber,
+  });
+  filaGranTotal.eachCell((celda) => (celda.font = NEGRITA));
+  filaGranTotal.getCell("debe").numFmt = FORMATO_MONTO;
+  filaGranTotal.getCell("haber").numFmt = FORMATO_MONTO;
+
+  const buffer = await libro.xlsx.writeBuffer();
+  return { nombre: nombreArchivo(reporte, "xlsx"), contenido: Buffer.from(buffer) };
 }
 
 const COLOR = { primario: "#1868DB", texto: "#292A2E", secundario: "#505258", borde: "#DDDEE1", fondo: "#F8F8F8" };
@@ -171,4 +217,4 @@ function aPdf(reporte) {
   });
 }
 
-module.exports = { aCsv, aPdf };
+module.exports = { aXlsx, aPdf };
