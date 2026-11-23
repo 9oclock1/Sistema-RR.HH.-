@@ -10,7 +10,7 @@ const {
   cargarPlanilla,
   cargarPlanillaCerrada,
   elegirFormato,
-  exigirAdministrador,
+  exigirResponsable,
   nombreDelResponsable,
   nombreMes,
   sinGenerar,
@@ -76,7 +76,7 @@ async function generar(idPlanilla, identidad) {
 }
 
 async function obtener(idPlanilla, identidad) {
-  exigirAdministrador(identidad);
+  exigirResponsable(identidad);
   const planilla = await cargarPlanilla(pool, idPlanilla);
   const guardada = await modelo.obtenerGuardada(pool, planilla.id_planilla);
   if (!guardada) throw sinGenerar("la planilla de aportes", planilla.periodo);

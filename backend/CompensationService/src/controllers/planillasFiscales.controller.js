@@ -1,10 +1,7 @@
 const tributaria = require("../services/planillasTributarias.service");
 const aportes = require("../services/planillasAportes.service");
 
-const identidad = (req) => ({
-  idEmpleado: req.get("X-Empleado-Id")?.trim() || null,
-  rol: req.get("X-Rol")?.trim() || null,
-});
+const identidad = (req) => req.identidad;
 
 function enviarArchivo(res, { nombreArchivo, tipo, contenido }) {
   res.set({

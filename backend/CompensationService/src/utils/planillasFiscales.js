@@ -3,7 +3,8 @@ const { UUID_RE } = require("./formatos");
 const modelo = require("../models/planillasTributarias.model");
 const empleadosCliente = require("../clients/empleados.cliente");
 
-const MENSAJE_SOLO_ADMIN = "Solo el Administrador de RRHH puede consultar las planillas tributaria y de aportes.";
+const ROLES_PLANILLAS_FISCALES = ["admin", "contador"];
+const MENSAJE_SIN_PERMISO = "Solo el Administrador de RRHH o el Contador pueden consultar las planillas tributaria y de aportes.";
 
 const ESTADOS_NO_CERRADA = { BORRADOR: "en borrador", APROBADA: "aprobada, pero aún no cerrada" };
 
@@ -15,8 +16,8 @@ const FORMATOS = {
 const nombreMes = (periodo) =>
   new Intl.DateTimeFormat("es-BO", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${periodo}-01T00:00:00Z`));
 
-function exigirAdministrador({ rol } = {}) {
-  if ((rol ?? "").trim().toLowerCase() !== "admin") throw new ErrorApp(403, MENSAJE_SOLO_ADMIN);
+function exigirResponsable({ rol } = {}) {
+  if (!ROLES_PLANILLAS_FISCALES.includes((rol ?? "").trim().toLowerCase())) throw new ErrorApp(403, MENSAJE_SIN_PERMISO);
 }
 
 function validarIdPlanilla(valor) {
@@ -68,7 +69,8 @@ const sinGenerar = (nombre, periodo) =>
 module.exports = {
   FORMATOS,
   nombreMes,
-  exigirAdministrador,
+  ROLES_PLANILLAS_FISCALES,
+  exigirResponsable,
   validarIdPlanilla,
   cargarPlanilla,
   cargarPlanillaCerrada,
