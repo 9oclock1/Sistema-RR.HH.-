@@ -1,8 +1,8 @@
-import { Calculator, Download, UserMinus } from "lucide-react";
+import { Calculator, Download, Scale, UserMinus } from "lucide-react";
 import { Boton, EstadoVacio, Etiqueta, Tabla } from "../../components/ui";
 import { ESTADOS, formatearBs, formatearFecha, formatearFechaHora } from "./formato";
 
-const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, puedeDescargar }) => [
+const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, onVerSaldos, puedeDescargar }) => [
   {
     clave: "colaborador",
     titulo: "Colaborador",
@@ -70,7 +70,7 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, puedeDescargar })
   {
     clave: "acciones",
     titulo: <span className="ds-solo-lector">Acciones</span>,
-    ancho: "96px",
+    ancho: "136px",
     alinear: "fin",
     celda: (p) => (
       <div className="desv-acciones">
@@ -81,6 +81,14 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, puedeDescargar })
           aria-label={`Ver sueldo promedio de ${p.nombre_empleado}`}
           title="Ver sueldo promedio indemnizable"
           onClick={() => onVerPromedio(p)}
+        />
+        <Boton
+          variante="sutil"
+          soloIcono
+          icono={Scale}
+          aria-label={`Ver saldos proporcionales de ${p.nombre_empleado}`}
+          title="Ver duodécimas de aguinaldo y vacaciones truncas"
+          onClick={() => onVerSaldos(p)}
         />
         {puedeDescargar && (
           <Boton
@@ -105,13 +113,14 @@ export default function TablaDesvinculaciones({
   onDescargar,
   descargandoId,
   onVerPromedio,
+  onVerSaldos,
   puedeDescargar = true,
 }) {
   return (
     <Tabla
       className="desv-tabla"
       descripcion="Procesos de desvinculación registrados"
-      columnas={COLUMNAS({ onDescargar, descargandoId, onVerPromedio, puedeDescargar })}
+      columnas={COLUMNAS({ onDescargar, descargandoId, onVerPromedio, onVerSaldos, puedeDescargar })}
       filas={procesos}
       claveFila="id_proceso"
       cargando={cargando}

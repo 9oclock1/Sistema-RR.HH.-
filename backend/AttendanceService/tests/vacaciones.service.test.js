@@ -57,3 +57,17 @@ test("consulta propia de un empleado no registrado: 403 (identidad rechazada); l
   await assert.rejects(servicio.consultarSaldo(inexistente, AHORA), (error) => error.estado === 404);
   assert.equal((await servicio.consultarMiSaldo(ANA, AHORA)).id_empleado, ANA);
 });
+
+test("KAN-77: con fecha de corte, el saldo se calcula a esa fecha (por ejemplo, la de retiro)", async () => {
+  const resultado = await servicio.consultarSaldo(ANA, AHORA, "2025-01-09");
+  assert.equal(resultado.fecha_consulta, "2025-01-09");
+  assert.equal(resultado.anios_servicio, 1);
+  assert.equal(resultado.saldo.acumulados, 15);
+  assert.equal(resultado.proximo_periodo.fecha_acreditacion, "2025-01-10");
+});
+
+test("KAN-77: una fecha de corte con formato inválido responde 400", async () => {
+  for (const fecha of ["09/01/2025", "2025-13-40", "hoy"]) {
+    await assert.rejects(servicio.consultarSaldo(ANA, AHORA, fecha), (error) => error.estado === 400);
+  }
+});

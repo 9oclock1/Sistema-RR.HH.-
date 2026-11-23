@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const controlador = require("../controllers/desvinculacionesController");
 const promedio = require("../controllers/promedioIndemnizableController");
+const saldos = require("../controllers/saldosProporcionalesController");
 const exigirAdmin = require("../middlewares/exigirAdmin");
 const subirRespaldo = require("../middlewares/subirRespaldo");
 
@@ -15,5 +16,8 @@ router.get("/desvinculaciones/:id", controlador.obtener);
 router.get("/desvinculaciones/:id/documento", controlador.descargarDocumento);
 router.get("/desvinculaciones/:id/promedio-indemnizable", promedio.obtener);
 router.post("/desvinculaciones/:id/promedio-indemnizable", promedio.calcular);
+// KAN-77: duodécimas de aguinaldo y vacaciones truncas del finiquito.
+router.get("/desvinculaciones/:id/saldos-proporcionales", saldos.obtener);
+router.post("/desvinculaciones/:id/saldos-proporcionales", saldos.calcular);
 
 module.exports = router;

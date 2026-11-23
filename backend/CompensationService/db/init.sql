@@ -963,3 +963,51 @@ CREATE TABLE DETALLE_PROMEDIO_INDEMNIZABLE (
         REFERENCES PLANILLA_EMPLEADOS (id_planilla_empleado),
     CONSTRAINT chk_detalle_promedio_total_ganado CHECK (total_ganado >= 0)
 );
+
+-- Saldos proporcionales del finiquito (KAN-77)
+
+-- Tabla: SALDOS_PROPORCIONALES
+-- Último cálculo de las duodécimas de aguinaldo y las vacaciones truncas de un proceso de liquidación (1 a 1).
+-- Copia el sueldo promedio, el saldo de vacaciones y los tiempos al momento del cálculo; recalcular mientras el
+-- proceso está abierto reemplaza el registro.
+CREATE TABLE SALDOS_PROPORCIONALES (
+    id_proceso UUID NOT NULL,
+    promedio numeric(12,2) NOT NULL,
+    salario_diario numeric(12,2) NOT NULL,
+    -- Aguinaldo: gestión en curso al retiro (1 de diciembre al 30 de noviembre)
+    gestion_aguinaldo smallint NOT NULL,
+    aguinaldo_desde date NOT NULL,
+    aguinaldo_hasta date NOT NULL,
+    aguinaldo_meses smallint NOT NULL,
+    aguinaldo_dias smallint NOT NULL,
+    monto_aguinaldo numeric(12,2) NOT NULL,
+    -- Vacaciones: días no gozados del módulo de vacaciones (AttendanceService) y duodécima del año en curso
+    anios_servicio smallint NOT NULL,
+    dias_acumulados smallint NOT NULL,
+    dias_gozados smallint NOT NULL,
+    dias_pendientes smallint NOT NULL,
+    monto_vacaciones_pendientes numeric(12,2) NOT NULL,
+    anio_en_curso_desde date NOT NULL,
+    anio_en_curso_meses smallint NOT NULL,
+    anio_en_curso_dias smallint NOT NULL,
+    dias_escala smallint NOT NULL,
+    dias_duodecima numeric(6,2) NOT NULL,
+    monto_duodecima_vacaciones numeric(12,2) NOT NULL,
+    total numeric(12,2) NOT NULL,
+    observaciones text[] NOT NULL DEFAULT '{}',
+    calculado_por UUID NULL,
+    calculado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT SALDOS_PROPORCIONALES_pk PRIMARY KEY (id_proceso),
+    CONSTRAINT fk_saldos_proceso FOREIGN KEY (id_proceso)
+        REFERENCES PROCESOS_DESVINCULACION (id_proceso) ON DELETE CASCADE,
+    CONSTRAINT chk_saldos_montos CHECK (
+        promedio >= 0 AND salario_diario >= 0 AND monto_aguinaldo >= 0 AND monto_vacaciones_pendientes >= 0
+        AND monto_duodecima_vacaciones >= 0 AND total >= 0
+    ),
+    CONSTRAINT chk_saldos_tiempos CHECK (
+        aguinaldo_meses BETWEEN 0 AND 12 AND aguinaldo_dias BETWEEN 0 AND 30
+        AND anio_en_curso_meses BETWEEN 0 AND 12 AND anio_en_curso_dias BETWEEN 0 AND 30
+        AND dias_escala IN (15, 20, 30) AND dias_duodecima >= 0
+        AND dias_pendientes >= 0 AND dias_acumulados >= 0 AND dias_gozados >= 0
+    )
+);

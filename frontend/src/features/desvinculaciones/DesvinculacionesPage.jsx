@@ -21,6 +21,7 @@ import { useRol, useUsuario } from "../../context/sesion";
 import { puedeAcceder } from "../../utils/permisos";
 import DesvinculacionFormulario from "./DesvinculacionFormulario";
 import PromedioIndemnizableModal from "./PromedioIndemnizableModal";
+import SaldosProporcionalesModal from "./SaldosProporcionalesModal";
 import TablaDesvinculaciones from "./TablaDesvinculaciones";
 import { ESTADOS, opciones } from "./formato";
 import "./desvinculaciones.css";
@@ -44,6 +45,7 @@ export default function DesvinculacionesPage() {
   const [formularioAbierto, setFormularioAbierto] = useState(false);
   const [descargandoId, setDescargandoId] = useState(null);
   const [procesoPromedio, setProcesoPromedio] = useState(null);
+  const [procesoSaldos, setProcesoSaldos] = useState(null);
 
   const cargar = useCallback(
     () =>
@@ -206,6 +208,7 @@ export default function DesvinculacionesPage() {
             descargandoId={descargandoId}
             puedeDescargar={puedeGestionar}
             onVerPromedio={setProcesoPromedio}
+            onVerSaldos={setProcesoSaldos}
           />
         </Tarjeta>
       )}
@@ -224,6 +227,16 @@ export default function DesvinculacionesPage() {
           proceso={procesoPromedio}
           identidad={identidad}
           onCerrar={() => setProcesoPromedio(null)}
+          onCalculado={cargar}
+          puedeCalcular={puedeGestionar}
+        />
+      )}
+
+      {procesoSaldos && (
+        <SaldosProporcionalesModal
+          proceso={procesoSaldos}
+          identidad={identidad}
+          onCerrar={() => setProcesoSaldos(null)}
           onCalculado={cargar}
           puedeCalcular={puedeGestionar}
         />
