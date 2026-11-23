@@ -1509,6 +1509,8 @@ INSERT INTO CALCULOS_PLANILLA (
   ('c0000000-0000-4000-8000-000000000804', (SELECT v.id_vigencia FROM VIGENCIAS_CONCEPTO v JOIN CONCEPTOS_PLANILLA c ON c.id_concepto = v.id_concepto WHERE c.codigo = 'SIP-SOLIDARIO-PAT' AND v.vigente_desde <= DATE '2026-10-31' AND (v.vigente_hasta IS NULL OR v.vigente_hasta >= DATE '2026-10-31') LIMIT 1), 11, 'APORTE', 'SIP-SOLIDARIO-PAT', 'Aporte patronal solidario', 'PORCENTAJE', 3530.00, NULL, 3.0000, 105.90, NULL)
 ON CONFLICT DO NOTHING;
 
+COMMIT;
+
 -- Planilla tributaria y de aportes de ejemplo (RF-48, KAN-68): entidades con su formato de archivo, parametros
 -- tributarios con vigencias (el salario minimo cambio el 1 de mayo de 2025), valores de la UFV, creditos fiscales declarados
 -- y dos planillas mensuales CERRADAS (2026-04 y 2026-05) de 10 colaboradores, calculadas con las tasas vigentes del catalogo.
