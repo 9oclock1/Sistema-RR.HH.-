@@ -219,3 +219,9 @@ El Administrador la envía desde Bonos por productividad (`POST /bonos-productiv
 - `PROCESOS_DESVINCULACION` registra cada proceso de liquidación con sus datos históricos copiados al momento del registro (incluyendo `corresponde_desahucio`, que queda fijo aunque el catálogo cambie después), y `DOCUMENTOS_DESVINCULACION` almacena el respaldo binario en tabla aparte (1 a 1) para no sobrecargar los listados.
 - Se consideran procesos abiertos los que tienen estado `INICIADO` o `EN_CURSO`; el índice único parcial `uq_proceso_abierto_empleado` impide en base de datos que un mismo colaborador tenga dos procesos abiertos al mismo tiempo.
 - El servicio valida la existencia y estado activo del colaborador contra EmployeeService y lo pasa a estado `BAJA` dentro de la misma transacción en que registra el proceso.
+
+## Rotación de personal (RF-75, KAN-95)
+
+- No agrega tablas. `GET /indicadores/rotacion` lee las bajas de `PROCESOS_DESVINCULACION` (todo estado salvo `ANULADO`; si un colaborador tiene varias, la de retiro más reciente) con su causal, y cruza el personal de EmployeeService (`GET /empleados`: fecha de ingreso, sucursal y área actuales, estado).
+- `fecha_retiro` es el último día trabajado: la baja cuenta en ese mes y el colaborador ya no está en la plantilla al cierre de ese día. Un colaborador en `BAJA` sin proceso registrado no tiene fecha de retiro y queda fuera de los cálculos; la respuesta lo informa en `avisos.bajas_sin_registro`.
+- Acceso: exige sesión real (`middlewares/autenticar.js`, el mismo JWT de AuthService que usan las boletas); el colaborador y su rol salen del token y se ignoran `X-Empleado-Id` y `X-Rol`. Administrador y Gerente ven toda la cadena; un supervisor, solo la sucursal donde trabaja según EmployeeService (pedir otra responde 403); los demás roles, 403.
