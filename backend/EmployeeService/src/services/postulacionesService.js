@@ -85,6 +85,9 @@ const revalidar = async (idConvocatoria, idPostulacion) => {
   if (!postulacion || postulacion.id_convocatoria !== idConvocatoria) {
     throw new HttpError(404, 'No se encontró la postulación en esta convocatoria.');
   }
+  if (postulacion.ascenso) {
+    throw conflicto('El ascenso de este postulante ya fue formalizado: su validación no se puede repetir.', 'YA_FORMALIZADO');
+  }
   return validar(postulacion, convocatoria);
 };
 
@@ -106,6 +109,8 @@ const listar = async (idConvocatoria) => {
       fecha_cierre_postulacion: convocatoria.fecha_cierre_postulacion,
     },
     ranking_definitivo: convocatoria.estado === 'CERRADA',
+    // KAN-84: la postulación cuyo ascenso se formalizó (con sus datos en `ascenso`), o null.
+    ascenso_formalizado: postulaciones.find((p) => p.ascenso) ?? null,
     formula_meritos: {
       peso_nota: PESO_NOTA,
       peso_antiguedad: PESO_ANTIGUEDAD,

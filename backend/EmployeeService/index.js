@@ -22,6 +22,7 @@ const errorHandler = require("./src/middlewares/errorHandler");
 const acusesMemorandumJob = require("./src/jobs/acusesMemorandumJob"); // RF-39
 const { iniciarCronCertificaciones } = require("./src/jobs/certificacionesCron");
 const { iniciarCronCierreConvocatorias } = require("./src/jobs/cierreConvocatoriasCron");
+const { iniciarCronAscensosProgramados } = require("./src/jobs/ascensosProgramadosCron"); // KAN-84
 const { iniciarCronReintentosCompras, iniciarCronRespuestaCompras } = require("./src/jobs/solicitudesCompraCron");
 
 const app = express();
@@ -85,6 +86,7 @@ if (require.main === module) {
   acusesMemorandumJob.iniciar(); // RF-39
   iniciarCronCertificaciones();
   iniciarCronCierreConvocatorias();
+  iniciarCronAscensosProgramados(); // KAN-84
   iniciarCronReintentosCompras();
   iniciarCronRespuestaCompras();
 }

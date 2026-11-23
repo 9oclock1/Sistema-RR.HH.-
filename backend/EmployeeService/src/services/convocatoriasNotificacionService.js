@@ -21,18 +21,17 @@ const armarMensaje = (convocatoria, destinatario) => ({
   ].join('\n'),
 });
 
-const avisarElegible = async (convocatoria, destinatario, { idPublicador } = {}) => {
-  const { asunto, contenido } = armarMensaje(convocatoria, destinatario);
+const enviarDirecta = async ({ idEmpleado, asunto, contenido, idRemitente }) => {
   try {
     const respuesta = await fetch(`${URL_NOTIFICACIONES}/comunicaciones/directa`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Rol': 'admin',
-        'X-Usuario-Id': idPublicador || USUARIO_SISTEMA,
+        'X-Usuario-Id': idRemitente || USUARIO_SISTEMA,
       },
       body: JSON.stringify({
-        id_empleado_destinatario: destinatario.id_empleado,
+        id_empleado_destinatario: idEmpleado,
         asunto,
         contenido,
         requiere_confirmacion: false,
@@ -48,4 +47,30 @@ const avisarElegible = async (convocatoria, destinatario, { idPublicador } = {})
   }
 };
 
-module.exports = { avisarElegible, armarMensaje };
+const avisarElegible = (convocatoria, destinatario, { idPublicador } = {}) =>
+  enviarDirecta({ idEmpleado: destinatario.id_empleado, idRemitente: idPublicador, ...armarMensaje(convocatoria, destinatario) });
+
+const montoBs = new Intl.NumberFormat('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// KAN-84 (criterio 4): aviso al empleado promovido con su nuevo cargo, haber y fecha de vigencia.
+const armarMensajeAscenso = ({ nombres, convocatoria, cargo, sucursal, ascenso }) => ({
+  asunto: `Ascenso formalizado: ${cargo.nombre}`,
+  contenido: [
+    `${nombres}, Recursos Humanos formalizó su ascenso por la convocatoria interna «${convocatoria.titulo}».`,
+    '',
+    `Nuevo cargo: ${cargo.nombre} (${sucursal}).`,
+    `Nivel salarial: ${cargo.nivel_salarial}.`,
+    cargo.cargo_jefe_directo ? `Reporta a: ${cargo.cargo_jefe_directo}.` : null,
+    `Haber mensual: Bs ${montoBs.format(ascenso.haber_mensual_pactado)}.`,
+    `Vigente desde el ${formatearFecha(ascenso.fecha_vigencia)}.`,
+    '',
+    `El cambio quedó registrado como adenda ${ascenso.numero_contrato} en su historial contractual.`,
+  ]
+    .filter((linea) => linea !== null)
+    .join('\n'),
+});
+
+const avisarAscenso = (datos, { idRemitente } = {}) =>
+  enviarDirecta({ idEmpleado: datos.id_empleado, idRemitente, ...armarMensajeAscenso(datos) });
+
+module.exports = { avisarElegible, armarMensaje, avisarAscenso, armarMensajeAscenso };

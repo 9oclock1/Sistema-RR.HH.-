@@ -153,6 +153,55 @@ export const formularioAPayload = (valores) => ({
   fecha_cierre_postulacion: valores.fecha_cierre_postulacion,
 });
 
+// KAN-84: formalización del ascenso del postulante apto seleccionado.
+export const ESTADOS_ASCENSO = {
+  APLICADO: { tono: "exito", icono: CircleCheck, texto: "Ascenso aplicado" },
+  PROGRAMADO: { tono: "info", icono: CalendarClock, texto: "Ascenso programado" },
+};
+
+export const estadoAscenso = (codigo) => ESTADOS_ASCENSO[codigo] ?? { ...SIN_ESTADO, texto: codigo ?? "—" };
+
+export const CAMPOS_ASCENSO = ["fecha_vigencia", "haber_mensual_pactado", "numero_contrato", "observaciones"];
+
+const MONTO_ASCENSO_REGEX = /^\d{1,10}([.,]\d{1,2})?$/;
+const montoBs = new Intl.NumberFormat("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export const formatearBs = (valor) => (valor === null || valor === undefined ? "—" : `Bs ${montoBs.format(valor)}`);
+
+export const formularioAscensoVacio = (hoy = hoyLaPaz()) => ({
+  fecha_vigencia: hoy,
+  haber_mensual_pactado: "",
+  numero_contrato: "",
+  observaciones: "",
+});
+
+export function validarFormularioAscenso(valores, hoy = hoyLaPaz()) {
+  const errores = {};
+  if (!valores.fecha_vigencia) errores.fecha_vigencia = "Indique la fecha de vigencia del ascenso.";
+  else if (valores.fecha_vigencia < hoy) errores.fecha_vigencia = "No puede ser anterior a hoy.";
+
+  const haber = valores.haber_mensual_pactado.trim();
+  if (haber && (!MONTO_ASCENSO_REGEX.test(haber) || Number(haber.replace(",", ".")) <= 0)) {
+    errores.haber_mensual_pactado = "Use un monto mayor a cero con hasta 2 decimales.";
+  }
+  if (valores.numero_contrato.trim().length > 40) errores.numero_contrato = "No puede superar los 40 caracteres.";
+  if (valores.observaciones.trim().length > 1000) errores.observaciones = "No puede superar los 1000 caracteres.";
+  return errores;
+}
+
+// Los campos opcionales vacíos no se envían: el backend usa sus valores por defecto.
+export const formularioAscensoAPayload = (valores) => {
+  const haber = valores.haber_mensual_pactado.trim();
+  const numero = valores.numero_contrato.trim();
+  const observaciones = valores.observaciones.trim();
+  return {
+    fecha_vigencia: valores.fecha_vigencia,
+    ...(haber && { haber_mensual_pactado: Number(haber.replace(",", ".")) }),
+    ...(numero && { numero_contrato: numero }),
+    ...(observaciones && { observaciones }),
+  };
+};
+
 export const cerrarSiVencio = (error) => {
   if (error?.status !== 401) return false;
   fijarSesion(null);

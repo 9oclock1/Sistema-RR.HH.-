@@ -282,6 +282,7 @@ function GestionConvocatorias({ usuario }) {
           sesion={sesion}
           puedeRevalidar={puedePublicar}
           onCerrar={() => setRevisando(null)}
+          onActualizada={reintentar}
         />
       )}
     </>

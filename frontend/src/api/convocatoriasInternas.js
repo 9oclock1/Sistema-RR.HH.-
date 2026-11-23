@@ -26,3 +26,10 @@ export const listarPostulaciones = (sesion, idConvocatoria) =>
 
 export const revalidarPostulacion = (sesion, idConvocatoria, idPostulacion) =>
   request(`${BASE}/${idConvocatoria}/postulaciones/${idPostulacion}/validacion`, { method: "POST", headers: comoRrhh(sesion) });
+
+// KAN-84: formalización del ascenso del postulante apto seleccionado (con la sesión del Administrador).
+export const formalizarAscenso = (idConvocatoria, idPostulacion, datos) =>
+  request(`${BASE}/${idConvocatoria}/postulaciones/${idPostulacion}/formalizacion`, { method: "POST", body: datos });
+
+export const reintentarAvisoAscenso = (idConvocatoria, idPostulacion) =>
+  request(`${BASE}/${idConvocatoria}/postulaciones/${idPostulacion}/formalizacion/notificacion`, { method: "POST" });
