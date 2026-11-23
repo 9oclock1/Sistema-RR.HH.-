@@ -3,16 +3,16 @@ const convocatoriasController = require('../controllers/convocatoriasController'
 const postulacionesController = require('../controllers/postulacionesController');
 const exigirRol = require('../middlewares/exigirRol');
 const identificarEmpleado = require('../middlewares/identificarEmpleado');
-const { identificarLector, leerEmpleadoOpcional } = require('../middlewares/accesoConvocatorias');
+const { autenticar, exigirRolSesion } = require('../middlewares/autenticar');
 
 const router = express.Router();
 
-router.get('/gestion', exigirRol('admin', 'gerente'), convocatoriasController.listarGestion);
-router.post('/', exigirRol('admin'), leerEmpleadoOpcional, convocatoriasController.publicar);
-router.post('/:id/notificacion', exigirRol('admin'), leerEmpleadoOpcional, convocatoriasController.reintentarNotificacion);
+router.get('/gestion', autenticar, exigirRolSesion('admin', 'gerente'), convocatoriasController.listarGestion);
+router.post('/', autenticar, exigirRolSesion('admin'), convocatoriasController.publicar);
+router.post('/:id/notificacion', autenticar, exigirRolSesion('admin'), convocatoriasController.reintentarNotificacion);
 
-router.get('/', identificarEmpleado, convocatoriasController.listarParaEmpleado);
-router.get('/:id', identificarLector, convocatoriasController.obtener);
+router.get('/', autenticar, convocatoriasController.listarParaEmpleado);
+router.get('/:id', autenticar, convocatoriasController.obtener);
 
 // KAN-81: postulación del empleado y validación de méritos; RRHH revisa el ranking y puede volver a validar.
 router.post('/:id/postulaciones', identificarEmpleado, postulacionesController.postular);

@@ -137,6 +137,89 @@ const registrarNotificacionFallida = async (db, idConvocatoria, motivo) => {
   );
 };
 
+const listarOcupantesActivos = async (db, { idCargo, idSucursal }) => {
+  const { rows } = await db.query(
+    `SELECT e.id_empleado, concat_ws(' ', e.nombres, e.primer_apellido, e.segundo_apellido) AS nombre_completo
+       FROM empleados e
+       JOIN estados_empleado ee ON ee.id_estado_empleado = e.id_estado_empleado
+      WHERE ee.permite_acceso AND e.id_cargo_actual = $1 AND e.id_sucursal_actual = $2
+      ORDER BY e.nombres, e.primer_apellido`,
+    [idCargo, idSucursal]
+  );
+  return rows;
+};
+
+const buscarVigenteMismoPuesto = async (db, { idCargo, idSucursal }) => {
+  const { rows } = await db.query(
+    `SELECT id_convocatoria, titulo
+       FROM convocatorias_ascenso
+      WHERE id_cargo = $1 AND id_sucursal = $2 AND esta_abierta AND fecha_cierre_postulacion >= CURRENT_DATE
+      LIMIT 1`,
+    [idCargo, idSucursal]
+  );
+  return rows[0] ?? null;
+};
+
+const listarCandidatosAviso = async (db, idCargo) => {
+  const { rows } = await db.query(
+    `SELECT e.id_empleado, e.nombres, to_char(e.fecha_ingreso, 'YYYY-MM-DD') AS fecha_ingreso
+       FROM empleados e
+       JOIN estados_empleado ee ON ee.id_estado_empleado = e.id_estado_empleado
+      WHERE ee.permite_acceso AND e.id_cargo_actual IS DISTINCT FROM $1
+      ORDER BY e.fecha_ingreso, e.id_empleado`,
+    [idCargo]
+  );
+  return rows;
+};
+
+const insertarDestinatarios = async (db, idConvocatoria, destinatarios) => {
+  if (destinatarios.length === 0) return;
+  await db.query(
+    `INSERT INTO destinatarios_convocatoria (id_convocatoria, id_empleado, meses_antiguedad)
+     SELECT $1, d.id_empleado, d.meses
+       FROM unnest($2::uuid[], $3::int[]) AS d(id_empleado, meses)
+     ON CONFLICT DO NOTHING`,
+    [idConvocatoria, destinatarios.map((d) => d.id_empleado), destinatarios.map((d) => d.meses)]
+  );
+};
+
+const listarDestinatariosPendientes = async (db, idConvocatoria) => {
+  const { rows } = await db.query(
+    `SELECT d.id_empleado, d.meses_antiguedad, e.nombres
+       FROM destinatarios_convocatoria d
+       JOIN empleados e ON e.id_empleado = d.id_empleado
+      WHERE d.id_convocatoria = $1 AND d.notificado_en IS NULL
+      ORDER BY e.fecha_ingreso, d.id_empleado`,
+    [idConvocatoria]
+  );
+  return rows;
+};
+
+const registrarAvisoEntregado = async (db, idConvocatoria, idEmpleado) => {
+  await db.query(
+    `UPDATE destinatarios_convocatoria SET notificado_en = CURRENT_TIMESTAMP, ultimo_error = NULL
+      WHERE id_convocatoria = $1 AND id_empleado = $2`,
+    [idConvocatoria, idEmpleado]
+  );
+};
+
+const registrarAvisoFallido = async (db, idConvocatoria, idEmpleado, motivo) => {
+  await db.query(
+    `UPDATE destinatarios_convocatoria SET ultimo_error = $3
+      WHERE id_convocatoria = $1 AND id_empleado = $2 AND notificado_en IS NULL`,
+    [idConvocatoria, idEmpleado, String(motivo ?? 'Error desconocido').slice(0, MAX_ERROR_NOTIFICACION)]
+  );
+};
+
+const contarDestinatarios = async (db, idConvocatoria) => {
+  const { rows } = await db.query(
+    `SELECT count(*)::int AS total, count(notificado_en)::int AS notificados
+       FROM destinatarios_convocatoria WHERE id_convocatoria = $1`,
+    [idConvocatoria]
+  );
+  return rows[0];
+};
+
 const cerrarVencidas = async (db) => {
   const { rows } = await db.query(
     `UPDATE convocatorias_ascenso
@@ -159,4 +242,12 @@ module.exports = {
   registrarNotificacionEntregada,
   registrarNotificacionFallida,
   cerrarVencidas,
+  listarOcupantesActivos,
+  buscarVigenteMismoPuesto,
+  listarCandidatosAviso,
+  insertarDestinatarios,
+  listarDestinatariosPendientes,
+  registrarAvisoEntregado,
+  registrarAvisoFallido,
+  contarDestinatarios,
 };
