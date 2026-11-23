@@ -1,0 +1,103 @@
+.pf-periodo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.pf-periodo .ds-campo {
+  width: calc(var(--size-sidebar) * 0.75);
+  max-width: 100%;
+}
+
+.pf-apilado {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.pf-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.pf-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pf-sutil {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.pf-resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--size-sidebar) * 0.75), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-page);
+}
+
+.pf-resumen__dato dt {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.pf-resumen__dato dd {
+  margin: 0;
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.pf-resumen__dato dd.pf-sutil {
+  font-weight: var(--font-weight-regular);
+}
+
+.pf-tabla .ds-tabla {
+  min-width: calc(var(--size-sidebar) * 3.75);
+}
+
+.pf-tabla--ancha .ds-tabla {
+  min-width: calc(var(--size-sidebar) * 3.25);
+}
+
+.pf-cifra {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pf-celda {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pf-celda--fin {
+  align-items: flex-end;
+}
+
+.pf-vista {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.pf-vista .ds-campo {
+  width: calc(var(--size-sidebar) * 1.1);
+  max-width: 100%;
+}

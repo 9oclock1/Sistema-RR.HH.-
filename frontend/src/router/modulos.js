@@ -47,6 +47,8 @@ import { RUTA_AUDITORIA_BONOS } from "../features/bonificaciones/auditoria";
 import PlanillaMensualPage from "../features/planillas/PlanillaMensualPage";
 import MisBoletasPage from "../features/boletas/MisBoletasPage";
 import AguinaldoPage from "../features/aguinaldo/AguinaldoPage";
+import PlanillasFiscalesPage from "../features/planillas-fiscales/PlanillasFiscalesPage";
+import { RUTA_PLANILLAS_FISCALES } from "../features/planillas-fiscales/planillasFiscales";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import ContratosView from "../features/Contratos/ContratosView";
 import { RUTA_CONTRATOS } from "../features/Contratos/utils/opciones";
@@ -310,6 +312,14 @@ export const SECCIONES = [
         icono: FileSpreadsheet,
         roles: ["admin"],
         pagina: PlanillaMensualPage,
+      },
+      {
+        ruta: RUTA_PLANILLAS_FISCALES,
+        etiqueta: "Planilla tributaria y aportes",
+        descripcion: "RC-IVA de cada dependiente y aportes laborales y patronales del periodo, exportables en el formato de cada entidad.",
+        icono: FileChartColumn,
+        roles: ["admin", "contador"],
+        pagina: PlanillasFiscalesPage,
       },
       {
         ruta: "/planillas/conceptos",
