@@ -1,0 +1,137 @@
+.pa-pagina,
+.pa-apilado {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.pa-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  max-width: 20rem;
+}
+
+.pa-formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pa-formulario__campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-3);
+}
+
+.pa-celda {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.pa-fuerte {
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text);
+}
+
+.pa-sutil {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.pa-avance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 10rem;
+}
+
+.pa-avance__cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.pa-barra {
+  display: block;
+  height: 8px;
+  border-radius: var(--radius-round);
+  background: var(--color-bg-neutral);
+  overflow: hidden;
+}
+
+.pa-barra__relleno {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-round);
+  background: var(--color-primary);
+}
+
+.pa-barra__relleno--completo {
+  background: var(--color-success);
+}
+
+.pa-barra__relleno--medio {
+  background: var(--color-warning);
+}
+
+.pa-barra__relleno--bajo {
+  background: var(--color-danger);
+}
+
+.pa-resumen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.pa-subtitulo {
+  margin: 0;
+  font-size: var(--font-size-body, 1rem);
+}
+
+.pa-cursos,
+.pa-pendientes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pa-pendientes {
+  padding-inline-start: var(--space-4);
+  list-style: disc;
+}
+
+.pa-curso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium, 8px);
+}
+
+.pa-curso__cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.pa-motivo {
+  color: var(--color-text-warning, var(--color-text-subtle));
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}

@@ -12,6 +12,7 @@ const mensajesPublicadosRoutes = require("./src/routes/mensajesPublicados.routes
 const { iniciarDespachador } = require("./src/services/eventos.service");
 const { iniciarConsumidor } = require("./src/services/confirmaciones.service");
 const ventasProductividadRoutes = require("./src/routes/ventasProductividad.routes");
+const boletasRoutes = require("./src/routes/boletas.routes");
 const desvinculacionesRoutes = require("./src/routes/desvinculacionesRoutes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 const ventasProductividad = require("./src/services/ventasProductividad.service");
@@ -54,6 +55,7 @@ app.use(confirmacionesRoutes);
 app.use(bonificacionesRoutes);
 app.use(mensajesPublicadosRoutes);
 app.use(ventasProductividadRoutes);
+app.use(boletasRoutes);
 app.use(desvinculacionesRoutes);
 app.use(manejadorErrores);
 

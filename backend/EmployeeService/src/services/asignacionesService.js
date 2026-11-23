@@ -46,22 +46,28 @@ const validarReglas = async (client, asignacion, empleado, vigente, hoy) => {
   }
 };
 
+// Cambia el cargo y la sucursal vigentes del empleado dentro de una transacción ya abierta: la usa crearAsignacion
+// y también la formalización del ascenso (KAN-83), que debe guardar el plan y la nueva asignación juntos.
+const aplicarAsignacion = async (client, datos) => {
+  const empleado = await empleadosModel.bloquearPorId(client, datos.id_empleado);
+  if (!empleado) throw empleadosService.noEncontrado();
+
+  const hoy = await asignacionesModel.fechaActual(client);
+  const asignacion = { ...datos, fecha_inicio: datos.fecha_inicio ?? hoy };
+  const vigente = await asignacionesModel.obtenerVigente(client, asignacion.id_empleado);
+
+  await validarReglas(client, asignacion, empleado, vigente, hoy);
+
+  if (vigente) await asignacionesModel.cerrar(client, vigente.id_asignacion, asignacion.fecha_inicio);
+  await asignacionesModel.insertarVigente(client, asignacion);
+  await empleadosModel.actualizarAsignacionActual(client, asignacion.id_empleado, asignacion);
+  return asignacion;
+};
+
 const crearAsignacion = (datos) =>
   withTransaction(async (client) => {
-    const empleado = await empleadosModel.bloquearPorId(client, datos.id_empleado);
-    if (!empleado) throw empleadosService.noEncontrado();
-
-    const hoy = await asignacionesModel.fechaActual(client);
-    const asignacion = { ...datos, fecha_inicio: datos.fecha_inicio ?? hoy };
-    const vigente = await asignacionesModel.obtenerVigente(client, asignacion.id_empleado);
-
-    await validarReglas(client, asignacion, empleado, vigente, hoy);
-
-    if (vigente) await asignacionesModel.cerrar(client, vigente.id_asignacion, asignacion.fecha_inicio);
-    await asignacionesModel.insertarVigente(client, asignacion);
-    await empleadosModel.actualizarAsignacionActual(client, asignacion.id_empleado, asignacion);
-
+    const asignacion = await aplicarAsignacion(client, datos);
     return empleadosService.construirFicha(client, asignacion.id_empleado);
   });
 
-module.exports = { crearAsignacion };
+module.exports = { crearAsignacion, aplicarAsignacion };

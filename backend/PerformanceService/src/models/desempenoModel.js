@@ -50,6 +50,19 @@ async function listarEvaluacionesDelCiclo(idCiclo, db = pool) {
   return rows;
 }
 
+async function listarEvaluacionesDeCiclosCerrados(db = pool) {
+  const { rows } = await db.query(
+    `SELECT e.id_ciclo, e.id_evaluacion, e.id_departamento, d.nombre AS departamento,
+            e.id_sucursal, s.nombre AS sucursal, e.id_estado_evaluacion, e.puntaje_final
+     FROM evaluaciones e
+     JOIN ciclos_evaluacion c ON c.id_ciclo = e.id_ciclo
+     JOIN departamentos d ON d.id_departamento = e.id_departamento
+     JOIN sucursales s ON s.id_sucursal = e.id_sucursal
+     WHERE c.id_estado_ciclo = ${ESTADO_CICLO.CERRADO}`,
+  );
+  return rows;
+}
+
 async function listarMetricasCrm(idCiclo, db = pool) {
   const { rows } = await db.query(
     `SELECT id_empleado, cantidad_quejas, cantidad_felicitaciones, minutos_resolucion_promedio
@@ -84,6 +97,7 @@ module.exports = {
   listarCiclosCerrados,
   obtenerCiclo,
   listarEvaluacionesDelCiclo,
+  listarEvaluacionesDeCiclosCerrados,
   listarMetricasCrm,
   obtenerSolicitudCrm,
   actualizarUmbral,
