@@ -252,6 +252,21 @@ CREATE TABLE POSTULACIONES_ASCENSO (
     )
 );
 CREATE INDEX IF NOT EXISTS ix_postulaciones_convocatoria_estado ON POSTULACIONES_ASCENSO (id_convocatoria, estado_postulacion);
+-- Table: DESTINATARIOS_CONVOCATORIA (KAN-80)
+-- Empleados elegibles a los que se avisa de una convocatoria: activos, que no ocupan el cargo ofertado y que cumplen
+-- la antigüedad mínima a la fecha de cierre. Un aviso por empleado; notificado_en queda en NULL mientras no se
+-- entregue, y el reintento solo vuelve a enviar a los pendientes.
+CREATE TABLE DESTINATARIOS_CONVOCATORIA (
+    id_convocatoria UUID NOT NULL REFERENCES CONVOCATORIAS_ASCENSO (id_convocatoria) ON DELETE CASCADE,
+    id_empleado UUID NOT NULL REFERENCES EMPLEADOS (id_empleado),
+    meses_antiguedad int NOT NULL,
+    notificado_en TIMESTAMPTZ NULL,
+    ultimo_error varchar(300) NULL,
+    CONSTRAINT DESTINATARIOS_CONVOCATORIA_pk PRIMARY KEY (id_convocatoria, id_empleado),
+    CONSTRAINT chk_destinatario_antiguedad CHECK (meses_antiguedad >= 0),
+    CONSTRAINT chk_destinatario_entrega CHECK (notificado_en IS NULL OR ultimo_error IS NULL)
+);
+CREATE INDEX ix_destinatarios_convocatoria_pendientes ON DESTINATARIOS_CONVOCATORIA (id_convocatoria) WHERE notificado_en IS NULL;
 -- Table: REQUISITOS_CAPACITACION_CARGO
 CREATE TABLE REQUISITOS_CAPACITACION_CARGO (
     id_requisito_cargo UUID NOT NULL,
