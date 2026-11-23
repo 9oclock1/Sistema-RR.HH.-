@@ -2,6 +2,7 @@ const pool = require('../../db/pool');
 const HttpError = require('../utils/HttpError');
 const modelo = require('../models/convocatoriasModel');
 const { notificarConvocatoria } = require('./convocatoriasNotificacionService');
+const { adjuntarMisPostulaciones } = require('./postulacionesService');
 const { validarConvocatoria, validarFiltroEstado } = require('../validators/convocatoriasValidator');
 
 const MENSAJE_SOLO_ACTIVOS = 'Solo los empleados activos pueden consultar las convocatorias internas.';
@@ -73,10 +74,11 @@ const listarGestion = async (query = {}) => {
   return { convocatorias, total: convocatorias.length };
 };
 
+// KAN-81: cada convocatoria lleva la postulación del empleado (mi_postulacion), con su estado de validación.
 const listarParaEmpleado = async (idEmpleado, query = {}) => {
   await exigirEmpleadoActivo(idEmpleado);
   const estados = validarFiltroEstado(query.estado, 'VIGENTES');
-  const convocatorias = await modelo.listar(pool, { estados });
+  const convocatorias = await adjuntarMisPostulaciones(await modelo.listar(pool, { estados }), idEmpleado);
   return { convocatorias, total: convocatorias.length };
 };
 

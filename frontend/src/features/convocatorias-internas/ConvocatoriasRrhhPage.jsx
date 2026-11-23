@@ -9,6 +9,7 @@ import { useRol, useUsuario } from "../../context/sesion";
 import { puedeAcceder } from "../../utils/permisos";
 import useRecurso from "../quejas/casos/useRecurso";
 import ConvocatoriaFormulario from "./ConvocatoriaFormulario";
+import PostulacionesModal from "./PostulacionesModal";
 import {
   FILTROS_ESTADO_RRHH,
   describirPlazo,
@@ -32,6 +33,7 @@ export default function ConvocatoriasRrhhPage() {
   const [catalogos, setCatalogos] = useState(null);
   const [abriendo, setAbriendo] = useState(false);
   const [reintentando, setReintentando] = useState(null);
+  const [revisando, setRevisando] = useState(null);
 
   const cargar = useCallback(() => listarConvocatoriasRrhh(sesion, estado), [sesion, estado]);
   const { datos, error, cargando, reintentar } = useRecurso(cargar);
@@ -164,12 +166,20 @@ export default function ConvocatoriasRrhhPage() {
       titulo: "Acciones",
       alinear: "fin",
       ancho: "10%",
-      celda: (c) =>
-        puedePublicar && c.estado_notificacion !== "ENTREGADA" && c.estado !== "CERRADA" ? (
-          <Boton tamano="sm" cargando={reintentando === c.id_convocatoria} onClick={() => reintentarNotificacion(c)}>
-            Reintentar aviso
-          </Boton>
-        ) : null,
+      celda: (c) => (
+        <div className="cv-acciones">
+          {c.estado !== "PROGRAMADA" && (
+            <Boton tamano="sm" onClick={() => setRevisando(c)} aria-label={`Ver las postulaciones de ${c.titulo}`}>
+              Postulaciones
+            </Boton>
+          )}
+          {puedePublicar && c.estado_notificacion !== "ENTREGADA" && c.estado !== "CERRADA" && (
+            <Boton tamano="sm" cargando={reintentando === c.id_convocatoria} onClick={() => reintentarNotificacion(c)}>
+              Reintentar aviso
+            </Boton>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -260,6 +270,15 @@ export default function ConvocatoriasRrhhPage() {
           sucursales={catalogos.sucursales}
           onGuardar={publicar}
           onCancelar={() => setCatalogos(null)}
+        />
+      )}
+
+      {revisando && (
+        <PostulacionesModal
+          convocatoria={revisando}
+          sesion={sesion}
+          puedeRevalidar={puedePublicar}
+          onCerrar={() => setRevisando(null)}
         />
       )}
     </section>

@@ -17,6 +17,20 @@ export const ESTADOS_NOTIFICACION = {
   PENDIENTE: { tono: "aviso", icono: Hourglass, texto: "Pendiente de notificar" },
 };
 
+// KAN-81: resultado de la validación de méritos de una postulación.
+export const ESTADOS_POSTULACION = {
+  APTO: { tono: "exito", icono: CircleCheck, texto: "Apto" },
+  NO_APTO: { tono: "peligro", icono: CircleAlert, texto: "No apto" },
+  PENDIENTE_VALIDACION: { tono: "aviso", icono: Hourglass, texto: "Validación pendiente" },
+};
+
+export const estadoPostulacion = (codigo) => ESTADOS_POSTULACION[codigo] ?? { ...SIN_ESTADO, texto: codigo ?? "—" };
+
+export const describirPermanencia = (meses) =>
+  meses === null || meses === undefined ? "—" : meses === 0 ? "Menos de un mes" : formatearAntiguedad(meses);
+
+export const formatearPuntaje = (valor) => (valor === null || valor === undefined ? "—" : nota.format(valor));
+
 export const FILTROS_ESTADO_RRHH = [
   { valor: "ABIERTA", etiqueta: "Abiertas" },
   { valor: "PROGRAMADA", etiqueta: "Programadas" },

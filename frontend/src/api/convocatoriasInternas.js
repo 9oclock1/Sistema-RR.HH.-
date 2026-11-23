@@ -19,3 +19,13 @@ export const reintentarNotificacionConvocatoria = (sesion, idConvocatoria) =>
 
 export const listarConvocatoriasEmpleado = (sesion, estado) =>
   request(`${BASE}${consultaDe(estado)}`, { headers: comoEmpleado(sesion) });
+
+// KAN-81: postulación del empleado (se valida al registrarla) y revisión de RRHH con el ranking de méritos.
+export const postularConvocatoria = (sesion, idConvocatoria) =>
+  request(`${BASE}/${idConvocatoria}/postulaciones`, { method: "POST", headers: comoEmpleado(sesion) });
+
+export const listarPostulaciones = (sesion, idConvocatoria) =>
+  request(`${BASE}/${idConvocatoria}/postulaciones`, { headers: comoRrhh(sesion) });
+
+export const revalidarPostulacion = (sesion, idConvocatoria, idPostulacion) =>
+  request(`${BASE}/${idConvocatoria}/postulaciones/${idPostulacion}/validacion`, { method: "POST", headers: comoRrhh(sesion) });

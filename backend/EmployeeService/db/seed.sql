@@ -168,4 +168,31 @@ INSERT INTO CONVOCATORIAS_ASCENSO (
    CURRENT_DATE, CURRENT_DATE + 14, TRUE, now(), NULL,
    'ENTREGADA', 12, now(), NULL)
 ON CONFLICT DO NOTHING;
+-- KAN-81: postulaciones de ejemplo a la convocatoria ya cerrada «Asesor de Atención - Miraflores» (mínimo 6 meses y
+-- nota 60), validadas al postularse. Las notas son de ejemplo (en producción vienen del historial de PerformanceService).
+-- Meses de permanencia y puntaje se calculan con la misma regla que el código: 70 % nota + 30 % antigüedad (tope 60 meses).
+--   Ranking: Carlos (86) > Ana (91, menos antigüedad) > Lucía (78,5). No aptos: Diego (nota 55) y Rosa (sin evaluaciones).
+INSERT INTO POSTULACIONES_ASCENSO (
+  id_postulacion, id_convocatoria, id_empleado, fecha_postulacion, estado_postulacion, meses_permanencia, cumple_antiguedad,
+  nota_ultima_evaluacion, ciclo_ultima_evaluacion, cumple_nota_evaluacion, puntaje_meritos, motivos_no_apto, validada_en
+)
+SELECT p.id_postulacion::uuid, 'f0000000-0000-4000-8000-000000000804'::uuid, e.id_empleado, p.fecha, p.estado,
+       m.meses, TRUE, p.nota, p.ciclo, p.nota IS NOT NULL AND p.nota >= 60,
+       CASE WHEN p.estado = 'APTO' THEN round(0.7 * p.nota + 0.3 * LEAST(m.meses, 60) / 60.0 * 100, 2) END,
+       p.motivos, p.fecha + interval '1 second'
+  FROM (VALUES
+    ('f0000000-0000-4000-8000-000000000981', 'f0000000-0000-4000-8000-000000000031', (CURRENT_DATE - 35)::timestamptz + interval '10 hours', 'APTO', 86.00, 'Evaluación trimestral 2026-T3', NULL::text[]),
+    ('f0000000-0000-4000-8000-000000000982', 'f0000000-0000-4000-8000-000000000035', (CURRENT_DATE - 33)::timestamptz + interval '15 hours', 'APTO', 91.00, 'Evaluación trimestral 2026-T3', NULL::text[]),
+    ('f0000000-0000-4000-8000-000000000983', 'f0000000-0000-4000-8000-000000000032', (CURRENT_DATE - 30)::timestamptz + interval '9 hours', 'APTO', 78.50, 'Evaluación trimestral 2026-T3', NULL::text[]),
+    ('f0000000-0000-4000-8000-000000000984', 'f0000000-0000-4000-8000-000000000033', (CURRENT_DATE - 28)::timestamptz + interval '11 hours', 'NO_APTO', 55.00, 'Evaluación trimestral 2026-T3',
+      ARRAY['Nota de la última evaluación insuficiente: obtuvo 55 (Evaluación trimestral 2026-T3) y la mínima es 60.']),
+    ('f0000000-0000-4000-8000-000000000985', 'f0000000-0000-4000-8000-000000000024', (CURRENT_DATE - 25)::timestamptz + interval '16 hours', 'NO_APTO', NULL, NULL,
+      ARRAY['No tiene evaluaciones de desempeño cerradas: no hay una nota que comparar con la mínima.'])
+  ) AS p(id_postulacion, id_empleado, fecha, estado, nota, ciclo, motivos)
+  JOIN EMPLEADOS e ON e.id_empleado = p.id_empleado::uuid
+  CROSS JOIN LATERAL (
+    SELECT (EXTRACT(YEAR FROM age((p.fecha AT TIME ZONE 'America/La_Paz')::date, e.fecha_ingreso)) * 12
+          + EXTRACT(MONTH FROM age((p.fecha AT TIME ZONE 'America/La_Paz')::date, e.fecha_ingreso)))::int AS meses
+  ) m
+ON CONFLICT DO NOTHING;
 COMMIT;

@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { Megaphone, RefreshCw, ShieldAlert, UserRound } from "lucide-react";
-import { listarConvocatoriasEmpleado } from "../../api/convocatoriasInternas";
-import { Alerta, Boton, EncabezadoPagina, EstadoVacio, Esqueleto, Selector, Tarjeta } from "../../components/ui";
+import { listarConvocatoriasEmpleado, postularConvocatoria } from "../../api/convocatoriasInternas";
+import { Alerta, Boton, EncabezadoPagina, EstadoVacio, Esqueleto, Selector, Tarjeta, useAvisos } from "../../components/ui";
 import { useRol, useUsuario } from "../../context/sesion";
 import useRecurso from "../quejas/casos/useRecurso";
 import TarjetaConvocatoria from "./TarjetaConvocatoria";
@@ -25,6 +25,27 @@ export default function ConvocatoriasEmpleadoPage() {
     [sesion, idEmpleado, estado],
   );
   const { datos, error, cargando, reintentar } = useRecurso(cargar);
+  const avisar = useAvisos();
+  const [postulando, setPostulando] = useState(null);
+
+  // KAN-81: la postulación se valida al registrarla; el aviso dice si quedó apto, no apto o pendiente.
+  const postular = async (convocatoria) => {
+    setPostulando(convocatoria.id_convocatoria);
+    try {
+      const postulacion = await postularConvocatoria(sesion, convocatoria.id_convocatoria);
+      const resultado = {
+        APTO: { tono: "exito", mensaje: "Cumple los requisitos: quedó como apto para el ranking de méritos." },
+        NO_APTO: { tono: "aviso", mensaje: "No cumple algún requisito. Revise los motivos en la convocatoria." },
+        PENDIENTE_VALIDACION: { tono: "info", mensaje: "Recursos Humanos completará la validación de méritos." },
+      }[postulacion.estado_postulacion];
+      avisar({ tono: resultado.tono, titulo: `Postulación registrada: ${convocatoria.titulo}`, mensaje: resultado.mensaje });
+    } catch (fallo) {
+      avisar({ tono: "peligro", titulo: "No se pudo registrar la postulación", mensaje: fallo.message });
+    } finally {
+      setPostulando(null);
+      reintentar();
+    }
+  };
 
   const sinPermiso = error?.status === 403;
 
@@ -103,7 +124,12 @@ export default function ConvocatoriasEmpleadoPage() {
           {datos && datos.convocatorias.length > 0 && (
             <ul className={cargando ? "cv-rejilla cv-actualizando" : "cv-rejilla"} aria-label="Convocatorias de ascenso" aria-busy={cargando}>
               {datos.convocatorias.map((convocatoria) => (
-                <TarjetaConvocatoria key={convocatoria.id_convocatoria} convocatoria={convocatoria} />
+                <TarjetaConvocatoria
+                  key={convocatoria.id_convocatoria}
+                  convocatoria={convocatoria}
+                  onPostular={postular}
+                  postulando={postulando === convocatoria.id_convocatoria}
+                />
               ))}
             </ul>
           )}
