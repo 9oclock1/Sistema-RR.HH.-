@@ -5,6 +5,7 @@ const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const {
   validarAdmin,
+  validarConsulta,
   identidadRegistro,
   validarFiltros,
   validarDatosDesvinculacion,
@@ -14,18 +15,18 @@ const {
 const noEncontrado = () => new ErrorApp(404, "Proceso de desvinculación no encontrado.");
 
 async function listarCausales(identidad) {
-  validarAdmin(identidad);
+  validarConsulta(identidad);
   return modelo.listarCausalesActivas();
 }
 
 async function listar(filtros, identidad) {
-  validarAdmin(identidad);
+  validarConsulta(identidad);
   const limpios = validarFiltros(filtros);
   return modelo.listarProcesos(limpios);
 }
 
 async function obtener(id, identidad) {
-  validarAdmin(identidad);
+  validarConsulta(identidad);
   if (!UUID_RE.test(id ?? "")) throw noEncontrado();
   const proceso = await modelo.obtenerProceso(id.toLowerCase());
   if (!proceso) throw noEncontrado();

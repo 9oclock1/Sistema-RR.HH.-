@@ -45,7 +45,7 @@ const COLUMNAS_DESGLOSE = [
   },
 ];
 
-export default function PromedioIndemnizableModal({ proceso, identidad, onCerrar, onCalculado }) {
+export default function PromedioIndemnizableModal({ proceso, identidad, onCerrar, onCalculado, puedeCalcular = true }) {
   const [cargando, setCargando] = useState(true);
   const [calculando, setCalculando] = useState(false);
   const [desglose, setDesglose] = useState(null);
@@ -55,7 +55,8 @@ export default function PromedioIndemnizableModal({ proceso, identidad, onCerrar
   // El modal se abre en la capa superior y taparía un aviso flotante: la confirmación se muestra dentro del modal.
   const [exitoCalculo, setExitoCalculo] = useState(null);
 
-  const esAbierto = ESTADOS_ABIERTOS.has(proceso.estado);
+  // Solo el Administrador calcula y solo sobre procesos abiertos; el Contador consulta el desglose (RF-55).
+  const esAbierto = puedeCalcular && ESTADOS_ABIERTOS.has(proceso.estado);
 
   const cargar = useCallback(
     () =>
@@ -177,7 +178,11 @@ export default function PromedioIndemnizableModal({ proceso, identidad, onCerrar
           <EstadoVacio
             icono={Calculator}
             titulo="Aún no se calculó el sueldo promedio"
-            mensaje="Se tomará el total ganado de las tres últimas planillas cerradas del colaborador hasta el mes del retiro."
+            mensaje={
+              puedeCalcular
+                ? "Se tomará el total ganado de las tres últimas planillas cerradas del colaborador hasta el mes del retiro."
+                : "Podrá consultar el desglose cuando el Administrador de RRHH calcule el sueldo promedio."
+            }
             accion={
               esAbierto && (
                 <Boton variante="primario" onClick={calcular} cargando={calculando}>

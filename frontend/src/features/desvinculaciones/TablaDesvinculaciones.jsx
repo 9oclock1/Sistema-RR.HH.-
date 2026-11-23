@@ -2,7 +2,7 @@ import { Calculator, Download, UserMinus } from "lucide-react";
 import { Boton, EstadoVacio, Etiqueta, Tabla } from "../../components/ui";
 import { ESTADOS, formatearBs, formatearFecha, formatearFechaHora } from "./formato";
 
-const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio }) => [
+const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, puedeDescargar }) => [
   {
     clave: "colaborador",
     titulo: "Colaborador",
@@ -82,15 +82,17 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio }) => [
           title="Ver sueldo promedio indemnizable"
           onClick={() => onVerPromedio(p)}
         />
-        <Boton
-          variante="sutil"
-          soloIcono
-          icono={Download}
-          cargando={descargandoId === p.id_proceso}
-          aria-label={`Descargar respaldo de ${p.nombre_empleado}`}
-          title={`Descargar ${p.documento?.nombre_archivo ?? "respaldo"}`}
-          onClick={() => onDescargar(p)}
-        />
+        {puedeDescargar && (
+          <Boton
+            variante="sutil"
+            soloIcono
+            icono={Download}
+            cargando={descargandoId === p.id_proceso}
+            aria-label={`Descargar respaldo de ${p.nombre_empleado}`}
+            title={`Descargar ${p.documento?.nombre_archivo ?? "respaldo"}`}
+            onClick={() => onDescargar(p)}
+          />
+        )}
       </div>
     ),
   },
@@ -103,12 +105,13 @@ export default function TablaDesvinculaciones({
   onDescargar,
   descargandoId,
   onVerPromedio,
+  puedeDescargar = true,
 }) {
   return (
     <Tabla
       className="desv-tabla"
       descripcion="Procesos de desvinculación registrados"
-      columnas={COLUMNAS({ onDescargar, descargandoId, onVerPromedio })}
+      columnas={COLUMNAS({ onDescargar, descargandoId, onVerPromedio, puedeDescargar })}
       filas={procesos}
       claveFila="id_proceso"
       cargando={cargando}

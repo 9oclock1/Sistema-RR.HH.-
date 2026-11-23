@@ -341,3 +341,57 @@ describe("promedioIndemnizableService", () => {
     assert.deepEqual(res, desglose);
   });
 });
+
+describe("rol Contador (solo lectura)", () => {
+  afterEach(() => mock.restoreAll());
+
+  const IDENTIDAD_CONTADOR = { idEmpleado: ID_ADMIN, rol: "contador" };
+
+  test("el Contador consulta el desglose del sueldo promedio", async () => {
+    const desglose = { id_proceso: ID_PROCESO, promedio: 3350.0, meses: [] };
+    mock.method(desvinculacionesModel, "obtenerProceso", async () => procesoBase());
+    mock.method(modelo, "obtenerDesglose", async () => desglose);
+
+    assert.deepEqual(await servicio.obtener(ID_PROCESO, IDENTIDAD_CONTADOR), desglose);
+    assert.deepEqual(await servicio.obtener(ID_PROCESO, { rol: " Contador " }), desglose);
+  });
+
+  test("el Contador no puede calcular ni recalcular: 403 sin consultar el modelo", async () => {
+    const obtenerProceso = mock.method(desvinculacionesModel, "obtenerProceso", async () => procesoBase());
+    const guardar = mock.method(modelo, "guardarPromedio", async () => {});
+
+    await assert.rejects(
+      () => servicio.calcular(ID_PROCESO, IDENTIDAD_CONTADOR),
+      (err) => err.estado === 403
+    );
+    assert.equal(obtenerProceso.mock.callCount(), 0);
+    assert.equal(guardar.mock.callCount(), 0);
+  });
+
+  test("el Contador lista los procesos y las causales, pero no registra bajas ni descarga el respaldo", async () => {
+    const desvinculacionesServicio = require("../src/services/desvinculacionesService");
+    const { validarConsulta } = require("../src/utils/desvinculaciones");
+    mock.method(desvinculacionesModel, "listarProcesos", async () => []);
+    mock.method(desvinculacionesModel, "listarCausalesActivas", async () => []);
+    mock.method(desvinculacionesModel, "obtenerProceso", async () => procesoBase());
+    const obtenerDocumento = mock.method(desvinculacionesModel, "obtenerDocumento", async () => ({}));
+
+    assert.deepEqual(await desvinculacionesServicio.listar({}, IDENTIDAD_CONTADOR), []);
+    assert.deepEqual(await desvinculacionesServicio.listarCausales(IDENTIDAD_CONTADOR), []);
+    assert.equal((await desvinculacionesServicio.obtener(ID_PROCESO, IDENTIDAD_CONTADOR)).id_proceso, ID_PROCESO);
+
+    await assert.rejects(
+      () => desvinculacionesServicio.obtenerDocumento(ID_PROCESO, IDENTIDAD_CONTADOR),
+      (err) => err.estado === 403
+    );
+    assert.equal(obtenerDocumento.mock.callCount(), 0);
+    await assert.rejects(
+      () => desvinculacionesServicio.registrar({}, null, IDENTIDAD_CONTADOR),
+      (err) => err.estado === 403
+    );
+
+    for (const rol of [undefined, "", "supervisor", "auditor", "empleado"]) {
+      assert.throws(() => validarConsulta({ rol }), (err) => err.estado === 403);
+    }
+  });
+});

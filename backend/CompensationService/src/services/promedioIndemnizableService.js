@@ -3,7 +3,7 @@ const modelo = require("../models/promedioIndemnizableModel");
 const { enTransaccion } = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
-const { validarAdmin, identidadRegistro, ESTADOS_ABIERTOS } = require("../utils/desvinculaciones");
+const { validarAdmin, validarConsulta, identidadRegistro, ESTADOS_ABIERTOS } = require("../utils/desvinculaciones");
 const { MESES_PROMEDIO, periodoLimite, calcularPromedio } = require("../utils/promedioIndemnizable");
 
 const noEncontrado = () => new ErrorApp(404, "Proceso de desvinculación no encontrado.");
@@ -50,9 +50,10 @@ async function calcular(idProceso, identidad) {
   });
 }
 
-// AC3: devuelve el desglose mensual usado para calcular el sueldo promedio indemnizable.
+// AC3: devuelve el desglose mensual usado para calcular el sueldo promedio indemnizable. El Contador lo consulta
+// en solo lectura; calcular y recalcular siguen siendo del Administrador de RRHH.
 async function obtener(idProceso, identidad) {
-  validarAdmin(identidad);
+  validarConsulta(identidad);
   if (!UUID_RE.test(idProceso ?? "")) throw noEncontrado();
 
   const idNormalizado = idProceso.toLowerCase();
