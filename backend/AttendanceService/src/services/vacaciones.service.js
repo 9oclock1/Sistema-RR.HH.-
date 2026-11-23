@@ -13,10 +13,21 @@ async function obtenerEmpleado(idEmpleado) {
   return empleado;
 }
 
+// `fecha` (AAAA-MM-DD, opcional): corte del saldo, por ejemplo la fecha de retiro de una liquidación (KAN-77).
+// Sin ella, el corte es hoy.
+function validarCorte(fecha) {
+  if (fecha === undefined || fecha === "") return null;
+  if (typeof fecha !== "string" || !FECHA_RE.test(fecha) || Number.isNaN(Date.parse(fecha))) {
+    throw new ErrorApp(400, "Filtros inválidos", [{ campo: "fecha", mensaje: "Use el formato AAAA-MM-DD." }]);
+  }
+  return fecha;
+}
+
 // Se calcula en cada consulta a partir de los movimientos vigentes: el saldo nunca queda desactualizado.
-async function consultarSaldo(idEmpleado, ahora = new Date()) {
+async function consultarSaldo(idEmpleado, ahora = new Date(), fecha) {
+  const corte = validarCorte(fecha);
   const empleado = await obtenerEmpleado(idEmpleado);
-  const hoy = fechaBolivia(ahora);
+  const hoy = corte ?? fechaBolivia(ahora);
   const movimientos = await modelo.listarMovimientos(idEmpleado);
   return {
     id_empleado: idEmpleado,

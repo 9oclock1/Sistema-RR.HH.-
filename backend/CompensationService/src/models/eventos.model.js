@@ -1,13 +1,14 @@
 const pool = require("../config/db");
 
-const COLUMNAS = `id_evento, topico, tipo_evento, id_planilla, destino, estado, intentos, ultimo_error,
+const COLUMNAS = `id_evento, topico, tipo_evento, id_planilla, id_aguinaldo, destino, estado, intentos, ultimo_error,
   proximo_intento_en, entregado_en, creado_en`;
 
-async function registrar(cliente, { idEvento, topico, tipoEvento, idPlanilla, destino, carga }) {
+// idPlanilla (planilla mensual) o idAguinaldo (RF-47, KAN-67): la misma bandeja de salida sirve para ambas.
+async function registrar(cliente, { idEvento, topico, tipoEvento, idPlanilla = null, idAguinaldo = null, destino, carga }) {
   await cliente.query(
-    `INSERT INTO eventos_salientes (id_evento, topico, tipo_evento, id_planilla, destino, carga)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [idEvento, topico, tipoEvento, idPlanilla, destino, carga]
+    `INSERT INTO eventos_salientes (id_evento, topico, tipo_evento, id_planilla, id_aguinaldo, destino, carga)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [idEvento, topico, tipoEvento, idPlanilla, idAguinaldo, destino, carga]
   );
 }
 
@@ -71,6 +72,18 @@ async function ultimosDePlanilla(db, idPlanilla) {
   return Object.fromEntries(rows.map((r) => [r.destino, r]));
 }
 
+// Último envío del aguinaldo a cada destino (RF-47, KAN-67).
+async function ultimosDeAguinaldo(db, idAguinaldo) {
+  const { rows } = await db.query(
+    `SELECT DISTINCT ON (destino) ${COLUMNAS}
+     FROM eventos_salientes
+     WHERE id_aguinaldo = $1
+     ORDER BY destino, creado_en DESC, id_evento`,
+    [idAguinaldo]
+  );
+  return Object.fromEntries(rows.map((r) => [r.destino, r]));
+}
+
 async function bloquearClave(cliente, clave) {
   await cliente.query("SELECT pg_advisory_xact_lock(hashtext($1))", [clave]);
 }
@@ -99,6 +112,7 @@ module.exports = {
   marcarError,
   reencolar,
   ultimosDePlanilla,
+  ultimosDeAguinaldo,
   bloquearClave,
   ultimoPorPeriodo,
   obtener,

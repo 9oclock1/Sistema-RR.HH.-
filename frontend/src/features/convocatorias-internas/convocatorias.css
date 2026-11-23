@@ -192,3 +192,76 @@
     transition: none;
   }
 }
+
+/* KAN-81: postulación del empleado y revisión de postulaciones de RRHH. */
+.cv-postulacion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium, 8px);
+  background: var(--color-bg-neutral);
+}
+
+.cv-postulacion__encabezado,
+.cv-resumen-postulaciones,
+.cv-pendiente {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.cv-postulacion__titulo {
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.cv-motivos {
+  margin: 0;
+  padding-inline-start: var(--space-4);
+  color: var(--color-text);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.cv-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.cv-subtitulo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-size-body, 1rem);
+}
+
+.cv-lista-postulaciones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cv-lista-postulaciones > li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.cv-lista-postulaciones > li.cv-pendiente {
+  flex-direction: row;
+}
+
+.cv-puntaje {
+  font-weight: var(--font-weight-semibold, 600);
+}

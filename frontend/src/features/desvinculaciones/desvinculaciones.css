@@ -29,7 +29,7 @@
 }
 
 .desv-tabla .ds-tabla {
-  min-width: calc(var(--size-sidebar) * 3.5);
+  min-width: calc(var(--size-sidebar) * 4.5);
 }
 
 .desv-nombre {
@@ -42,6 +42,113 @@
   color: var(--color-text-subtle);
   font-size: var(--font-size-small);
   line-height: var(--line-height-small);
+}
+
+.desv-monto {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.desv-acciones {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Modal de sueldo promedio indemnizable */
+.desv-promedio-contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.desv-promedio-cabecera {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.desv-promedio-colaborador {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
+  font-weight: var(--font-weight-semibold);
+}
+
+.desv-promedio-cabecera .desv-nota {
+  margin: 0;
+}
+
+.desv-esqueletos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.desv-promedio-resumen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-page);
+}
+
+.desv-promedio-valor {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.desv-promedio-detalle {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.desv-promedio-resumen .desv-nota {
+  margin: 0;
+}
+
+.desv-promedio-observaciones {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.desv-ingresos-lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  color: var(--color-text-secondary);
+}
+
+.desv-ingreso-item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* Saldos proporcionales (KAN-77): concepto con su cálculo debajo */
+.desv-saldo-concepto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  white-space: normal;
 }
 
 /* Formulario dentro del modal */

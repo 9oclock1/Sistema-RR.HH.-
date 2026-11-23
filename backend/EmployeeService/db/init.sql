@@ -218,20 +218,40 @@ CREATE TABLE MEMORANDUMS (
     fecha_hora_acuse TIMESTAMPTZ NULL,
     CONSTRAINT MEMORANDUMS_pk PRIMARY KEY (id_memorandum)
 );
--- Table: POSTULACIONES_ASCENSO
+-- Table: POSTULACIONES_ASCENSO (KAN-81)
+-- Un empleado se postula una sola vez por convocatoria (uq_postulacion_convocatoria_empleado). Al registrarla, el
+-- sistema la valida: meses de permanencia (desde la fecha de ingreso) y nota de la última evaluación de desempeño
+-- cerrada (PerformanceService) frente a los mínimos de la convocatoria. Queda APTO o NO_APTO con sus motivos; si
+-- PerformanceService no responde queda PENDIENTE_VALIDACION con el error, y RRHH puede volver a validarla.
+-- puntaje_meritos ordena el ranking de los aptos.
 CREATE TABLE POSTULACIONES_ASCENSO (
     id_postulacion UUID NOT NULL,
     id_convocatoria UUID NOT NULL,
     id_empleado UUID NOT NULL,
     fecha_postulacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    cumple_antiguedad boolean NOT NULL,
-    cumple_nota_evaluacion boolean NOT NULL,
-    estado_postulacion varchar(30) NOT NULL,
+    estado_postulacion varchar(30) NOT NULL DEFAULT 'PENDIENTE_VALIDACION',
+    meses_permanencia int NULL,
+    cumple_antiguedad boolean NULL,
+    nota_ultima_evaluacion numeric(5, 2) NULL,
+    ciclo_ultima_evaluacion varchar(120) NULL,
+    cumple_nota_evaluacion boolean NULL,
+    puntaje_meritos numeric(5, 2) NULL,
+    motivos_no_apto text[] NULL,
+    validada_en TIMESTAMPTZ NULL,
+    error_validacion varchar(300) NULL,
     fecha_formalizacion_ascenso date NULL,
     observaciones_resolucion text NULL,
     CONSTRAINT POSTULACIONES_ASCENSO_pk PRIMARY KEY (id_postulacion),
-    CONSTRAINT uq_postulacion_convocatoria_empleado UNIQUE (id_convocatoria, id_empleado)
+    CONSTRAINT uq_postulacion_convocatoria_empleado UNIQUE (id_convocatoria, id_empleado),
+    CONSTRAINT chk_postulacion_estado CHECK (estado_postulacion IN ('PENDIENTE_VALIDACION', 'APTO', 'NO_APTO')),
+    CONSTRAINT chk_postulacion_validada CHECK (
+        (estado_postulacion = 'PENDIENTE_VALIDACION') = (validada_en IS NULL)
+        AND (estado_postulacion = 'PENDIENTE_VALIDACION' OR (cumple_antiguedad IS NOT NULL AND cumple_nota_evaluacion IS NOT NULL))
+        AND (estado_postulacion <> 'APTO' OR (cumple_antiguedad AND cumple_nota_evaluacion AND puntaje_meritos IS NOT NULL))
+        AND (estado_postulacion <> 'NO_APTO' OR cardinality(motivos_no_apto) > 0)
+    )
 );
+CREATE INDEX IF NOT EXISTS ix_postulaciones_convocatoria_estado ON POSTULACIONES_ASCENSO (id_convocatoria, estado_postulacion);
 -- Table: REQUISITOS_CAPACITACION_CARGO
 CREATE TABLE REQUISITOS_CAPACITACION_CARGO (
     id_requisito_cargo UUID NOT NULL,
@@ -665,3 +685,34 @@ CREATE INDEX IF NOT EXISTS ix_solicitud_servicio_curso_estado
     ON SOLICITUDES_SERVICIO_CAPACITACION (id_curso, estado);
 CREATE INDEX IF NOT EXISTS ix_historial_solicitud_servicio_fecha
     ON HISTORIAL_SOLICITUD_SERVICIO (id_solicitud_servicio, registrado_en DESC);
+
+-- Table: PLANES_ASCENSO (KAN-83)
+-- Plan de capacitación previo a un ascenso: el Administrador lo asigna a un empleado con el cargo al que aspira.
+-- Los cursos del plan son los de REQUISITOS_CAPACITACION_CARGO del cargo destino y su estado (pendiente o cumplido)
+-- se calcula al consultar contra el Kardex (CAPACITACIONES_CERTIFICACION), así refleja al instante lo que se registre.
+-- Un empleado tiene a lo sumo un plan EN_CURSO. Al formalizar el ascenso queda FORMALIZADO, con constancia de si se
+-- formalizó con cursos pendientes (tras la advertencia) y cuántos eran.
+CREATE TABLE PLANES_ASCENSO (
+    id_plan UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    id_cargo_destino UUID NOT NULL,
+    estado varchar(15) NOT NULL DEFAULT 'EN_CURSO',
+    observaciones varchar(500) NULL,
+    asignado_por UUID NULL,
+    asignado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    formalizado_en TIMESTAMPTZ NULL,
+    formalizado_por UUID NULL,
+    cursos_pendientes_al_formalizar int NULL,
+    CONSTRAINT PLANES_ASCENSO_pk PRIMARY KEY (id_plan),
+    CONSTRAINT ck_plan_ascenso_estado CHECK (estado IN ('EN_CURSO', 'FORMALIZADO')),
+    CONSTRAINT ck_plan_ascenso_formalizado CHECK (
+        (estado = 'FORMALIZADO') = (formalizado_en IS NOT NULL)
+        AND (estado = 'FORMALIZADO') = (cursos_pendientes_al_formalizar IS NOT NULL)
+    ),
+    CONSTRAINT ck_plan_ascenso_pendientes CHECK (cursos_pendientes_al_formalizar IS NULL OR cursos_pendientes_al_formalizar >= 0),
+    CONSTRAINT PLANES_ASCENSO_EMPLEADOS FOREIGN KEY (id_empleado) REFERENCES EMPLEADOS (id_empleado),
+    CONSTRAINT PLANES_ASCENSO_CARGOS FOREIGN KEY (id_cargo_destino) REFERENCES CARGOS (id_cargo)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_plan_ascenso_en_curso
+    ON PLANES_ASCENSO (id_empleado)
+    WHERE estado = 'EN_CURSO';

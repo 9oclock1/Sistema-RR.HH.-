@@ -14,6 +14,34 @@ export const opciones = (catalogo) =>
 
 export const formatearFecha = (fecha) => (fecha ? fecha.split("-").reverse().join("/") : "—");
 
+export const formatearBs = (valor) => {
+  if (valor === null || valor === undefined || Number.isNaN(Number(valor))) return "—";
+  return `Bs ${Number(valor).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const MESES = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
+
+export const formatearPeriodo = (periodo) => {
+  if (!periodo || typeof periodo !== "string") return "—";
+  const [anio, mesStr] = periodo.split("-");
+  const mes = Number(mesStr);
+  if (!anio || !mes || mes < 1 || mes > 12) return periodo;
+  return `${MESES[mes - 1]} ${anio}`;
+};
+
 export const formatearFechaHora = (iso) => {
   if (!iso) return "—";
   const fecha = new Date(iso);

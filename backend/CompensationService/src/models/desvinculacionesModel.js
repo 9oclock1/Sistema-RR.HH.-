@@ -15,10 +15,14 @@ const SELECT_PROCESO = `
          p.creado_en,
          d.nombre_archivo,
          d.tipo_mime,
-         d.tamano_bytes
+         d.tamano_bytes,
+         pi.promedio AS pi_promedio,
+         pi.meses_considerados AS pi_meses_considerados,
+         pi.calculado_en AS pi_calculado_en
     FROM PROCESOS_DESVINCULACION p
     JOIN CAUSALES_DESVINCULACION c ON c.codigo = p.codigo_causal
     JOIN DOCUMENTOS_DESVINCULACION d ON d.id_proceso = p.id_proceso
+    LEFT JOIN PROMEDIOS_INDEMNIZABLES pi ON pi.id_proceso = p.id_proceso
 `;
 
 function aProceso(fila) {
@@ -38,6 +42,14 @@ function aProceso(fila) {
       tipo_mime: fila.tipo_mime,
       tamano_bytes: fila.tamano_bytes,
     },
+    promedio_indemnizable:
+      fila.pi_promedio !== null && fila.pi_promedio !== undefined
+        ? {
+            promedio: fila.pi_promedio,
+            meses_considerados: fila.pi_meses_considerados,
+            calculado_en: fila.pi_calculado_en,
+          }
+        : null,
     registrado_por: fila.registrado_por,
     creado_en: fila.creado_en,
   };

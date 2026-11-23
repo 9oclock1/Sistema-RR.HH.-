@@ -1,8 +1,8 @@
-import { Download, UserMinus } from "lucide-react";
+import { Calculator, Download, Scale, UserMinus } from "lucide-react";
 import { Boton, EstadoVacio, Etiqueta, Tabla } from "../../components/ui";
-import { ESTADOS, formatearFecha, formatearFechaHora } from "./formato";
+import { ESTADOS, formatearBs, formatearFecha, formatearFechaHora } from "./formato";
 
-const COLUMNAS = ({ onDescargar, descargandoId }) => [
+const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, onVerSaldos, puedeDescargar }) => [
   {
     clave: "colaborador",
     titulo: "Colaborador",
@@ -16,19 +16,19 @@ const COLUMNAS = ({ onDescargar, descargandoId }) => [
   {
     clave: "causal",
     titulo: "Causal",
-    ancho: "22%",
+    ancho: "16%",
     celda: (p) => p.causal?.nombre ?? "—",
   },
   {
     clave: "fecha_retiro",
     titulo: "Fecha de retiro",
-    ancho: "13%",
+    ancho: "10%",
     celda: (p) => formatearFecha(p.fecha_retiro),
   },
   {
     clave: "desahucio",
     titulo: "Desahucio",
-    ancho: "20%",
+    ancho: "17%",
     celda: (p) => (
       <Etiqueta tono={p.corresponde_desahucio ? "aviso" : "neutral"}>
         {p.corresponde_desahucio ? "Corresponde desahucio" : "No corresponde desahucio"}
@@ -36,9 +36,26 @@ const COLUMNAS = ({ onDescargar, descargandoId }) => [
     ),
   },
   {
+    clave: "promedio_indemnizable",
+    titulo: "Sueldo promedio",
+    ancho: "11%",
+    celda: (p) =>
+      p.promedio_indemnizable ? (
+        <div className="desv-nombre">
+          <span className="desv-monto">{formatearBs(p.promedio_indemnizable.promedio)}</span>
+          <span className="desv-nota">
+            {p.promedio_indemnizable.meses_considerados}{" "}
+            {p.promedio_indemnizable.meses_considerados === 1 ? "mes" : "meses"}
+          </span>
+        </div>
+      ) : (
+        <span className="desv-nota">Sin calcular</span>
+      ),
+  },
+  {
     clave: "estado",
     titulo: "Estado",
-    ancho: "12%",
+    ancho: "9%",
     celda: (p) => {
       const cfg = ESTADOS[p.estado] ?? { etiqueta: p.estado, tono: "neutral" };
       return <Etiqueta tono={cfg.tono}>{cfg.etiqueta}</Etiqueta>;
@@ -47,34 +64,63 @@ const COLUMNAS = ({ onDescargar, descargandoId }) => [
   {
     clave: "creado_en",
     titulo: "Registrado",
-    ancho: "12%",
+    ancho: "9%",
     celda: (p) => formatearFechaHora(p.creado_en),
   },
   {
     clave: "acciones",
-    titulo: <span className="ds-solo-lector">Respaldo</span>,
-    ancho: "64px",
+    titulo: <span className="ds-solo-lector">Acciones</span>,
+    ancho: "136px",
     alinear: "fin",
     celda: (p) => (
-      <Boton
-        variante="sutil"
-        soloIcono
-        icono={Download}
-        cargando={descargandoId === p.id_proceso}
-        aria-label={`Descargar respaldo de ${p.nombre_empleado}`}
-        title={`Descargar ${p.documento?.nombre_archivo ?? "respaldo"}`}
-        onClick={() => onDescargar(p)}
-      />
+      <div className="desv-acciones">
+        <Boton
+          variante="sutil"
+          soloIcono
+          icono={Calculator}
+          aria-label={`Ver sueldo promedio de ${p.nombre_empleado}`}
+          title="Ver sueldo promedio indemnizable"
+          onClick={() => onVerPromedio(p)}
+        />
+        <Boton
+          variante="sutil"
+          soloIcono
+          icono={Scale}
+          aria-label={`Ver saldos proporcionales de ${p.nombre_empleado}`}
+          title="Ver duodécimas de aguinaldo y vacaciones truncas"
+          onClick={() => onVerSaldos(p)}
+        />
+        {puedeDescargar && (
+          <Boton
+            variante="sutil"
+            soloIcono
+            icono={Download}
+            cargando={descargandoId === p.id_proceso}
+            aria-label={`Descargar respaldo de ${p.nombre_empleado}`}
+            title={`Descargar ${p.documento?.nombre_archivo ?? "respaldo"}`}
+            onClick={() => onDescargar(p)}
+          />
+        )}
+      </div>
     ),
   },
 ];
 
-export default function TablaDesvinculaciones({ procesos, cargando, vacio, onDescargar, descargandoId }) {
+export default function TablaDesvinculaciones({
+  procesos,
+  cargando,
+  vacio,
+  onDescargar,
+  descargandoId,
+  onVerPromedio,
+  onVerSaldos,
+  puedeDescargar = true,
+}) {
   return (
     <Tabla
       className="desv-tabla"
       descripcion="Procesos de desvinculación registrados"
-      columnas={COLUMNAS({ onDescargar, descargandoId })}
+      columnas={COLUMNAS({ onDescargar, descargandoId, onVerPromedio, onVerSaldos, puedeDescargar })}
       filas={procesos}
       claveFila="id_proceso"
       cargando={cargando}

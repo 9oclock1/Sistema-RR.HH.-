@@ -1,7 +1,7 @@
 const pool = require("../config/db");
 
-const COLUMNAS = `id_evento_entrante, id_mensaje, topico, tipo_evento, origen, id_planilla, destino, carga, estado,
-  intentos, detalle, recibido_en, procesado_en`;
+const COLUMNAS = `id_evento_entrante, id_mensaje, topico, tipo_evento, origen, id_planilla, id_aguinaldo, destino,
+  carga, estado, intentos, detalle, recibido_en, procesado_en`;
 
 // Registra el mensaje si es nuevo y lo bloquea: dos entregas del mismo mensaje no se procesan a la vez.
 async function reclamar(cliente, { idMensaje, topico, tipoEvento, origen, carga }) {
@@ -17,15 +17,17 @@ async function reclamar(cliente, { idMensaje, topico, tipoEvento, origen, carga 
   return rows[0];
 }
 
-// Termina un intento: PROCESADO, IGNORADO o FALLIDO (inválido).
-async function cerrar(cliente, id, { estado, detalle = null, idPlanilla = null, destino = null }) {
+// Termina un intento: PROCESADO, IGNORADO o FALLIDO (inválido). idPlanilla o idAguinaldo (RF-47, KAN-67),
+// nunca los dos: lo decide el tipo de confirmación (ver utils/integraciones.leerConfirmacion).
+async function cerrar(cliente, id, { estado, detalle = null, idPlanilla = null, idAguinaldo = null, destino = null }) {
   await cliente.query(
     `UPDATE eventos_entrantes
-     SET estado = $2::text, detalle = left($3, 255), id_planilla = COALESCE($4, id_planilla), destino = COALESCE($5, destino),
+     SET estado = $2::text, detalle = left($3, 255), id_planilla = COALESCE($4, id_planilla),
+         id_aguinaldo = COALESCE($5, id_aguinaldo), destino = COALESCE($6, destino),
          intentos = intentos + 1,
          procesado_en = CASE WHEN $2::text IN ('PROCESADO', 'IGNORADO') THEN CURRENT_TIMESTAMP ELSE NULL END
      WHERE id_evento_entrante = $1`,
-    [id, estado, detalle, idPlanilla, destino]
+    [id, estado, detalle, idPlanilla, idAguinaldo, destino]
   );
 }
 

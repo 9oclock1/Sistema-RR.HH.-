@@ -93,6 +93,41 @@ INSERT INTO ASIGNACIONES_EMPLEADO (id_asignacion, id_empleado, id_cargo, id_sucu
   ('f0000000-0000-4000-8000-000000000752', 'f0000000-0000-4000-8000-000000000742', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', '2024-02-01'),
   ('f0000000-0000-4000-8000-000000000753', 'f0000000-0000-4000-8000-000000000743', 'f0000000-0000-4000-8000-000000000105', 'f0000000-0000-4000-8000-000000000012', '2021-08-01')
 ON CONFLICT DO NOTHING;
+-- KAN-83: seguimiento del plan de capacitación previo al ascenso.
+-- Cursos requeridos: Supervisor de Cajas (104) exige arqueo, liderazgo y seguridad (este último vence a los 24 meses);
+-- Jefe de Atención al Cliente (103) exige atención avanzada y liderazgo.
+--   Carlos (cajero -> Supervisor): los 3 cursos al día                              -> 100 %
+--   Ana (cajero -> Supervisor): arqueo y liderazgo; su certificado de seguridad venció -> 67 % (1 pendiente)
+--   Paola (asesora -> Jefe de Atención): solo atención avanzada                       -> 50 %
+--   Diego (cajero -> Supervisor): ningún curso todavía                                -> 0 %
+INSERT INTO CURSOS_CAPACITACION (id_curso, codigo, nombre, descripcion, horas_academicas, tipo_capacitacion, requiere_vencimiento, meses_vigencia) VALUES
+  ('f0000000-0000-4000-8000-000000000c01', 'ATC-AVZ', 'Atención al cliente avanzada', 'Manejo de reclamos y fidelización.', 24, 'TECNICA', FALSE, NULL),
+  ('f0000000-0000-4000-8000-000000000c02', 'CAJ-ARQ', 'Arqueo y control de caja', 'Cuadre, faltantes y sobrantes, custodia de valores.', 16, 'TECNICA', FALSE, NULL),
+  ('f0000000-0000-4000-8000-000000000c03', 'LID-EQ', 'Liderazgo de equipos', 'Conducción de equipos, delegación y retroalimentación.', 32, 'TECNICA', FALSE, NULL),
+  ('f0000000-0000-4000-8000-000000000c04', 'SEG-PA', 'Seguridad y primeros auxilios', 'Evacuación, extintores y primeros auxilios.', 12, 'CERTIFICACION', TRUE, 24)
+ON CONFLICT DO NOTHING;
+INSERT INTO REQUISITOS_CAPACITACION_CARGO (id_requisito_cargo, id_cargo, id_curso, es_obligatorio, meses_validez_requerida) VALUES
+  ('f0000000-0000-4000-8000-000000000c11', 'f0000000-0000-4000-8000-000000000104', 'f0000000-0000-4000-8000-000000000c02', TRUE, NULL),
+  ('f0000000-0000-4000-8000-000000000c12', 'f0000000-0000-4000-8000-000000000104', 'f0000000-0000-4000-8000-000000000c03', TRUE, NULL),
+  ('f0000000-0000-4000-8000-000000000c13', 'f0000000-0000-4000-8000-000000000104', 'f0000000-0000-4000-8000-000000000c04', TRUE, NULL),
+  ('f0000000-0000-4000-8000-000000000c14', 'f0000000-0000-4000-8000-000000000103', 'f0000000-0000-4000-8000-000000000c01', TRUE, NULL),
+  ('f0000000-0000-4000-8000-000000000c15', 'f0000000-0000-4000-8000-000000000103', 'f0000000-0000-4000-8000-000000000c03', TRUE, NULL)
+ON CONFLICT DO NOTHING;
+INSERT INTO CAPACITACIONES_CERTIFICACION (id_capacitacion, id_empleado, id_curso, institucion_emisora, fecha_inicio, fecha_fin, fecha_emision, fecha_vencimiento) VALUES
+  ('f0000000-0000-4000-8000-000000000c21', 'f0000000-0000-4000-8000-000000000031', 'f0000000-0000-4000-8000-000000000c02', 'Instituto de Formación Financiera', '2025-08-04', '2025-08-15', '2025-08-20', NULL),
+  ('f0000000-0000-4000-8000-000000000c22', 'f0000000-0000-4000-8000-000000000031', 'f0000000-0000-4000-8000-000000000c03', 'Escuela de Gestión Andina', '2026-02-02', '2026-03-13', '2026-03-20', NULL),
+  ('f0000000-0000-4000-8000-000000000c23', 'f0000000-0000-4000-8000-000000000031', 'f0000000-0000-4000-8000-000000000c04', 'Cruz Roja Boliviana', '2025-09-08', '2025-09-10', '2025-09-12', '2027-09-12'),
+  ('f0000000-0000-4000-8000-000000000c24', 'f0000000-0000-4000-8000-000000000035', 'f0000000-0000-4000-8000-000000000c02', 'Instituto de Formación Financiera', '2025-06-02', '2025-06-13', '2025-06-18', NULL),
+  ('f0000000-0000-4000-8000-000000000c25', 'f0000000-0000-4000-8000-000000000035', 'f0000000-0000-4000-8000-000000000c03', 'Escuela de Gestión Andina', '2026-02-02', '2026-03-13', '2026-03-20', NULL),
+  ('f0000000-0000-4000-8000-000000000c26', 'f0000000-0000-4000-8000-000000000035', 'f0000000-0000-4000-8000-000000000c04', 'Cruz Roja Boliviana', '2024-05-06', '2024-05-08', '2024-05-10', '2026-05-10'),
+  ('f0000000-0000-4000-8000-000000000c27', 'f0000000-0000-4000-8000-000000000034', 'f0000000-0000-4000-8000-000000000c01', 'Cámara Nacional de Comercio', '2026-04-06', '2026-04-24', '2026-04-30', NULL)
+ON CONFLICT DO NOTHING;
+INSERT INTO PLANES_ASCENSO (id_plan, id_empleado, id_cargo_destino, observaciones, asignado_por, asignado_en) VALUES
+  ('f0000000-0000-4000-8000-000000000c31', 'f0000000-0000-4000-8000-000000000031', 'f0000000-0000-4000-8000-000000000104', 'Candidato a la supervisión de cajas de Sopocachi.', 'f0000000-0000-4000-8000-000000000023', '2026-07-01 09:00:00-04'),
+  ('f0000000-0000-4000-8000-000000000c32', 'f0000000-0000-4000-8000-000000000035', 'f0000000-0000-4000-8000-000000000104', 'Candidata a la supervisión de cajas de Miraflores.', 'f0000000-0000-4000-8000-000000000023', '2026-07-01 09:00:00-04'),
+  ('f0000000-0000-4000-8000-000000000c33', 'f0000000-0000-4000-8000-000000000034', 'f0000000-0000-4000-8000-000000000103', NULL, 'f0000000-0000-4000-8000-000000000023', '2026-08-03 09:00:00-04'),
+  ('f0000000-0000-4000-8000-000000000c34', 'f0000000-0000-4000-8000-000000000033', 'f0000000-0000-4000-8000-000000000104', NULL, 'f0000000-0000-4000-8000-000000000023', '2026-10-05 09:00:00-04')
+ON CONFLICT DO NOTHING;
 COMMIT;
 
 -- Convocatorias internas de ascenso de ejemplo (KAN-80, RF-60). Las fechas se calculan respecto del día en que se carga este archivo.
@@ -132,5 +167,53 @@ INSERT INTO CONVOCATORIAS_ASCENSO (
    'Cinco años en el área, experiencia en procesos de selección y liquidaciones, y título en administración o afín.', 60, 85.00,
    CURRENT_DATE, CURRENT_DATE + 14, TRUE, now(), NULL,
    'ENTREGADA', 12, now(), NULL)
+ON CONFLICT DO NOTHING;
+-- KAN-81: postulaciones de ejemplo a la convocatoria ya cerrada «Asesor de Atención - Miraflores» (mínimo 6 meses y
+-- nota 60), validadas al postularse. Las notas son de ejemplo (en producción vienen del historial de PerformanceService).
+-- Meses de permanencia y puntaje se calculan con la misma regla que el código: 70 % nota + 30 % antigüedad (tope 60 meses).
+--   Ranking: Carlos (86) > Ana (91, menos antigüedad) > Lucía (78,5). No aptos: Diego (nota 55) y Rosa (sin evaluaciones).
+INSERT INTO POSTULACIONES_ASCENSO (
+  id_postulacion, id_convocatoria, id_empleado, fecha_postulacion, estado_postulacion, meses_permanencia, cumple_antiguedad,
+  nota_ultima_evaluacion, ciclo_ultima_evaluacion, cumple_nota_evaluacion, puntaje_meritos, motivos_no_apto, validada_en
+)
+SELECT p.id_postulacion::uuid, 'f0000000-0000-4000-8000-000000000804'::uuid, e.id_empleado, p.fecha, p.estado,
+       m.meses, TRUE, p.nota, p.ciclo, p.nota IS NOT NULL AND p.nota >= 60,
+       CASE WHEN p.estado = 'APTO' THEN round(0.7 * p.nota + 0.3 * LEAST(m.meses, 60) / 60.0 * 100, 2) END,
+       p.motivos, p.fecha + interval '1 second'
+  FROM (VALUES
+    ('f0000000-0000-4000-8000-000000000981', 'f0000000-0000-4000-8000-000000000031', (CURRENT_DATE - 35)::timestamptz + interval '10 hours', 'APTO', 86.00, 'Evaluación trimestral 2026-T3', NULL::text[]),
+    ('f0000000-0000-4000-8000-000000000982', 'f0000000-0000-4000-8000-000000000035', (CURRENT_DATE - 33)::timestamptz + interval '15 hours', 'APTO', 91.00, 'Evaluación trimestral 2026-T3', NULL::text[]),
+    ('f0000000-0000-4000-8000-000000000983', 'f0000000-0000-4000-8000-000000000032', (CURRENT_DATE - 30)::timestamptz + interval '9 hours', 'APTO', 78.50, 'Evaluación trimestral 2026-T3', NULL::text[]),
+    ('f0000000-0000-4000-8000-000000000984', 'f0000000-0000-4000-8000-000000000033', (CURRENT_DATE - 28)::timestamptz + interval '11 hours', 'NO_APTO', 55.00, 'Evaluación trimestral 2026-T3',
+      ARRAY['Nota de la última evaluación insuficiente: obtuvo 55 (Evaluación trimestral 2026-T3) y la mínima es 60.']),
+    ('f0000000-0000-4000-8000-000000000985', 'f0000000-0000-4000-8000-000000000024', (CURRENT_DATE - 25)::timestamptz + interval '16 hours', 'NO_APTO', NULL, NULL,
+      ARRAY['No tiene evaluaciones de desempeño cerradas: no hay una nota que comparar con la mínima.'])
+  ) AS p(id_postulacion, id_empleado, fecha, estado, nota, ciclo, motivos)
+  JOIN EMPLEADOS e ON e.id_empleado = p.id_empleado::uuid
+  CROSS JOIN LATERAL (
+    SELECT (EXTRACT(YEAR FROM age((p.fecha AT TIME ZONE 'America/La_Paz')::date, e.fecha_ingreso)) * 12
+          + EXTRACT(MONTH FROM age((p.fecha AT TIME ZONE 'America/La_Paz')::date, e.fecha_ingreso)))::int AS meses
+  ) m
+ON CONFLICT DO NOTHING;
+COMMIT;
+
+-- Colaborador con menos de tres meses de antigüedad para pruebas de sueldo promedio indemnizable (RF-55, KAN-75).
+BEGIN;
+INSERT INTO EMPLEADOS (id_empleado, numero_documento, nombres, primer_apellido, segundo_apellido, fecha_nacimiento, genero, telefono_celular, correo_personal, direccion_domicilio, fecha_ingreso, id_cargo_actual, id_sucursal_actual, id_estado_empleado) VALUES
+  ('f0000000-0000-4000-8000-000000000744', '7108744', 'Fernando', 'Choque', 'Ticona', '1997-04-18', 'Masculino', '71008744', 'fernando.choque@correo.test', 'Zona Sopocachi, La Paz', '2026-09-01', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000011', 4)
+ON CONFLICT DO NOTHING;
+INSERT INTO ASIGNACIONES_EMPLEADO (id_asignacion, id_empleado, id_cargo, id_sucursal, fecha_inicio) VALUES
+  ('f0000000-0000-4000-8000-000000000754', 'f0000000-0000-4000-8000-000000000744', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000011', '2026-09-01')
+ON CONFLICT DO NOTHING;
+COMMIT;
+
+-- Colaboradora activa con planillas cerradas en CompensationService, para probar desde la pantalla el registro de su
+-- baja y el cálculo del sueldo promedio indemnizable (RF-54 y RF-55).
+BEGIN;
+INSERT INTO EMPLEADOS (id_empleado, numero_documento, nombres, primer_apellido, segundo_apellido, fecha_nacimiento, genero, telefono_celular, correo_personal, direccion_domicilio, fecha_ingreso, id_cargo_actual, id_sucursal_actual, id_estado_empleado) VALUES
+  ('f0000000-0000-4000-8000-000000000745', '7108745', 'Gabriela', 'Rocha', 'Mendoza', '1996-02-14', 'Femenino', '71008745', 'gabriela.rocha@correo.test', 'Zona Miraflores, La Paz', '2025-03-03', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', 1)
+ON CONFLICT DO NOTHING;
+INSERT INTO ASIGNACIONES_EMPLEADO (id_asignacion, id_empleado, id_cargo, id_sucursal, fecha_inicio) VALUES
+  ('f0000000-0000-4000-8000-000000000755', 'f0000000-0000-4000-8000-000000000745', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', '2025-03-03')
 ON CONFLICT DO NOTHING;
 COMMIT;

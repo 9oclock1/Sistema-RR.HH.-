@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ChartLine, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, Gift, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
@@ -8,8 +8,13 @@ import ConvocatoriasRrhhPage from "../features/convocatorias-internas/Convocator
 import { RUTA_CONVOCATORIAS_EMPLEADO, RUTA_CONVOCATORIAS_RRHH } from "../features/convocatorias-internas/convocatorias";
 import CiclosEvaluacionPage from "../features/ciclos-evaluacion/CiclosEvaluacionPage";
 import { RUTA_CICLOS } from "../features/ciclos-evaluacion/ciclo";
+import DashboardDesempenoPage from "../features/dashboard-desempeno/DashboardDesempenoPage";
+import DashboardQuejasPage from "../features/dashboard-quejas/DashboardQuejasPage";
+import { RUTA_DASHBOARD_QUEJAS } from "../features/dashboard-quejas/dashboardQuejas";
+import { RUTA_DASHBOARD_DESEMPENO } from "../features/dashboard-desempeno/dashboardDesempeno";
 import DesempenoGlobalPage from "../features/desempeno-global/DesempenoGlobalPage";
 import DesvinculacionesPage from "../features/desvinculaciones/DesvinculacionesPage";
+import RotacionPersonalPage from "../features/rotacion-personal/RotacionPersonalPage";
 import { RUTA_DESEMPENO_GLOBAL } from "../features/desempeno-global/desempenoGlobal";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
 import MisResultadosPage from "../features/evaluaciones/MisResultadosPage";
@@ -30,6 +35,8 @@ import ApplicantRegistration from "../features/recruitment/ApplicantRegistration
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
 import CapacitacionesView from "../features/Capacitaciones/CapacitacionesView";
 import { RUTA_CAPACITACIONES } from "../features/Capacitaciones/utils/opciones";
+import PlanesAscensoPage from "../features/planes-ascenso/PlanesAscensoPage";
+import { RUTA_PLANES_ASCENSO } from "../features/planes-ascenso/planesAscenso";
 import NotificacionesPage from "../features/notificaciones/NotificacionesPage";
 import CargosList from "../features/Cargos/CargosList";
 import ConceptosPage from "../features/conceptos/ConceptosPage";
@@ -38,6 +45,8 @@ import BonosProductividadPage from "../features/bonos-productividad/BonosProduct
 import AuditoriaBonosPage from "../features/bonificaciones/AuditoriaBonosPage";
 import { RUTA_AUDITORIA_BONOS } from "../features/bonificaciones/auditoria";
 import PlanillaMensualPage from "../features/planillas/PlanillaMensualPage";
+import MisBoletasPage from "../features/boletas/MisBoletasPage";
+import AguinaldoPage from "../features/aguinaldo/AguinaldoPage";
 import PlanillasFiscalesPage from "../features/planillas-fiscales/PlanillasFiscalesPage";
 import { RUTA_PLANILLAS_FISCALES } from "../features/planillas-fiscales/planillasFiscales";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
@@ -353,12 +362,28 @@ export const SECCIONES = [
         pagina: BonosProductividadPage,
       },
       {
+        ruta: "/planillas/aguinaldos",
+        etiqueta: "Planilla de aguinaldos",
+        descripcion: "Duodécimas del promedio de los tres últimos sueldos por los meses y días trabajados en la gestión, aprobadas y enviadas a Contabilidad y Pagos.",
+        icono: Gift,
+        roles: ["admin", "contador"],
+        pagina: AguinaldoPage,
+      },
+      {
         ruta: RUTA_AUDITORIA_BONOS,
         etiqueta: "Auditoría de bonificaciones",
         descripcion: "Altas, modificaciones y anulaciones de bonos, y el historial por colaborador o por sucursal, con exportación.",
         icono: ShieldCheck,
         roles: ["admin", "auditor"],
         pagina: AuditoriaBonosPage,
+      },
+      {
+        ruta: "/planillas/mis-boletas",
+        etiqueta: "Mis boletas de pago",
+        descripcion: "Consulta y descarga en PDF de sus boletas de pago de las planillas cerradas.",
+        icono: ReceiptText,
+        roles: ["empleado"],
+        pagina: MisBoletasPage,
       },
     ],
   },
@@ -370,7 +395,8 @@ export const SECCIONES = [
         etiqueta: "Desvinculaciones",
         descripcion: "Registro de la causal formal de baja, fecha de retiro y respaldo, que inicia el proceso de liquidación.",
         icono: UserMinus,
-        roles: ["admin"],
+        // El Contador consulta los procesos y el desglose del sueldo promedio en solo lectura (RF-55).
+        roles: ["admin", "contador"],
         pagina: DesvinculacionesPage,
       },
     ],
@@ -394,6 +420,14 @@ export const SECCIONES = [
         icono: GraduationCap,
         roles: ["gerente"],
         pagina: CapacitacionesView,
+      },
+      {
+        ruta: RUTA_PLANES_ASCENSO,
+        etiqueta: "Planes de ascenso",
+        descripcion: "Seguimiento de las capacitaciones requeridas antes de un ascenso, con el avance de cada candidato.",
+        icono: TrendingUp,
+        roles: ["gerente"],
+        pagina: PlanesAscensoPage,
       },
       {
         ruta: RUTA_CONTRATOS,
@@ -529,6 +563,35 @@ export const SECCIONES = [
         icono: History,
         roles: ["admin", "auditor"],
         pagina: HistorialQuejasPage,
+      },
+    ],
+  },
+  {
+    titulo: "Dashboards",
+    modulos: [
+      {
+        ruta: RUTA_DASHBOARD_DESEMPENO,
+        etiqueta: "Dashboard de desempeño",
+        descripcion: "Indicadores de puntaje promedio, cumplimiento de evaluaciones y alto desempeño por ciclo, con histograma, ranking de áreas y comparativo entre ciclos.",
+        icono: Gauge,
+        roles: ["gerente"],
+        pagina: DashboardDesempenoPage,
+      },
+      {
+        ruta: RUTA_DASHBOARD_QUEJAS,
+        etiqueta: "Dashboard de quejas",
+        descripcion: "Tasa de resolución y tiempo promedio de atención de las quejas internas, con tendencia mensual, incidencia por categoría, área y sucursal, y exportación a PDF.",
+        icono: MessageSquareWarning,
+        roles: ["admin"],
+        pagina: DashboardQuejasPage,
+      },
+      {
+        ruta: "/dashboards/rotacion",
+        etiqueta: "Rotación de personal",
+        descripcion: "Rotación mensual, retención y rotación temprana con semáforo, tendencia de 12 meses y motivos de baja.",
+        icono: ChartLine,
+        roles: ["supervisor"],
+        pagina: RotacionPersonalPage,
       },
     ],
   },

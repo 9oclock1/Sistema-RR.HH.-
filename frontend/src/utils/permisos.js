@@ -6,6 +6,9 @@ export const ROLES = {
   supervisor: { nombre: "Supervisor de área", incluye: ["empleado"] },
   empleado: { nombre: "Empleado", incluye: [] },
   auditor: { nombre: "Auditor (TI)", incluye: [] },
+  // RF-44/47/49 nombran al Contador como responsable de planillas, aguinaldos y reporte contable. Incluye
+  // "empleado": también es colaborador y ve sus propias boletas y solicitudes.
+  contador: { nombre: "Contador / Encargado de planillas", incluye: ["empleado"] },
 };
 
 export const ROL_PREDETERMINADO = "admin";

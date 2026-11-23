@@ -22,6 +22,22 @@ services:
     networks:
       - rrhh-network
 
+  # Emulador local de Pub/Sub (KAN-67 y similares): sin credenciales reales de GCP, CompensationService no
+  # puede publicar ni suscribirse de verdad. El emulador deja probar el envío real; Contabilidad y Pagos no
+  # existen en este sistema, así que su confirmación se simula desde la pantalla, pero el transporte es real:
+  # se publica en su tópico y la suscripción real de CompensationService la recibe. No usar en producción.
+  # Los tópicos propios de RRHH (ucb-sis323-sub-f) y los de Contabilidad/Pagos (-d/-a) se crean solos al
+  # arrancar CompensationService; para el de Ventas y Marketing (-e), ver scripts/configurar-pubsub-emulador.sh.
+  pubsub-emulator:
+    image: google/cloud-sdk:emulators
+    container_name: pubsub-emulator
+    restart: unless-stopped
+    command: gcloud beta emulators pubsub start --host-port=0.0.0.0:8085 --project=project-a96e5fe1-5ba6-4698-a85
+    ports:
+      - "8085:8085"
+    networks:
+      - rrhh-network
+
   # Frontend
   frontend:
     build:
@@ -143,6 +159,7 @@ services:
       - ./credentials:/credentials:ro
     depends_on:
       - postgres
+      - pubsub-emulator
     networks:
       - rrhh-network
 

@@ -169,11 +169,16 @@ function armarOrdenPago({ planilla, empleados, concepto }) {
   };
 }
 
-// Respuestas de Contabilidad y Pagos (KAN-347). Cada tipo lo envía solo el grupo del destino.
+// Respuestas de Contabilidad y Pagos. Cada tipo lo envía solo el grupo del destino. PLANILLA es la planilla
+// mensual (KAN-347); AGUINALDO es la planilla de aguinaldos (RF-47, KAN-67) y reutiliza la misma bandeja de
+// entrada, solo que el campo que identifica el recurso es id_aguinaldo en vez de id_planilla.
 const TIPOS_CONFIRMACION = {
-  CONFIRMACION_ASIENTO_PLANILLA: "CONTABILIDAD",
-  CONFIRMACION_ORDEN_PAGO_PLANILLA: "PAGOS",
+  CONFIRMACION_ASIENTO_PLANILLA: { destino: "CONTABILIDAD", recurso: "PLANILLA" },
+  CONFIRMACION_ORDEN_PAGO_PLANILLA: { destino: "PAGOS", recurso: "PLANILLA" },
+  CONFIRMACION_ASIENTO_AGUINALDO: { destino: "CONTABILIDAD", recurso: "AGUINALDO" },
+  CONFIRMACION_ORDEN_PAGO_AGUINALDO: { destino: "PAGOS", recurso: "AGUINALDO" },
 };
+const CAMPO_ID_RECURSO = { PLANILLA: "id_planilla", AGUINALDO: "id_aguinaldo" };
 const RESULTADOS = ["CONFIRMADA", "RECHAZADA"];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -191,10 +196,12 @@ function esConfirmacion(cuerpo) {
 
 const texto = (valor, maximo) => (typeof valor === "string" && valor.trim() ? valor.trim().slice(0, maximo) : null);
 
-// Devuelve { errores } si el mensaje no se puede aplicar, o la confirmación lista para aplicar.
+// Devuelve { errores } si el mensaje no se puede aplicar, o la confirmación lista para aplicar. El campo
+// que identifica el recurso (datos.id_planilla o datos.id_aguinaldo) depende del tipo de confirmación.
 function leerConfirmacion(cuerpo) {
   const { encabezado, datos } = cuerpo;
-  const destino = TIPOS_CONFIRMACION[encabezado.tipo];
+  const { destino, recurso } = TIPOS_CONFIRMACION[encabezado.tipo];
+  const campoId = CAMPO_ID_RECURSO[recurso];
   const grupo = DESTINOS[destino].grupo;
   const errores = [];
   if (encabezado.origen?.grupo !== grupo) errores.push(`El tipo ${encabezado.tipo} solo lo envía el grupo ${grupo}.`);
@@ -202,7 +209,7 @@ function leerConfirmacion(cuerpo) {
     errores.push("Falta el bloque datos.");
     return { errores };
   }
-  if (!UUID_RE.test(datos.id_planilla ?? "")) errores.push("datos.id_planilla debe ser un UUID.");
+  if (!UUID_RE.test(datos[campoId] ?? "")) errores.push(`datos.${campoId} debe ser un UUID.`);
   if (!UUID_RE.test(datos.id_mensaje_origen ?? "")) errores.push("datos.id_mensaje_origen debe ser el id_mensaje enviado por RRHH.");
   if (!RESULTADOS.includes(datos.resultado)) errores.push("datos.resultado debe ser CONFIRMADA o RECHAZADA.");
   const motivo = texto(datos.motivo, 255);
@@ -211,7 +218,8 @@ function leerConfirmacion(cuerpo) {
   const confirmada = datos.resultado === "CONFIRMADA";
   return {
     destino,
-    idPlanilla: datos.id_planilla.toLowerCase(),
+    recurso,
+    [recurso === "AGUINALDO" ? "idAguinaldo" : "idPlanilla"]: datos[campoId].toLowerCase(),
     idMensajeOrigen: datos.id_mensaje_origen.toLowerCase(),
     resultado: datos.resultado,
     referencia: confirmada ? texto(datos.referencia, 60) : null,
@@ -224,6 +232,7 @@ module.exports = {
   DESTINOS,
   CUENTAS,
   TIPOS_CONFIRMACION,
+  RESULTADOS,
   MAXIMO_INTENTOS_ENTRADA,
   esperaNuevaEntrega,
   esConfirmacion,

@@ -30,3 +30,21 @@ export const descargarDocumentoDesvinculacion = (idProceso, identidad) =>
     cabeceras: cabeceras(identidad),
     respuestaBinaria: true,
   });
+
+export const obtenerPromedioIndemnizable = (idProceso, identidad) =>
+  solicitar(`${RUTA}/${idProceso}/promedio-indemnizable`, {
+    cabeceras: cabeceras(identidad),
+  });
+
+// KAN-77: duodécimas de aguinaldo y vacaciones truncas del finiquito.
+export const obtenerSaldosProporcionales = (idProceso, identidad) =>
+  solicitar(`${RUTA}/${idProceso}/saldos-proporcionales`, { cabeceras: cabeceras(identidad) });
+
+export const calcularSaldosProporcionales = (idProceso, identidad) =>
+  solicitar(`${RUTA}/${idProceso}/saldos-proporcionales`, { metodo: "POST", cabeceras: cabeceras(identidad) });
+
+export const calcularPromedioIndemnizable = (idProceso, identidad) =>
+  solicitar(`${RUTA}/${idProceso}/promedio-indemnizable`, {
+    metodo: "POST",
+    cabeceras: cabeceras(identidad),
+  });

@@ -4,7 +4,7 @@ La base no usa triggers, procedimientos almacenados ni vistas (decisión del equ
 
 ## Referencias a otros servicios (sin FK)
 
-- `id_empleado` de `ASIGNACIONES_CONDICION`, `BONOS_CONDICION`, `PLANILLA_EMPLEADOS`, `METRICAS_VENTAS_PERIODO` y `BONOS_PRODUCTIVIDAD` debería hacer referencia a id_empleado de EmployeeDB.
+- `id_empleado` de `ASIGNACIONES_CONDICION`, `BONOS_CONDICION`, `PLANILLA_EMPLEADOS`, `METRICAS_VENTAS_PERIODO`, `BONOS_PRODUCTIVIDAD` y `BOLETAS_PAGO` debería hacer referencia a id_empleado de EmployeeDB.
 - `generada_por` y `aprobada_por` de `PLANILLAS` deberían hacer referencia a id_empleado de EmployeeDB (el Administrador que actuó).
 - `id_contrato` de `PLANILLA_EMPLEADOS` debería hacer referencia a id_contrato de `CONTRATOS` en EmployeeDB (la última versión del contrato en el mes).
 - Nombre, cargo, área, sucursal y haber se copian al generar la planilla: no cambian si después cambian en EmployeeDB.
@@ -32,6 +32,26 @@ La base no usa triggers, procedimientos almacenados ni vistas (decisión del equ
 - Servicio: una integración rechazada deja la planilla `APROBADA`; se reenvía con un mensaje nuevo y vuelve a `PENDIENTE`. Una integración confirmada ya no cambia.
 - `EVENTOS_SALIENTES` es la bandeja de salida: el evento se guarda en la misma transacción que la aprobación y se envía después.
 - Servicio: no se aprueba si algún concepto con monto en la planilla no tiene cuenta contable (el asiento no se podría armar).
+
+## Boletas de pago (RF-46, KAN-66)
+
+- `BOLETAS_PAGO`: una boleta por colaborador y planilla `CERRADA` (`uq_boleta_planilla_empleado`, `uq_boleta_empleado_periodo`). Servicio: no se emite boleta de una planilla en borrador o aprobada.
+- El detalle no se copia: se lee de `PLANILLA_EMPLEADOS` y `CALCULOS_PLANILLA`, que en una planilla cerrada ya no cambian. Las FK sin `CASCADE` impiden borrar una planilla con boletas.
+- `hash_contenido` es el SHA-256 del contenido de la boleta al emitirla. Servicio: se vuelve a calcular en cada consulta y descarga; si no coincide, la boleta no se entrega (409).
+- `descargas` y `ultima_descarga_en` registran las descargas del PDF.
+- Servicio: la boleta se emite la primera vez que el colaborador consulta sus boletas (`GET /boletas`), para cada planilla cerrada que aún no la tenga; así también quedan cubiertas las planillas cerradas antes de esta historia. `GET /boletas/:id` devuelve el detalle y `GET /boletas/:id/pdf` el PDF.
+- Acceso (JWT/RBAC): la identidad sale del JWT que firma AuthService al iniciar sesión (cookie `rrhh_sesion` o `Authorization: Bearer`), verificado con `JWT_SECRET` (el mismo de AuthService). Las cabeceras `X-Empleado-Id` y `X-Rol` se ignoran en estas rutas. Sin token, o con un token alterado o vencido, 401; cada colaborador ve solo sus boletas y la de otro responde 403; el rol `admin` (RRHH) del token puede ver cualquiera.
+
+## Planilla de aguinaldos (RF-47, KAN-67)
+
+- `PLANILLA_AGUINALDO` (cabecera, una por `gestion`) y `AGUINALDO_EMPLEADOS` (detalle) son tablas propias, separadas de `PLANILLAS`: el aguinaldo no tiene asistencia, horas extra ni conceptos por renglón, solo el monto de la duodécima. Mismo ciclo de vida que la planilla mensual: `BORRADOR` → `APROBADA` (se publica el asiento y la orden de dispersión) → `CERRADA` (ambas confirmaciones llegaron). Los mismos CHECK de `PLANILLAS` (aprobación, integraciones, cierre, respuestas) se repiten aquí.
+- Gestión: del 1 de diciembre del año anterior al 30 de noviembre de `gestion` (criterio implícito: no se genera si esa fecha es futura). Ejemplo: `gestion=2026` cubre 2025-12-01 a 2026-11-30.
+- Duodécimas (criterio 1): meses calendario completos (por aniversario de día del mes, igual que `aniosDeServicio`) más los días reales del mes incompleto — no un mes comercial de 30 días fijo, para que trabajar toda la gestión dé exactamente 12 meses y 0 días. `monto = promedio_sueldo * (meses + dias/30) / 12`.
+- Promedio de los tres últimos sueldos (criterio 1): el haber vigente en el último mes trabajado y los dos anteriores (vía el historial completo de contrato del colaborador — `/contratos/vigentes` tiene un tope de 92 días, insuficiente para una gestión de 12 meses), promediando con los que existan si ingresó hace menos de 3 meses.
+- Exclusión (criterio 2): menos de 3 meses de servicio en la gestión; queda en `AGUINALDO_EMPLEADOS` con `excluido = TRUE` y el motivo, monto 0 (no se omite la fila: así se ve quién se evaluó y por qué no le corresponde).
+- Retiro durante la gestión: EmployeeService no guarda una fecha de baja explícita. Para un colaborador inactivo se usa el fin de su última versión de contrato (si no se renovó) como aproximación; sin esa fecha, o si sigue activo, se cuenta hasta hoy o el fin de la gestión.
+- `EVENTOS_SALIENTES` y `EVENTOS_ENTRANTES` ganan la columna `id_aguinaldo` (además de `id_planilla`): la misma bandeja de salida y el mismo despachador de la planilla mensual sirven para el aguinaldo (criterio 3 y 5), nunca con los dos id a la vez (`chk_evento_recurso_unico`). Los tipos de mensaje son propios (`AGUINALDO_APROBADO_ASIENTO`, `AGUINALDO_APROBADO_ORDEN_PAGO`, `CONFIRMACION_ASIENTO_AGUINALDO`, `CONFIRMACION_ORDEN_PAGO_AGUINALDO`); `utils/integraciones.leerConfirmacion` identifica el recurso (`PLANILLA` o `AGUINALDO`) por el tipo y lee `datos.id_planilla` o `datos.id_aguinaldo` según corresponda. `confirmaciones.service.aplicar` es el mismo código para ambos recursos.
+- El asiento del aguinaldo es simple: debe la cuenta de gasto de aguinaldos (5.1.1.06, referencial), haber sueldos y salarios por pagar (2.1.2.01); sin descuentos de ley en este alcance (no está en los criterios de aceptación).
 
 ## Integración con Contabilidad (D) y Pagos (A)
 
@@ -210,6 +230,28 @@ El Administrador la envía desde Bonos por productividad (`POST /bonos-productiv
 - `PROCESOS_DESVINCULACION` registra cada proceso de liquidación con sus datos históricos copiados al momento del registro (incluyendo `corresponde_desahucio`, que queda fijo aunque el catálogo cambie después), y `DOCUMENTOS_DESVINCULACION` almacena el respaldo binario en tabla aparte (1 a 1) para no sobrecargar los listados.
 - Se consideran procesos abiertos los que tienen estado `INICIADO` o `EN_CURSO`; el índice único parcial `uq_proceso_abierto_empleado` impide en base de datos que un mismo colaborador tenga dos procesos abiertos al mismo tiempo.
 - El servicio valida la existencia y estado activo del colaborador contra EmployeeService y lo pasa a estado `BAJA` dentro de la misma transacción en que registra el proceso.
+
+## Sueldo promedio indemnizable (RF-55, KAN-75)
+
+- **Regla de cálculo:** sobre un proceso de desvinculación abierto (`INICIADO` o `EN_CURSO`), toma las últimas planillas en estado `CERRADA` del colaborador hasta el mes de la `fecha_retiro` (máximo 3) y promedia su `total_ganado` en centavos con redondeo mitad hacia arriba. Si hay menos de 3 meses, promedia los disponibles y registra la observación; también advierte si falta el mes del retiro, si hay huecos entre los periodos o si algún mes tiene menos de 30 días pagados.
+- **Copia por mes:** `DETALLE_PROMEDIO_INDEMNIZABLE` guarda `dias_pagados`, `haber_mensual` y `total_ganado` al momento del cálculo para dejar fija la base legal del finiquito.
+- **Recálculo:** mientras el proceso siga abierto, volver a calcular reemplaza la cabecera en `PROMEDIOS_INDEMNIZABLES` y su detalle, útil cuando se cierra posteriormente la planilla del mes de retiro.
+- **Estado del proceso:** al realizar el primer cálculo, el proceso pasa automáticamente de `INICIADO` a `EN_CURSO`.
+
+## Rotación de personal (RF-75, KAN-95)
+
+- No agrega tablas. `GET /indicadores/rotacion` lee las bajas de `PROCESOS_DESVINCULACION` (todo estado salvo `ANULADO`; si un colaborador tiene varias, la de retiro más reciente) con su causal, y cruza el personal de EmployeeService (`GET /empleados`: fecha de ingreso, sucursal y área actuales, estado).
+- `fecha_retiro` es el último día trabajado: la baja cuenta en ese mes y el colaborador ya no está en la plantilla al cierre de ese día. Un colaborador en `BAJA` sin proceso registrado no tiene fecha de retiro y queda fuera de los cálculos; la respuesta lo informa en `avisos.bajas_sin_registro`.
+- Acceso: exige sesión real (`middlewares/autenticar.js`, el mismo JWT de AuthService que usan las boletas); el colaborador y su rol salen del token y se ignoran `X-Empleado-Id` y `X-Rol`. Administrador y Gerente ven toda la cadena; un supervisor, solo la sucursal donde trabaja según EmployeeService (pedir otra responde 403); los demás roles, 403.
+- Datos de ejemplo: `seed-rotacion.sql` de EmployeeService (sucursal Calacoto y 65 colaboradores, con ingresos mes a mes), el de AuthService (cuenta de la supervisora de Calacoto, ver `CUENTAS-DE-PRUEBA.md`) y luego el de este servicio (10 bajas con las 4 causales). Las fechas de los últimos 12 meses son relativas al mes actual de La Paz. Con los seeds base de ambos servicios, el mes actual muestra rotación 3% (verde), retención 90,3% (verde) y rotación temprana 15,8% (amarillo).
+
+## Saldos proporcionales del finiquito (KAN-77)
+
+- `SALDOS_PROPORCIONALES` guarda el último cálculo de cada proceso de liquidación (1 a 1, recalcular lo reemplaza) con la copia de los datos usados: sueldo promedio, saldo de vacaciones y tiempos. Calcula el Administrador de RRHH sobre un proceso abierto (lo pasa de `INICIADO` a `EN_CURSO`); el Contador lo consulta en solo lectura.
+- **Valorización:** con el sueldo promedio indemnizable del proceso (RF-55, `PROMEDIOS_INDEMNIZABLES`); si todavía no se calculó, se calcula primero con su propia regla. Sueldo diario = promedio / 30.
+- **Duodécimas de aguinaldo (criterio 1):** gestión en curso al retiro (1 de diciembre al 30 de noviembre, igual que RF-47), meses y días trabajados en ella hasta la fecha de retiro: `promedio × (meses + días/30) / 12`. Sin pago con menos de 3 meses en la gestión, ni si su aguinaldo de esa gestión ya se liquidó en una planilla de aguinaldos aprobada o cerrada (se informa en observaciones).
+- **Vacaciones no gozadas (criterio 2):** días acreditados menos gozados según el módulo de vacaciones de AttendanceService al día del retiro (`GET /vacaciones/empleados/:id/saldo?fecha=AAAA-MM-DD`, parámetro nuevo); los días en proceso de goce se pagan como no gozados y se informa. `días × sueldo diario`.
+- **Duodécima de vacaciones (criterio 3):** desde el último aniversario de servicio (o el ingreso, antes del primer año) hasta el retiro, en proporción a los días de la escala que le habrían correspondido al cumplir ese año (15, 20 o 30; el módulo de vacaciones la informa en `proximo_periodo.dias`): `escala × (meses + días/30) / 12` días, × sueldo diario.
 
 ## Planilla tributaria y de aportes (RF-48, KAN-68)
 
