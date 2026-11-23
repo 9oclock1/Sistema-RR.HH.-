@@ -1032,6 +1032,13 @@ CREATE TABLE PARAMETROS_TRIBUTARIOS (
         daterange(vigente_desde, vigente_hasta, '[]') WITH &&
     )
 );
+-- Tabla: VALORES_UFV
+CREATE TABLE VALORES_UFV (
+    fecha date NOT NULL,
+    valor numeric(10,5) NOT NULL,
+    CONSTRAINT VALORES_UFV_pk PRIMARY KEY (fecha),
+    CONSTRAINT chk_ufv_valor CHECK (valor > 0)
+);
 -- Tabla: ENTIDADES_APORTE
 CREATE TABLE ENTIDADES_APORTE (
     codigo varchar(20) NOT NULL,
@@ -1059,12 +1066,12 @@ CREATE TABLE CREDITOS_FISCALES_DECLARADOS (
     id_empleado UUID NOT NULL,
     periodo char(7) NOT NULL,
     monto_facturas numeric(12,2) NOT NULL DEFAULT 0,
-    saldo_anterior_favor numeric(12,2) NOT NULL DEFAULT 0,
+    saldo_inicial_favor numeric(12,2) NOT NULL DEFAULT 0,
     declarado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT CREDITOS_FISCALES_DECLARADOS_pk PRIMARY KEY (id_credito),
     CONSTRAINT uq_credito_empleado_periodo UNIQUE (id_empleado, periodo),
     CONSTRAINT chk_credito_periodo CHECK (periodo ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
-    CONSTRAINT chk_credito_montos CHECK (monto_facturas >= 0 AND saldo_anterior_favor >= 0)
+    CONSTRAINT chk_credito_montos CHECK (monto_facturas >= 0 AND saldo_inicial_favor >= 0)
 );
 -- Tabla: PLANILLAS_TRIBUTARIAS
 CREATE TABLE PLANILLAS_TRIBUTARIAS (
@@ -1076,12 +1083,18 @@ CREATE TABLE PLANILLAS_TRIBUTARIAS (
     minimo_no_imponible numeric(12,2) NOT NULL,
     alicuota_rciva numeric(7,4) NOT NULL,
     alicuota_credito_fiscal numeric(7,4) NOT NULL,
+    computo_salarios_minimos numeric(12,2) NOT NULL,
+    periodo_saldo_anterior char(7) NULL,
+    ufv_inicial numeric(10,5) NULL,
+    ufv_final numeric(10,5) NULL,
     cantidad_dependientes int NOT NULL DEFAULT 0,
     total_sueldo_neto numeric(14,2) NOT NULL DEFAULT 0,
     total_base_imponible numeric(14,2) NOT NULL DEFAULT 0,
     total_impuesto_determinado numeric(14,2) NOT NULL DEFAULT 0,
+    total_computo_salarios_minimos numeric(14,2) NOT NULL DEFAULT 0,
     total_credito_aplicado numeric(14,2) NOT NULL DEFAULT 0,
     total_impuesto_retenido numeric(14,2) NOT NULL DEFAULT 0,
+    total_actualizacion_ufv numeric(14,2) NOT NULL DEFAULT 0,
     advertencias text[] NOT NULL DEFAULT '{}',
     generada_por UUID NULL,
     generada_por_nombre varchar(150) NULL,
@@ -1092,12 +1105,17 @@ CREATE TABLE PLANILLAS_TRIBUTARIAS (
         REFERENCES PLANILLAS (id_planilla) ON DELETE CASCADE,
     CONSTRAINT chk_planilla_tributaria_parametros CHECK (
         salario_minimo > 0 AND multiplo_minimo_no_imponible > 0 AND minimo_no_imponible > 0
-        AND alicuota_rciva > 0 AND alicuota_credito_fiscal > 0
+        AND alicuota_rciva > 0 AND alicuota_credito_fiscal > 0 AND computo_salarios_minimos >= 0
+    ),
+    CONSTRAINT chk_planilla_tributaria_ufv CHECK (
+        (ufv_inicial IS NULL) = (ufv_final IS NULL) AND (ufv_inicial IS NULL OR (ufv_inicial > 0 AND ufv_final > 0))
+        AND (ufv_inicial IS NULL OR periodo_saldo_anterior IS NOT NULL)
     ),
     CONSTRAINT chk_planilla_tributaria_totales CHECK (
         cantidad_dependientes >= 0 AND total_sueldo_neto >= 0 AND total_base_imponible >= 0
-        AND total_impuesto_determinado >= 0 AND total_credito_aplicado >= 0 AND total_impuesto_retenido >= 0
-        AND total_impuesto_determinado = total_credito_aplicado + total_impuesto_retenido
+        AND total_impuesto_determinado >= 0 AND total_computo_salarios_minimos >= 0 AND total_credito_aplicado >= 0
+        AND total_impuesto_retenido >= 0 AND total_actualizacion_ufv >= 0
+        AND total_impuesto_determinado = total_computo_salarios_minimos + total_credito_aplicado + total_impuesto_retenido
     )
 );
 -- Tabla: RETENCIONES_RCIVA
@@ -1112,8 +1130,12 @@ CREATE TABLE RETENCIONES_RCIVA (
     sueldo_neto numeric(12,2) NOT NULL,
     base_imponible numeric(12,2) NOT NULL,
     impuesto_determinado numeric(12,2) NOT NULL,
+    computo_salarios_minimos numeric(12,2) NOT NULL DEFAULT 0,
     monto_facturas numeric(12,2) NOT NULL DEFAULT 0,
     credito_fiscal_facturas numeric(12,2) NOT NULL DEFAULT 0,
+    origen_saldo varchar(15) NOT NULL,
+    saldo_mes_anterior numeric(12,2) NOT NULL DEFAULT 0,
+    actualizacion_ufv numeric(12,2) NOT NULL DEFAULT 0,
     saldo_anterior_favor numeric(12,2) NOT NULL DEFAULT 0,
     credito_aplicado numeric(12,2) NOT NULL,
     impuesto_retenido numeric(12,2) NOT NULL,
@@ -1124,11 +1146,14 @@ CREATE TABLE RETENCIONES_RCIVA (
         REFERENCES PLANILLAS_TRIBUTARIAS (id_planilla_tributaria) ON DELETE CASCADE,
     CONSTRAINT chk_retencion_montos CHECK (
         total_ganado >= 0 AND aportes_laborales >= 0 AND sueldo_neto >= 0 AND base_imponible >= 0
-        AND impuesto_determinado >= 0 AND monto_facturas >= 0 AND credito_fiscal_facturas >= 0
+        AND impuesto_determinado >= 0 AND computo_salarios_minimos >= 0 AND monto_facturas >= 0
+        AND credito_fiscal_facturas >= 0 AND saldo_mes_anterior >= 0 AND actualizacion_ufv >= 0
         AND saldo_anterior_favor >= 0 AND credito_aplicado >= 0 AND impuesto_retenido >= 0 AND saldo_favor_siguiente >= 0
     ),
+    CONSTRAINT chk_retencion_origen_saldo CHECK (origen_saldo IN ('MES_ANTERIOR', 'SALDO_INICIAL')),
     CONSTRAINT chk_retencion_balance CHECK (
-        impuesto_determinado = credito_aplicado + impuesto_retenido
+        impuesto_determinado = computo_salarios_minimos + credito_aplicado + impuesto_retenido
+        AND saldo_anterior_favor = saldo_mes_anterior + actualizacion_ufv
         AND credito_fiscal_facturas + saldo_anterior_favor = credito_aplicado + saldo_favor_siguiente
     )
 );
