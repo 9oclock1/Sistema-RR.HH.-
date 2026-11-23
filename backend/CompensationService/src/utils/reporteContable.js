@@ -2,9 +2,11 @@ const { agruparPorCentroDeCosto, ESTADO_CONCILIACION } = require("./integracione
 const { agruparAguinaldoPorCentroDeCosto } = require("./aguinaldo");
 
 // Reporte contable consolidado de planillas por periodo y centro de costo (RF-49, KAN-69). Un reporte
-// siempre consolida UN recurso cerrado (una planilla mensual o la planilla de aguinaldos de una gestión):
-// los totales por construcción cuadran con lo que esa planilla envió a Contabilidad (criterio 3), y el
-// estado de conciliación es el mismo estado_contabilidad/estado_pagos de siempre (criterio 2).
+// consolida los centros de costo de uno o dos recursos (una planilla mensual y, si se fundió, el aguinaldo
+// que cerró ese mismo mes), pero cada recurso tiene su PROPIO asiento y su propia conciliación con
+// Contabilidad y Pagos: la planilla y el aguinaldo son envíos distintos, con estados distintos (criterio 2).
+// Por eso el reporte expone `asientos`, una lista con un elemento por recurso, en vez de un solo
+// `conciliacion` para todo el reporte (eso escondía el estado del aguinaldo detrás del de la planilla).
 const NOMBRE_DESTINO = { contabilidad: "Contabilidad", pagos: "Pagos" };
 
 function conciliacionDe(recurso) {
@@ -16,6 +18,16 @@ function conciliacionDe(recurso) {
   });
   return { contabilidad: integracion("contabilidad"), pagos: integracion("pagos") };
 }
+
+// Un asiento por recurso (PLANILLA o AGUINALDO), con su propia conciliación. `identificador` es el periodo
+// (planilla) o la gestión (aguinaldo): lo que en pantalla identifica a qué envío pertenece cada estado.
+const asientoDe = (recurso, tipo, identificador) => ({
+  recurso: tipo,
+  id_recurso: recurso[tipo === "PLANILLA" ? "id_planilla" : "id_aguinaldo"],
+  ...identificador,
+  estado: recurso.estado,
+  conciliacion: conciliacionDe(recurso),
+});
 
 const sumarTotales = (centros, campo) => Math.round(centros.reduce((t, c) => t + c[campo], 0) * 100) / 100;
 
@@ -74,6 +86,8 @@ function construirReportePlanilla({ planilla, filasConceptos, filasPasivos, agui
     aguinaldo && filasAguinaldo
       ? combinarCentros([centrosPlanilla, agruparAguinaldoPorCentroDeCosto(filasAguinaldo)])
       : centrosPlanilla;
+  const asientos = [asientoDe(planilla, "PLANILLA", { periodo: planilla.periodo })];
+  if (aguinaldo) asientos.push(asientoDe(aguinaldo, "AGUINALDO", { gestion: aguinaldo.gestion }));
   return {
     recurso: "PLANILLA",
     id_recurso: planilla.id_planilla,
@@ -82,8 +96,7 @@ function construirReportePlanilla({ planilla, filasConceptos, filasPasivos, agui
     colaboradores: planilla.colaboradores,
     centros_costo,
     totales: totalesDe(centros_costo),
-    conciliacion: conciliacionDe(planilla),
-    aguinaldo_incluido: aguinaldo ? { id_aguinaldo: aguinaldo.id_aguinaldo, gestion: aguinaldo.gestion } : null,
+    asientos,
   };
 }
 
@@ -97,13 +110,14 @@ function construirReporteAguinaldo({ aguinaldo, filasPorCentro }) {
     colaboradores: aguinaldo.colaboradores,
     centros_costo,
     totales: totalesDe(centros_costo),
-    conciliacion: conciliacionDe(aguinaldo),
+    asientos: [asientoDe(aguinaldo, "AGUINALDO", { gestion: aguinaldo.gestion })],
   };
 }
 
 module.exports = {
   NOMBRE_DESTINO,
   conciliacionDe,
+  asientoDe,
   totalesDe,
   combinarCentros,
   construirReportePlanilla,

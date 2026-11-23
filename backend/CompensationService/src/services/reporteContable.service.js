@@ -10,21 +10,22 @@ const { construirReportePlanilla, construirReporteAguinaldo } = require("../util
 
 const PERIODO_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
-// Regla de negocio acordada para el criterio 1 ("periodo cerrado"): por defecto, estricta, solo CERRADA.
-// Antes se aceptaba también APROBADA para poder demostrar el criterio 2 (conciliación "pendiente"/"con
-// error"), pero eso era una lectura flexible de "cerrado" — una CERRADA, por definición, ya tiene ambas
-// confirmaciones en CONFIRMADA, así que con esta regla el reporte nunca mostrará "pendiente" ni "con error"
-// mientras el recurso no llegue a cerrarse del todo. Cambiar esto es una decisión de negocio, no de código:
-// alcanza con tocar esta constante.
-const ESTADOS_PERMITIDOS = ["CERRADA"];
+// Regla de negocio para el criterio 1 ("periodo cerrado"): APROBADA o CERRADA. Restringir solo a CERRADA
+// (como se intentó antes) hacía que el criterio 2 ("pendiente"/"con error") nunca se pudiera demostrar: una
+// CERRADA, por definición, ya tiene ambas confirmaciones en CONFIRMADA, así que el reporte siempre mostraba
+// "registrado". Con APROBADA también permitida, el Contador puede consultar el reporte apenas se envía el
+// asiento (y la orden de pago), con la conciliación todavía "pendiente" o, si algún destino la rechazó, "con
+// error" — que es justamente lo que el criterio 2 pide poder mostrar. Lo único que sigue bloqueado es
+// BORRADOR, porque ahí no se envió nada: no hay asiento que conciliar.
+const ESTADOS_PERMITIDOS = ["APROBADA", "CERRADA"];
 
-// codigo "NO_CERRADA": así el frontend puede ofrecer "simular aceptación" sin parsear el texto del mensaje.
-const noCerrado = (nombre) =>
+// codigo "EN_BORRADOR": así el frontend sabe que no hay nada que simular (todavía no se envió el asiento).
+const enBorrador = (nombre) =>
   new ErrorApp(
     409,
-    `${nombre} todavía no está cerrada: el reporte contable solo se genera cuando Contabilidad y Pagos ya confirmaron.`,
+    `${nombre} está en borrador: el reporte contable se genera recién al aprobarla, cuando se envía el asiento a Contabilidad y la orden a Pagos.`,
     undefined,
-    "NO_CERRADA"
+    "EN_BORRADOR"
   );
 
 const MENSAJE_ROL = "Solo el Administrador de RRHH o el Contador pueden consultar el reporte contable.";
@@ -45,7 +46,7 @@ function finDeMes(periodo) {
 }
 
 // Criterio 1: el reporte contable consolidado de UNA planilla mensual, por cuenta contable y centro de
-// costo. Solo con el periodo CERRADA (ver ESTADOS_PERMITIDOS). El criterio también pide incluir "aguinaldos":
+// costo. Con el periodo APROBADA o CERRADA (ver ESTADOS_PERMITIDOS). El criterio también pide incluir "aguinaldos":
 // si una planilla de aguinaldos se cerró dentro de este mismo mes, se funde en el mismo consolidado (ver
 // aguinaldoModelo.obtenerCerradoEnMes y utils/reporteContable#combinarCentros) en vez de quedar visible solo
 // en el reporte de aguinaldos por gestión.
@@ -56,7 +57,7 @@ async function generarPlanilla(periodo, identidad = {}) {
   }
   const planilla = (await planillasModelo.listar(periodo))[0];
   if (!planilla) throw new ErrorApp(404, `No existe una planilla para el periodo ${periodo}.`);
-  if (!ESTADOS_PERMITIDOS.includes(planilla.estado)) throw noCerrado(`La planilla de ${periodo}`);
+  if (!ESTADOS_PERMITIDOS.includes(planilla.estado)) throw enBorrador(`La planilla de ${periodo}`);
   const [filasConceptos, filasPasivos, aguinaldo] = await Promise.all([
     planillasModelo.conceptosPorCentroDeCosto(pool, planilla.id_planilla),
     planillasModelo.pasivosPorCentroDeCosto(pool, planilla.id_planilla),
@@ -72,7 +73,7 @@ async function generarAguinaldo(gestion, identidad = {}) {
   const aguinaldo = (await aguinaldoModelo.listar()).find((a) => a.gestion === gestionValidada);
   if (!aguinaldo) throw new ErrorApp(404, `No existe una planilla de aguinaldos para la gestión ${gestionValidada}.`);
   if (!ESTADOS_PERMITIDOS.includes(aguinaldo.estado)) {
-    throw noCerrado(`La planilla de aguinaldos de la gestión ${gestionValidada}`);
+    throw enBorrador(`La planilla de aguinaldos de la gestión ${gestionValidada}`);
   }
   const filasPorCentro = await aguinaldoModelo.montosPorCentroDeCosto(pool, aguinaldo.id_aguinaldo);
   return construirReporteAguinaldo({ aguinaldo, filasPorCentro });

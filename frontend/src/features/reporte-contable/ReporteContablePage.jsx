@@ -22,8 +22,9 @@ import "../conceptos/conceptos.css";
 
 const DESTINOS_SIMULAR = ["contabilidad", "pagos"];
 
-// El aguinaldo de una gestión ya aparece sumado en el reporte de la planilla del mes en que se cerró (ver
-// aguinaldo_incluido más abajo); esta segunda opción queda para ver el detalle completo de esa gestión aparte.
+// El aguinaldo de una gestión ya aparece sumado en los centros de costo del reporte de la planilla del mes
+// en que se cerró (ver reporte.asientos más abajo, que trae su propia conciliación aparte); esta segunda
+// opción queda para ver el detalle completo de esa gestión aparte.
 const RECURSOS = [
   { valor: "planilla", etiqueta: "Planilla mensual" },
   { valor: "aguinaldo", etiqueta: "Planilla de aguinaldos (detalle por gestión)" },
@@ -60,6 +61,36 @@ function Conciliacion({ titulo, datos }) {
       {datos.referencia && <span className="conceptos-nota">Ref. {datos.referencia}</span>}
       {datos.motivo && <span className="conceptos-nota">{datos.motivo}</span>}
     </div>
+  );
+}
+
+// Criterio 2: cada asiento (la planilla y, si se fundió, el aguinaldo del mes) tiene su propia conciliación
+// con Contabilidad y Pagos — no se mezclan en un solo estado para todo el reporte.
+function AsientoConciliacion({ asiento, onSimular, simulando }) {
+  const titulo = asiento.recurso === "PLANILLA" ? `Planilla mensual · ${asiento.periodo}` : `Aguinaldo · gestión ${asiento.gestion}`;
+  const pendiente = asiento.conciliacion.contabilidad.estado !== "registrado" || asiento.conciliacion.pagos.estado !== "registrado";
+  return (
+    <Tarjeta className="conceptos-tarjeta">
+      <div className="planilla-estado" role="status">
+        <strong>{titulo}</strong>
+        <Etiqueta tono="info">{asiento.estado}</Etiqueta>
+      </div>
+      <div className="vigencias-resumen planilla-totales">
+        <Conciliacion titulo="Contabilidad" datos={asiento.conciliacion.contabilidad} />
+        <Conciliacion titulo="Pagos" datos={asiento.conciliacion.pagos} />
+      </div>
+      {pendiente && (
+        <Boton
+          tamano="sm"
+          variante="sutil"
+          icono={FlaskConical}
+          cargando={simulando === asiento.id_recurso}
+          onClick={() => onSimular(asiento)}
+        >
+          Simular aceptación
+        </Boton>
+      )}
+    </Tarjeta>
   );
 }
 
@@ -116,7 +147,8 @@ export default function ReporteContablePage() {
   const [carga, setCarga] = useState(null);
   const [intento, setIntento] = useState(0);
   const [descargando, setDescargando] = useState(null);
-  const [simulando, setSimulando] = useState(false);
+  // id_recurso del asiento que se está simulando (hay hasta dos: la planilla y el aguinaldo fundido en ella).
+  const [simulando, setSimulando] = useState(null);
 
   const identificador = recurso === "planilla" ? periodo : gestion;
   const anioValido = Number.isInteger(gestion) && gestion >= 2000 && gestion <= 2100;
@@ -125,7 +157,8 @@ export default function ReporteContablePage() {
   useEffect(() => {
     if (!valido) return undefined;
     let vigente = true;
-    setCarga(null);
+    // No hace falta limpiar `carga` aquí: en cuanto recurso/identificador cambian, `actual` ya no coincide
+    // con lo cargado y se deriva null solo (mismo patrón que el resto de los dashboards de este módulo).
     generarReporteContable(recurso, identificador, identidad)
       .then((reporte) => vigente && setCarga({ recurso, identificador, reporte }))
       .catch((e) => vigente && setCarga({ recurso, identificador, error: e.message, codigo: e.codigo }));
@@ -150,35 +183,36 @@ export default function ReporteContablePage() {
     [reporte]
   );
 
-  // El reporte exige el recurso CERRADA (ambas confirmaciones ya llegaron): mientras eso no pase, no hay
-  // nada que mostrar. Este botón simula que Contabilidad y Pagos aceptan, pero de la misma forma real que ya
-  // usan las pantallas de Planillas/Aguinaldos: PUBLICA la confirmación en Pub/Sub (no la aplica directo), y
-  // la suscripción real de este mismo servicio la recibe y la cierra, igual que una confirmación genuina.
-  const simularAceptacion = async () => {
-    setSimulando(true);
+  // El reporte ya admite APROBADA, así que puede mostrar un asiento "pendiente" o "con error": este botón
+  // simula que Contabilidad y Pagos aceptan, igual que ya usan las pantallas de Planillas/Aguinaldos: PUBLICA
+  // la confirmación en Pub/Sub (no la aplica directo), y la suscripción real de este mismo servicio la
+  // recibe y la aplica, igual que una confirmación genuina. Cada asiento (planilla o aguinaldo) se simula por
+  // separado, porque cada uno es un envío distinto con su propio estado.
+  const simularAceptacion = async (asiento) => {
+    setSimulando(asiento.id_recurso);
     try {
       const recursoActual =
-        recurso === "planilla"
-          ? (await listarPlanillas(periodo))[0]
-          : (await listarAguinaldos()).find((a) => a.gestion === gestion);
+        asiento.recurso === "PLANILLA"
+          ? (await listarPlanillas(asiento.periodo))[0]
+          : (await listarAguinaldos()).find((a) => a.gestion === asiento.gestion);
       if (!recursoActual) throw new Error("No se encontró el recurso para simular la aceptación.");
-      const simular = recurso === "planilla" ? simularConfirmacionPlanilla : simularConfirmacionAguinaldo;
+      const simular = asiento.recurso === "PLANILLA" ? simularConfirmacionPlanilla : simularConfirmacionAguinaldo;
       const pendientes = DESTINOS_SIMULAR.filter((d) => recursoActual.integraciones[d].estado !== "CONFIRMADA");
       if (pendientes.length === 0) {
-        avisar({ tono: "info", titulo: "Ya estaba todo confirmado", mensaje: "Debería cerrarse en unos segundos." });
+        avisar({ tono: "info", titulo: "Ya estaba todo confirmado", mensaje: "Debería actualizarse en unos segundos." });
       } else {
         await Promise.all(pendientes.map((d) => simular(recursoActual.id_planilla ?? recursoActual.id_aguinaldo, d, { resultado: "CONFIRMADA" }, identidad)));
         avisar({
           tono: "info",
           titulo: "Simulación enviada",
-          mensaje: "Se publicó la aceptación de Contabilidad y Pagos; el reporte se podrá generar en unos segundos.",
+          mensaje: "Se publicó la aceptación de Contabilidad y Pagos; el reporte se actualizará en unos segundos.",
         });
       }
       setTimeout(() => setIntento((n) => n + 1), 2500);
     } catch (e) {
       avisar({ tono: "peligro", titulo: "No se pudo simular la aceptación", mensaje: e.message });
     } finally {
-      setSimulando(false);
+      setSimulando(null);
     }
   };
 
@@ -270,16 +304,9 @@ export default function ReporteContablePage() {
             role="alert"
             titulo="No se pudo generar el reporte"
             acciones={
-              <>
-                {actual.codigo === "NO_CERRADA" && (
-                  <Boton tamano="sm" variante="sutil" icono={FlaskConical} cargando={simulando} onClick={simularAceptacion}>
-                    Simular aceptación
-                  </Boton>
-                )}
-                <Boton tamano="sm" onClick={() => setIntento((n) => n + 1)}>
-                  Reintentar
-                </Boton>
-              </>
+              <Boton tamano="sm" onClick={() => setIntento((n) => n + 1)}>
+                Reintentar
+              </Boton>
             }
           >
             {actual.error}
@@ -294,16 +321,9 @@ export default function ReporteContablePage() {
               <Etiqueta tono="info">{reporte.estado}</Etiqueta>
               <span className="conceptos-nota">{reporte.colaboradores} colaboradores</span>
             </div>
-            {reporte.aguinaldo_incluido && (
-              <Alerta tono="info" titulo="Incluye el aguinaldo de la gestión">
-                El aguinaldo de la gestión {reporte.aguinaldo_incluido.gestion} se cerró este mes: sus montos ya están
-                sumados en los centros de costo y en los totales de este reporte.
-              </Alerta>
-            )}
-            <div className="vigencias-resumen planilla-totales">
-              <Conciliacion titulo="Contabilidad" datos={reporte.conciliacion.contabilidad} />
-              <Conciliacion titulo="Pagos" datos={reporte.conciliacion.pagos} />
-            </div>
+            {reporte.asientos.map((asiento) => (
+              <AsientoConciliacion key={asiento.id_recurso} asiento={asiento} onSimular={simularAceptacion} simulando={simulando} />
+            ))}
 
             {centrosFiltrados.length === 0 ? (
               <EstadoVacio icono={Download} titulo="Sin gastos en este periodo" mensaje="No hay montos registrados para consolidar." />

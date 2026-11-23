@@ -128,10 +128,14 @@ test("construirReportePlanilla: traduce estado_contabilidad/estado_pagos al voca
     filasPasivos: [{ sucursal: "Casa matriz", area: "Administración", liquido_pagable: 1000, total_aportes: 0 }],
   });
   assert.equal(reporte.recurso, "PLANILLA");
-  assert.equal(reporte.conciliacion.contabilidad.estado, "registrado");
-  assert.equal(reporte.conciliacion.contabilidad.referencia, "AST-001");
-  assert.equal(reporte.conciliacion.pagos.estado, "con_error");
-  assert.equal(reporte.conciliacion.pagos.motivo, "Cuenta bancaria inválida");
+  assert.equal(reporte.asientos.length, 1);
+  const [asiento] = reporte.asientos;
+  assert.equal(asiento.recurso, "PLANILLA");
+  assert.equal(asiento.periodo, "2026-10");
+  assert.equal(asiento.conciliacion.contabilidad.estado, "registrado");
+  assert.equal(asiento.conciliacion.contabilidad.referencia, "AST-001");
+  assert.equal(asiento.conciliacion.pagos.estado, "con_error");
+  assert.equal(asiento.conciliacion.pagos.motivo, "Cuenta bancaria inválida");
   assert.equal(reporte.totales.cuadra, true);
 });
 
@@ -141,8 +145,9 @@ test("construirReportePlanilla: con PENDIENTE en ambos destinos reporta 'pendien
     filasConceptos: [],
     filasPasivos: [],
   });
-  assert.equal(reporte.conciliacion.contabilidad.estado, "pendiente");
-  assert.equal(reporte.conciliacion.pagos.estado, "pendiente");
+  const [asiento] = reporte.asientos;
+  assert.equal(asiento.conciliacion.contabilidad.estado, "pendiente");
+  assert.equal(asiento.conciliacion.pagos.estado, "pendiente");
   assert.equal(reporte.totales.total_debe, 0);
   assert.equal(reporte.totales.cuadra, true);
 });
@@ -173,35 +178,60 @@ test("construirReporteAguinaldo: usa gestion en vez de periodo y cuadra por cent
   assert.equal(reporte.gestion, 2023);
   assert.equal(reporte.totales.total_debe, 15800);
   assert.equal(reporte.totales.total_haber, 15800);
-  assert.equal(reporte.conciliacion.contabilidad.estado, "registrado");
-  assert.equal(reporte.conciliacion.pagos.estado, "registrado");
+  assert.equal(reporte.asientos.length, 1);
+  assert.equal(reporte.asientos[0].conciliacion.contabilidad.estado, "registrado");
+  assert.equal(reporte.asientos[0].conciliacion.pagos.estado, "registrado");
 });
 
-test("construirReportePlanilla: con un aguinaldo cerrado ese mes, lo funde en los mismos centros de costo", () => {
+test("construirReportePlanilla: con un aguinaldo cerrado ese mes, lo funde en los centros de costo pero mantiene su propio asiento", () => {
   const reporte = construirReportePlanilla({
     planilla: { ...PLANILLA_BASE, estado: "CERRADA" },
     filasConceptos: [concepto("Casa matriz", "Administración", "INGRESO", 1000)],
     filasPasivos: [{ sucursal: "Casa matriz", area: "Administración", liquido_pagable: 1000, total_aportes: 0 }],
-    aguinaldo: { id_aguinaldo: "f1e2d3c4-b5a6-4978-8899-aabbccddeeff", gestion: 2026 },
+    aguinaldo: {
+      id_aguinaldo: "f1e2d3c4-b5a6-4978-8899-aabbccddeeff",
+      gestion: 2026,
+      estado: "CERRADA",
+      estado_contabilidad: "PENDIENTE",
+      referencia_contabilidad: null,
+      motivo_contabilidad: null,
+      respondida_contabilidad_en: null,
+      estado_pagos: "RECHAZADA",
+      referencia_pagos: null,
+      motivo_pagos: "Cuenta de aguinaldo inválida",
+      respondida_pagos_en: "2026-11-06T10:00:00Z",
+    },
     filasAguinaldo: [{ sucursal: "Casa matriz", area: "Administración", monto: 500 }],
   });
-  assert.equal(reporte.aguinaldo_incluido.gestion, 2026);
-  // Sueldos y salarios por pagar (haber) ahora trae el líquido de la planilla (1000) MÁS el del aguinaldo (500).
+
+  // Criterio 2: cada recurso tiene su propio asiento y su propia conciliación — no se mezclan ni se pierden.
+  assert.equal(reporte.asientos.length, 2);
+  const asientoPlanilla = reporte.asientos.find((a) => a.recurso === "PLANILLA");
+  const asientoAguinaldo = reporte.asientos.find((a) => a.recurso === "AGUINALDO");
+  assert.equal(asientoPlanilla.periodo, "2026-10");
+  assert.equal(asientoPlanilla.conciliacion.contabilidad.estado, "registrado"); // CONFIRMADA en PLANILLA_BASE
+  assert.equal(asientoAguinaldo.gestion, 2026);
+  assert.equal(asientoAguinaldo.conciliacion.contabilidad.estado, "pendiente");
+  assert.equal(asientoAguinaldo.conciliacion.pagos.estado, "con_error");
+  assert.equal(asientoAguinaldo.conciliacion.pagos.motivo, "Cuenta de aguinaldo inválida");
+
+  // Los centros de costo SÍ se funden: Sueldos y salarios por pagar trae el líquido de la planilla (1000)
+  // MÁS el del aguinaldo (500), aunque sus conciliaciones vayan separadas.
   const centro = reporte.centros_costo.find((c) => c.centro_costo === "Casa matriz · Administración");
   const sueldosPorPagar = centro.renglones.find((r) => r.cuenta.codigo === CUENTAS.SUELDOS_POR_PAGAR.codigo);
   assert.equal(sueldosPorPagar.haber, 1500);
-  // El debe también crece: 1000 de sueldos (planilla) + 500 de la cuenta de aguinaldos.
   assert.equal(reporte.totales.total_debe, 1500);
   assert.equal(reporte.totales.total_haber, 1500);
   assert.equal(reporte.totales.cuadra, true);
 });
 
-test("construirReportePlanilla: sin aguinaldo cerrado ese mes, no agrega aguinaldo_incluido ni cambia los totales", () => {
+test("construirReportePlanilla: sin aguinaldo cerrado ese mes, el reporte trae un solo asiento", () => {
   const reporte = construirReportePlanilla({
     planilla: { ...PLANILLA_BASE, estado: "CERRADA" },
     filasConceptos: [concepto("Casa matriz", "Administración", "INGRESO", 1000)],
     filasPasivos: [{ sucursal: "Casa matriz", area: "Administración", liquido_pagable: 1000, total_aportes: 0 }],
   });
-  assert.equal(reporte.aguinaldo_incluido, null);
+  assert.equal(reporte.asientos.length, 1);
+  assert.equal(reporte.asientos[0].recurso, "PLANILLA");
   assert.equal(reporte.totales.total_debe, 1000);
 });
