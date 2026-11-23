@@ -3,6 +3,9 @@ import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsisten
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
+import ConvocatoriasEmpleadoPage from "../features/convocatorias-internas/ConvocatoriasEmpleadoPage";
+import ConvocatoriasRrhhPage from "../features/convocatorias-internas/ConvocatoriasRrhhPage";
+import { RUTA_CONVOCATORIAS_EMPLEADO, RUTA_CONVOCATORIAS_RRHH } from "../features/convocatorias-internas/convocatorias";
 import CiclosEvaluacionPage from "../features/ciclos-evaluacion/CiclosEvaluacionPage";
 import { RUTA_CICLOS } from "../features/ciclos-evaluacion/ciclo";
 import DashboardDesempenoPage from "../features/dashboard-desempeno/DashboardDesempenoPage";
@@ -162,6 +165,27 @@ export const SECCIONES = [
         icono: CalendarClock,
         roles: ["reclutador"],
         pagina: AgendaEntrevistasPage,
+      },
+    ],
+  },
+  {
+    titulo: "Ascensos",
+    modulos: [
+      {
+        ruta: RUTA_CONVOCATORIAS_RRHH,
+        etiqueta: "Convocatorias internas",
+        descripcion: "Publicación de vacantes de ascenso dirigidas solo a empleados activos, con su vigencia, sus requisitos y el aviso por mensajería.",
+        icono: Megaphone,
+        roles: ["gerente"],
+        pagina: ConvocatoriasRrhhPage,
+      },
+      {
+        ruta: RUTA_CONVOCATORIAS_EMPLEADO,
+        etiqueta: "Convocatorias de ascenso",
+        descripcion: "Vacantes internas abiertas para su plan de carrera, con sus requisitos y la fecha de cierre.",
+        icono: TrendingUp,
+        roles: ["empleado"],
+        pagina: ConvocatoriasEmpleadoPage,
       },
     ],
   },
