@@ -1504,3 +1504,111 @@ INSERT INTO CALCULOS_PLANILLA (
 ON CONFLICT DO NOTHING;
 
 COMMIT;
+
+-- Procesos por desahucio con 1 año exacto, 91 y 90 días de servicio (RF-56, KAN-76). Las líneas de planilla se
+-- enlazan por periodo para usar la planilla que exista de agosto a octubre de 2026.
+BEGIN;
+
+INSERT INTO PROCESOS_DESVINCULACION (
+  id_proceso, id_empleado, nombre_empleado, fecha_ingreso, codigo_causal,
+  fecha_retiro, corresponde_desahucio, observaciones, estado, registrado_por, registrado_por_rol
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000a41',
+    'f0000000-0000-4000-8000-000000000a61',
+    'Sofía Mamani Lima',
+    '2025-11-01',
+    'DESAHUCIO',
+    '2026-10-31',
+    TRUE,
+    'Preaviso de desahucio entregado tras un año de servicio.',
+    'INICIADO',
+    'f0000000-0000-4000-8000-000000000023',
+    'admin'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000a42',
+    'f0000000-0000-4000-8000-000000000a62',
+    'Marco Condori Flores',
+    '2026-08-02',
+    'DESAHUCIO',
+    '2026-10-31',
+    TRUE,
+    'Desahucio comunicado al concluir el tercer mes de servicio.',
+    'INICIADO',
+    'f0000000-0000-4000-8000-000000000023',
+    'admin'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000a43',
+    'f0000000-0000-4000-8000-000000000a63',
+    'Lucía Vargas Ríos',
+    '2026-08-03',
+    'DESAHUCIO',
+    '2026-10-31',
+    TRUE,
+    'Desahucio comunicado dentro del período de prueba.',
+    'INICIADO',
+    'f0000000-0000-4000-8000-000000000023',
+    'admin'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO DOCUMENTOS_DESVINCULACION (
+  id_proceso, nombre_archivo, tipo_mime, tamano_bytes, contenido
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000a41',
+    'desahucio-sofia-mamani.pdf',
+    'application/pdf',
+    octet_length(convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')),
+    convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000a42',
+    'desahucio-marco-condori.pdf',
+    'application/pdf',
+    octet_length(convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')),
+    convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000a43',
+    'desahucio-lucia-vargas.pdf',
+    'application/pdf',
+    octet_length(convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')),
+    convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO PLANILLA_EMPLEADOS (
+  id_planilla_empleado, id_planilla, id_empleado, nombre_empleado, numero_documento,
+  cargo, area, sucursal, id_contrato, numero_contrato, haber_mensual,
+  contrato_desde, contrato_hasta, dias_contrato, dias_pagados,
+  minutos_extra_habil, minutos_domingo, minutos_nocturnos,
+  total_ganado, total_descuentos, liquido_pagable, total_aportes
+)
+SELECT v.id_planilla_empleado::uuid, p.id_planilla, v.id_empleado::uuid, v.nombre_empleado, v.numero_documento,
+       v.cargo, v.area, v.sucursal, v.id_contrato::uuid, v.numero_contrato, v.haber_mensual,
+       v.contrato_desde, v.contrato_hasta, v.dias, v.dias,
+       0, 0, 0,
+       v.total_ganado, v.total_descuentos, v.liquido_pagable, v.total_aportes
+  FROM (VALUES
+    ('c0000000-0000-4000-8000-000000000a81', '2026-08', 'f0000000-0000-4000-8000-000000000a61', 'Sofía Mamani Lima', '7108761', 'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000a91', 'CTR-2025-761', 3800.00, DATE '2026-08-01', DATE '2026-08-31', 30, 30, 3800.00, 482.98, 3317.02, 634.98),
+    ('c0000000-0000-4000-8000-000000000a82', '2026-09', 'f0000000-0000-4000-8000-000000000a61', 'Sofía Mamani Lima', '7108761', 'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000a91', 'CTR-2025-761', 3800.00, DATE '2026-09-01', DATE '2026-09-30', 30, 30, 3800.00, 482.98, 3317.02, 634.98),
+    ('c0000000-0000-4000-8000-000000000a83', '2026-10', 'f0000000-0000-4000-8000-000000000a61', 'Sofía Mamani Lima', '7108761', 'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000a91', 'CTR-2025-761', 3800.00, DATE '2026-10-01', DATE '2026-10-31', 30, 30, 3800.00, 482.98, 3317.02, 634.98),
+    ('c0000000-0000-4000-8000-000000000a84', '2026-08', 'f0000000-0000-4000-8000-000000000a62', 'Marco Condori Flores', '7108762', 'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000a92', 'CTR-2026-762', 3300.00, DATE '2026-08-02', DATE '2026-08-31', 29, 29, 3190.00, 405.45, 2784.55, 533.05),
+    ('c0000000-0000-4000-8000-000000000a85', '2026-09', 'f0000000-0000-4000-8000-000000000a62', 'Marco Condori Flores', '7108762', 'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000a92', 'CTR-2026-762', 3300.00, DATE '2026-09-01', DATE '2026-09-30', 30, 30, 3300.00, 419.43, 2880.57, 551.43),
+    ('c0000000-0000-4000-8000-000000000a86', '2026-10', 'f0000000-0000-4000-8000-000000000a62', 'Marco Condori Flores', '7108762', 'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000a92', 'CTR-2026-762', 3300.00, DATE '2026-10-01', DATE '2026-10-31', 30, 30, 3300.00, 419.43, 2880.57, 551.43),
+    ('c0000000-0000-4000-8000-000000000a87', '2026-08', 'f0000000-0000-4000-8000-000000000a63', 'Lucía Vargas Ríos', '7108763', 'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000a93', 'CTR-2026-763', 3300.00, DATE '2026-08-03', DATE '2026-08-31', 28, 28, 3080.00, 391.47, 2688.53, 514.67),
+    ('c0000000-0000-4000-8000-000000000a88', '2026-09', 'f0000000-0000-4000-8000-000000000a63', 'Lucía Vargas Ríos', '7108763', 'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000a93', 'CTR-2026-763', 3300.00, DATE '2026-09-01', DATE '2026-09-30', 30, 30, 3300.00, 419.43, 2880.57, 551.43),
+    ('c0000000-0000-4000-8000-000000000a89', '2026-10', 'f0000000-0000-4000-8000-000000000a63', 'Lucía Vargas Ríos', '7108763', 'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000a93', 'CTR-2026-763', 3300.00, DATE '2026-10-01', DATE '2026-10-31', 30, 30, 3300.00, 419.43, 2880.57, 551.43)
+  ) AS v (
+    id_planilla_empleado, periodo, id_empleado, nombre_empleado, numero_documento,
+    cargo, area, sucursal, id_contrato, numero_contrato, haber_mensual,
+    contrato_desde, contrato_hasta, dias, dias_pagados,
+    total_ganado, total_descuentos, liquido_pagable, total_aportes
+  )
+  JOIN PLANILLAS p ON p.periodo = v.periodo
+ON CONFLICT DO NOTHING;
+
+COMMIT;

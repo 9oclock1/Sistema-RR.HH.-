@@ -150,3 +150,18 @@ INSERT INTO ASIGNACIONES_EMPLEADO (id_asignacion, id_empleado, id_cargo, id_sucu
   ('f0000000-0000-4000-8000-000000000755', 'f0000000-0000-4000-8000-000000000745', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', '2025-03-03')
 ON CONFLICT DO NOTHING;
 COMMIT;
+
+-- Colaboradores desvinculados por desahucio con 1 año exacto, 91 y 90 días de servicio, para probar la indemnización
+-- y el desahucio (RF-56, KAN-76).
+BEGIN;
+INSERT INTO EMPLEADOS (id_empleado, numero_documento, nombres, primer_apellido, segundo_apellido, fecha_nacimiento, genero, telefono_celular, correo_personal, direccion_domicilio, fecha_ingreso, id_cargo_actual, id_sucursal_actual, id_estado_empleado) VALUES
+  ('f0000000-0000-4000-8000-000000000a61', '7108761', 'Sofía', 'Mamani', 'Lima', '1994-07-21', 'Femenino', '71008761', 'sofia.mamani@correo.test', 'Zona Sopocachi, La Paz', '2025-11-01', 'f0000000-0000-4000-8000-000000000105', 'f0000000-0000-4000-8000-000000000011', 4),
+  ('f0000000-0000-4000-8000-000000000a62', '7108762', 'Marco', 'Condori', 'Flores', '1998-01-09', 'Masculino', '71008762', 'marco.condori@correo.test', 'Zona Miraflores, La Paz', '2026-08-02', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', 4),
+  ('f0000000-0000-4000-8000-000000000a63', '7108763', 'Lucía', 'Vargas', 'Ríos', '1999-10-30', 'Femenino', '71008763', 'lucia.vargas@correo.test', 'Zona Miraflores, La Paz', '2026-08-03', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', 4)
+ON CONFLICT DO NOTHING;
+INSERT INTO ASIGNACIONES_EMPLEADO (id_asignacion, id_empleado, id_cargo, id_sucursal, fecha_inicio) VALUES
+  ('f0000000-0000-4000-8000-000000000a71', 'f0000000-0000-4000-8000-000000000a61', 'f0000000-0000-4000-8000-000000000105', 'f0000000-0000-4000-8000-000000000011', '2025-11-01'),
+  ('f0000000-0000-4000-8000-000000000a72', 'f0000000-0000-4000-8000-000000000a62', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', '2026-08-02'),
+  ('f0000000-0000-4000-8000-000000000a73', 'f0000000-0000-4000-8000-000000000a63', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', '2026-08-03')
+ON CONFLICT DO NOTHING;
+COMMIT;
