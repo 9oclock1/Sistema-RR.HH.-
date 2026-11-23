@@ -49,38 +49,50 @@ function leerFiltros(consulta = {}, ahora = new Date()) {
     if (desde > hasta) errores.push({ campo: "hasta", mensaje: "La fecha final no puede ser anterior a la inicial." });
   }
   if (errores.length > 0) throw new ErrorApp(400, "Revise los filtros del dashboard.", errores);
-  return { desde, hasta, idSucursal, idDepartamento };
+  // zonaHoraria la usa el modelo para convertir el periodo a instantes: sin ella, `AT TIME ZONE NULL` da NULL y
+  // no se cuenta ninguna queja.
+  return { desde, hasta, idSucursal, idDepartamento, zonaHoraria: zona };
 }
 
 const redondear1 = (valor) => Math.round(valor * 10) / 10;
 
-// KPI-03 = quejas del periodo / plantilla * 100. "Plantilla" se simplifica a los empleados activos del alcance
-// (RF-75 sí calcula un promedio real con la trayectoria de ingresos/bajas, pero esa infraestructura no existe
-// para quejas/atrasos y la Historia solo pide comparar áreas y sucursales, no una cifra de rotación): si el
-// negocio necesita el promedio real, el cambio es aquí, no en el resto del dashboard.
-function calcularKpi03({ quejas, empleadosActivos }) {
-  const valor = empleadosActivos > 0 ? redondear1((quejas / empleadosActivos) * 100) : null;
+const DIA_MS = 24 * 60 * 60 * 1000;
+const DIAS_POR_MES = 365.25 / 12;
+
+// Ambas metas son mensuales. Un periodo de hasta un mes se compara tal cual; uno más largo se lleva a su
+// equivalente mensual (p. ej. un trimestre se divide entre ~3) para no pintarlo de rojo solo por durar más.
+function mesesDelPeriodo(desde, hasta) {
+  const dias = (Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / DIA_MS + 1;
+  if (dias <= 31) return 1;
+  return Math.round((dias / DIAS_POR_MES) * 100) / 100;
+}
+
+// KPI-03 = quejas del periodo / plantilla * 100, en su equivalente mensual. "Plantilla" son los empleados
+// activos del alcance según EmployeeService (no un promedio con ingresos/bajas): si el negocio necesita el
+// promedio real, el cambio es aquí, no en el resto del dashboard.
+function calcularKpi03({ quejas, empleadosActivos, meses = 1 }) {
+  const valor = empleadosActivos > 0 ? redondear1((quejas / empleadosActivos / meses) * 100) : null;
   return {
     codigo: "KPI-03",
     nombre: "Índice de quejas por cada 100 empleados",
     valor,
     meta: META_INDICE_QUEJAS,
     semaforo: semaforoMenorEsMejor(valor, META_INDICE_QUEJAS),
-    detalle: { quejas, empleados_activos: empleadosActivos },
+    detalle: { quejas, empleados_activos: empleadosActivos, meses_periodo: meses },
   };
 }
 
-// KPI-06 = minutos de atraso del periodo / empleados activos.
-function calcularKpi06({ minutosAtraso, empleadosActivos }) {
-  const valor = empleadosActivos > 0 ? redondear1(minutosAtraso / empleadosActivos) : null;
+// KPI-06 = minutos de atraso del periodo de los empleados activos / empleados activos, en su equivalente mensual.
+function calcularKpi06({ minutosAtraso, empleadosActivos, meses = 1 }) {
+  const valor = empleadosActivos > 0 ? redondear1(minutosAtraso / empleadosActivos / meses) : null;
   return {
     codigo: "KPI-06",
     nombre: "Minutos de atraso promedio por empleado",
     valor,
     meta: META_MINUTOS_ATRASO,
     semaforo: semaforoMenorEsMejor(valor, META_MINUTOS_ATRASO),
-    detalle: { minutos_atraso: minutosAtraso, empleados_activos: empleadosActivos },
+    detalle: { minutos_atraso: minutosAtraso, empleados_activos: empleadosActivos, meses_periodo: meses },
   };
 }
 
-module.exports = { META_INDICE_QUEJAS, META_MINUTOS_ATRASO, leerFiltros, calcularKpi03, calcularKpi06 };
+module.exports = { META_INDICE_QUEJAS, META_MINUTOS_ATRASO, leerFiltros, mesesDelPeriodo, calcularKpi03, calcularKpi06 };

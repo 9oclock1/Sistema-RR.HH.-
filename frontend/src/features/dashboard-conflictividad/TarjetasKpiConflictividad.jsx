@@ -38,6 +38,10 @@ function TarjetaKpi({ kpi, valor, detalle }) {
   );
 }
 
+// Las metas son mensuales: con un periodo de más de un mes, el valor es su equivalente mensual.
+const porMes = (detalle) =>
+  detalle.meses_periodo > 1 ? ` · equivalente mensual (${detalle.meses_periodo.toLocaleString("es-BO")} meses)` : "";
+
 // Criterio 1: KPI-03 (índice de quejas) y KPI-06 (minutos de atraso promedio), con su semáforo.
 export default function TarjetasKpiConflictividad({ indiceQuejas, minutosAtraso }) {
   return (
@@ -45,12 +49,12 @@ export default function TarjetasKpiConflictividad({ indiceQuejas, minutosAtraso 
       <TarjetaKpi
         kpi={indiceQuejas}
         valor={formatearIndice(indiceQuejas.valor)}
-        detalle={`Meta: ≤ ${formatearIndice(indiceQuejas.meta)} · ${indiceQuejas.detalle.quejas} quejas sobre ${indiceQuejas.detalle.empleados_activos} empleados activos`}
+        detalle={`Meta: ≤ ${formatearIndice(indiceQuejas.meta)} al mes · ${indiceQuejas.detalle.quejas} quejas sobre ${indiceQuejas.detalle.empleados_activos} empleados activos${porMes(indiceQuejas.detalle)}`}
       />
       <TarjetaKpi
         kpi={minutosAtraso}
         valor={formatearMinutos(minutosAtraso.valor)}
-        detalle={`Meta: ≤ ${formatearMinutos(minutosAtraso.meta)} · ${minutosAtraso.detalle.minutos_atraso} min de atraso sobre ${minutosAtraso.detalle.empleados_activos} empleados activos`}
+        detalle={`Meta: ≤ ${formatearMinutos(minutosAtraso.meta)} al mes · ${minutosAtraso.detalle.minutos_atraso} min de atraso sobre ${minutosAtraso.detalle.empleados_activos} empleados activos${porMes(minutosAtraso.detalle)}`}
       />
     </ul>
   );
