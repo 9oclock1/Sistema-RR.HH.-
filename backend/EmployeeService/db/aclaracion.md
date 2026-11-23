@@ -8,10 +8,14 @@ Dentro de la base de datos se encuentra las siguientes observaciones que deben s
 - La fecha de cierre no puede ser anterior a la de inicio (`chk_convocatoria_fechas`). `esta_abierta` y `cerrada_en` van juntas: una convocatoria cerrada siempre tiene su fecha de cierre y una abierta nunca (`chk_convocatoria_cierre`).
 - Backend: una convocatoria acepta postulaciones solo si `esta_abierta` y la fecha de hoy (America/La_Paz) está entre el inicio y el cierre, ambos inclusive. Aunque el job diario aún no la haya cerrado, una convocatoria con la fecha de cierre vencida se informa como cerrada.
 - Backend: al llegar la fecha de cierre, el job diario pone `esta_abierta` en FALSE y llena `cerrada_en`, así que deja de aceptar postulaciones sin intervención de RRHH.
+- Backend: quién consulta y con qué rol sale de la sesión (JWT de la cookie `rrhh_sesion` firmado por AuthService), no de las cabeceras `X-Empleado-Id` y `X-Rol`. Sin sesión válida responde 401.
 - Backend: solo los empleados activos (`ESTADOS_EMPLEADO.permite_acceso`) ven las convocatorias. RRHH (admin y gerente) ve todas, también las cerradas.
-- Backend: al publicar, solo se aceptan cargos activos del catálogo y sucursales existentes, con la fecha de cierre desde hoy en adelante.
-- La notificación a los empleados activos va por el comunicado institucional de NotificationService. `estado_notificacion` es `PENDIENTE` (todavía no se intentó), `ENTREGADA` (con `notificada_en` y `destinatarios_notificados`) o `FALLIDA` (con `ultimo_error_notificacion`). Publicar no falla si la notificación falla: RRHH la reintenta.
+- Backend: al publicar, solo se aceptan cargos activos del catálogo y sucursales activas, con la fecha de inicio desde hoy y el cierre después del inicio.
+- Backend: el cargo debe estar vacante en esa sucursal: si un empleado activo ya lo ocupa (`EMPLEADOS.id_cargo_actual` e `id_sucursal_actual`), la publicación se rechaza con 409. Tampoco se publica una segunda convocatoria abierta o programada para el mismo cargo y sucursal.
+- `DESTINATARIOS_CONVOCATORIA` guarda a los empleados elegibles a los que se avisa: activos, que no ocupan ya el cargo ofertado y que a la fecha de cierre cumplen `meses_antiguedad_minima` (meses calendario completos desde `fecha_ingreso`, igual que la validación de la postulación). La nota mínima no se filtra al avisar: se valida al postularse (KAN-81).
+- A cada elegible le llega un mensaje directo de NotificationService. `estado_notificacion` es `PENDIENTE` (todavía no se intentó), `ENTREGADA` (todos los avisos llegaron; `notificada_en` y `destinatarios_notificados`) o `FALLIDA` (algún aviso no llegó; `ultimo_error_notificacion`). Publicar no falla si la notificación falla: RRHH la reintenta y solo se reenvía a los que tienen `notificado_en` en NULL. Si nadie cumple la antigüedad, queda `ENTREGADA` con 0 destinatarios.
 - Si ya tiene una base creada con la tabla anterior, vuelva a crear `POSTULACIONES_ASCENSO` y `CONVOCATORIAS_ASCENSO` desde `init.sql` (estaban vacías) o recree el volumen de la base.
+- Si su base ya existe, cree `DESTINATARIOS_CONVOCATORIA` con su bloque de `init.sql` y vuelva a cargar `seed.sql` (agrega la sucursal El Alto y mueve las convocatorias de ejemplo a cargos vacantes).
 
 ## Postulaciones de ascenso
 

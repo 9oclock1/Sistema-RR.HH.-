@@ -2,12 +2,12 @@ const convocatoriasService = require('../services/convocatoriasService');
 const { validarIdRuta } = require('../validators/comunes');
 
 const publicar = async (req, res) => {
-  res.status(201).json(await convocatoriasService.publicar(req.body, { idEmpleado: req.idEmpleado }));
+  res.status(201).json(await convocatoriasService.publicar(req.body, { idEmpleado: req.identidad.idEmpleado }));
 };
 
 const reintentarNotificacion = async (req, res) => {
   const idConvocatoria = validarIdRuta(req.params.id, 'id');
-  res.status(200).json(await convocatoriasService.reintentarNotificacion(idConvocatoria, { idEmpleado: req.idEmpleado }));
+  res.status(200).json(await convocatoriasService.reintentarNotificacion(idConvocatoria, { idEmpleado: req.identidad.idEmpleado }));
 };
 
 const listarGestion = async (req, res) => {
@@ -15,13 +15,13 @@ const listarGestion = async (req, res) => {
 };
 
 const listarParaEmpleado = async (req, res) => {
-  res.status(200).json(await convocatoriasService.listarParaEmpleado(req.idEmpleado, req.query));
+  res.status(200).json(await convocatoriasService.listarParaEmpleado(req.identidad.idEmpleado, req.query));
 };
 
 const obtener = async (req, res) => {
   const idConvocatoria = validarIdRuta(req.params.id, 'id');
   res.status(200).json(
-    await convocatoriasService.obtener(idConvocatoria, { esRrhh: req.esRrhh === true, idEmpleado: req.idEmpleado })
+    await convocatoriasService.obtener(idConvocatoria, req.identidad)
   );
 };
 

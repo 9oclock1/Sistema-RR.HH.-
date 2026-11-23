@@ -8,17 +8,14 @@ const comoEmpleado = ({ rol, idEmpleado }) => ({ ...(rol && { "X-Rol": rol }), "
 
 const consultaDe = (estado) => (estado ? `?estado=${encodeURIComponent(estado)}` : "");
 
-export const listarConvocatoriasRrhh = (sesion, estado) =>
-  request(`${BASE}/gestion${consultaDe(estado)}`, { headers: comoRrhh(sesion) });
+export const listarConvocatoriasRrhh = (estado) => request(`${BASE}/gestion${consultaDe(estado)}`);
 
-export const publicarConvocatoria = (sesion, datos) =>
-  request(BASE, { method: "POST", body: datos, headers: comoRrhh(sesion) });
+export const publicarConvocatoria = (datos) => request(BASE, { method: "POST", body: datos });
 
-export const reintentarNotificacionConvocatoria = (sesion, idConvocatoria) =>
-  request(`${BASE}/${idConvocatoria}/notificacion`, { method: "POST", headers: comoRrhh(sesion) });
+export const reintentarNotificacionConvocatoria = (idConvocatoria) =>
+  request(`${BASE}/${idConvocatoria}/notificacion`, { method: "POST" });
 
-export const listarConvocatoriasEmpleado = (sesion, estado) =>
-  request(`${BASE}${consultaDe(estado)}`, { headers: comoEmpleado(sesion) });
+export const listarConvocatoriasEmpleado = (estado) => request(`${BASE}${consultaDe(estado)}`);
 
 // KAN-81: postulación del empleado (se valida al registrarla) y revisión de RRHH con el ranking de méritos.
 export const postularConvocatoria = (sesion, idConvocatoria) =>

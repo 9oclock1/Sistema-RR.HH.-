@@ -1,4 +1,5 @@
 import { CalendarClock, CircleAlert, CircleCheck, Hourglass, Lock } from "lucide-react";
+import { fijarSesion } from "../../context/sesion";
 
 export const RUTA_CONVOCATORIAS_RRHH = "/ascensos/gestion-convocatorias";
 export const RUTA_CONVOCATORIAS_EMPLEADO = "/ascensos/convocatorias";
@@ -93,7 +94,7 @@ const nota = new Intl.NumberFormat("es-BO", { maximumFractionDigits: 2 });
 
 export const formatearNota = (valor) => `${nota.format(valor)} de 100`;
 
-export const pluralEmpleados = (cantidad) => `${cantidad} ${cantidad === 1 ? "empleado activo" : "empleados activos"}`;
+export const pluralEmpleados = (cantidad) => `${cantidad} ${cantidad === 1 ? "empleado elegible" : "empleados elegibles"}`;
 
 export const formularioVacio = (hoy = hoyLaPaz()) => ({
   id_cargo: "",
@@ -151,3 +152,11 @@ export const formularioAPayload = (valores) => ({
   fecha_inicio_postulacion: valores.fecha_inicio_postulacion,
   fecha_cierre_postulacion: valores.fecha_cierre_postulacion,
 });
+
+export const cerrarSiVencio = (error) => {
+  if (error?.status !== 401) return false;
+  fijarSesion(null);
+  return true;
+};
+
+export const identidadDe = (usuario) => ({ rol: usuario.rol, idEmpleado: usuario.id_empleado });

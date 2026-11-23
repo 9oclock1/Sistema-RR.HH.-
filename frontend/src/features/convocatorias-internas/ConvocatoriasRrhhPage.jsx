@@ -5,29 +5,28 @@ import { getCargos } from "../../api/cargosApi";
 import { listarConvocatoriasRrhh, publicarConvocatoria, reintentarNotificacionConvocatoria } from "../../api/convocatoriasInternas";
 import { getSucursales } from "../../api/sucursalesApi";
 import { Alerta, Boton, EncabezadoPagina, EstadoVacio, Etiqueta, Selector, Tabla, Tarjeta, TextoTruncado, useAvisos } from "../../components/ui";
-import { useRol, useUsuario } from "../../context/sesion";
-import { puedeAcceder } from "../../utils/permisos";
 import useRecurso from "../quejas/casos/useRecurso";
 import ConvocatoriaFormulario from "./ConvocatoriaFormulario";
 import PostulacionesModal from "./PostulacionesModal";
+import SesionRequerida from "./SesionRequerida";
 import {
   FILTROS_ESTADO_RRHH,
+  cerrarSiVencio,
   describirPlazo,
   estadoConvocatoria,
   estadoNotificacion,
   formatearAntiguedad,
   formatearFecha,
   formatearNota,
+  identidadDe,
   pluralEmpleados,
 } from "./convocatorias";
 import "./convocatorias.css";
 
-export default function ConvocatoriasRrhhPage() {
+function GestionConvocatorias({ usuario }) {
   const avisar = useAvisos();
-  const rol = useRol();
-  const idEmpleado = useUsuario();
-  const sesion = useMemo(() => ({ rol, idEmpleado }), [rol, idEmpleado]);
-  const puedePublicar = puedeAcceder(rol, ["admin"]);
+  const sesion = useMemo(() => identidadDe(usuario), [usuario]);
+  const puedePublicar = usuario.rol === "admin";
 
   const [estado, setEstado] = useState("");
   const [catalogos, setCatalogos] = useState(null);
@@ -35,7 +34,14 @@ export default function ConvocatoriasRrhhPage() {
   const [reintentando, setReintentando] = useState(null);
   const [revisando, setRevisando] = useState(null);
 
-  const cargar = useCallback(() => listarConvocatoriasRrhh(sesion, estado), [sesion, estado]);
+  const cargar = useCallback(
+    () =>
+      listarConvocatoriasRrhh(estado).catch((fallo) => {
+        cerrarSiVencio(fallo);
+        throw fallo;
+      }),
+    [estado],
+  );
   const { datos, error, cargando, reintentar } = useRecurso(cargar);
 
   const abrirFormulario = async () => {
@@ -51,20 +57,29 @@ export default function ConvocatoriasRrhhPage() {
   };
 
   const publicar = async (payload) => {
-    const publicada = await publicarConvocatoria(sesion, payload);
+    let publicada;
+    try {
+      publicada = await publicarConvocatoria(payload);
+    } catch (fallo) {
+      if (cerrarSiVencio(fallo)) return;
+      throw fallo;
+    }
     setCatalogos(null);
     reintentar();
     if (publicada.notificacion.estado === "ENTREGADA") {
       avisar({
         tono: "exito",
         titulo: "Convocatoria publicada",
-        mensaje: `Se notificó a ${pluralEmpleados(publicada.notificacion.destinatarios)}.`,
+        mensaje:
+          publicada.notificacion.destinatarios > 0
+            ? `Se notificó a ${pluralEmpleados(publicada.notificacion.destinatarios)}.`
+            : "Ningún empleado activo cumple todavía la antigüedad mínima: no se envió ningún aviso.",
       });
     } else {
       avisar({
         tono: "aviso",
-        titulo: "Convocatoria publicada sin notificar",
-        mensaje: "No se pudo avisar a los empleados. Reintente la notificación desde la lista.",
+        titulo: "Convocatoria publicada sin notificar a todos",
+        mensaje: "Algunos avisos no llegaron. Reintente la notificación desde la lista: solo se reenvía a los pendientes.",
       });
     }
   };
@@ -72,7 +87,7 @@ export default function ConvocatoriasRrhhPage() {
   const reintentarNotificacion = async (convocatoria) => {
     setReintentando(convocatoria.id_convocatoria);
     try {
-      const actualizada = await reintentarNotificacionConvocatoria(sesion, convocatoria.id_convocatoria);
+      const actualizada = await reintentarNotificacionConvocatoria(convocatoria.id_convocatoria);
       const entregada = actualizada.notificacion.estado === "ENTREGADA";
       avisar({
         tono: entregada ? "exito" : "aviso",
@@ -82,7 +97,7 @@ export default function ConvocatoriasRrhhPage() {
           : "NotificationService no respondió. Intente de nuevo en unos minutos.",
       });
     } catch (fallo) {
-      avisar({ tono: "peligro", titulo: "No se pudo reintentar la notificación", mensaje: fallo.message });
+      if (!cerrarSiVencio(fallo)) avisar({ tono: "peligro", titulo: "No se pudo reintentar la notificación", mensaje: fallo.message });
     } finally {
       setReintentando(null);
       reintentar();
@@ -205,23 +220,7 @@ export default function ConvocatoriasRrhhPage() {
   );
 
   return (
-    <section className="cv-pagina" aria-labelledby="cv-titulo-rrhh">
-      <EncabezadoPagina
-        migas={[{ etiqueta: "Inicio", href: "/" }, { etiqueta: "Ascensos" }]}
-        enlace={Link}
-        titulo="Convocatorias internas"
-        idTitulo="cv-titulo-rrhh"
-        descripcion="Publique vacantes de ascenso dirigidas solo a empleados activos. Al publicarlas se les notifica y, al llegar la fecha de cierre, dejan de aceptar postulaciones."
-        acciones={
-          <>
-            <Boton icono={RefreshCw} onClick={reintentar} cargando={cargando && Boolean(datos)}>
-              Actualizar
-            </Boton>
-            {puedePublicar && datos?.total > 0 && botonPublicar}
-          </>
-        }
-      />
-
+    <>
       {error ? (
         <Alerta
           tono="peligro"
@@ -250,6 +249,10 @@ export default function ConvocatoriasRrhhPage() {
                 {datos.total} {datos.total === 1 ? "convocatoria" : "convocatorias"}
               </p>
             )}
+            <Boton icono={RefreshCw} onClick={reintentar} cargando={cargando && Boolean(datos)}>
+              Actualizar
+            </Boton>
+            {puedePublicar && datos?.total > 0 && botonPublicar}
           </div>
           <Tabla
             className="cv-tabla"
@@ -281,6 +284,23 @@ export default function ConvocatoriasRrhhPage() {
           onCerrar={() => setRevisando(null)}
         />
       )}
+    </>
+  );
+}
+
+export default function ConvocatoriasRrhhPage() {
+  return (
+    <section className="cv-pagina" aria-labelledby="cv-titulo-rrhh">
+      <EncabezadoPagina
+        migas={[{ etiqueta: "Inicio", href: "/" }, { etiqueta: "Ascensos" }]}
+        enlace={Link}
+        titulo="Convocatorias internas"
+        idTitulo="cv-titulo-rrhh"
+        descripcion="Publique vacantes de ascenso para empleados activos. Al publicarlas se avisa a quienes cumplen la antigüedad mínima y, al llegar la fecha de cierre, dejan de aceptar postulaciones."
+      />
+      <SesionRequerida mensaje="La gestión de convocatorias exige iniciar sesión con una cuenta de Recursos Humanos.">
+        {(usuario) => <GestionConvocatorias key={usuario.id_empleado} usuario={usuario} />}
+      </SesionRequerida>
     </section>
   );
 }

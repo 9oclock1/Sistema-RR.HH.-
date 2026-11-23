@@ -11,7 +11,7 @@ import {
 } from "../../api/convocatoriasInternas";
 import { ApiError } from "../../api/httpClient";
 import ProveedorAvisos from "../../components/ui/ProveedorAvisos";
-import { cambiarRol, cambiarUsuario } from "../../context/sesion";
+import { fijarSesion } from "../../context/sesion";
 import ConvocatoriasEmpleadoPage from "./ConvocatoriasEmpleadoPage";
 import ConvocatoriasRrhhPage from "./ConvocatoriasRrhhPage";
 
@@ -64,8 +64,7 @@ const montar = (Pagina) =>
 
 describe("portal del empleado: postulación", () => {
   beforeEach(() => {
-    cambiarRol("empleado");
-    cambiarUsuario(ANA);
+    fijarSesion({ id_empleado: ANA, correo: "ana.torrez@correo.test", rol: "empleado" });
   });
 
   it("criterio 1: el empleado se postula a una convocatoria abierta y ve el resultado de la validación", async () => {
@@ -156,8 +155,7 @@ describe("RRHH: postulaciones y ranking de méritos", () => {
   };
 
   beforeEach(() => {
-    cambiarRol("admin");
-    cambiarUsuario(ANA);
+    fijarSesion({ id_empleado: ANA, correo: "ana.torrez@correo.test", rol: "admin" });
     listarConvocatoriasRrhh.mockResolvedValue({ convocatorias: [cerrada], total: 1 });
     listarPostulaciones.mockResolvedValue(ranking);
   });
@@ -202,7 +200,7 @@ describe("RRHH: postulaciones y ranking de méritos", () => {
   });
 
   it("la gerencia revisa el ranking pero no vuelve a validar", async () => {
-    cambiarRol("gerente");
+    fijarSesion({ id_empleado: ANA, correo: "ana.torrez@correo.test", rol: "gerente" });
     const dialogo = await abrirPostulaciones();
     await within(dialogo).findByRole("list", { name: "Postulaciones pendientes de validar" });
     expect(within(dialogo).queryByRole("button", { name: "Volver a validar" })).toBeNull();
