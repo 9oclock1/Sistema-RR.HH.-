@@ -17,6 +17,16 @@ const nombreArchivo = (reporte, extension) => {
 const tituloConciliacion = ({ estado, referencia, motivo }) =>
   [ESTADO_CONCILIACION_TEXTO[estado], referencia && `ref. ${referencia}`, motivo].filter(Boolean).join(" · ");
 
+// Criterio 2: cada asiento (la planilla y, si se fundió, el aguinaldo) tiene su propia conciliación.
+const nombreAsiento = (asiento) =>
+  asiento.recurso === "PLANILLA" ? `Asiento planilla ${asiento.periodo}` : `Asiento aguinaldo gestión ${asiento.gestion}`;
+
+const lineasConciliacion = (reporte) =>
+  reporte.asientos.flatMap((asiento) => [
+    [`${nombreAsiento(asiento)} · Contabilidad`, tituloConciliacion(asiento.conciliacion.contabilidad)],
+    [`${nombreAsiento(asiento)} · Pagos`, tituloConciliacion(asiento.conciliacion.pagos)],
+  ]);
+
 const COLUMNAS_XLSX = [
   { header: "Sucursal", key: "sucursal", width: 20 },
   { header: "Área", key: "area", width: 18 },
@@ -37,7 +47,7 @@ async function aXlsx(reporte) {
   const libro = new ExcelJS.Workbook();
   libro.creator = "Sistema RR.HH.";
   libro.created = new Date();
-  const hoja = libro.addWorksheet("Reporte contable", { views: [{ state: "frozen", ySplit: 9 }] });
+  const hoja = libro.addWorksheet("Reporte contable");
   hoja.columns = COLUMNAS_XLSX;
 
   hoja.mergeCells("A1:F1");
@@ -52,11 +62,12 @@ async function aXlsx(reporte) {
   agregarFila("Periodo", identificador(reporte));
   agregarFila("Estado", reporte.estado);
   agregarFila("Colaboradores", reporte.colaboradores);
-  agregarFila("Conciliación Contabilidad", tituloConciliacion(reporte.conciliacion.contabilidad));
-  agregarFila("Conciliación Pagos", tituloConciliacion(reporte.conciliacion.pagos));
+  for (const [etiqueta, valor] of lineasConciliacion(reporte)) agregarFila(etiqueta, valor);
   hoja.addRow([]);
 
   const filaEncabezado = hoja.addRow(COLUMNAS_XLSX.map((c) => c.header));
+  // El encabezado queda fijo al desplazarse; su fila depende de cuántos asientos lleva el reporte.
+  hoja.views = [{ state: "frozen", ySplit: filaEncabezado.number }];
   filaEncabezado.eachCell((celda) => {
     celda.font = NEGRITA;
     celda.fill = FONDO_TOTAL;
@@ -147,8 +158,7 @@ function dibujarEncabezado(doc, reporte) {
       `Estado: ${reporte.estado} · ${reporte.colaboradores} colaboradores · Generado el ${fechaHora.format(new Date())}`,
     { width: ancho }
   );
-  doc.text(`Conciliación Contabilidad: ${tituloConciliacion(reporte.conciliacion.contabilidad)}`, { width: ancho });
-  doc.text(`Conciliación Pagos: ${tituloConciliacion(reporte.conciliacion.pagos)}`, { width: ancho });
+  for (const [etiqueta, valor] of lineasConciliacion(reporte)) doc.text(`${etiqueta}: ${valor}`, { width: ancho });
   doc.moveDown(0.6);
 }
 
