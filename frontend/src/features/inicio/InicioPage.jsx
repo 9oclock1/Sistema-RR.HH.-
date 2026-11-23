@@ -1,6 +1,8 @@
 import { Link } from "react-router";
-import { Contador, EncabezadoPagina, EstadoVacio, Tarjeta } from "../../components/ui";
-import { useRol } from "../../context/sesion";
+import { LogOut } from "lucide-react";
+import { Boton, Contador, EncabezadoPagina, EstadoVacio, Tarjeta } from "../../components/ui";
+import { useRol, useSesion } from "../../context/sesion";
+import { useCerrarSesion } from "../sesion/useCerrarSesion";
 import AvisoMemorandumsPendientes from "../Memorandums/acuses/AvisoMemorandumsPendientes";
 import { seccionesPara } from "../../router/modulos";
 import { ROLES } from "../../utils/permisos";
@@ -49,6 +51,8 @@ function AccesoModulo({ modulo }) {
 
 export default function InicioPage() {
   const rol = useRol();
+  const sesion = useSesion();
+  const { salir, cerrando } = useCerrarSesion();
   const secciones = seccionesPara(rol);
   const ahora = new Date();
 
@@ -56,7 +60,18 @@ export default function InicioPage() {
     <div className="inicio">
       <EncabezadoPagina
         titulo={saludo(ahora)}
-        descripcion={`${fechaHoy(ahora)}. Estos son los módulos disponibles para su rol, ${ROLES[rol].nombre}.`}
+        descripcion={
+          sesion
+            ? `${fechaHoy(ahora)}. Sesión iniciada como ${sesion.correo}. Estos son los módulos disponibles para su rol, ${ROLES[rol].nombre}.`
+            : `${fechaHoy(ahora)}. Estos son los módulos disponibles para su rol, ${ROLES[rol].nombre}.`
+        }
+        acciones={
+          sesion && (
+            <Boton icono={LogOut} onClick={salir} cargando={cerrando}>
+              Cerrar sesión
+            </Boton>
+          )
+        }
       />
 
       <AvisoMemorandumsPendientes />
