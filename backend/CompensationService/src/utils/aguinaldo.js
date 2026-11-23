@@ -59,9 +59,31 @@ function haberEnFecha(versiones, fecha) {
   return version ? Number(version.haber_mensual_pactado) : null;
 }
 
-// RF-47, criterio 1: promedio de los tres últimos sueldos. Se toman los haberes vigentes en el último mes
-// trabajado y los dos anteriores; si el colaborador no tenía contrato en alguno de esos meses (ingresó hace
-// menos de 3 meses) se promedia con los que sí existen, nunca con menos de uno.
+// Estados de planilla mensual cuyos montos ya no cambian: aprobada (enviada a Contabilidad y Pagos) o cerrada.
+const ESTADOS_PLANILLA_SUELDO = ["APROBADA", "CERRADA"];
+
+// RF-47, criterio 1: promedio de los tres últimos sueldos REALES, es decir, el total ganado (haber, bono de
+// antigüedad, horas extra, dominicales, bonos) de las tres últimas planillas mensuales del colaborador
+// hasta su último mes trabajado. Con menos de tres planillas se promedia con las que haya.
+// `planillas`: [{ periodo: "AAAA-MM", total_ganado }] del colaborador. null si no tiene ninguna.
+function promedioDePlanillas(planillas, fechaReferencia) {
+  const limite = String(fechaReferencia).slice(0, 7);
+  const ultimas = (planillas ?? [])
+    .filter((p) => p.periodo <= limite)
+    .sort((a, b) => b.periodo.localeCompare(a.periodo))
+    .slice(0, 3);
+  if (ultimas.length === 0) return null;
+  const suma = ultimas.reduce((total, p) => total + Math.round(Number(p.total_ganado) * 100), 0);
+  return {
+    promedio: Math.round(suma / ultimas.length) / 100,
+    meses: ultimas.length,
+    periodos: ultimas.map((p) => p.periodo).reverse(),
+  };
+}
+
+// Respaldo cuando el colaborador no tiene ninguna planilla mensual (por ejemplo, si el sistema empezó a
+// emitir planillas después): el haber pactado en el contrato en el último mes trabajado y los dos
+// anteriores, promediando con los que existan, nunca con menos de uno.
 function promedioUltimosSueldos(versiones, fechaReferencia) {
   const fechas = [fechaReferencia, sumarMeses(fechaReferencia, -1), sumarMeses(fechaReferencia, -2)];
   const valores = fechas.map((f) => haberEnFecha(versiones, f)).filter((v) => v !== null);
@@ -75,21 +97,57 @@ function calcularMonto(promedioSueldo, meses, diasResto) {
   return redondear((promedioSueldo * (meses + diasResto / DIAS_MES_COMERCIAL)) / 12);
 }
 
+// De dónde sale el promedio: las planillas mensuales (lo normal) o, sin ninguna, el contrato.
+function promedioDeSueldos(planillas, versionesContrato, fechaFinEfectiva) {
+  const dePlanillas = promedioDePlanillas(planillas, fechaFinEfectiva);
+  if (dePlanillas) return { promedio: dePlanillas.promedio, origen: "PLANILLAS", meses: dePlanillas.meses };
+  const deContrato = promedioUltimosSueldos(versionesContrato, fechaFinEfectiva);
+  if (deContrato !== null) return { promedio: deContrato, origen: "CONTRATO", meses: null };
+  return null;
+}
+
+// Último día que se cuenta para el colaborador en la gestión (criterio 1: se genera con la gestión abierta).
+// - Con desvinculación registrada (fecha_retiro, último día trabajado) dentro de la gestión: hasta ese día.
+// - Activo: hasta el 30 de noviembre. Mientras la gestión sigue abierta, la planilla proyecta el año completo
+//   de quien sigue trabajando; así el monto no cambia día a día y el borrador generado antes del cierre ya es
+//   el que se paga. Si alguien se retira antes del cierre, se vuelve a generar el borrador.
+// - Inactivo sin desvinculación registrada: el fin de su último contrato si fue antes; si no, hoy (no se le
+//   proyecta un tiempo que ya no va a trabajar).
+function fechaFinEfectiva({ activo, fechaRetiro, versiones = [] }, rango, hoy) {
+  if (fechaRetiro) return fechaRetiro < rango.hasta ? fechaRetiro : rango.hasta;
+  if (activo !== false) return rango.hasta;
+  const limite = hoy < rango.hasta ? hoy : rango.hasta;
+  const finesDeContrato = versiones.map((v) => v.vigente_hasta).filter(Boolean);
+  const ultimaSalida = finesDeContrato.length > 0 ? finesDeContrato.reduce((max, f) => (f > max ? f : max)) : null;
+  return ultimaSalida && ultimaSalida < limite ? ultimaSalida : limite;
+}
+
+const plural = (n, singular, pluralTexto) => `${n} ${n === 1 ? singular : pluralTexto}`;
+
 // Resultado completo para un colaborador: null si no corresponde calcularlo (sin ningún día en la gestión).
-function calcularAguinaldo({ fechaIngreso, fechaFinEfectiva, versionesContrato }, rango) {
+// Excluido (criterio 2) con menos de 3 meses en la gestión; también, sin ningún sueldo registrado (ni
+// planillas ni contrato), para no aprobar un aguinaldo en cero como si fuera el monto correcto.
+function calcularAguinaldo({ fechaIngreso, fechaFinEfectiva, versionesContrato = [], planillas = [] }, rango) {
   const tiempo = mesesYDias(fechaIngreso, fechaFinEfectiva, rango);
   if (!tiempo) return null;
-  const promedioSueldo = promedioUltimosSueldos(versionesContrato, fechaFinEfectiva) ?? 0;
-  const excluido = tiempo.meses < MESES_MINIMOS;
+  const sueldos = promedioDeSueldos(planillas, versionesContrato, fechaFinEfectiva);
+  const promedioSueldo = sueldos?.promedio ?? 0;
+  let motivo = null;
+  if (tiempo.meses < MESES_MINIMOS) {
+    motivo = `Menos de ${MESES_MINIMOS} meses de servicio en la gestión (trabajó ${plural(tiempo.meses, "mes", "meses")} y ${plural(tiempo.dias_resto, "día", "días")}).`;
+  } else if (!sueldos) {
+    motivo = "Sin sueldo registrado: no tiene planillas mensuales aprobadas ni un contrato vigente en sus tres últimos meses.";
+  }
+  const excluido = motivo !== null;
   return {
     meses_trabajados: tiempo.meses,
     dias_trabajados: tiempo.dias_resto,
     promedio_sueldo: promedioSueldo,
+    origen_promedio: sueldos?.origen ?? null,
+    meses_promedio: sueldos?.meses ?? null,
     monto: excluido ? 0 : calcularMonto(promedioSueldo, tiempo.meses, tiempo.dias_resto),
     excluido,
-    motivo_exclusion: excluido
-      ? `Menos de ${MESES_MINIMOS} meses de servicio en la gestión (trabajó ${tiempo.meses} mes${tiempo.meses === 1 ? "" : "es"} y ${tiempo.dias_resto} día${tiempo.dias_resto === 1 ? "" : "s"}).`
-      : null,
+    motivo_exclusion: motivo,
   };
 }
 
@@ -213,9 +271,12 @@ module.exports = {
   rangoGestion,
   mesesYDias,
   haberEnFecha,
+  ESTADOS_PLANILLA_SUELDO,
+  promedioDePlanillas,
   promedioUltimosSueldos,
   calcularMonto,
   calcularAguinaldo,
+  fechaFinEfectiva,
   UUID_O_NULO,
   DESTINOS_AGUINALDO,
   armarMensajeAguinaldo,

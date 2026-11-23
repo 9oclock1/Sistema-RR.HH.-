@@ -391,10 +391,19 @@ CREATE TABLE AGUINALDO_EMPLEADOS (
     meses_trabajados smallint NOT NULL,
     dias_trabajados smallint NOT NULL,
     promedio_sueldo numeric(12,2) NOT NULL,
+    -- PLANILLAS: total ganado de sus últimas planillas mensuales (meses_promedio = cuántas, 1 a 3);
+    -- CONTRATO: sin planillas, el haber pactado; NULL: sin sueldo registrado (queda excluido).
+    origen_promedio varchar(10) NULL,
+    meses_promedio smallint NULL,
     monto numeric(12,2) NOT NULL,
     excluido boolean NOT NULL DEFAULT FALSE,
     motivo_exclusion varchar(255) NULL,
     CONSTRAINT AGUINALDO_EMPLEADOS_pk PRIMARY KEY (id_aguinaldo_empleado),
+    CONSTRAINT chk_aguinaldo_empleado_origen CHECK (
+        (origen_promedio IS NULL OR origen_promedio IN ('PLANILLAS', 'CONTRATO'))
+        AND (origen_promedio = 'PLANILLAS') = (meses_promedio IS NOT NULL)
+        AND (meses_promedio IS NULL OR meses_promedio BETWEEN 1 AND 3)
+    ),
     CONSTRAINT uq_aguinaldo_empleado UNIQUE (id_aguinaldo, id_empleado),
     CONSTRAINT fk_aguinaldo_empleado_aguinaldo FOREIGN KEY (id_aguinaldo)
         REFERENCES PLANILLA_AGUINALDO (id_aguinaldo) ON DELETE CASCADE,

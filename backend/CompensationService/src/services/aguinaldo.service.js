@@ -19,6 +19,8 @@ const {
   validarGestion,
   rangoGestion,
   calcularAguinaldo,
+  fechaFinEfectiva,
+  ESTADOS_PLANILLA_SUELDO,
   DESTINOS_AGUINALDO,
   armarMensajeAguinaldo,
   armarAsientoAguinaldo,
@@ -89,6 +91,8 @@ const formatearEmpleado = (e) => ({
   meses_trabajados: e.meses_trabajados,
   dias_trabajados: e.dias_trabajados,
   promedio_sueldo: e.promedio_sueldo,
+  origen_promedio: e.origen_promedio,
+  meses_promedio: e.meses_promedio,
   monto: e.monto,
   excluido: e.excluido,
   motivo_exclusion: e.motivo_exclusion,
@@ -135,21 +139,6 @@ async function registrarEnvio(cliente, id, destino) {
   });
 }
 
-// EmployeeService no guarda una fecha de baja explícita: para un colaborador inactivo, se usa el fin de su
-// última versión de contrato (si no se renovó) como aproximación de cuándo dejó de trabajar; sin esa fecha,
-// o si sigue activo, el fin efectivo es hoy (o el fin de la gestión, lo que sea antes).
-function finEfectivoDe(persona, versiones, rango, hoy) {
-  const finGestionOHoy = hoy < rango.hasta ? hoy : rango.hasta;
-  if (persona.activo === false) {
-    const fechasFin = versiones.map((v) => v.vigente_hasta).filter(Boolean);
-    if (fechasFin.length > 0) {
-      const ultimaSalida = fechasFin.reduce((max, f) => (f > max ? f : max));
-      if (ultimaSalida < finGestionOHoy) return ultimaSalida;
-    }
-  }
-  return finGestionOHoy;
-}
-
 async function fechasDeIngreso(empleados) {
   const resultados = await Promise.allSettled(empleados.map((e) => empleadosCliente.obtenerEmpleado(e.id_empleado)));
   return new Map(
@@ -166,30 +155,40 @@ async function historialesDeContrato(empleados) {
   );
 }
 
-// Criterio 1: duodécimas del promedio de los tres últimos sueldos, por los meses y días trabajados en la
-// gestión. Criterio 2: menos de tres meses de servicio en la gestión queda excluido con el motivo.
-//
-// El criterio dice "dado que la gestión fiscal está abierta", pero acá se exige lo contrario (`hasta` ya
-// pasado): la duodécima necesita los meses y días COMPLETOS de la gestión para calcularse bien, así que
-// generarla antes de que cierre (30 de noviembre) daría un monto incompleto que cambiaría día a día. En la
-// práctica el aguinaldo se paga hasta el 20 de diciembre, así que esto encaja con "gestión recién cerrada,
-// lista para liquidarse" — se puede generar desde el mismo 30 de noviembre en adelante. Si la intención del
-// criterio es otra (por ejemplo, dejar armar un borrador ANTES de que cierre), es una decisión de negocio
-// que cambiaría esta regla, no un error de cálculo.
+// Agrupa por colaborador las filas [{ id_empleado, ... }] de una consulta.
+function porEmpleado(filas) {
+  const mapa = new Map();
+  for (const fila of filas) {
+    const id = String(fila.id_empleado).toLowerCase();
+    if (!mapa.has(id)) mapa.set(id, []);
+    mapa.get(id).push(fila);
+  }
+  return mapa;
+}
+
+// Criterio 1: con la gestión abierta (ya empezó, el 1 de diciembre del año anterior, y aún no se aprobó su
+// planilla), duodécimas del promedio de los tres últimos sueldos por los meses y días trabajados en la
+// gestión. A quien sigue activo se le proyecta hasta el 30 de noviembre (ver fechaFinEfectiva). Criterio 2:
+// menos de tres meses de servicio en la gestión queda excluido con el motivo.
 async function generar(datos = {}, identidad = {}) {
   const idResponsable = validarResponsable(identidad);
   const gestion = validarGestion(datos.gestion);
   const rango = rangoGestion(gestion);
   const hoy = hoyLaPaz();
-  if (rango.hasta > hoy) {
-    throw new ErrorApp(409, `La gestión ${gestion} todavía no termina (cierra el 30 de noviembre): no se puede generar su aguinaldo.`);
+  if (rango.desde > hoy) {
+    throw new ErrorApp(409, `La gestión ${gestion} todavía no empieza (inicia el 1 de diciembre de ${gestion - 1}): no se puede generar su aguinaldo.`);
   }
   const existente = (await modelo.listar()).find((a) => a.gestion === gestion);
   if (existente && existente.estado !== "BORRADOR") throw yaAprobada(gestion);
 
   const personal = await externos.listarPersonal();
   const nombreResponsable = responsableEn(personal, idResponsable);
-  const [fechasIngreso, versionesDe] = await Promise.all([fechasDeIngreso(personal), historialesDeContrato(personal)]);
+  const [fechasIngreso, versionesDe, planillasDe, retiros] = await Promise.all([
+    fechasDeIngreso(personal),
+    historialesDeContrato(personal),
+    modelo.sueldosDePlanillas(pool, rango.hasta.slice(0, 7), ESTADOS_PLANILLA_SUELDO).then(porEmpleado),
+    modelo.retirosRegistrados(pool).then((filas) => new Map(filas.map((f) => [String(f.id_empleado).toLowerCase(), f.fecha_retiro]))),
+  ]);
 
   const empleados = [];
   for (const persona of personal) {
@@ -197,8 +196,11 @@ async function generar(datos = {}, identidad = {}) {
     const fechaIngreso = fechasIngreso.get(persona.id_empleado);
     if (!fechaIngreso) continue; // Sin fecha de ingreso registrada: no se puede ubicar en la gestión.
     const versiones = versionesDe.get(id) ?? [];
-    const fechaFinEfectiva = finEfectivoDe(persona, versiones, rango, hoy);
-    const resultado = calcularAguinaldo({ fechaIngreso, fechaFinEfectiva, versionesContrato: versiones }, rango);
+    const fechaFin = fechaFinEfectiva({ activo: persona.activo, fechaRetiro: retiros.get(id), versiones }, rango, hoy);
+    const resultado = calcularAguinaldo(
+      { fechaIngreso, fechaFinEfectiva: fechaFin, versionesContrato: versiones, planillas: planillasDe.get(id) ?? [] },
+      rango
+    );
     if (!resultado) continue; // Ningún día de la relación laboral cae dentro de la gestión.
     empleados.push({
       id_empleado: id,

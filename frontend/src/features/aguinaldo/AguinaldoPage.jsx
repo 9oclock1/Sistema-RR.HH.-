@@ -35,12 +35,19 @@ const NOMBRE_DESTINO = { contabilidad: "Contabilidad", pagos: "Pagos" };
 
 const INTERVALO_INTEGRACIONES_MS = 10000;
 
-// La gestión del aguinaldo cierra el 30 de noviembre: mientras no llegue esa fecha, la última cerrada es la anterior.
+// La gestión del aguinaldo va del 1 de diciembre al 30 de noviembre: desde diciembre, la abierta es la del año siguiente.
 function gestionReciente() {
   const hoy = new Date();
-  const anio = hoy.getFullYear();
-  return hoy <= new Date(`${anio}-11-30T00:00:00`) ? anio - 1 : anio;
+  return hoy.getMonth() === 11 ? hoy.getFullYear() + 1 : hoy.getFullYear();
 }
+
+const yaEmpezo = (gestion) => new Date(`${gestion - 1}-12-01T00:00:00`) <= new Date();
+const sigueAbierta = (gestion) => new Date() < new Date(`${gestion}-12-01T00:00:00`);
+
+const ORIGEN_PROMEDIO = {
+  PLANILLAS: (f) => `Total ganado de ${plural(f.meses_promedio, "planilla", "planillas")}`,
+  CONTRATO: () => "Haber del contrato (sin planillas)",
+};
 
 const normalizar = (texto) =>
   (texto ?? "")
@@ -70,7 +77,18 @@ const COLUMNAS = [
       </span>
     ),
   },
-  { clave: "promedio", titulo: "Promedio de sueldo", ancho: "18%", alinear: "fin", celda: (f) => <span className="planilla-cifra">{formatearBs(f.promedio_sueldo)}</span> },
+  {
+    clave: "promedio",
+    titulo: "Promedio de sueldo",
+    ancho: "18%",
+    alinear: "fin",
+    celda: (f) => (
+      <div className="conceptos-nombre">
+        <span className="planilla-cifra">{formatearBs(f.promedio_sueldo)}</span>
+        {ORIGEN_PROMEDIO[f.origen_promedio] && <span className="conceptos-nota">{ORIGEN_PROMEDIO[f.origen_promedio](f)}</span>}
+      </div>
+    ),
+  },
   {
     clave: "monto",
     titulo: "Aguinaldo",
@@ -102,7 +120,7 @@ function Resumen({ aguinaldo }) {
         <dd>{totales.colaboradores}</dd>
       </div>
       <div>
-        <dt>Excluidos (menos de 3 meses)</dt>
+        <dt>Excluidos</dt>
         <dd>{totales.excluidos}</dd>
       </div>
       <div>
@@ -127,8 +145,8 @@ export default function AguinaldoPage() {
   const [simulando, setSimulando] = useState(null);
   const [busqueda, setBusqueda] = useState("");
   const anioValido = Number.isInteger(gestion) && gestion >= 2000 && gestion <= 2100;
-  const gestionYaTermino = anioValido && new Date(`${gestion}-11-30T00:00:00`) <= new Date();
-  const valido = anioValido && gestionYaTermino;
+  const gestionEmpezo = anioValido && yaEmpezo(gestion);
+  const valido = anioValido && gestionEmpezo;
   const identidad = { idEmpleado, rol };
 
   useEffect(() => {
@@ -297,7 +315,7 @@ export default function AguinaldoPage() {
             max="2100"
             value={gestion}
             onChange={(evento) => setGestion(Number(evento.target.value))}
-            error={anioValido && !gestionYaTermino ? "Esa gestión todavía no termina (cierra el 30 de noviembre)." : undefined}
+            error={anioValido && !gestionEmpezo ? `Esa gestión todavía no empieza (inicia el 1 de diciembre de ${gestion - 1}).` : undefined}
           />
           <div className="planilla-barra__acciones">
             {aguinaldo?.estado === "BORRADOR" && (
@@ -318,6 +336,13 @@ export default function AguinaldoPage() {
             )}
           </div>
         </div>
+
+        {valido && sigueAbierta(gestion) && aguinaldo?.estado !== "CERRADA" && (
+          <Alerta tono="info" titulo={`La gestión ${gestion} sigue abierta`}>
+            A quien sigue trabajando se le cuentan los meses hasta el 30 de noviembre; a quien tiene registrada su
+            desvinculación, hasta su fecha de retiro. Si alguien se retira antes del cierre, vuelva a generar el borrador.
+          </Alerta>
+        )}
 
         {errorDeGestion && (
           <Alerta tono="peligro" role="alert" titulo="No se pudo completar la acción" onCerrar={() => setErrorAccion(null)}>

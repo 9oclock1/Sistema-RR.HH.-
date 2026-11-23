@@ -14,10 +14,40 @@ const COLUMNAS_EMPLEADO = [
   "meses_trabajados",
   "dias_trabajados",
   "promedio_sueldo",
+  "origen_promedio",
+  "meses_promedio",
   "monto",
   "excluido",
   "motivo_exclusion",
 ];
+
+const marcadores = (desde, cantidad) => Array.from({ length: cantidad }, (_, i) => `$${desde + i}`).join(", ");
+
+// Total ganado de cada colaborador en las planillas mensuales con montos definitivos hasta `periodoHasta`
+// (AAAA-MM). Base del promedio de los tres últimos sueldos (RF-47, criterio 1).
+async function sueldosDePlanillas(db, periodoHasta, estados) {
+  const { rows } = await db.query(
+    `SELECT pe.id_empleado, p.periodo, pe.total_ganado
+     FROM planilla_empleados pe
+     JOIN planillas p ON p.id_planilla = pe.id_planilla
+     WHERE p.estado = ANY($2) AND p.periodo <= $1
+     ORDER BY pe.id_empleado, p.periodo DESC`,
+    [periodoHasta, estados]
+  );
+  return rows;
+}
+
+// Fecha de retiro (último día trabajado) de cada colaborador con desvinculación registrada (RF-54, no anulada;
+// la más reciente si tuvo varias).
+async function retirosRegistrados(db) {
+  const { rows } = await db.query(
+    `SELECT DISTINCT ON (id_empleado) id_empleado, to_char(fecha_retiro, 'YYYY-MM-DD') AS fecha_retiro
+     FROM procesos_desvinculacion
+     WHERE estado <> 'ANULADO'
+     ORDER BY id_empleado, fecha_retiro DESC`
+  );
+  return rows;
+}
 
 async function listar() {
   const { rows } = await pool.query(`SELECT ${COLUMNAS} FROM planilla_aguinaldo a ORDER BY a.gestion DESC LIMIT 24`);
@@ -70,7 +100,7 @@ async function guardarEmpleados(cliente, idAguinaldo, empleados) {
   for (const e of empleados) {
     await cliente.query(
       `INSERT INTO aguinaldo_empleados (id_aguinaldo, ${COLUMNAS_EMPLEADO.join(", ")})
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+       VALUES ($1, ${marcadores(2, COLUMNAS_EMPLEADO.length)})`,
       [idAguinaldo, ...COLUMNAS_EMPLEADO.map((c) => e[c])]
     );
   }
@@ -158,6 +188,8 @@ module.exports = {
   reemplazar,
   guardarEmpleados,
   listarEmpleados,
+  sueldosDePlanillas,
+  retirosRegistrados,
   eliminar,
   aprobar,
   contarEmpleados,

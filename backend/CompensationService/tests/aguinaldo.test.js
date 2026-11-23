@@ -8,6 +8,8 @@ const {
   promedioUltimosSueldos,
   calcularMonto,
   calcularAguinaldo,
+  promedioDePlanillas,
+  fechaFinEfectiva,
   MESES_MINIMOS,
   DESTINOS_AGUINALDO,
   armarMensajeAguinaldo,
@@ -145,6 +147,80 @@ test("calcularAguinaldo: sin ningún día en la gestión, devuelve null (no corr
     calcularAguinaldo({ fechaIngreso: "2027-01-01", fechaFinEfectiva: rango.hasta, versionesContrato: [] }, rango),
     null
   );
+});
+
+// ---- promedio con las planillas reales y gestión abierta ----
+
+const planilla = (periodo, total_ganado) => ({ periodo, total_ganado });
+
+test("promedioDePlanillas: promedia el total ganado de las tres últimas planillas hasta el último mes trabajado", () => {
+  const planillas = [planilla("2026-06", 6138.33), planilla("2026-07", 6090), planilla("2026-08", 6032), planilla("2026-09", 6380)];
+  const resultado = promedioDePlanillas(planillas, "2026-08-20");
+  assert.deepEqual(resultado, { promedio: 6086.78, meses: 3, periodos: ["2026-06", "2026-07", "2026-08"] });
+});
+
+test("promedioDePlanillas: con menos de tres planillas promedia las que hay; sin ninguna devuelve null", () => {
+  assert.deepEqual(promedioDePlanillas([planilla("2026-10", 3000), planilla("2026-11", 3500)], "2026-11-30"), {
+    promedio: 3250,
+    meses: 2,
+    periodos: ["2026-10", "2026-11"],
+  });
+  assert.equal(promedioDePlanillas([planilla("2026-12", 3000)], "2026-11-30"), null);
+  assert.equal(promedioDePlanillas([], "2026-11-30"), null);
+});
+
+test("calcularAguinaldo: usa las planillas antes que el contrato e informa el origen", () => {
+  const rango = rangoGestion(2026);
+  const resultado = calcularAguinaldo(
+    {
+      fechaIngreso: "2020-01-01",
+      fechaFinEfectiva: rango.hasta,
+      versionesContrato: [version("2020-01-01", null, 5000)],
+      planillas: [planilla("2026-09", 6000), planilla("2026-10", 6300), planilla("2026-11", 6600)],
+    },
+    rango
+  );
+  assert.equal(resultado.promedio_sueldo, 6300);
+  assert.equal(resultado.origen_promedio, "PLANILLAS");
+  assert.equal(resultado.meses_promedio, 3);
+  assert.equal(resultado.monto, 6300);
+});
+
+test("calcularAguinaldo: sin planillas usa el haber del contrato", () => {
+  const rango = rangoGestion(2026);
+  const resultado = calcularAguinaldo(
+    { fechaIngreso: "2020-01-01", fechaFinEfectiva: rango.hasta, versionesContrato: [version("2020-01-01", null, 5000)] },
+    rango
+  );
+  assert.equal(resultado.origen_promedio, "CONTRATO");
+  assert.equal(resultado.meses_promedio, null);
+  assert.equal(resultado.monto, 5000);
+});
+
+test("calcularAguinaldo: sin planillas ni contrato queda excluido con el motivo, no aprobado en cero", () => {
+  const rango = rangoGestion(2026);
+  const resultado = calcularAguinaldo({ fechaIngreso: "2020-01-01", fechaFinEfectiva: rango.hasta }, rango);
+  assert.equal(resultado.excluido, true);
+  assert.equal(resultado.monto, 0);
+  assert.equal(resultado.origen_promedio, null);
+  assert.match(resultado.motivo_exclusion, /Sin sueldo registrado/);
+});
+
+test("fechaFinEfectiva: con la gestión abierta, a quien sigue activo se le cuenta hasta el 30 de noviembre", () => {
+  const rango = rangoGestion(2026);
+  assert.equal(fechaFinEfectiva({ activo: true }, rango, "2026-11-22"), "2026-11-30");
+});
+
+test("fechaFinEfectiva: con desvinculación registrada se cuenta hasta su fecha de retiro", () => {
+  const rango = rangoGestion(2026);
+  assert.equal(fechaFinEfectiva({ activo: false, fechaRetiro: "2026-08-20" }, rango, "2026-11-22"), "2026-08-20");
+  assert.equal(fechaFinEfectiva({ activo: false, fechaRetiro: "2027-01-10" }, rango, "2026-11-22"), "2026-11-30");
+});
+
+test("fechaFinEfectiva: inactivo sin desvinculación, hasta el fin de su contrato o hasta hoy", () => {
+  const rango = rangoGestion(2026);
+  assert.equal(fechaFinEfectiva({ activo: false, versiones: [version("2020-01-01", "2026-05-31", 5000)] }, rango, "2026-11-22"), "2026-05-31");
+  assert.equal(fechaFinEfectiva({ activo: false, versiones: [] }, rango, "2026-11-22"), "2026-11-22");
 });
 
 // ---- mensajes para Contabilidad y Pagos ----
