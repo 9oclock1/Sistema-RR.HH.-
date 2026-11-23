@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Megaphone, RefreshCw, ShieldAlert, UserRound } from "lucide-react";
+import { Megaphone, RefreshCw, ShieldAlert } from "lucide-react";
 import { listarConvocatoriasEmpleado, postularConvocatoria } from "../../api/convocatoriasInternas";
 import { Alerta, Boton, EncabezadoPagina, EstadoVacio, Esqueleto, Selector, Tarjeta, useAvisos } from "../../components/ui";
-import { useRol, useUsuario } from "../../context/sesion";
 import useRecurso from "../quejas/casos/useRecurso";
+import SesionRequerida from "./SesionRequerida";
 import TarjetaConvocatoria from "./TarjetaConvocatoria";
-import { FILTROS_ESTADO_EMPLEADO, MENSAJE_SOLO_ACTIVOS } from "./convocatorias";
+import { FILTROS_ESTADO_EMPLEADO, MENSAJE_SOLO_ACTIVOS, cerrarSiVencio, identidadDe } from "./convocatorias";
 import "./convocatorias.css";
 
 const MENSAJES_VACIO = {
@@ -15,14 +15,16 @@ const MENSAJES_VACIO = {
   TODAS: "Todavía no hay convocatorias publicadas.",
 };
 
-export default function ConvocatoriasEmpleadoPage() {
-  const rol = useRol();
-  const idEmpleado = useUsuario();
+function ConvocatoriasDelEmpleado({ usuario }) {
   const [estado, setEstado] = useState("VIGENTES");
-  const sesion = useMemo(() => ({ rol, idEmpleado }), [rol, idEmpleado]);
+  const sesion = useMemo(() => identidadDe(usuario), [usuario]);
   const cargar = useCallback(
-    () => (idEmpleado ? listarConvocatoriasEmpleado(sesion, estado) : Promise.resolve(null)),
-    [sesion, idEmpleado, estado],
+    () =>
+      listarConvocatoriasEmpleado(estado).catch((fallo) => {
+        cerrarSiVencio(fallo);
+        throw fallo;
+      }),
+    [estado],
   );
   const { datos, error, cargando, reintentar } = useRecurso(cargar);
   const avisar = useAvisos();
@@ -40,6 +42,7 @@ export default function ConvocatoriasEmpleadoPage() {
       }[postulacion.estado_postulacion];
       avisar({ tono: resultado.tono, titulo: `Postulación registrada: ${convocatoria.titulo}`, mensaje: resultado.mensaje });
     } catch (fallo) {
+      if (cerrarSiVencio(fallo)) return;
       avisar({ tono: "peligro", titulo: "No se pudo registrar la postulación", mensaje: fallo.message });
     } finally {
       setPostulando(null);
@@ -50,39 +53,14 @@ export default function ConvocatoriasEmpleadoPage() {
   const sinPermiso = error?.status === 403;
 
   return (
-    <section className="cv-pagina" aria-labelledby="cv-titulo-empleado">
-      <EncabezadoPagina
-        migas={[{ etiqueta: "Inicio", href: "/" }, { etiqueta: "Ascensos" }]}
-        enlace={Link}
-        titulo="Convocatorias de ascenso"
-        idTitulo="cv-titulo-empleado"
-        descripcion="Vacantes internas publicadas por Recursos Humanos para el plan de carrera. Solo las ven los empleados activos."
-        acciones={
-          idEmpleado && (
-            <Boton icono={RefreshCw} onClick={reintentar} cargando={cargando && Boolean(datos)}>
-              Actualizar
-            </Boton>
-          )
-        }
-      />
-
-      {!idEmpleado && (
-        <Tarjeta>
-          <EstadoVacio
-            icono={UserRound}
-            titulo="Elija su usuario de prueba"
-            mensaje="Seleccione quién es en «Usuario de prueba», al pie de la barra lateral, para ver las convocatorias disponibles."
-          />
-        </Tarjeta>
-      )}
-
-      {idEmpleado && sinPermiso && (
+    <>
+      {sinPermiso && (
         <Tarjeta>
           <EstadoVacio icono={ShieldAlert} titulo="Acceso solo para empleados activos" mensaje={MENSAJE_SOLO_ACTIVOS} />
         </Tarjeta>
       )}
 
-      {idEmpleado && error && !sinPermiso && (
+      {error && !sinPermiso && (
         <Alerta
           tono="peligro"
           role="alert"
@@ -97,7 +75,7 @@ export default function ConvocatoriasEmpleadoPage() {
         </Alerta>
       )}
 
-      {idEmpleado && !error && (
+      {!error && (
         <div className="cv-apilado">
           <div className="cv-filtros">
             <Selector
@@ -111,6 +89,9 @@ export default function ConvocatoriasEmpleadoPage() {
                 {datos.total} {datos.total === 1 ? "convocatoria" : "convocatorias"}
               </p>
             )}
+            <Boton icono={RefreshCw} onClick={reintentar} cargando={cargando && Boolean(datos)}>
+              Actualizar
+            </Boton>
           </div>
 
           {!datos && <Esqueleto forma="bloque" alto="12rem" />}
@@ -135,6 +116,23 @@ export default function ConvocatoriasEmpleadoPage() {
           )}
         </div>
       )}
+    </>
+  );
+}
+
+export default function ConvocatoriasEmpleadoPage() {
+  return (
+    <section className="cv-pagina" aria-labelledby="cv-titulo-empleado">
+      <EncabezadoPagina
+        migas={[{ etiqueta: "Inicio", href: "/" }, { etiqueta: "Ascensos" }]}
+        enlace={Link}
+        titulo="Convocatorias de ascenso"
+        idTitulo="cv-titulo-empleado"
+        descripcion="Vacantes internas publicadas por Recursos Humanos para el plan de carrera. Solo las ven los empleados activos."
+      />
+      <SesionRequerida mensaje="Las convocatorias de ascenso se muestran con su propia cuenta, no con el usuario de prueba.">
+        {(usuario) => <ConvocatoriasDelEmpleado key={usuario.id_empleado} usuario={usuario} />}
+      </SesionRequerida>
     </section>
   );
 }
