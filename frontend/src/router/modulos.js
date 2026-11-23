@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ChartLine, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, Gift, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ChartLine, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, Gift, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Scale, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
@@ -10,6 +10,7 @@ import CiclosEvaluacionPage from "../features/ciclos-evaluacion/CiclosEvaluacion
 import { RUTA_CICLOS } from "../features/ciclos-evaluacion/ciclo";
 import DashboardDesempenoPage from "../features/dashboard-desempeno/DashboardDesempenoPage";
 import DashboardQuejasPage from "../features/dashboard-quejas/DashboardQuejasPage";
+import DashboardConflictividadPage from "../features/dashboard-conflictividad/DashboardConflictividadPage";
 import { RUTA_DASHBOARD_QUEJAS } from "../features/dashboard-quejas/dashboardQuejas";
 import { RUTA_DASHBOARD_DESEMPENO } from "../features/dashboard-desempeno/dashboardDesempeno";
 import DesempenoGlobalPage from "../features/desempeno-global/DesempenoGlobalPage";
@@ -584,6 +585,14 @@ export const SECCIONES = [
         icono: MessageSquareWarning,
         roles: ["admin"],
         pagina: DashboardQuejasPage,
+      },
+      {
+        ruta: "/dashboards/conflictividad",
+        etiqueta: "Conflictividad y puntualidad",
+        descripcion: "Índice de quejas por cada 100 empleados y minutos de atraso promedio, con semáforo y comparativo por área y sucursal.",
+        icono: Scale,
+        roles: ["supervisor"],
+        pagina: DashboardConflictividadPage,
       },
       {
         ruta: "/dashboards/rotacion",
