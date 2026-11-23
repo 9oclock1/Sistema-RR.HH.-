@@ -8,6 +8,7 @@ import ConvocatoriasRrhhPage from "../features/convocatorias-internas/Convocator
 import { RUTA_CONVOCATORIAS_EMPLEADO, RUTA_CONVOCATORIAS_RRHH } from "../features/convocatorias-internas/convocatorias";
 import CiclosEvaluacionPage from "../features/ciclos-evaluacion/CiclosEvaluacionPage";
 import { RUTA_CICLOS } from "../features/ciclos-evaluacion/ciclo";
+import DashboardAsistenciaPage from "../features/dashboard-asistencia/DashboardAsistenciaPage";
 import DashboardDesempenoPage from "../features/dashboard-desempeno/DashboardDesempenoPage";
 import DashboardQuejasPage from "../features/dashboard-quejas/DashboardQuejasPage";
 import { RUTA_DASHBOARD_QUEJAS } from "../features/dashboard-quejas/dashboardQuejas";
@@ -569,6 +570,14 @@ export const SECCIONES = [
   {
     titulo: "Dashboards",
     modulos: [
+      {
+        ruta: "/dashboards/asistencia",
+        etiqueta: "Ausentismo y puntualidad",
+        descripcion: "KPI-04 (ausentismo) y KPI-05 (puntualidad) por sucursal, con semáforo, comparativo y detalle diario de faltas y atrasos.",
+        icono: AlarmClock,
+        roles: ["supervisor"],
+        pagina: DashboardAsistenciaPage,
+      },
       {
         ruta: RUTA_DASHBOARD_DESEMPENO,
         etiqueta: "Dashboard de desempeño",

@@ -254,4 +254,13 @@ async function alcanceFiltros(identidad) {
   };
 }
 
-module.exports = { DIAS_MAXIMOS, leerFiltros, resolverAlcance, indicadores, totalizar, generar, alcanceFiltros };
+module.exports = {
+  DIAS_MAXIMOS,
+  leerFiltros,
+  resolverAlcance,
+  personalDelAlcance,
+  indicadores,
+  totalizar,
+  generar,
+  alcanceFiltros,
+};
