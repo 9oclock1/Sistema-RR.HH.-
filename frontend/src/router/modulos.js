@@ -323,7 +323,7 @@ export const SECCIONES = [
         etiqueta: "Planilla de aguinaldos",
         descripcion: "Duodécimas del promedio de los tres últimos sueldos por los meses y días trabajados en la gestión, aprobadas y enviadas a Contabilidad y Pagos.",
         icono: Gift,
-        roles: ["admin"],
+        roles: ["admin", "contador"],
         pagina: AguinaldoPage,
       },
       {
