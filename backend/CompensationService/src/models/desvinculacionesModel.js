@@ -18,11 +18,15 @@ const SELECT_PROCESO = `
          d.tamano_bytes,
          pi.promedio AS pi_promedio,
          pi.meses_considerados AS pi_meses_considerados,
-         pi.calculado_en AS pi_calculado_en
+         pi.calculado_en AS pi_calculado_en,
+         b.total AS b_total,
+         b.promedio_base AS b_promedio_base,
+         b.calculado_en AS b_calculado_en
     FROM PROCESOS_DESVINCULACION p
     JOIN CAUSALES_DESVINCULACION c ON c.codigo = p.codigo_causal
     JOIN DOCUMENTOS_DESVINCULACION d ON d.id_proceso = p.id_proceso
     LEFT JOIN PROMEDIOS_INDEMNIZABLES pi ON pi.id_proceso = p.id_proceso
+    LEFT JOIN BENEFICIOS_SOCIALES b ON b.id_proceso = p.id_proceso
 `;
 
 function aProceso(fila) {
@@ -48,6 +52,14 @@ function aProceso(fila) {
             promedio: fila.pi_promedio,
             meses_considerados: fila.pi_meses_considerados,
             calculado_en: fila.pi_calculado_en,
+          }
+        : null,
+    beneficios_sociales:
+      fila.b_total !== null && fila.b_total !== undefined
+        ? {
+            total: fila.b_total,
+            calculado_en: fila.b_calculado_en,
+            desactualizado: fila.pi_promedio !== fila.b_promedio_base,
           }
         : null,
     registrado_por: fila.registrado_por,

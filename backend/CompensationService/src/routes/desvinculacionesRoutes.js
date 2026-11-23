@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const controlador = require("../controllers/desvinculacionesController");
 const promedio = require("../controllers/promedioIndemnizableController");
+const beneficios = require("../controllers/beneficiosSocialesController");
 const exigirAdmin = require("../middlewares/exigirAdmin");
 const subirRespaldo = require("../middlewares/subirRespaldo");
 
@@ -15,5 +16,7 @@ router.get("/desvinculaciones/:id", controlador.obtener);
 router.get("/desvinculaciones/:id/documento", controlador.descargarDocumento);
 router.get("/desvinculaciones/:id/promedio-indemnizable", promedio.obtener);
 router.post("/desvinculaciones/:id/promedio-indemnizable", promedio.calcular);
+router.get("/desvinculaciones/:id/beneficios-sociales", beneficios.obtener);
+router.post("/desvinculaciones/:id/beneficios-sociales", beneficios.calcular);
 
 module.exports = router;
