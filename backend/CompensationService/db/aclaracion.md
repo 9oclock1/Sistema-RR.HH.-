@@ -226,3 +226,12 @@ El Administrador la envía desde Bonos por productividad (`POST /bonos-productiv
 - **Copia por mes:** `DETALLE_PROMEDIO_INDEMNIZABLE` guarda `dias_pagados`, `haber_mensual` y `total_ganado` al momento del cálculo para dejar fija la base legal del finiquito.
 - **Recálculo:** mientras el proceso siga abierto, volver a calcular reemplaza la cabecera en `PROMEDIOS_INDEMNIZABLES` y su detalle, útil cuando se cierra posteriormente la planilla del mes de retiro.
 - **Estado del proceso:** al realizar el primer cálculo, el proceso pasa automáticamente de `INICIADO` a `EN_CURSO`.
+
+## Indemnización y desahucio (RF-56, KAN-76)
+
+- **Base:** el sueldo promedio indemnizable de KAN-75 (`PROMEDIOS_INDEMNIZABLES.promedio`); sin promedio calculado no se calcula. `BENEFICIOS_SOCIALES.promedio_base` guarda la copia usada: si el promedio se recalcula después, el cálculo se informa como desactualizado.
+- **Tiempo de servicio:** de `fecha_ingreso` a `fecha_retiro`, contando ambos días. Años y meses calendario completos; los días restantes van a `dias_fraccion`.
+- **Indemnización (LGT art. 13, DS 110):** corresponde con más de 90 días de servicio, también en renuncia o conclusión de contrato. Monto = promedio × años + promedio × meses / 12 + promedio × días / 360. No corresponde en despido por causa justificada (`DESPIDO_LEGAL`, LGT art. 16).
+- **Desahucio (LGT art. 12):** tres sueldos promedio cuando `PROCESOS_DESVINCULACION.corresponde_desahucio` es verdadero (causal `DESAHUCIO`), salvo en los primeros 90 días (período de prueba, LGT art. 13).
+- **Detalle:** `DETALLE_BENEFICIOS_SOCIALES` guarda un renglón por años, meses, días y desahucio con su cantidad y divisor. Montos en centavos con redondeo mitad hacia arriba; el total es la suma de los renglones.
+- **Recálculo:** solo en procesos abiertos; reemplaza la cabecera y su detalle.

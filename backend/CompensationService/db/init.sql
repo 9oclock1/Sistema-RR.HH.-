@@ -862,3 +862,66 @@ CREATE TABLE DETALLE_PROMEDIO_INDEMNIZABLE (
         REFERENCES PLANILLA_EMPLEADOS (id_planilla_empleado),
     CONSTRAINT chk_detalle_promedio_total_ganado CHECK (total_ganado >= 0)
 );
+
+-- Beneficios sociales: indemnización y desahucio (RF-56, KAN-76)
+
+-- Tabla: BENEFICIOS_SOCIALES
+-- Último cálculo de la indemnización por tiempo de servicio y del desahucio de cada proceso (1 a 1).
+-- Copia el sueldo promedio y las fechas usadas; si el promedio cambia después, el cálculo queda desactualizado.
+CREATE TABLE BENEFICIOS_SOCIALES (
+    id_proceso UUID NOT NULL,
+    promedio_base numeric(12,2) NOT NULL,
+    fecha_ingreso date NOT NULL,
+    fecha_retiro date NOT NULL,
+    dias_servicio integer NOT NULL,
+    anios_servicio smallint NOT NULL,
+    meses_servicio smallint NOT NULL,
+    dias_fraccion smallint NOT NULL,
+    corresponde_indemnizacion boolean NOT NULL,
+    motivo_indemnizacion varchar(250) NOT NULL,
+    monto_indemnizacion numeric(12,2) NOT NULL,
+    corresponde_desahucio boolean NOT NULL,
+    motivo_desahucio varchar(250) NOT NULL,
+    monto_desahucio numeric(12,2) NOT NULL,
+    total numeric(12,2) NOT NULL,
+    calculado_por UUID NULL,
+    calculado_por_rol varchar(20) NULL,
+    calculado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT BENEFICIOS_SOCIALES_pk PRIMARY KEY (id_proceso),
+    CONSTRAINT fk_beneficios_proceso FOREIGN KEY (id_proceso)
+        REFERENCES PROCESOS_DESVINCULACION (id_proceso) ON DELETE CASCADE,
+    CONSTRAINT chk_beneficios_fechas CHECK (fecha_retiro >= fecha_ingreso),
+    CONSTRAINT chk_beneficios_dias CHECK (dias_servicio > 0),
+    CONSTRAINT chk_beneficios_tiempo CHECK (
+        anios_servicio >= 0 AND meses_servicio BETWEEN 0 AND 11 AND dias_fraccion BETWEEN 0 AND 30
+    ),
+    CONSTRAINT chk_beneficios_montos CHECK (
+        promedio_base >= 0 AND monto_indemnizacion >= 0 AND monto_desahucio >= 0
+        AND total = monto_indemnizacion + monto_desahucio
+    ),
+    CONSTRAINT chk_beneficios_sin_monto CHECK (
+        (corresponde_indemnizacion OR monto_indemnizacion = 0)
+        AND (corresponde_desahucio OR monto_desahucio = 0)
+    )
+);
+
+-- Tabla: DETALLE_BENEFICIOS_SOCIALES
+-- Renglones del cálculo: monto = promedio_base × cantidad / divisor (años / 1, meses / 12, días / 360, sueldos / 1).
+CREATE TABLE DETALLE_BENEFICIOS_SOCIALES (
+    id_proceso UUID NOT NULL,
+    orden smallint NOT NULL,
+    codigo_concepto varchar(25) NOT NULL,
+    descripcion varchar(120) NOT NULL,
+    unidad varchar(10) NOT NULL,
+    cantidad smallint NOT NULL,
+    divisor smallint NOT NULL,
+    monto numeric(12,2) NOT NULL,
+    CONSTRAINT DETALLE_BENEFICIOS_SOCIALES_pk PRIMARY KEY (id_proceso, orden),
+    CONSTRAINT fk_detalle_beneficios FOREIGN KEY (id_proceso)
+        REFERENCES BENEFICIOS_SOCIALES (id_proceso) ON DELETE CASCADE,
+    CONSTRAINT chk_detalle_beneficios_concepto CHECK (codigo_concepto IN ('INDEMNIZACION', 'DESAHUCIO')),
+    CONSTRAINT chk_detalle_beneficios_unidad CHECK (unidad IN ('ANIO', 'MES', 'DIA', 'SUELDO')),
+    CONSTRAINT chk_detalle_beneficios_cantidad CHECK (cantidad > 0),
+    CONSTRAINT chk_detalle_beneficios_divisor CHECK (divisor IN (1, 12, 360)),
+    CONSTRAINT chk_detalle_beneficios_monto CHECK (monto >= 0)
+);
