@@ -1510,12 +1510,17 @@ INSERT INTO CALCULOS_PLANILLA (
 ON CONFLICT DO NOTHING;
 
 -- Planilla tributaria y de aportes de ejemplo (RF-48, KAN-68): entidades con su formato de archivo, parametros
--- tributarios con vigencias (el salario minimo cambio el 1 de mayo de 2025), creditos fiscales declarados y dos planillas
--- mensuales CERRADAS (2026-04 y 2026-05) de 10 colaboradores, calculadas con las tasas vigentes del catalogo de conceptos.
---   Con salario minimo 2.750 el minimo no imponible es 5.500: solo pagan RC-IVA los 3 jefes (21, 22 y 23).
---   21 Marcela: declara facturas de Bs 1.200 en abril y 1.500 en mayo, el credito cubre parte del impuesto.
---   22 Jorge: no declara nada, se le retiene todo el impuesto.
---   23 Andrea: declara Bs 4.000 en abril, el credito supera el impuesto y le queda saldo a favor para mayo.
+-- tributarios con vigencias (el salario minimo cambio el 1 de mayo de 2025), valores de la UFV, creditos fiscales declarados
+-- y dos planillas mensuales CERRADAS (2026-04 y 2026-05) de 10 colaboradores, calculadas con las tasas vigentes del catalogo.
+--   Con salario minimo 2.750 el minimo no imponible es 5.500 y el computo del 13 % de 2 salarios minimos es 715: en la
+--   practica solo retiene quien tiene un sueldo neto mayor a 11.000.
+--   22 Jorge: en mayo cobra un bono de productividad de 6.500 (total ganado 15.000, con el Aporte Nacional Solidario sobre
+--      el excedente de 13.000). Declara facturas de Bs 1.000: el credito reduce su retencion pero no la cubre.
+--   21 Marcela: trae un saldo a favor inicial de 80 del sistema anterior y declara facturas en abril y mayo. No tiene
+--      impuesto despues del computo, asi que todo su credito pasa como saldo a favor al mes siguiente.
+--   23 Andrea: declara Bs 4.000 en abril y 3.000 en mayo. El saldo de abril pasa solo a mayo, actualizado con la UFV,
+--      si se genera primero la planilla tributaria de abril.
+-- Los valores de la UFV son de ejemplo: reemplacelos con los que publica el Banco Central de Bolivia.
 BEGIN;
 INSERT INTO ENTIDADES_APORTE (codigo, nombre, formato_archivo, orden) VALUES
   ('LARGO_PLAZO', 'Gestora Publica de la Seguridad Social de Largo Plazo', 'TXT', 1),
@@ -1544,11 +1549,22 @@ INSERT INTO PARAMETROS_TRIBUTARIOS (codigo, nombre, valor, vigente_desde, vigent
   ('ALICUOTA_RCIVA', 'Alicuota del RC-IVA (%)', 13, '2000-01-01', NULL),
   ('ALICUOTA_CREDITO_FISCAL', 'Alicuota del credito fiscal de las facturas (%)', 13, '2000-01-01', NULL)
 ON CONFLICT DO NOTHING;
-INSERT INTO CREDITOS_FISCALES_DECLARADOS (id_empleado, periodo, monto_facturas, saldo_anterior_favor) VALUES
-  ('f0000000-0000-4000-8000-000000000021', '2026-04', 1200.00, 0),
+INSERT INTO VALORES_UFV (fecha, valor) VALUES
+  ('2026-03-31', 2.71250),
+  ('2026-04-30', 2.71840),
+  ('2026-05-31', 2.72460),
+  ('2026-06-30', 2.73010),
+  ('2026-07-31', 2.73590),
+  ('2026-08-31', 2.74120),
+  ('2026-09-30', 2.74700),
+  ('2026-10-31', 2.75260)
+ON CONFLICT DO NOTHING;
+INSERT INTO CREDITOS_FISCALES_DECLARADOS (id_empleado, periodo, monto_facturas, saldo_inicial_favor) VALUES
+  ('f0000000-0000-4000-8000-000000000021', '2026-04', 1200.00, 80.00),
   ('f0000000-0000-4000-8000-000000000021', '2026-05', 1500.00, 0),
+  ('f0000000-0000-4000-8000-000000000022', '2026-05', 1000.00, 0),
   ('f0000000-0000-4000-8000-000000000023', '2026-04', 4000.00, 0),
-  ('f0000000-0000-4000-8000-000000000023', '2026-05', 3000.00, 156.97),
+  ('f0000000-0000-4000-8000-000000000023', '2026-05', 3000.00, 0),
   ('f0000000-0000-4000-8000-000000000024', '2026-04', 800.00, 0),
   ('f0000000-0000-4000-8000-000000000026', '2026-05', 500.00, 0)
 ON CONFLICT DO NOTHING;
@@ -1563,6 +1579,8 @@ DECLARE
   v_orden int;
   v_descuentos numeric(12,2);
   v_aportes numeric(12,2);
+  v_bono numeric(12,2);
+  v_total numeric(12,2);
   emp record;
   c record;
 BEGIN
@@ -1607,6 +1625,9 @@ BEGIN
         'CT-2026-00' || right(emp.id_empleado::text, 2), emp.haber, '2026-01-01', '2026-12-31', 30, 30
       ) RETURNING id_planilla_empleado INTO v_pe;
 
+      v_bono := CASE WHEN p = '2026-05' AND emp.id_empleado = 'f0000000-0000-4000-8000-000000000022' THEN 6500.00 ELSE 0 END;
+      v_total := emp.haber + v_bono;
+
       INSERT INTO calculos_planilla (id_planilla_empleado, id_vigencia, orden, tipo, codigo, nombre, forma_calculo, base, cantidad, valor, resultado)
       SELECT v_pe, vg.id_vigencia, 1, 'INGRESO', co.codigo, co.nombre, 'PORCENTAJE', emp.haber, 30, vg.valor, emp.haber
       FROM conceptos_planilla co
@@ -1615,6 +1636,12 @@ BEGIN
       WHERE co.codigo = 'HABER-BASICO';
 
       v_orden := 1;
+      IF v_bono > 0 THEN
+        v_orden := v_orden + 1;
+        INSERT INTO calculos_planilla (id_planilla_empleado, id_vigencia, orden, tipo, codigo, nombre, forma_calculo, base, cantidad, valor, resultado)
+        SELECT v_pe, NULL, v_orden, 'INGRESO', co.codigo, co.nombre, 'MONTO_FIJO', NULL, NULL, v_bono, v_bono
+        FROM conceptos_planilla co WHERE co.codigo = 'BONO-PRODUCTIVIDAD';
+      END IF;
       FOR c IN
         SELECT co.codigo, co.nombre, co.tipo, vg.id_vigencia, vg.valor
         FROM conceptos_planilla co
@@ -1625,14 +1652,29 @@ BEGIN
       LOOP
         v_orden := v_orden + 1;
         INSERT INTO calculos_planilla (id_planilla_empleado, id_vigencia, orden, tipo, codigo, nombre, forma_calculo, base, cantidad, valor, resultado)
-        VALUES (v_pe, c.id_vigencia, v_orden, c.tipo, c.codigo, c.nombre, 'PORCENTAJE', emp.haber, NULL, c.valor, round(emp.haber * c.valor / 100, 2));
+        VALUES (v_pe, c.id_vigencia, v_orden, c.tipo, c.codigo, c.nombre, 'PORCENTAJE', v_total, NULL, c.valor, round(v_total * c.valor / 100, 2));
+      END LOOP;
+
+      FOR c IN
+        SELECT co.codigo, co.nombre, vg.id_vigencia, vg.valor, substr(co.codigo, 5)::numeric AS umbral
+        FROM conceptos_planilla co
+        JOIN vigencias_concepto vg ON vg.id_concepto = co.id_concepto
+          AND v_fin BETWEEN vg.vigente_desde AND COALESCE(vg.vigente_hasta, 'infinity'::date)
+        WHERE co.codigo LIKE 'ANS-%' AND co.esta_activo
+        ORDER BY co.codigo
+      LOOP
+        CONTINUE WHEN v_total <= c.umbral;
+        v_orden := v_orden + 1;
+        INSERT INTO calculos_planilla (id_planilla_empleado, id_vigencia, orden, tipo, codigo, nombre, forma_calculo, base, cantidad, valor, resultado)
+        VALUES (v_pe, c.id_vigencia, v_orden, 'DESCUENTO', c.codigo, c.nombre, 'PORCENTAJE', v_total - c.umbral, NULL, c.valor,
+                round((v_total - c.umbral) * c.valor / 100, 2));
       END LOOP;
 
       SELECT COALESCE(sum(resultado) FILTER (WHERE tipo = 'DESCUENTO'), 0), COALESCE(sum(resultado) FILTER (WHERE tipo = 'APORTE'), 0)
         INTO v_descuentos, v_aportes
       FROM calculos_planilla WHERE id_planilla_empleado = v_pe;
       UPDATE planilla_empleados
-      SET total_ganado = emp.haber, total_descuentos = v_descuentos, liquido_pagable = emp.haber - v_descuentos, total_aportes = v_aportes
+      SET total_ganado = v_total, total_descuentos = v_descuentos, liquido_pagable = v_total - v_descuentos, total_aportes = v_aportes
       WHERE id_planilla_empleado = v_pe;
     END LOOP;
   END LOOP;

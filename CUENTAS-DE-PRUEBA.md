@@ -25,7 +25,7 @@ Por ahora **Mis boletas de pago** y **Rotación de personal** exigen sesión rea
 | `diego.quispe@correo.test` | Diego Quispe Mamani | Cajero | `empleado` | Activa |
 | `paola.gutierrez@correo.test` | Paola Gutiérrez Limachi | Asesor de Atención | `empleado` | Activa |
 | `ana.torrez@correo.test` | Ana Torrez Villca | Cajero | `empleado` | Activa |
-| `mario.fernandez@correo.test` | Mario Fernández Cruz | Asesor de Atención | `empleado` | Activa |
+| `mario.fernandez@correo.test` | Mario Fernández Cruz | Asesor de Atención | `contador` | Activa |
 | `elena.paredes@correo.test` | Elena Paredes Gómez | Cajero | `empleado` | Desactivada (de baja) |
 | `luciano.morales@correo.test` | Luciano Morales Chávez | Cajero | `empleado` | Desactivada (de baja) |
 | `valeria.nina@correo.test` | Valeria Nina Quisbert | Asesor de Atención | `empleado` | Desactivada (de baja) |
@@ -34,7 +34,7 @@ Por ahora **Mis boletas de pago** y **Rotación de personal** exigen sesión rea
 
 Los colaboradores de baja tienen la cuenta desactivada: el inicio de sesión se rechaza.
 
-Roles: `admin` (Administrador de RRHH, ve todo), `gerente` (Gerente de talento), `reclutador` (Encargado de reclutamiento), `supervisor` (Supervisor de área), `empleado` y `auditor` (Auditor de TI). Los roles incluyen los permisos de los que están debajo: `admin` ve también lo de `gerente` y `reclutador`, y así hacia abajo.
+Roles: `admin` (Administrador de RRHH, ve todo), `gerente` (Gerente de talento), `reclutador` (Encargado de reclutamiento), `supervisor` (Supervisor de área), `empleado`, `auditor` (Auditor de TI) y `contador` (Contador / Encargado de planillas: planilla mensual, aguinaldos y planillas tributaria y de aportes). Los roles incluyen los permisos de los que están debajo: `admin` ve también lo de `gerente` y `reclutador`, y así hacia abajo.
 
 Para probar Mis boletas de pago: `ana.torrez@correo.test` o `carlos.rojas@correo.test` (cada uno ve solo las suyas); `andrea.salazar@correo.test` (RRHH) puede abrir la de cualquiera.
 
