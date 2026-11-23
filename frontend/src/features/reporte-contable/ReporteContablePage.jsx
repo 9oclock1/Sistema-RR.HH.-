@@ -22,9 +22,11 @@ import "../conceptos/conceptos.css";
 
 const DESTINOS_SIMULAR = ["contabilidad", "pagos"];
 
+// El aguinaldo de una gestión ya aparece sumado en el reporte de la planilla del mes en que se cerró (ver
+// aguinaldo_incluido más abajo); esta segunda opción queda para ver el detalle completo de esa gestión aparte.
 const RECURSOS = [
   { valor: "planilla", etiqueta: "Planilla mensual" },
-  { valor: "aguinaldo", etiqueta: "Planilla de aguinaldos" },
+  { valor: "aguinaldo", etiqueta: "Planilla de aguinaldos (detalle por gestión)" },
 ];
 
 const CONCILIACION = {
@@ -292,6 +294,12 @@ export default function ReporteContablePage() {
               <Etiqueta tono="info">{reporte.estado}</Etiqueta>
               <span className="conceptos-nota">{reporte.colaboradores} colaboradores</span>
             </div>
+            {reporte.aguinaldo_incluido && (
+              <Alerta tono="info" titulo="Incluye el aguinaldo de la gestión">
+                El aguinaldo de la gestión {reporte.aguinaldo_incluido.gestion} se cerró este mes: sus montos ya están
+                sumados en los centros de costo y en los totales de este reporte.
+              </Alerta>
+            )}
             <div className="vigencias-resumen planilla-totales">
               <Conciliacion titulo="Contabilidad" datos={reporte.conciliacion.contabilidad} />
               <Conciliacion titulo="Pagos" datos={reporte.conciliacion.pagos} />

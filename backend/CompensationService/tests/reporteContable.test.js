@@ -176,3 +176,32 @@ test("construirReporteAguinaldo: usa gestion en vez de periodo y cuadra por cent
   assert.equal(reporte.conciliacion.contabilidad.estado, "registrado");
   assert.equal(reporte.conciliacion.pagos.estado, "registrado");
 });
+
+test("construirReportePlanilla: con un aguinaldo cerrado ese mes, lo funde en los mismos centros de costo", () => {
+  const reporte = construirReportePlanilla({
+    planilla: { ...PLANILLA_BASE, estado: "CERRADA" },
+    filasConceptos: [concepto("Casa matriz", "Administración", "INGRESO", 1000)],
+    filasPasivos: [{ sucursal: "Casa matriz", area: "Administración", liquido_pagable: 1000, total_aportes: 0 }],
+    aguinaldo: { id_aguinaldo: "f1e2d3c4-b5a6-4978-8899-aabbccddeeff", gestion: 2026 },
+    filasAguinaldo: [{ sucursal: "Casa matriz", area: "Administración", monto: 500 }],
+  });
+  assert.equal(reporte.aguinaldo_incluido.gestion, 2026);
+  // Sueldos y salarios por pagar (haber) ahora trae el líquido de la planilla (1000) MÁS el del aguinaldo (500).
+  const centro = reporte.centros_costo.find((c) => c.centro_costo === "Casa matriz · Administración");
+  const sueldosPorPagar = centro.renglones.find((r) => r.cuenta.codigo === CUENTAS.SUELDOS_POR_PAGAR.codigo);
+  assert.equal(sueldosPorPagar.haber, 1500);
+  // El debe también crece: 1000 de sueldos (planilla) + 500 de la cuenta de aguinaldos.
+  assert.equal(reporte.totales.total_debe, 1500);
+  assert.equal(reporte.totales.total_haber, 1500);
+  assert.equal(reporte.totales.cuadra, true);
+});
+
+test("construirReportePlanilla: sin aguinaldo cerrado ese mes, no agrega aguinaldo_incluido ni cambia los totales", () => {
+  const reporte = construirReportePlanilla({
+    planilla: { ...PLANILLA_BASE, estado: "CERRADA" },
+    filasConceptos: [concepto("Casa matriz", "Administración", "INGRESO", 1000)],
+    filasPasivos: [{ sucursal: "Casa matriz", area: "Administración", liquido_pagable: 1000, total_aportes: 0 }],
+  });
+  assert.equal(reporte.aguinaldo_incluido, null);
+  assert.equal(reporte.totales.total_debe, 1000);
+});

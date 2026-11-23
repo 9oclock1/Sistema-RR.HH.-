@@ -121,6 +121,18 @@ async function empleadosDeIntegracion(cliente, id) {
   return rows;
 }
 
+// El aguinaldo de una gestión se cierra (ambas confirmaciones) en un mes puntual, normalmente distinto del
+// mes que factura la planilla mensual: el reporte contable de UN periodo (RF-49, KAN-69, criterio 1) debe
+// incluirlo si su cierre cayó en ese mes, para no dejarlo en un reporte aparte que nunca se cruza con sueldos
+// y horas extra del mismo periodo.
+async function obtenerCerradoEnMes(cliente, desde, hasta) {
+  const { rows } = await cliente.query(
+    `SELECT ${COLUMNAS} FROM planilla_aguinaldo a WHERE a.estado = 'CERRADA' AND a.cerrada_en::date BETWEEN $1 AND $2`,
+    [desde, hasta]
+  );
+  return rows[0];
+}
+
 // Monto del aguinaldo por sucursal (centro de costo), para el reporte contable consolidado (RF-49, KAN-69).
 async function montosPorCentroDeCosto(cliente, id) {
   const { rows } = await cliente.query(
@@ -178,6 +190,7 @@ module.exports = {
   aprobar,
   contarEmpleados,
   empleadosDeIntegracion,
+  obtenerCerradoEnMes,
   montosPorCentroDeCosto,
   responder,
   cerrarSiConfirmada,

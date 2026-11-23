@@ -37,8 +37,18 @@ async function autorizar(identidad) {
   responsableEn(await externos.listarPersonal(), id);
 }
 
+// Último día del mes de `periodo` (AAAA-MM), para acotar la búsqueda del aguinaldo cerrado ese mes.
+function finDeMes(periodo) {
+  const [anio, mes] = periodo.split("-").map(Number);
+  const dias = new Date(Date.UTC(anio, mes, 0)).getUTCDate();
+  return `${periodo}-${String(dias).padStart(2, "0")}`;
+}
+
 // Criterio 1: el reporte contable consolidado de UNA planilla mensual, por cuenta contable y centro de
-// costo. Solo con el periodo CERRADA (ver ESTADOS_PERMITIDOS).
+// costo. Solo con el periodo CERRADA (ver ESTADOS_PERMITIDOS). El criterio también pide incluir "aguinaldos":
+// si una planilla de aguinaldos se cerró dentro de este mismo mes, se funde en el mismo consolidado (ver
+// aguinaldoModelo.obtenerCerradoEnMes y utils/reporteContable#combinarCentros) en vez de quedar visible solo
+// en el reporte de aguinaldos por gestión.
 async function generarPlanilla(periodo, identidad = {}) {
   await autorizar(identidad);
   if (!PERIODO_RE.test(periodo ?? "")) {
@@ -47,11 +57,13 @@ async function generarPlanilla(periodo, identidad = {}) {
   const planilla = (await planillasModelo.listar(periodo))[0];
   if (!planilla) throw new ErrorApp(404, `No existe una planilla para el periodo ${periodo}.`);
   if (!ESTADOS_PERMITIDOS.includes(planilla.estado)) throw noCerrado(`La planilla de ${periodo}`);
-  const [filasConceptos, filasPasivos] = await Promise.all([
+  const [filasConceptos, filasPasivos, aguinaldo] = await Promise.all([
     planillasModelo.conceptosPorCentroDeCosto(pool, planilla.id_planilla),
     planillasModelo.pasivosPorCentroDeCosto(pool, planilla.id_planilla),
+    aguinaldoModelo.obtenerCerradoEnMes(pool, `${periodo}-01`, finDeMes(periodo)),
   ]);
-  return construirReportePlanilla({ planilla, filasConceptos, filasPasivos });
+  const filasAguinaldo = aguinaldo ? await aguinaldoModelo.montosPorCentroDeCosto(pool, aguinaldo.id_aguinaldo) : null;
+  return construirReportePlanilla({ planilla, filasConceptos, filasPasivos, aguinaldo, filasAguinaldo });
 }
 
 async function generarAguinaldo(gestion, identidad = {}) {
