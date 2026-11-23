@@ -6,6 +6,7 @@ const plantillasRoutes = require("./src/routes/plantillasRoutes");
 const competenciasRoutes = require("./src/routes/competenciasRoutes");
 const escalasRoutes = require("./src/routes/escalasRoutes");
 const quejasRoutes = require("./src/routes/quejasRoutes");
+const dashboardConflictividadRoutes = require("./src/routes/dashboardConflictividadRoutes");
 const ciclosRoutes = require("./src/routes/ciclosRoutes");
 const desempenoRoutes = require("./src/routes/desempenoRoutes");
 const mensajesPublicadosRoutes = require("./src/routes/mensajesPublicadosRoutes");
@@ -46,6 +47,7 @@ app.get("/health", async (req, res) => {
 app.use(evaluacionesRoutes);
 app.use(plantillasRoutes);
 app.use(quejasRoutes);
+app.use(dashboardConflictividadRoutes);
 app.use(competenciasRoutes);
 app.use(escalasRoutes);
 app.use(ciclosRoutes);

@@ -285,6 +285,11 @@ describe("RF-03, criterio 4: cierre del ciclo al vencer la fecha límite", () =>
       mock.method(evaluacionesModelo, "obtenerEvaluacion", async () => ayudas.evaluacion(cambios));
       mock.method(evaluacionesModelo, "listarEstructura", async () => ayudas.filas());
       mock.method(evaluacionesModelo, "listarNiveles", async () => ayudas.NIVELES);
+      // Fix sin relación con KAN-506 (se detectó de paso al correr toda la suite en esta rama): faltaba este
+      // mock, así que "el formulario se muestra como vencido..." y "una evaluación ya enviada..." terminaban
+      // golpeando Postgres de verdad en vez de la transacción falsa de este archivo. Si esta rama no se
+      // mergea a main pronto, replicar este mismo mock ahí también.
+      mock.method(evaluacionesModelo, "listarCompromisos", async () => []);
       mock.method(evaluacionesModelo, "guardarRespuestas", async () => {
         escrituras.respuestas += 1;
       });
