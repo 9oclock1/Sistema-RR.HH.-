@@ -2,31 +2,18 @@ import { solicitar } from "./cliente";
 
 const RUTA = "/comp/planillas";
 
-const cabeceras = ({ idEmpleado, rol }) => ({
-  ...(idEmpleado && { "X-Empleado-Id": idEmpleado }),
-  "X-Rol": rol,
-});
+export const generarPlanillaTributaria = (idPlanilla) => solicitar(`${RUTA}/${idPlanilla}/tributaria`, { metodo: "POST" });
 
-export const generarPlanillaTributaria = (idPlanilla, identidad) =>
-  solicitar(`${RUTA}/${idPlanilla}/tributaria`, { metodo: "POST", cabeceras: cabeceras(identidad) });
+export const obtenerPlanillaTributaria = (idPlanilla) => solicitar(`${RUTA}/${idPlanilla}/tributaria`);
 
-export const obtenerPlanillaTributaria = (idPlanilla, identidad) =>
-  solicitar(`${RUTA}/${idPlanilla}/tributaria`, { cabeceras: cabeceras(identidad) });
+export const exportarPlanillaTributaria = (idPlanilla, formato) =>
+  solicitar(`${RUTA}/${idPlanilla}/tributaria/exportacion?formato=${encodeURIComponent(formato)}`, { respuestaBinaria: true });
 
-export const exportarPlanillaTributaria = (idPlanilla, formato, identidad) =>
-  solicitar(`${RUTA}/${idPlanilla}/tributaria/exportacion?formato=${encodeURIComponent(formato)}`, {
-    cabeceras: cabeceras(identidad),
-    respuestaBinaria: true,
-  });
+export const generarPlanillaAportes = (idPlanilla) => solicitar(`${RUTA}/${idPlanilla}/aportes`, { metodo: "POST" });
 
-export const generarPlanillaAportes = (idPlanilla, identidad) =>
-  solicitar(`${RUTA}/${idPlanilla}/aportes`, { metodo: "POST", cabeceras: cabeceras(identidad) });
+export const obtenerPlanillaAportes = (idPlanilla) => solicitar(`${RUTA}/${idPlanilla}/aportes`);
 
-export const obtenerPlanillaAportes = (idPlanilla, identidad) =>
-  solicitar(`${RUTA}/${idPlanilla}/aportes`, { cabeceras: cabeceras(identidad) });
-
-export const exportarPlanillaAportes = (idPlanilla, entidad, identidad) =>
+export const exportarPlanillaAportes = (idPlanilla, entidad) =>
   solicitar(`${RUTA}/${idPlanilla}/aportes/exportacion${entidad ? `?entidad=${encodeURIComponent(entidad)}` : ""}`, {
-    cabeceras: cabeceras(identidad),
     respuestaBinaria: true,
   });

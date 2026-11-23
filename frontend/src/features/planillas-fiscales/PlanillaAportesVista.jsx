@@ -8,8 +8,8 @@ import { descargarArchivo } from "../quejas/historial/historial";
 import useRecurso from "../quejas/casos/useRecurso";
 import {
   ETIQUETAS_TIPO,
-  MENSAJE_ELEGIR_USUARIO,
   TONOS_TIPO,
+  cerrarSiVencio,
   esSinGenerar,
   formatearTasa,
   nombreArchivoAportes,
@@ -51,12 +51,19 @@ const COLUMNAS_DETALLE = [
   { clave: "monto", titulo: "Monto", alinear: "fin", celda: (d) => <strong className="pf-cifra">{formatearBs(d.monto)}</strong> },
 ];
 
-export default function PlanillaAportesVista({ planilla, identidad, puedeGenerar }) {
+export default function PlanillaAportesVista({ planilla }) {
   const avisar = useAvisos();
   const [generando, setGenerando] = useState(false);
   const [descargando, setDescargando] = useState(null);
   const [entidadVista, setEntidadVista] = useState("");
-  const cargar = useCallback(() => obtenerPlanillaAportes(planilla.id_planilla, identidad), [planilla.id_planilla, identidad]);
+  const cargar = useCallback(
+    () =>
+      obtenerPlanillaAportes(planilla.id_planilla).catch((fallo) => {
+        cerrarSiVencio(fallo);
+        throw fallo;
+      }),
+    [planilla.id_planilla],
+  );
   const { datos, error, cargando, reintentar } = useRecurso(cargar);
 
   const entidadActual = datos ? (datos.entidades.find((e) => e.codigo === entidadVista) ?? datos.entidades[0]) : null;
@@ -68,7 +75,7 @@ export default function PlanillaAportesVista({ planilla, identidad, puedeGenerar
   const generar = async () => {
     setGenerando(true);
     try {
-      const generada = await generarPlanillaAportes(planilla.id_planilla, identidad);
+      const generada = await generarPlanillaAportes(planilla.id_planilla);
       avisar({
         tono: "exito",
         titulo: "Planilla de aportes generada",
@@ -76,7 +83,7 @@ export default function PlanillaAportesVista({ planilla, identidad, puedeGenerar
       });
       reintentar();
     } catch (fallo) {
-      avisar({ tono: "peligro", titulo: "No se pudo generar la planilla de aportes", mensaje: fallo.message });
+      if (!cerrarSiVencio(fallo)) avisar({ tono: "peligro", titulo: "No se pudo generar la planilla de aportes", mensaje: fallo.message });
     } finally {
       setGenerando(false);
     }
@@ -86,27 +93,20 @@ export default function PlanillaAportesVista({ planilla, identidad, puedeGenerar
     const clave = entidad ? entidad.codigo : "todo";
     setDescargando(clave);
     try {
-      const archivo = await exportarPlanillaAportes(planilla.id_planilla, entidad?.codigo, identidad);
+      const archivo = await exportarPlanillaAportes(planilla.id_planilla, entidad?.codigo);
       const nombre = entidad
         ? nombreArchivoAportes(planilla.periodo, entidad.codigo, entidad.formato_archivo.toLowerCase())
         : nombreArchivoZip(planilla.periodo);
       descargarArchivo(archivo, nombre);
     } catch (fallo) {
-      avisar({ tono: "peligro", titulo: "No se pudo descargar el archivo", mensaje: fallo.message });
+      if (!cerrarSiVencio(fallo)) avisar({ tono: "peligro", titulo: "No se pudo descargar el archivo", mensaje: fallo.message });
     } finally {
       setDescargando(null);
     }
   };
 
   const botonGenerar = (etiqueta, variante) => (
-    <Boton
-      variante={variante}
-      icono={variante === "primario" ? Landmark : RefreshCw}
-      cargando={generando}
-      disabled={!puedeGenerar}
-      onClick={generar}
-      title={puedeGenerar ? undefined : MENSAJE_ELEGIR_USUARIO}
-    >
+    <Boton variante={variante} icono={variante === "primario" ? Landmark : RefreshCw} cargando={generando} onClick={generar}>
       {etiqueta}
     </Boton>
   );
@@ -192,7 +192,7 @@ export default function PlanillaAportesVista({ planilla, identidad, puedeGenerar
           <Boton icono={FileArchive} cargando={descargando === "todo"} disabled={Boolean(descargando)} onClick={() => descargar(null)}>
             Descargar todo (ZIP)
           </Boton>
-          {puedeGenerar && botonGenerar("Volver a generar", "predeterminado")}
+          {botonGenerar("Volver a generar", "predeterminado")}
         </div>
       </div>
 

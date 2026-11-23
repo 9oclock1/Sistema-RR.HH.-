@@ -1,27 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { LogIn, ShieldAlert } from "lucide-react";
 import { listarPlanillas } from "../../api/planillas";
 import { Alerta, Boton, CampoTexto, EncabezadoPagina, EstadoVacio, Esqueleto, Etiqueta, Pestanas, Tarjeta } from "../../components/ui";
-import { useRol, useUsuario } from "../../context/sesion";
+import { abrirInicioSesion, useSesion } from "../../context/sesion";
 import { formatearMes, mesActual } from "../condiciones/formato";
 import { ESTADOS_PLANILLA, mesAnterior } from "../planillas/formato";
 import PlanillaAportesVista from "./PlanillaAportesVista";
 import PlanillaTributariaVista from "./PlanillaTributariaVista";
-import { PERIODO_RE } from "./planillasFiscales";
+import { PERIODO_RE, ROLES_PLANILLAS_FISCALES } from "./planillasFiscales";
 import "../conceptos/conceptos.css";
 import "./planillasFiscales.css";
 
 const nombreMes = (periodo) => formatearMes(periodo).toLowerCase();
 
-export default function PlanillasFiscalesPage() {
-  const rol = useRol();
-  const idEmpleado = useUsuario();
+function PlanillasDelPeriodo() {
   const [periodo, setPeriodo] = useState(mesAnterior);
   const [pestana, setPestana] = useState("tributaria");
   const [carga, setCarga] = useState(null);
   const [intento, setIntento] = useState(0);
   const valido = PERIODO_RE.test(periodo) && periodo <= mesActual();
-  const identidad = useMemo(() => ({ idEmpleado, rol }), [idEmpleado, rol]);
 
   useEffect(() => {
     if (!valido) return undefined;
@@ -89,20 +87,80 @@ export default function PlanillasFiscalesPage() {
         </Alerta>
       );
     }
-    const vista = { key: planilla.id_planilla, planilla, identidad, puedeGenerar: Boolean(idEmpleado) };
     return (
       <Pestanas
         etiqueta="Planillas del periodo"
         activa={pestana}
         onCambiar={setPestana}
         pestanas={[
-          { id: "tributaria", etiqueta: "Planilla tributaria (RC-IVA)", contenido: <PlanillaTributariaVista {...vista} /> },
-          { id: "aportes", etiqueta: "Aportes laborales y patronales", contenido: <PlanillaAportesVista {...vista} /> },
+          {
+            id: "tributaria",
+            etiqueta: "Planilla tributaria (RC-IVA)",
+            contenido: <PlanillaTributariaVista key={planilla.id_planilla} planilla={planilla} />,
+          },
+          {
+            id: "aportes",
+            etiqueta: "Aportes laborales y patronales",
+            contenido: <PlanillaAportesVista key={planilla.id_planilla} planilla={planilla} />,
+          },
         ]}
       />
     );
   };
 
+  return (
+    <Tarjeta className="conceptos-tarjeta">
+      <div className="pf-periodo">
+        <CampoTexto
+          id="fiscales-periodo"
+          etiqueta="Periodo"
+          type="month"
+          value={periodo}
+          max={mesActual()}
+          onChange={(evento) => cambiarPeriodo(evento.target.value)}
+          error={periodo && !valido ? "Elija un mes hasta el actual." : undefined}
+        />
+        {estado && <Etiqueta tono={estado.tono}>Planilla {estado.etiqueta.toLowerCase()}</Etiqueta>}
+      </div>
+      {contenido()}
+    </Tarjeta>
+  );
+}
+
+function Acceso() {
+  const usuario = useSesion();
+  if (usuario === undefined) return <Esqueleto forma="bloque" alto="14rem" />;
+  if (usuario === null) {
+    return (
+      <Tarjeta>
+        <EstadoVacio
+          icono={LogIn}
+          titulo="Inicie sesión para continuar"
+          mensaje="Las planillas tributaria y de aportes exigen iniciar sesión con la cuenta del Administrador de RRHH o del Contador."
+          accion={
+            <Boton variante="primario" icono={LogIn} onClick={() => abrirInicioSesion()}>
+              Iniciar sesión
+            </Boton>
+          }
+        />
+      </Tarjeta>
+    );
+  }
+  if (!ROLES_PLANILLAS_FISCALES.includes(usuario.rol)) {
+    return (
+      <Tarjeta>
+        <EstadoVacio
+          icono={ShieldAlert}
+          titulo="Sin acceso a las planillas fiscales"
+          mensaje="Solo el Administrador de RRHH o el Contador pueden generar y descargar las planillas tributaria y de aportes."
+        />
+      </Tarjeta>
+    );
+  }
+  return <PlanillasDelPeriodo key={usuario.id_empleado} />;
+}
+
+export default function PlanillasFiscalesPage() {
   return (
     <section className="conceptos" aria-labelledby="fiscales-titulo">
       <EncabezadoPagina
@@ -112,28 +170,7 @@ export default function PlanillasFiscalesPage() {
         idTitulo="fiscales-titulo"
         descripcion="Calcula el RC-IVA de cada dependiente y reúne los aportes laborales y patronales del periodo, listos para exportar en el formato de cada entidad."
       />
-
-      {!idEmpleado && (
-        <Alerta tono="info" titulo="Elija su usuario">
-          Para generar las planillas, elija su usuario de prueba en la barra superior.
-        </Alerta>
-      )}
-
-      <Tarjeta className="conceptos-tarjeta">
-        <div className="pf-periodo">
-          <CampoTexto
-            id="fiscales-periodo"
-            etiqueta="Periodo"
-            type="month"
-            value={periodo}
-            max={mesActual()}
-            onChange={(evento) => cambiarPeriodo(evento.target.value)}
-            error={periodo && !valido ? "Elija un mes hasta el actual." : undefined}
-          />
-          {estado && <Etiqueta tono={estado.tono}>Planilla {estado.etiqueta.toLowerCase()}</Etiqueta>}
-        </div>
-        {contenido()}
-      </Tarjeta>
+      <Acceso />
     </section>
   );
 }

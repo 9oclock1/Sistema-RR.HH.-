@@ -318,7 +318,7 @@ export const SECCIONES = [
         etiqueta: "Planilla tributaria y aportes",
         descripcion: "RC-IVA de cada dependiente y aportes laborales y patronales del periodo, exportables en el formato de cada entidad.",
         icono: FileChartColumn,
-        roles: ["admin"],
+        roles: ["admin", "contador"],
         pagina: PlanillasFiscalesPage,
       },
       {
