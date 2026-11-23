@@ -5,6 +5,7 @@ import {
   esSinGenerar,
   formatearPorcentaje,
   formatearTasa,
+  formatearUfv,
   nombreArchivoAportes,
   nombreArchivoTributaria,
   nombreArchivoZip,
@@ -35,5 +36,9 @@ describe("planillas fiscales", () => {
     expect(formatearPorcentaje(13)).toMatch(/^13\s%$/);
     expect(formatearTasa(1.71)).toMatch(/^1,71\s%$/);
     expect(formatearTasa(10)).toMatch(/^10,00\s%$/);
+  });
+
+  it("da formato a la UFV con cinco decimales", () => {
+    expect(formatearUfv(2.7184)).toBe("2,71840");
   });
 });

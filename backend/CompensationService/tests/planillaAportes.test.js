@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { aDetalle, resumirPorEntidad, resumirTotales, separarRenglones } = require("../src/utils/aportesPlanilla");
 const { crc32, crearZip, construirTxt, construirXlsx, escaparXml, letraColumna } = require("../src/utils/archivos");
-const { FORMATOS, elegirFormato, exigirAdministrador, nombreMes } = require("../src/utils/planillasFiscales");
+const { FORMATOS, elegirFormato, exigirResponsable, nombreMes } = require("../src/utils/planillasFiscales");
 
 const renglon = (extra) => ({
   id_empleado: "e1",
@@ -174,12 +174,12 @@ test("elegirFormato valida el formato pedido y usa el de la entidad por defecto"
   assert.equal(FORMATOS.xlsx.extension, "xlsx");
 });
 
-test("solo el administrador accede a las planillas fiscales", () => {
-  assert.doesNotThrow(() => exigirAdministrador({ rol: "Admin" }));
-  for (const rol of ["supervisor", "empleado", "", undefined]) {
-    assert.throws(() => exigirAdministrador({ rol }), (e) => e.estado === 403);
+test("solo el administrador de RRHH y el contador acceden a las planillas fiscales", () => {
+  for (const rol of ["admin", "Contador", " contador "]) assert.doesNotThrow(() => exigirResponsable({ rol }));
+  for (const rol of ["gerente", "supervisor", "empleado", "auditor", "", undefined]) {
+    assert.throws(() => exigirResponsable({ rol }), (e) => e.estado === 403);
   }
-  assert.throws(() => exigirAdministrador(), (e) => e.estado === 403);
+  assert.throws(() => exigirResponsable(), (e) => e.estado === 403);
 });
 
 test("nombreMes escribe el mes en español", () => {
