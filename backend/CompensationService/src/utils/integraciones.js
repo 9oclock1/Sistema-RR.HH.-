@@ -155,6 +155,11 @@ const SIN_CUENTA = { codigo: "—", nombre: "(sin cuenta contable asignada)" };
 // equivalente de aguinaldos) y `filasPasivos` de pasivosPorCentroDeCosto. Por diseño, cuentaDe() ya no debería
 // devolver null aquí (sinCuenta() lo bloquea al aprobar), pero si pasara no se descarta el monto: se agrupa
 // bajo SIN_CUENTA para que el total siga cuadrando con la planilla cerrada en vez de perderse en silencio.
+//
+// El criterio dice "centro de costo (sucursal/área)": acá se usa solo la sucursal. El colaborador también
+// tiene `area` (se copia igual que `sucursal` al generar, ver PLANILLA_EMPLEADOS/AGUINALDO_EMPLEADOS), así
+// que si la lectura correcta del criterio es agrupar por ambas dimensiones (no solo usarlas como sinónimos
+// de "centro de costo"), el dato ya está disponible y el cambio es acotado: no requiere otra migración.
 function agruparPorCentroDeCosto({ filasConceptos, filasPasivos }) {
   const centros = new Map();
   const centroDe = (sucursal) => {

@@ -2,6 +2,12 @@ const PDFDocument = require("pdfkit");
 
 // RF-49 (criterio 3): el reporte contable consolidado en CSV (hojas de cálculo) y PDF, con los mismos totales
 // que en pantalla, para que el Contador los adjunte a la conciliación con Contabilidad.
+//
+// El criterio dice "lo descarga en Excel": esto es CSV, no un .xlsx real. Es el mismo patrón que ya usa
+// AttendanceService para sus propios reportes (`;`, BOM y coma decimal para que Excel lo abra bien, sin
+// agregar una librería nueva como exceljs). Si el criterio exige el binario real, hay que decidir si vale
+// agregar esa dependencia solo para este reporte, o si el CSV (que ya funciona y es el patrón del repo)
+// alcanza para "Excel" en este contexto.
 
 const decimal = (valor) => Number(valor).toFixed(2).replace(".", ",");
 const ESTADO_CONCILIACION_TEXTO = { registrado: "Registrado", pendiente: "Pendiente", con_error: "Con error" };

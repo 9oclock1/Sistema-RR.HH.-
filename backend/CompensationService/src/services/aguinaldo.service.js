@@ -175,6 +175,14 @@ async function historialesDeContrato(empleados) {
 
 // Criterio 1: duodécimas del promedio de los tres últimos sueldos, por los meses y días trabajados en la
 // gestión. Criterio 2: menos de tres meses de servicio en la gestión queda excluido con el motivo.
+//
+// El criterio dice "dado que la gestión fiscal está abierta", pero acá se exige lo contrario (`hasta` ya
+// pasado): la duodécima necesita los meses y días COMPLETOS de la gestión para calcularse bien, así que
+// generarla antes de que cierre (30 de noviembre) daría un monto incompleto que cambiaría día a día. En la
+// práctica el aguinaldo se paga hasta el 20 de diciembre, así que esto encaja con "gestión recién cerrada,
+// lista para liquidarse" — se puede generar desde el mismo 30 de noviembre en adelante. Si la intención del
+// criterio es otra (por ejemplo, dejar armar un borrador ANTES de que cierre), es una decisión de negocio
+// que cambiaría esta regla, no un error de cálculo.
 async function generar(datos = {}, identidad = {}) {
   const idResponsable = validarResponsable(identidad);
   const gestion = validarGestion(datos.gestion);
