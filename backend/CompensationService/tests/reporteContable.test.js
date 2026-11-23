@@ -4,8 +4,9 @@ const { agruparPorCentroDeCosto, CUENTAS } = require("../src/utils/integraciones
 const { agruparAguinaldoPorCentroDeCosto, CUENTA_AGUINALDO } = require("../src/utils/aguinaldo");
 const { construirReportePlanilla, construirReporteAguinaldo } = require("../src/utils/reporteContable");
 
-const concepto = (sucursal, tipo, monto, cuenta = ["5.1.1.01", "Sueldos y salarios"]) => ({
+const concepto = (sucursal, area, tipo, monto, cuenta = ["5.1.1.01", "Sueldos y salarios"]) => ({
   sucursal,
+  area,
   tipo,
   codigo: "HABER-BASICO",
   cuenta_codigo: cuenta[0],
@@ -13,45 +14,76 @@ const concepto = (sucursal, tipo, monto, cuenta = ["5.1.1.01", "Sueldos y salari
   monto,
 });
 
-test("agruparPorCentroDeCosto: separa gasto (debe) y pasivo (haber) por sucursal, cada una cuadrada", () => {
+test("agruparPorCentroDeCosto: separa gasto (debe) y pasivo (haber) por sucursal Y área, cada una cuadrada", () => {
   const filasConceptos = [
-    concepto("Casa matriz", "INGRESO", 1000),
-    concepto("Casa matriz", "DESCUENTO", 130, ["2.1.3.01", "Aportes laborales por pagar"]),
-    concepto("Sucursal Santa Cruz", "INGRESO", 500),
+    concepto("Casa matriz", "Administración", "INGRESO", 1000),
+    concepto("Casa matriz", "Administración", "DESCUENTO", 130, ["2.1.3.01", "Aportes laborales por pagar"]),
+    concepto("Sucursal Santa Cruz", "Ventas", "INGRESO", 500),
   ];
   const filasPasivos = [
-    { sucursal: "Casa matriz", liquido_pagable: 870, total_aportes: 100 },
-    { sucursal: "Sucursal Santa Cruz", liquido_pagable: 500, total_aportes: 50 },
+    { sucursal: "Casa matriz", area: "Administración", liquido_pagable: 870, total_aportes: 100 },
+    { sucursal: "Sucursal Santa Cruz", area: "Ventas", liquido_pagable: 500, total_aportes: 50 },
   ];
   const centros = agruparPorCentroDeCosto({ filasConceptos, filasPasivos });
 
   assert.equal(centros.length, 2);
-  const matriz = centros.find((c) => c.centro_costo === "Casa matriz");
+  const matriz = centros.find((c) => c.sucursal === "Casa matriz");
+  assert.equal(matriz.centro_costo, "Casa matriz · Administración");
+  assert.equal(matriz.area, "Administración");
   assert.equal(matriz.total_debe, 1000);
   assert.equal(matriz.total_haber, 1100); // 130 (descuento) + 100 (aportes patronales) + 870 (líquido)
   const haberSueldos = matriz.renglones.find((r) => r.cuenta.codigo === CUENTAS.SUELDOS_POR_PAGAR.codigo);
   assert.equal(haberSueldos.haber, 870);
 
-  const santaCruz = centros.find((c) => c.centro_costo === "Sucursal Santa Cruz");
+  const santaCruz = centros.find((c) => c.sucursal === "Sucursal Santa Cruz");
+  assert.equal(santaCruz.centro_costo, "Sucursal Santa Cruz · Ventas");
   assert.equal(santaCruz.total_debe, 500);
   assert.equal(santaCruz.total_haber, 550); // 50 aportes + 500 líquido
 });
 
-test("agruparPorCentroDeCosto: sin sucursal registrada, agrupa bajo '(sin sucursal)' sin perder el monto", () => {
+test("agruparPorCentroDeCosto: misma sucursal con áreas distintas no se mezcla", () => {
   const centros = agruparPorCentroDeCosto({
-    filasConceptos: [concepto(null, "INGRESO", 300)],
-    filasPasivos: [{ sucursal: null, liquido_pagable: 300, total_aportes: 0 }],
+    filasConceptos: [
+      concepto("Casa matriz", "Administración", "INGRESO", 1000),
+      concepto("Casa matriz", "Ventas", "INGRESO", 400),
+    ],
+    filasPasivos: [
+      { sucursal: "Casa matriz", area: "Administración", liquido_pagable: 1000, total_aportes: 0 },
+      { sucursal: "Casa matriz", area: "Ventas", liquido_pagable: 400, total_aportes: 0 },
+    ],
+  });
+  assert.equal(centros.length, 2);
+  assert.deepEqual(
+    centros.map((c) => c.centro_costo).sort(),
+    ["Casa matriz · Administración", "Casa matriz · Ventas"]
+  );
+});
+
+test("agruparPorCentroDeCosto: sin sucursal ni área, agrupa bajo '(sin sucursal) · (sin área)' sin perder el monto", () => {
+  const centros = agruparPorCentroDeCosto({
+    filasConceptos: [concepto(null, null, "INGRESO", 300)],
+    filasPasivos: [{ sucursal: null, area: null, liquido_pagable: 300, total_aportes: 0 }],
   });
   assert.equal(centros.length, 1);
-  assert.equal(centros[0].centro_costo, "(sin sucursal)");
+  assert.equal(centros[0].centro_costo, "(sin sucursal) · (sin área)");
+  assert.equal(centros[0].sucursal, "(sin sucursal)");
+  assert.equal(centros[0].area, "(sin área)");
   assert.equal(centros[0].total_debe, 300);
   assert.equal(centros[0].total_haber, 300);
 });
 
+test("agruparPorCentroDeCosto: con sucursal pero sin área, solo el área cae en '(sin área)'", () => {
+  const centros = agruparPorCentroDeCosto({
+    filasConceptos: [concepto("Casa matriz", null, "INGRESO", 200)],
+    filasPasivos: [{ sucursal: "Casa matriz", area: null, liquido_pagable: 200, total_aportes: 0 }],
+  });
+  assert.equal(centros[0].centro_costo, "Casa matriz · (sin área)");
+});
+
 test("agruparPorCentroDeCosto: un concepto sin cuenta contable no se descarta, cae en '(sin cuenta contable asignada)'", () => {
   const centros = agruparPorCentroDeCosto({
-    filasConceptos: [concepto("Casa matriz", "APORTE", 80, [null, null])],
-    filasPasivos: [{ sucursal: "Casa matriz", liquido_pagable: 0, total_aportes: 80 }],
+    filasConceptos: [concepto("Casa matriz", "Administración", "APORTE", 80, [null, null])],
+    filasPasivos: [{ sucursal: "Casa matriz", area: "Administración", liquido_pagable: 0, total_aportes: 80 }],
   });
   const renglonSinCuenta = centros[0].renglones.find((r) => r.cuenta.codigo === "—");
   assert.ok(renglonSinCuenta, "debe existir un renglón de respaldo para el monto sin cuenta");
@@ -59,12 +91,13 @@ test("agruparPorCentroDeCosto: un concepto sin cuenta contable no se descarta, c
   assert.equal(centros[0].total_debe, 80);
 });
 
-test("agruparAguinaldoPorCentroDeCosto: un par debe/haber por sucursal, usando la cuenta de aguinaldos", () => {
+test("agruparAguinaldoPorCentroDeCosto: un par debe/haber por sucursal y área, usando la cuenta de aguinaldos", () => {
   const centros = agruparAguinaldoPorCentroDeCosto([
-    { sucursal: "Casa matriz", monto: 2000 },
-    { sucursal: "Sucursal Santa Cruz", monto: 1500 },
+    { sucursal: "Casa matriz", area: "Administración", monto: 2000 },
+    { sucursal: "Sucursal Santa Cruz", area: "Ventas", monto: 1500 },
   ]);
   assert.equal(centros.length, 2);
+  assert.equal(centros[0].centro_costo, "Casa matriz · Administración");
   assert.deepEqual(
     centros[0].renglones.map((r) => r.cuenta.codigo),
     [CUENTA_AGUINALDO.codigo, CUENTAS.SUELDOS_POR_PAGAR.codigo]
@@ -91,8 +124,8 @@ const PLANILLA_BASE = {
 test("construirReportePlanilla: traduce estado_contabilidad/estado_pagos al vocabulario de conciliación", () => {
   const reporte = construirReportePlanilla({
     planilla: PLANILLA_BASE,
-    filasConceptos: [concepto("Casa matriz", "INGRESO", 1000)],
-    filasPasivos: [{ sucursal: "Casa matriz", liquido_pagable: 1000, total_aportes: 0 }],
+    filasConceptos: [concepto("Casa matriz", "Administración", "INGRESO", 1000)],
+    filasPasivos: [{ sucursal: "Casa matriz", area: "Administración", liquido_pagable: 1000, total_aportes: 0 }],
   });
   assert.equal(reporte.recurso, "PLANILLA");
   assert.equal(reporte.conciliacion.contabilidad.estado, "registrado");

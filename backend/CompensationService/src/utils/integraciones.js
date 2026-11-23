@@ -2,6 +2,7 @@
 // `encabezado` (quién lo envía, para quién, tipo y fecha) y `datos`. El formato está en db/aclaracion.md.
 
 const { CUOTA } = require("./calculo");
+const { ErrorApp } = require("./errores");
 
 const ORIGEN = { grupo: "F", modulo: "RRHH" };
 const VERSION_ESQUEMA = 1;
@@ -40,6 +41,44 @@ function armarMensaje({ idMensaje, destino, fecha, datos }) {
       version_esquema: VERSION_ESQUEMA,
     },
     datos,
+  };
+}
+
+// Tipo de confirmación que cada destino envía por la planilla mensual (ver TIPOS_CONFIRMACION más abajo).
+const TIPO_CONFIRMACION_PLANILLA = {
+  CONTABILIDAD: "CONFIRMACION_ASIENTO_PLANILLA",
+  PAGOS: "CONFIRMACION_ORDEN_PAGO_PLANILLA",
+};
+
+// Validación genérica de la simulación de confirmación: sirve igual para la planilla mensual y para
+// aguinaldos (RF-47/KAN-67 la usó primero; un botón "simular aceptación" en el reporte contable, RF-49/
+// KAN-69, la reutiliza para la planilla mensual).
+function validarSimulacionConfirmacion(datos = {}) {
+  const errores = [];
+  if (!RESULTADOS.includes(datos.resultado)) errores.push({ campo: "resultado", mensaje: "Use CONFIRMADA o RECHAZADA." });
+  const motivo = typeof datos.motivo === "string" ? datos.motivo.trim() : "";
+  if (datos.resultado === "RECHAZADA" && !motivo) {
+    errores.push({ campo: "motivo", mensaje: "Indique el motivo del rechazo." });
+  }
+  if (errores.length > 0) throw new ErrorApp(400, "Datos de la simulación inválidos", errores);
+  const referencia = typeof datos.referencia === "string" ? datos.referencia.trim() : "";
+  return { resultado: datos.resultado, referencia: referencia || null, motivo: datos.resultado === "RECHAZADA" ? motivo : null };
+}
+
+// Mismo sobre que armarMensaje, pero en sentido contrario (el destino "envía" la confirmación a RRHH): lo usa
+// la simulación de confirmación de la planilla mensual, igual que armarConfirmacionSimulada en utils/aguinaldo.js.
+function armarConfirmacionSimuladaPlanilla({ idMensaje, idPlanilla, idMensajeOrigen, destino, resultado, referencia, motivo }) {
+  const { grupo, modulo } = DESTINOS[destino];
+  return {
+    encabezado: {
+      id_mensaje: idMensaje,
+      origen: { grupo, modulo },
+      destino: ORIGEN,
+      tipo: TIPO_CONFIRMACION_PLANILLA[destino],
+      fecha: new Date().toISOString(),
+      version_esquema: VERSION_ESQUEMA,
+    },
+    datos: { id_planilla: idPlanilla, id_mensaje_origen: idMensajeOrigen, resultado, referencia, motivo },
   };
 }
 
@@ -156,15 +195,27 @@ const SIN_CUENTA = { codigo: "—", nombre: "(sin cuenta contable asignada)" };
 // devolver null aquí (sinCuenta() lo bloquea al aprobar), pero si pasara no se descarta el monto: se agrupa
 // bajo SIN_CUENTA para que el total siga cuadrando con la planilla cerrada en vez de perderse en silencio.
 //
-// El criterio dice "centro de costo (sucursal/área)": acá se usa solo la sucursal. El colaborador también
-// tiene `area` (se copia igual que `sucursal` al generar, ver PLANILLA_EMPLEADOS/AGUINALDO_EMPLEADOS), así
-// que si la lectura correcta del criterio es agrupar por ambas dimensiones (no solo usarlas como sinónimos
-// de "centro de costo"), el dato ya está disponible y el cambio es acotado: no requiere otra migración.
+// El criterio dice "centro de costo (sucursal/área)": se agrupa por el PAR (sucursal, área) del colaborador,
+// cada una con su propio "(sin sucursal)" / "(sin área)" si falta. `centro_costo` sigue siendo un único
+// texto (para el título en pantalla, el PDF y el nombre de la hoja), pero el centro también expone
+// `sucursal`/`area` por separado para quien los necesite sin volver a parsear el texto.
+const SIN_SUCURSAL = "(sin sucursal)";
+const SIN_AREA = "(sin área)";
+
 function agruparPorCentroDeCosto({ filasConceptos, filasPasivos }) {
   const centros = new Map();
-  const centroDe = (sucursal) => {
-    const clave = sucursal || "(sin sucursal)";
-    if (!centros.has(clave)) centros.set(clave, { centro_costo: clave, renglones: new Map() });
+  const centroDe = (sucursal, area) => {
+    const sucursalTexto = sucursal || SIN_SUCURSAL;
+    const areaTexto = area || SIN_AREA;
+    const clave = `${sucursalTexto}|${areaTexto}`;
+    if (!centros.has(clave)) {
+      centros.set(clave, {
+        centro_costo: `${sucursalTexto} · ${areaTexto}`,
+        sucursal: sucursalTexto,
+        area: areaTexto,
+        renglones: new Map(),
+      });
+    }
     return centros.get(clave);
   };
   const sumarA = (centro, cuenta, lado, cents) => {
@@ -178,12 +229,12 @@ function agruparPorCentroDeCosto({ filasConceptos, filasPasivos }) {
   for (const f of filasConceptos) {
     const cents = centavos(f.monto);
     const cuenta = cuentaDe(f) ?? SIN_CUENTA;
-    const centro = centroDe(f.sucursal);
+    const centro = centroDe(f.sucursal, f.area);
     if (f.tipo === "INGRESO" || f.tipo === "APORTE") sumarA(centro, cuenta, "debe", cents);
     if (f.tipo === "DESCUENTO") sumarA(centro, cuenta, "haber", cents);
   }
   for (const p of filasPasivos) {
-    const centro = centroDe(p.sucursal);
+    const centro = centroDe(p.sucursal, p.area);
     sumarA(centro, CUENTAS.APORTES_PATRONALES_POR_PAGAR, "haber", centavos(p.total_aportes));
     sumarA(centro, CUENTAS.SUELDOS_POR_PAGAR, "haber", centavos(p.liquido_pagable));
   }
@@ -195,7 +246,14 @@ function agruparPorCentroDeCosto({ filasConceptos, filasPasivos }) {
         .sort((a, b) => (a.lado === b.lado ? a.cuenta.codigo.localeCompare(b.cuenta.codigo) : a.lado === "debe" ? -1 : 1))
         .map((r) => ({ cuenta: r.cuenta, debe: r.lado === "debe" ? bs(r.cents) : 0, haber: r.lado === "haber" ? bs(r.cents) : 0 }));
       const total = (lado) => bs(filas.filter((r) => r.lado === lado).reduce((t, r) => t + r.cents, 0));
-      return { centro_costo: centro.centro_costo, renglones, total_debe: total("debe"), total_haber: total("haber") };
+      return {
+        centro_costo: centro.centro_costo,
+        sucursal: centro.sucursal,
+        area: centro.area,
+        renglones,
+        total_debe: total("debe"),
+        total_haber: total("haber"),
+      };
     })
     .sort((a, b) => a.centro_costo.localeCompare(b.centro_costo, "es"));
 }
@@ -297,6 +355,8 @@ module.exports = {
   leerConfirmacion,
   esperaReintento,
   armarMensaje,
+  armarConfirmacionSimuladaPlanilla,
+  validarSimulacionConfirmacion,
   atributosDe,
   errorDePublicacion,
   sinCuenta,

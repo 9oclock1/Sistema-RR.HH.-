@@ -204,25 +204,25 @@ async function conceptosDeIntegracion(cliente, id) {
 // consolidado (RF-49, KAN-69): no se usa para el asiento en sí (ese sigue siendo un solo total por cuenta).
 async function conceptosPorCentroDeCosto(cliente, id) {
   const { rows } = await cliente.query(
-    `SELECT pe.sucursal, k.tipo, k.codigo, c.cuenta_contable_codigo AS cuenta_codigo, c.cuenta_contable_nombre AS cuenta_nombre,
+    `SELECT pe.sucursal, pe.area, k.tipo, k.codigo, c.cuenta_contable_codigo AS cuenta_codigo, c.cuenta_contable_nombre AS cuenta_nombre,
             SUM(k.resultado) AS monto
      FROM calculos_planilla k
      JOIN planilla_empleados pe USING (id_planilla_empleado)
      LEFT JOIN vigencias_concepto v ON v.id_vigencia = k.id_vigencia
      LEFT JOIN conceptos_planilla c ON c.id_concepto = v.id_concepto OR (k.id_vigencia IS NULL AND c.codigo = k.codigo)
      WHERE pe.id_planilla = $1
-     GROUP BY pe.sucursal, k.tipo, k.codigo, c.cuenta_contable_codigo, c.cuenta_contable_nombre
-     ORDER BY pe.sucursal, k.tipo, k.codigo`,
+     GROUP BY pe.sucursal, pe.area, k.tipo, k.codigo, c.cuenta_contable_codigo, c.cuenta_contable_nombre
+     ORDER BY pe.sucursal, pe.area, k.tipo, k.codigo`,
     [id]
   );
   return rows;
 }
 
-// Líquido pagable y aportes patronales (pasivos del asiento) por sucursal.
+// Líquido pagable y aportes patronales (pasivos del asiento) por sucursal y área.
 async function pasivosPorCentroDeCosto(cliente, id) {
   const { rows } = await cliente.query(
-    `SELECT sucursal, SUM(liquido_pagable) AS liquido_pagable, SUM(total_aportes) AS total_aportes, COUNT(*)::int AS colaboradores
-     FROM planilla_empleados WHERE id_planilla = $1 GROUP BY sucursal ORDER BY sucursal`,
+    `SELECT sucursal, area, SUM(liquido_pagable) AS liquido_pagable, SUM(total_aportes) AS total_aportes, COUNT(*)::int AS colaboradores
+     FROM planilla_empleados WHERE id_planilla = $1 GROUP BY sucursal, area ORDER BY sucursal, area`,
     [id]
   );
   return rows;

@@ -124,9 +124,9 @@ async function empleadosDeIntegracion(cliente, id) {
 // Monto del aguinaldo por sucursal (centro de costo), para el reporte contable consolidado (RF-49, KAN-69).
 async function montosPorCentroDeCosto(cliente, id) {
   const { rows } = await cliente.query(
-    `SELECT sucursal, SUM(monto) AS monto, COUNT(*)::int AS colaboradores
+    `SELECT sucursal, area, SUM(monto) AS monto, COUNT(*)::int AS colaboradores
      FROM aguinaldo_empleados WHERE id_aguinaldo = $1 AND NOT excluido
-     GROUP BY sucursal ORDER BY sucursal`,
+     GROUP BY sucursal, area ORDER BY sucursal, area`,
     [id]
   );
   return rows;
