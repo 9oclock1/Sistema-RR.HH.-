@@ -186,6 +186,7 @@ test("confirmaciones: solo se toman las dirigidas a RRHH con un tipo conocido", 
 test("confirmaciones: confirmada con referencia recortada; rechazada con motivo", () => {
   assert.deepEqual(leerConfirmacion(confirmacion()), {
     destino: "CONTABILIDAD",
+    recurso: "PLANILLA",
     idPlanilla: ID_PLANILLA,
     idMensajeOrigen: ID_ENVIO,
     resultado: "CONFIRMADA",
@@ -213,6 +214,28 @@ test("confirmaciones: errores que no se arreglan reintentando", () => {
   assert.match(errores(confirmacion({}, { resultado: "RECHAZADA", motivo: "  " })), /necesita datos.motivo/);
   assert.match(errores({ ...confirmacion(), datos: null }), /Falta el bloque datos/);
   assert.equal(leerConfirmacion(confirmacion({}, { motivo: "x".repeat(300), resultado: "RECHAZADA" })).motivo.length, 255);
+});
+
+const ID_AGUINALDO = "7a1b2c3d-4e5f-4a6b-9c8d-1e2f3a4b5c6d";
+
+test("confirmaciones de aguinaldo (RF-47): usan id_aguinaldo en vez de id_planilla, mismo sobre", () => {
+  const confirmacionAguinaldo = leerConfirmacion(
+    confirmacion({ tipo: "CONFIRMACION_ASIENTO_AGUINALDO" }, { id_planilla: undefined, id_aguinaldo: ID_AGUINALDO })
+  );
+  assert.deepEqual(confirmacionAguinaldo, {
+    destino: "CONTABILIDAD",
+    recurso: "AGUINALDO",
+    idAguinaldo: ID_AGUINALDO,
+    idMensajeOrigen: ID_ENVIO,
+    resultado: "CONFIRMADA",
+    referencia: "AS-458",
+    motivo: null,
+  });
+  assert.equal(esConfirmacion(confirmacion({ tipo: "CONFIRMACION_ORDEN_PAGO_AGUINALDO" })), true);
+  assert.match(
+    leerConfirmacion(confirmacion({ tipo: "CONFIRMACION_ASIENTO_AGUINALDO" }, { id_planilla: undefined })).errores.join(" "),
+    /id_aguinaldo debe ser un UUID/
+  );
 });
 
 test("reintentos: el envío espera 30 s, 1 min, 2 min… hasta 1 h; una entrega fallida 2 s, 4 s… hasta 1 min", () => {

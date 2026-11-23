@@ -48,8 +48,24 @@ async function despachar() {
   return eventos.length;
 }
 
+// Solo para el emulador de desarrollo (PUBSUB_EMULATOR_HOST): crea el tópico propio si falta, para no tener
+// que provisionarlo a mano cada vez que se reinicia el emulador. Contra el proyecto real nunca se llama (las
+// credenciales de la app no deberían poder crear tópicos; eso lo provisiona la infraestructura).
+async function asegurarTopicoEnEmulador() {
+  if (!process.env.PUBSUB_EMULATOR_HOST) return;
+  const clientePubSub = pubsub.obtenerCliente();
+  if (!clientePubSub) return;
+  try {
+    await clientePubSub.topic(topicoPropio()).get({ autoCreate: true });
+    console.log(`Tópico ${topicoPropio()} listo en el emulador de Pub/Sub.`);
+  } catch (error) {
+    console.error(`No se pudo asegurar el tópico ${topicoPropio()} en el emulador:`, error.message);
+  }
+}
+
 function iniciarDespachador() {
   const intervalo = Number(process.env.INTERVALO_EVENTOS_MS) || 5000;
+  asegurarTopicoEnEmulador();
   let ocupado = false;
   setInterval(async () => {
     if (ocupado) return;

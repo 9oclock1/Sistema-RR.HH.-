@@ -1,6 +1,7 @@
 const pool = require("../config/db");
 const modelo = require("../models/confirmaciones.model");
 const planillas = require("../models/planillas.model");
+const aguinaldos = require("../models/aguinaldo.model");
 const eventos = require("../models/eventos.model");
 const pubsub = require("../config/pubsub");
 const externos = require("./externos.service");
@@ -10,6 +11,7 @@ const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const { validarResponsable } = require("../utils/planillas");
 const {
+  DESTINOS,
   MAXIMO_INTENTOS_ENTRADA,
   esperaNuevaEntrega,
   esConfirmacion,
@@ -24,36 +26,46 @@ const CAMPO = { CONTABILIDAD: "contabilidad", PAGOS: "pagos" };
 
 // Un mensaje que no se arregla reintentando: queda FALLIDO sin volver a entregarse.
 class ErrorPermanente extends Error {
-  constructor(mensaje, idPlanilla = null) {
+  constructor(mensaje, idRecurso = null) {
     super(mensaje);
-    this.idPlanilla = idPlanilla;
+    this.idRecurso = idRecurso;
   }
 }
 
-// Aplica la respuesta a la planilla. Criterio 4: con ambas confirmaciones la planilla queda CERRADA.
+// PLANILLA (planilla mensual, KAN-347) y AGUINALDO (planilla de aguinaldos, RF-47/KAN-67) comparten la misma
+// bandeja de entrada y la misma lógica de aplicación; solo cambian el modelo, la columna de id en
+// eventos_salientes/eventos_entrantes y cómo se llama el recurso en los mensajes de error.
+const RECURSOS = {
+  PLANILLA: { nombre: "La planilla", modelo: planillas, idColumna: "id_planilla", ultimos: eventos.ultimosDePlanilla },
+  AGUINALDO: { nombre: "El aguinaldo", modelo: aguinaldos, idColumna: "id_aguinaldo", ultimos: eventos.ultimosDeAguinaldo },
+};
+
+// Aplica la respuesta al recurso. Criterio 4: con ambas confirmaciones queda CERRADO.
 async function aplicar(cliente, c) {
-  const planilla = await planillas.bloquear(cliente, c.idPlanilla);
-  if (!planilla) throw new ErrorPermanente(`La planilla ${c.idPlanilla} no existe.`);
-  if (planilla.estado === "BORRADOR") {
-    throw new ErrorPermanente("La planilla está en borrador: todavía no se envió.", planilla.id_planilla);
+  const { nombre, modelo: modeloRecurso, idColumna, ultimos } = RECURSOS[c.recurso];
+  const idRecurso = c.idPlanilla ?? c.idAguinaldo;
+  const recurso = await modeloRecurso.bloquear(cliente, idRecurso);
+  if (!recurso) throw new ErrorPermanente(`${nombre} ${idRecurso} no existe.`);
+  if (recurso.estado === "BORRADOR") {
+    throw new ErrorPermanente(`${nombre} está en borrador: todavía no se envió.`, recurso[idColumna]);
   }
   const envio = await eventos.obtener(cliente, c.idMensajeOrigen);
-  if (!envio || envio.id_planilla !== planilla.id_planilla || envio.destino !== c.destino) {
+  if (!envio || envio[idColumna] !== recurso[idColumna] || envio.destino !== c.destino) {
     throw new ErrorPermanente(
-      `El mensaje ${c.idMensajeOrigen} no es un envío de esta planilla a ${NOMBRE[c.destino]}.`,
-      planilla.id_planilla
+      `El mensaje ${c.idMensajeOrigen} no es un envío de ${nombre.toLowerCase()} a ${NOMBRE[c.destino]}.`,
+      recurso[idColumna]
     );
   }
-  const ultimo = (await eventos.ultimosDePlanilla(cliente, planilla.id_planilla))[c.destino];
+  const ultimo = (await ultimos(cliente, recurso[idColumna]))[c.destino];
   if (ultimo.id_evento !== envio.id_evento) {
-    return { estado: "IGNORADO", detalle: "Responde a un envío anterior: la planilla se reenvió después." };
+    return { estado: "IGNORADO", detalle: `Responde a un envío anterior: ${nombre.toLowerCase()} se reenvió después.` };
   }
-  if (planilla[`estado_${CAMPO[c.destino]}`] === "CONFIRMADA") {
-    return { estado: "IGNORADO", detalle: `${NOMBRE[c.destino]} ya había confirmado la planilla.` };
+  if (recurso[`estado_${CAMPO[c.destino]}`] === "CONFIRMADA") {
+    return { estado: "IGNORADO", detalle: `${NOMBRE[c.destino]} ya había confirmado ${nombre.toLowerCase()}.` };
   }
-  await planillas.responder(cliente, planilla.id_planilla, c.destino, c);
-  const cerrada = await planillas.cerrarSiConfirmada(cliente, planilla.id_planilla);
-  return { estado: "PROCESADO", detalle: cerrada ? "Planilla cerrada." : null };
+  await modeloRecurso.responder(cliente, recurso[idColumna], c.destino, c);
+  const cerrado = await modeloRecurso.cerrarSiConfirmada(cliente, recurso[idColumna]);
+  return { estado: "PROCESADO", detalle: cerrado ? `${nombre} cerrado${c.recurso === "PLANILLA" ? "a" : ""}.` : null };
 }
 
 // Procesa una entrega de Pub/Sub. Devuelve { ack: true } o { ack: false, esperaMs } para que vuelva a entregarse.
@@ -76,12 +88,13 @@ async function procesar({ idMensaje, topico, cuerpo }) {
         await modelo.cerrar(cliente, fila.id_evento_entrante, { estado: "FALLIDO", detalle: confirmacion.errores.join(" ") });
         return { ack: true };
       }
+      const idColumna = confirmacion.recurso === "AGUINALDO" ? "idAguinaldo" : "idPlanilla";
       await cliente.query("SAVEPOINT aplicar");
       try {
         const resultado = await aplicar(cliente, confirmacion);
         await modelo.cerrar(cliente, fila.id_evento_entrante, {
           ...resultado,
-          idPlanilla: confirmacion.idPlanilla,
+          [idColumna]: confirmacion[idColumna],
           destino: confirmacion.destino,
         });
       } catch (error) {
@@ -90,7 +103,7 @@ async function procesar({ idMensaje, topico, cuerpo }) {
         await modelo.cerrar(cliente, fila.id_evento_entrante, {
           estado: "FALLIDO",
           detalle: error.message,
-          idPlanilla: error.idPlanilla,
+          [idColumna]: error.idRecurso,
           destino: confirmacion.destino,
         });
       }
@@ -129,6 +142,23 @@ function topicosDeConfirmacion() {
     .filter(Boolean);
 }
 
+// El tópico donde Contabilidad o Pagos publicarían de verdad su confirmación (mismo tópico que escuchar()
+// suscribe). Lo usa la simulación de confirmación del aguinaldo (RF-47, KAN-67) para publicar ahí en vez de
+// aplicar el resultado en el proceso: así la suscripción real de este mismo servicio es la que lo recibe.
+const topicoDeDestino = (destino) => `ucb-sis323-sub-${DESTINOS[destino].grupo.toLowerCase()}`;
+
+// Solo para el emulador de desarrollo: crea el tópico si falta, para no depender de que alguien lo haya
+// provisionado a mano (scripts/configurar-pubsub-emulador.sh) antes de arrancar. Contra el proyecto real
+// nunca se llama (las credenciales de la app no deberían poder crear tópicos).
+async function asegurarTopicoEnEmulador(clientePubSub, topico) {
+  if (!process.env.PUBSUB_EMULATOR_HOST) return;
+  try {
+    await clientePubSub.topic(topico).get({ autoCreate: true });
+  } catch (error) {
+    console.error(`No se pudo asegurar el tópico ${topico} en el emulador:`, error.message);
+  }
+}
+
 async function escuchar(clientePubSub, topico) {
   const nombre = `${topico}${process.env.PUBSUB_SUFIJO_SUSCRIPCION || "-rrhh-planillas"}`;
   const volverAIntentar = () => setTimeout(() => escuchar(clientePubSub, topico), REINTENTO_SUSCRIPCION_MS).unref();
@@ -150,10 +180,13 @@ async function escuchar(clientePubSub, topico) {
   }
 }
 
-function iniciarConsumidor() {
+async function iniciarConsumidor() {
   const clientePubSub = pubsub.obtenerCliente();
   if (!clientePubSub) return;
-  for (const topico of topicosDeConfirmacion()) escuchar(clientePubSub, topico);
+  for (const topico of topicosDeConfirmacion()) {
+    await asegurarTopicoEnEmulador(clientePubSub, topico);
+    escuchar(clientePubSub, topico);
+  }
 }
 
 const formatear = (f) => ({
@@ -163,6 +196,7 @@ const formatear = (f) => ({
   tipo_evento: f.tipo_evento,
   origen: f.origen,
   id_planilla: f.id_planilla,
+  id_aguinaldo: f.id_aguinaldo,
   destino: f.destino,
   estado: f.estado,
   intentos: f.intentos,
@@ -202,4 +236,4 @@ async function reprocesar(id, identidad = {}) {
   return formatear(await modelo.obtener(pool, id));
 }
 
-module.exports = { procesar, iniciarConsumidor, listar, reprocesar, ErrorPermanente };
+module.exports = { procesar, iniciarConsumidor, listar, reprocesar, ErrorPermanente, topicoDeDestino, asegurarTopicoEnEmulador };

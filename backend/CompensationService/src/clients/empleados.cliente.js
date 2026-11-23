@@ -78,4 +78,22 @@ async function darDeBaja(idEmpleado) {
   return respuesta.json().catch(() => ({ id_empleado: idEmpleado }));
 }
 
-module.exports = { obtenerEmpleado, listarEmpleados, obtenerHaberVigente, darDeBaja };
+// Historial completo de versiones de contrato de un colaborador, remapeado a vigente_desde/vigente_hasta
+// (igual que /contratos/vigentes) para que utils/aguinaldo.js use el mismo nombre de campo sin importar la
+// fuente. /contratos/vigentes tiene un tope de 92 días de rango: para la gestión del aguinaldo (12 meses) se
+// pide el historial completo del colaborador en vez de filtrar por fecha en el servidor.
+async function listarContratosDe(idEmpleado) {
+  const historial = await consultar(
+    `/contratos?id_empleado=${encodeURIComponent(idEmpleado)}`,
+    { "X-Rol": "admin" },
+    sinContratos
+  );
+  if (!Array.isArray(historial)) return [];
+  return historial.map((v) => ({
+    vigente_desde: v.fecha_vigencia,
+    vigente_hasta: v.vigente_hasta,
+    haber_mensual_pactado: v.haber_mensual_pactado,
+  }));
+}
+
+module.exports = { obtenerEmpleado, listarEmpleados, obtenerHaberVigente, darDeBaja, listarContratosDe };

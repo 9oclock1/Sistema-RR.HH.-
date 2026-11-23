@@ -23,7 +23,7 @@ export function useEmpleados() {
   return {
     empleados: resultado.empleados,
     error: resultado.error,
-    cargando: resultado.version === -1,
+    cargando: resultado.version !== version,
     recargar,
   };
 }
