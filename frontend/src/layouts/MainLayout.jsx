@@ -248,7 +248,7 @@ export default function MainLayout() {
             ayuda={
               sesion
                 ? `Sesión de ${nombreSesion} (${ROLES[sesion.rol]?.nombre ?? sesion.rol}). Desactívela para volver al usuario de prueba.`
-                : "Necesario para Mis boletas de pago. El resto funciona con el usuario de prueba."
+                : "Necesario para Mis boletas de pago y Rotación de personal. El resto funciona con el usuario de prueba."
             }
             checked={Boolean(sesion)}
             onChange={alternarSesion}
