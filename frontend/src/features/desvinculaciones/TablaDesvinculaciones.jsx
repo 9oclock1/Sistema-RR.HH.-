@@ -1,8 +1,8 @@
-import { Calculator, Download, UserMinus } from "lucide-react";
+import { Calculator, Download, HandCoins, UserMinus } from "lucide-react";
 import { Boton, EstadoVacio, Etiqueta, Tabla } from "../../components/ui";
 import { ESTADOS, formatearBs, formatearFecha, formatearFechaHora } from "./formato";
 
-const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, puedeDescargar }) => [
+const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, onVerBeneficios, puedeDescargar }) => [
   {
     clave: "colaborador",
     titulo: "Colaborador",
@@ -53,6 +53,20 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, puedeDescargar })
       ),
   },
   {
+    clave: "beneficios_sociales",
+    titulo: "Indemnización y desahucio",
+    ancho: "12%",
+    celda: (p) =>
+      p.beneficios_sociales ? (
+        <div className="desv-nombre">
+          <span className="desv-monto">{formatearBs(p.beneficios_sociales.total)}</span>
+          {p.beneficios_sociales.desactualizado && <span className="desv-nota">Desactualizado</span>}
+        </div>
+      ) : (
+        <span className="desv-nota">Sin calcular</span>
+      ),
+  },
+  {
     clave: "estado",
     titulo: "Estado",
     ancho: "9%",
@@ -70,7 +84,7 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, puedeDescargar })
   {
     clave: "acciones",
     titulo: <span className="ds-solo-lector">Acciones</span>,
-    ancho: "96px",
+    ancho: "144px",
     alinear: "fin",
     celda: (p) => (
       <div className="desv-acciones">
@@ -81,6 +95,14 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, puedeDescargar })
           aria-label={`Ver sueldo promedio de ${p.nombre_empleado}`}
           title="Ver sueldo promedio indemnizable"
           onClick={() => onVerPromedio(p)}
+        />
+        <Boton
+          variante="sutil"
+          soloIcono
+          icono={HandCoins}
+          aria-label={`Ver indemnización y desahucio de ${p.nombre_empleado}`}
+          title="Ver indemnización y desahucio"
+          onClick={() => onVerBeneficios(p)}
         />
         {puedeDescargar && (
           <Boton
@@ -105,13 +127,14 @@ export default function TablaDesvinculaciones({
   onDescargar,
   descargandoId,
   onVerPromedio,
+  onVerBeneficios,
   puedeDescargar = true,
 }) {
   return (
     <Tabla
       className="desv-tabla"
       descripcion="Procesos de desvinculación registrados"
-      columnas={COLUMNAS({ onDescargar, descargandoId, onVerPromedio, puedeDescargar })}
+      columnas={COLUMNAS({ onDescargar, descargandoId, onVerPromedio, onVerBeneficios, puedeDescargar })}
       filas={procesos}
       claveFila="id_proceso"
       cargando={cargando}

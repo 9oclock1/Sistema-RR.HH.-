@@ -20,6 +20,7 @@ import {
 import { useRol, useUsuario } from "../../context/sesion";
 import { puedeAcceder } from "../../utils/permisos";
 import DesvinculacionFormulario from "./DesvinculacionFormulario";
+import BeneficiosSocialesModal from "./BeneficiosSocialesModal";
 import PromedioIndemnizableModal from "./PromedioIndemnizableModal";
 import TablaDesvinculaciones from "./TablaDesvinculaciones";
 import { ESTADOS, opciones } from "./formato";
@@ -34,6 +35,8 @@ export default function DesvinculacionesPage() {
   const identidad = useMemo(() => ({ idEmpleado, rol }), [idEmpleado, rol]);
   // El Contador solo consulta: registrar bajas, descargar respaldos y calcular el promedio son del Administrador.
   const puedeGestionar = puedeAcceder(rol, ["admin"]);
+  // La indemnización y el desahucio los calculan el Administrador y el Contador (RF-56).
+  const puedeCalcularBeneficios = puedeAcceder(rol, ["admin", "contador"]);
 
   const [procesos, setProcesos] = useState([]);
   const [causales, setCausales] = useState([]);
@@ -44,6 +47,7 @@ export default function DesvinculacionesPage() {
   const [formularioAbierto, setFormularioAbierto] = useState(false);
   const [descargandoId, setDescargandoId] = useState(null);
   const [procesoPromedio, setProcesoPromedio] = useState(null);
+  const [procesoBeneficios, setProcesoBeneficios] = useState(null);
 
   const cargar = useCallback(
     () =>
@@ -206,6 +210,7 @@ export default function DesvinculacionesPage() {
             descargandoId={descargandoId}
             puedeDescargar={puedeGestionar}
             onVerPromedio={setProcesoPromedio}
+            onVerBeneficios={setProcesoBeneficios}
           />
         </Tarjeta>
       )}
@@ -226,6 +231,16 @@ export default function DesvinculacionesPage() {
           onCerrar={() => setProcesoPromedio(null)}
           onCalculado={cargar}
           puedeCalcular={puedeGestionar}
+        />
+      )}
+
+      {procesoBeneficios && (
+        <BeneficiosSocialesModal
+          proceso={procesoBeneficios}
+          identidad={identidad}
+          onCerrar={() => setProcesoBeneficios(null)}
+          onCalculado={cargar}
+          puedeCalcular={puedeCalcularBeneficios}
         />
       )}
     </section>

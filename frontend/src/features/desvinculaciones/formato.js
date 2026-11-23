@@ -42,6 +42,20 @@ export const formatearPeriodo = (periodo) => {
   return `${MESES[mes - 1]} ${anio}`;
 };
 
+const contar = (n, singular, varios) => `${n} ${n === 1 ? singular : varios}`;
+
+// "5 años, 3 meses y 10 días (1928 días)"; omite las partes en cero.
+export const formatearTiempoServicio = (tiempo) => {
+  if (!tiempo) return "—";
+  const partes = [
+    tiempo.anios > 0 && contar(tiempo.anios, "año", "años"),
+    tiempo.meses > 0 && contar(tiempo.meses, "mes", "meses"),
+    tiempo.dias > 0 && contar(tiempo.dias, "día", "días"),
+  ].filter(Boolean);
+  const texto = partes.length > 1 ? `${partes.slice(0, -1).join(", ")} y ${partes.at(-1)}` : partes[0] ?? "0 días";
+  return `${texto} (${contar(tiempo.dias_servicio, "día", "días")})`;
+};
+
 export const formatearFechaHora = (iso) => {
   if (!iso) return "—";
   const fecha = new Date(iso);

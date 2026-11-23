@@ -41,3 +41,14 @@ export const calcularPromedioIndemnizable = (idProceso, identidad) =>
     metodo: "POST",
     cabeceras: cabeceras(identidad),
   });
+
+export const obtenerBeneficiosSociales = (idProceso, identidad) =>
+  solicitar(`${RUTA}/${idProceso}/beneficios-sociales`, {
+    cabeceras: cabeceras(identidad),
+  });
+
+export const calcularBeneficiosSociales = (idProceso, identidad) =>
+  solicitar(`${RUTA}/${idProceso}/beneficios-sociales`, {
+    metodo: "POST",
+    cabeceras: cabeceras(identidad),
+  });
