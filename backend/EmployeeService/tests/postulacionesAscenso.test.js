@@ -1,5 +1,8 @@
+process.env.JWT_SECRET = 'secreto-de-prueba-postulaciones';
+
 jest.mock('../db/pool', () => require('./helpers/bdEnMemoria').crearBdEnMemoria());
 
+const jwt = require('jsonwebtoken');
 const request = require('supertest');
 const pool = require('../db/pool');
 const app = require('../index');
@@ -142,7 +145,8 @@ describe('criterio 1: un empleado activo se postula a una convocatoria vigente u
   });
 
   test('el empleado ve su postulación en su portal de convocatorias', async () => {
-    const lista = await request(app).get('/convocatorias').set('X-Empleado-Id', ANA);
+    const sesionAna = jwt.sign({ rol: 'empleado' }, process.env.JWT_SECRET, { algorithm: 'HS256', subject: ANA, expiresIn: 3600 });
+    const lista = await request(app).get('/convocatorias').set('Cookie', `rrhh_sesion=${sesionAna}`);
     const abierta = lista.body.convocatorias.find((c) => c.id_convocatoria === ABIERTA);
     expect(abierta.mi_postulacion).toMatchObject({ estado_postulacion: 'APTO' });
     expect((await request(app).get(`/convocatorias/${ABIERTA}/postulaciones/mia`).set('X-Empleado-Id', EVA)).status).toBe(404);
