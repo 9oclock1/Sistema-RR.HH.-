@@ -96,18 +96,35 @@ CREATE TABLE CONTRATOS (
 );
 -- Table: CONVOCATORIAS_ASCENSO
 CREATE TABLE CONVOCATORIAS_ASCENSO (
-    id_convocatoria UUID NOT NULL,
+    id_convocatoria UUID NOT NULL DEFAULT gen_random_uuid(),
     id_cargo UUID NOT NULL,
     id_sucursal UUID NOT NULL,
+    id_empleado_publicador UUID NULL,
     titulo varchar(120) NOT NULL,
     descripcion_requisitos text NOT NULL,
     meses_antiguedad_minima int NOT NULL DEFAULT 6,
-    nota_minima_desempeno numeric(4, 2) NOT NULL,
+    nota_minima_desempeno numeric(5, 2) NOT NULL,
     fecha_inicio_postulacion date NOT NULL,
     fecha_cierre_postulacion date NOT NULL,
     esta_abierta boolean NOT NULL DEFAULT true,
-    CONSTRAINT CONVOCATORIAS_ASCENSO_pk PRIMARY KEY (id_convocatoria)
+    publicada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    cerrada_en TIMESTAMPTZ NULL,
+    estado_notificacion varchar(15) NOT NULL DEFAULT 'PENDIENTE',
+    destinatarios_notificados int NULL,
+    notificada_en TIMESTAMPTZ NULL,
+    ultimo_error_notificacion varchar(300) NULL,
+    CONSTRAINT CONVOCATORIAS_ASCENSO_pk PRIMARY KEY (id_convocatoria),
+    CONSTRAINT chk_convocatoria_titulo CHECK (btrim(titulo) <> ''),
+    CONSTRAINT chk_convocatoria_requisitos CHECK (btrim(descripcion_requisitos) <> ''),
+    CONSTRAINT chk_convocatoria_antiguedad CHECK (meses_antiguedad_minima BETWEEN 0 AND 600),
+    CONSTRAINT chk_convocatoria_nota CHECK (nota_minima_desempeno BETWEEN 0 AND 100),
+    CONSTRAINT chk_convocatoria_fechas CHECK (fecha_cierre_postulacion >= fecha_inicio_postulacion),
+    CONSTRAINT chk_convocatoria_cierre CHECK (esta_abierta = (cerrada_en IS NULL)),
+    CONSTRAINT chk_convocatoria_notificacion CHECK (estado_notificacion IN ('PENDIENTE', 'ENTREGADA', 'FALLIDA')),
+    CONSTRAINT chk_convocatoria_notificacion_entrega CHECK ((estado_notificacion = 'ENTREGADA') = (notificada_en IS NOT NULL))
 );
+CREATE INDEX ix_convocatoria_vigencia ON CONVOCATORIAS_ASCENSO (esta_abierta, fecha_cierre_postulacion);
+CREATE INDEX ix_convocatoria_cargo ON CONVOCATORIAS_ASCENSO (id_cargo);
 -- Table: CURSOS_CAPACITACION
 CREATE TABLE CURSOS_CAPACITACION (
     id_curso UUID NOT NULL,
@@ -201,20 +218,55 @@ CREATE TABLE MEMORANDUMS (
     fecha_hora_acuse TIMESTAMPTZ NULL,
     CONSTRAINT MEMORANDUMS_pk PRIMARY KEY (id_memorandum)
 );
--- Table: POSTULACIONES_ASCENSO
+-- Table: POSTULACIONES_ASCENSO (KAN-81)
+-- Un empleado se postula una sola vez por convocatoria (uq_postulacion_convocatoria_empleado). Al registrarla, el
+-- sistema la valida: meses de permanencia (desde la fecha de ingreso) y nota de la última evaluación de desempeño
+-- cerrada (PerformanceService) frente a los mínimos de la convocatoria. Queda APTO o NO_APTO con sus motivos; si
+-- PerformanceService no responde queda PENDIENTE_VALIDACION con el error, y RRHH puede volver a validarla.
+-- puntaje_meritos ordena el ranking de los aptos.
 CREATE TABLE POSTULACIONES_ASCENSO (
     id_postulacion UUID NOT NULL,
     id_convocatoria UUID NOT NULL,
     id_empleado UUID NOT NULL,
     fecha_postulacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    cumple_antiguedad boolean NOT NULL,
-    cumple_nota_evaluacion boolean NOT NULL,
-    estado_postulacion varchar(30) NOT NULL,
+    estado_postulacion varchar(30) NOT NULL DEFAULT 'PENDIENTE_VALIDACION',
+    meses_permanencia int NULL,
+    cumple_antiguedad boolean NULL,
+    nota_ultima_evaluacion numeric(5, 2) NULL,
+    ciclo_ultima_evaluacion varchar(120) NULL,
+    cumple_nota_evaluacion boolean NULL,
+    puntaje_meritos numeric(5, 2) NULL,
+    motivos_no_apto text[] NULL,
+    validada_en TIMESTAMPTZ NULL,
+    error_validacion varchar(300) NULL,
     fecha_formalizacion_ascenso date NULL,
     observaciones_resolucion text NULL,
     CONSTRAINT POSTULACIONES_ASCENSO_pk PRIMARY KEY (id_postulacion),
-    CONSTRAINT uq_postulacion_convocatoria_empleado UNIQUE (id_convocatoria, id_empleado)
+    CONSTRAINT uq_postulacion_convocatoria_empleado UNIQUE (id_convocatoria, id_empleado),
+    CONSTRAINT chk_postulacion_estado CHECK (estado_postulacion IN ('PENDIENTE_VALIDACION', 'APTO', 'NO_APTO')),
+    CONSTRAINT chk_postulacion_validada CHECK (
+        (estado_postulacion = 'PENDIENTE_VALIDACION') = (validada_en IS NULL)
+        AND (estado_postulacion = 'PENDIENTE_VALIDACION' OR (cumple_antiguedad IS NOT NULL AND cumple_nota_evaluacion IS NOT NULL))
+        AND (estado_postulacion <> 'APTO' OR (cumple_antiguedad AND cumple_nota_evaluacion AND puntaje_meritos IS NOT NULL))
+        AND (estado_postulacion <> 'NO_APTO' OR cardinality(motivos_no_apto) > 0)
+    )
 );
+CREATE INDEX IF NOT EXISTS ix_postulaciones_convocatoria_estado ON POSTULACIONES_ASCENSO (id_convocatoria, estado_postulacion);
+-- Table: DESTINATARIOS_CONVOCATORIA (KAN-80)
+-- Empleados elegibles a los que se avisa de una convocatoria: activos, que no ocupan el cargo ofertado y que cumplen
+-- la antigüedad mínima a la fecha de cierre. Un aviso por empleado; notificado_en queda en NULL mientras no se
+-- entregue, y el reintento solo vuelve a enviar a los pendientes.
+CREATE TABLE DESTINATARIOS_CONVOCATORIA (
+    id_convocatoria UUID NOT NULL REFERENCES CONVOCATORIAS_ASCENSO (id_convocatoria) ON DELETE CASCADE,
+    id_empleado UUID NOT NULL REFERENCES EMPLEADOS (id_empleado),
+    meses_antiguedad int NOT NULL,
+    notificado_en TIMESTAMPTZ NULL,
+    ultimo_error varchar(300) NULL,
+    CONSTRAINT DESTINATARIOS_CONVOCATORIA_pk PRIMARY KEY (id_convocatoria, id_empleado),
+    CONSTRAINT chk_destinatario_antiguedad CHECK (meses_antiguedad >= 0),
+    CONSTRAINT chk_destinatario_entrega CHECK (notificado_en IS NULL OR ultimo_error IS NULL)
+);
+CREATE INDEX ix_destinatarios_convocatoria_pendientes ON DESTINATARIOS_CONVOCATORIA (id_convocatoria) WHERE notificado_en IS NULL;
 -- Table: REQUISITOS_CAPACITACION_CARGO
 CREATE TABLE REQUISITOS_CAPACITACION_CARGO (
     id_requisito_cargo UUID NOT NULL,
@@ -329,6 +381,9 @@ ADD CONSTRAINT CONVOCATORIAS_ASCENSO_CARGOS FOREIGN KEY (id_cargo) REFERENCES CA
 -- Reference: CONVOCATORIAS_ASCENSO_SUCURSALES (table: CONVOCATORIAS_ASCENSO)
 ALTER TABLE CONVOCATORIAS_ASCENSO
 ADD CONSTRAINT CONVOCATORIAS_ASCENSO_SUCURSALES FOREIGN KEY (id_sucursal) REFERENCES SUCURSALES (id_sucursal) NOT DEFERRABLE INITIALLY IMMEDIATE;
+-- Reference: CONVOCATORIAS_ASCENSO_EMPLEADOS_PUBLICADOR (table: CONVOCATORIAS_ASCENSO)
+ALTER TABLE CONVOCATORIAS_ASCENSO
+ADD CONSTRAINT CONVOCATORIAS_ASCENSO_EMPLEADOS_PUBLICADOR FOREIGN KEY (id_empleado_publicador) REFERENCES EMPLEADOS (id_empleado) NOT DEFERRABLE INITIALLY IMMEDIATE;
 -- Reference: DEPARTAMENTOS_DEPARTAMENTOS (table: DEPARTAMENTOS)
 ALTER TABLE DEPARTAMENTOS
 ADD CONSTRAINT DEPARTAMENTOS_DEPARTAMENTOS FOREIGN KEY (id_departamento_padre) REFERENCES DEPARTAMENTOS (id_departamento) NOT DEFERRABLE INITIALLY IMMEDIATE;

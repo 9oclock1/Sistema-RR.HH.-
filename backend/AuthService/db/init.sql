@@ -16,7 +16,7 @@ CREATE TABLE USUARIOS (
     CONSTRAINT USUARIOS_pk PRIMARY KEY (id_usuario),
     CONSTRAINT uq_usuario_empleado UNIQUE (id_empleado),
     CONSTRAINT uq_usuario_correo UNIQUE (correo),
-    CONSTRAINT chk_usuario_rol CHECK (rol IN ('admin', 'gerente', 'reclutador', 'supervisor', 'empleado', 'auditor')),
+    CONSTRAINT chk_usuario_rol CHECK (rol IN ('admin', 'gerente', 'reclutador', 'supervisor', 'empleado', 'auditor', 'contador')),
     CONSTRAINT chk_usuario_correo CHECK (correo = lower(correo) AND correo ~ '^[^@ ]+@[^@ ]+$'),
     CONSTRAINT chk_usuario_hash CHECK (hash_contrasena ~ '^scrypt\$[0-9a-f]{32}\$[0-9a-f]{128}$')
 );

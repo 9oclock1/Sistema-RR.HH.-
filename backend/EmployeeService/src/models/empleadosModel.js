@@ -12,6 +12,8 @@ const listar = async (db, { idSucursal = null, idDepartamento = null } = {}) => 
             e.id_sucursal_actual AS id_sucursal,
             c.id_departamento,
             d.nombre AS area,
+            e.fecha_ingreso,
+            ee.codigo AS estado_codigo,
             ee.permite_acceso AS activo
        FROM empleados e
        JOIN cargos c            ON c.id_cargo = e.id_cargo_actual

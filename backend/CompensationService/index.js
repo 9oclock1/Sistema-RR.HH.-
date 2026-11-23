@@ -6,6 +6,8 @@ const condicionesRoutes = require("./src/routes/condiciones.routes");
 const anticiposRoutes = require("./src/routes/anticipos.routes");
 const antiguedadRoutes = require("./src/routes/antiguedad.routes");
 const planillasRoutes = require("./src/routes/planillas.routes");
+const aguinaldoRoutes = require("./src/routes/aguinaldo.routes");
+const planillasFiscalesRoutes = require("./src/routes/planillasFiscales.routes");
 const confirmacionesRoutes = require("./src/routes/confirmaciones.routes");
 const bonificacionesRoutes = require("./src/routes/bonificaciones.routes");
 const mensajesPublicadosRoutes = require("./src/routes/mensajesPublicados.routes");
@@ -14,6 +16,7 @@ const { iniciarConsumidor } = require("./src/services/confirmaciones.service");
 const ventasProductividadRoutes = require("./src/routes/ventasProductividad.routes");
 const boletasRoutes = require("./src/routes/boletas.routes");
 const desvinculacionesRoutes = require("./src/routes/desvinculacionesRoutes");
+const rotacionRoutes = require("./src/routes/rotacion.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 const ventasProductividad = require("./src/services/ventasProductividad.service");
 
@@ -51,12 +54,15 @@ app.use(condicionesRoutes);
 app.use(anticiposRoutes);
 app.use(antiguedadRoutes);
 app.use(planillasRoutes);
+app.use(aguinaldoRoutes);
+app.use(planillasFiscalesRoutes);
 app.use(confirmacionesRoutes);
 app.use(bonificacionesRoutes);
 app.use(mensajesPublicadosRoutes);
 app.use(ventasProductividadRoutes);
 app.use(boletasRoutes);
 app.use(desvinculacionesRoutes);
+app.use(rotacionRoutes);
 app.use(manejadorErrores);
 
 app.listen(PORT, "0.0.0.0", () => {

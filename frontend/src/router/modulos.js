@@ -1,8 +1,11 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ChartLine, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, Gift, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
 import BandejaAprobacionesPage from "../features/aprobaciones/BandejaAprobacionesPage";
+import ConvocatoriasEmpleadoPage from "../features/convocatorias-internas/ConvocatoriasEmpleadoPage";
+import ConvocatoriasRrhhPage from "../features/convocatorias-internas/ConvocatoriasRrhhPage";
+import { RUTA_CONVOCATORIAS_EMPLEADO, RUTA_CONVOCATORIAS_RRHH } from "../features/convocatorias-internas/convocatorias";
 import CiclosEvaluacionPage from "../features/ciclos-evaluacion/CiclosEvaluacionPage";
 import { RUTA_CICLOS } from "../features/ciclos-evaluacion/ciclo";
 import DashboardDesempenoPage from "../features/dashboard-desempeno/DashboardDesempenoPage";
@@ -11,6 +14,7 @@ import { RUTA_DASHBOARD_QUEJAS } from "../features/dashboard-quejas/dashboardQue
 import { RUTA_DASHBOARD_DESEMPENO } from "../features/dashboard-desempeno/dashboardDesempeno";
 import DesempenoGlobalPage from "../features/desempeno-global/DesempenoGlobalPage";
 import DesvinculacionesPage from "../features/desvinculaciones/DesvinculacionesPage";
+import RotacionPersonalPage from "../features/rotacion-personal/RotacionPersonalPage";
 import { RUTA_DESEMPENO_GLOBAL } from "../features/desempeno-global/desempenoGlobal";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
 import MisResultadosPage from "../features/evaluaciones/MisResultadosPage";
@@ -42,6 +46,9 @@ import AuditoriaBonosPage from "../features/bonificaciones/AuditoriaBonosPage";
 import { RUTA_AUDITORIA_BONOS } from "../features/bonificaciones/auditoria";
 import PlanillaMensualPage from "../features/planillas/PlanillaMensualPage";
 import MisBoletasPage from "../features/boletas/MisBoletasPage";
+import AguinaldoPage from "../features/aguinaldo/AguinaldoPage";
+import PlanillasFiscalesPage from "../features/planillas-fiscales/PlanillasFiscalesPage";
+import { RUTA_PLANILLAS_FISCALES } from "../features/planillas-fiscales/planillasFiscales";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import ContratosView from "../features/Contratos/ContratosView";
 import { RUTA_CONTRATOS } from "../features/Contratos/utils/opciones";
@@ -166,6 +173,27 @@ export const SECCIONES = [
     ],
   },
   {
+    titulo: "Ascensos",
+    modulos: [
+      {
+        ruta: RUTA_CONVOCATORIAS_RRHH,
+        etiqueta: "Convocatorias internas",
+        descripcion: "Publicación de vacantes de ascenso dirigidas solo a empleados activos, con su vigencia, sus requisitos y el aviso por mensajería.",
+        icono: Megaphone,
+        roles: ["gerente"],
+        pagina: ConvocatoriasRrhhPage,
+      },
+      {
+        ruta: RUTA_CONVOCATORIAS_EMPLEADO,
+        etiqueta: "Convocatorias de ascenso",
+        descripcion: "Vacantes internas abiertas para su plan de carrera, con sus requisitos y la fecha de cierre.",
+        icono: TrendingUp,
+        roles: ["empleado"],
+        pagina: ConvocatoriasEmpleadoPage,
+      },
+    ],
+  },
+  {
     titulo: "Asistencia",
     modulos: [
       {
@@ -286,6 +314,14 @@ export const SECCIONES = [
         pagina: PlanillaMensualPage,
       },
       {
+        ruta: RUTA_PLANILLAS_FISCALES,
+        etiqueta: "Planilla tributaria y aportes",
+        descripcion: "RC-IVA de cada dependiente y aportes laborales y patronales del periodo, exportables en el formato de cada entidad.",
+        icono: FileChartColumn,
+        roles: ["admin", "contador"],
+        pagina: PlanillasFiscalesPage,
+      },
+      {
         ruta: "/planillas/conceptos",
         etiqueta: "Conceptos de pago",
         descripcion: "Ingresos, descuentos y aportes de la planilla con su valor, vigencia y cuenta contable.",
@@ -324,6 +360,14 @@ export const SECCIONES = [
         icono: Target,
         roles: ["admin"],
         pagina: BonosProductividadPage,
+      },
+      {
+        ruta: "/planillas/aguinaldos",
+        etiqueta: "Planilla de aguinaldos",
+        descripcion: "Duodécimas del promedio de los tres últimos sueldos por los meses y días trabajados en la gestión, aprobadas y enviadas a Contabilidad y Pagos.",
+        icono: Gift,
+        roles: ["admin", "contador"],
+        pagina: AguinaldoPage,
       },
       {
         ruta: RUTA_AUDITORIA_BONOS,
@@ -540,6 +584,14 @@ export const SECCIONES = [
         icono: MessageSquareWarning,
         roles: ["admin"],
         pagina: DashboardQuejasPage,
+      },
+      {
+        ruta: "/dashboards/rotacion",
+        etiqueta: "Rotación de personal",
+        descripcion: "Rotación mensual, retención y rotación temprana con semáforo, tendencia de 12 meses y motivos de baja.",
+        icono: ChartLine,
+        roles: ["supervisor"],
+        pagina: RotacionPersonalPage,
       },
     ],
   },

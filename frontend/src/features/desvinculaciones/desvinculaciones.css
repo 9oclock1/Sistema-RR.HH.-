@@ -28,8 +28,9 @@
   line-height: var(--size-control);
 }
 
+/* Ocho columnas y cuatro acciones: la tabla se desplaza dentro de la tarjeta antes de apretar al colaborador. */
 .desv-tabla .ds-tabla {
-  min-width: calc(var(--size-sidebar) * 4.5);
+  min-width: calc(var(--size-sidebar) * 5.5);
 }
 
 .desv-nombre {
@@ -140,6 +141,15 @@
   display: flex;
   justify-content: space-between;
   gap: var(--space-3);
+}
+
+/* Saldos proporcionales (KAN-77): concepto con su cálculo debajo */
+.desv-saldo-concepto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  white-space: normal;
 }
 
 /* Formulario dentro del modal */

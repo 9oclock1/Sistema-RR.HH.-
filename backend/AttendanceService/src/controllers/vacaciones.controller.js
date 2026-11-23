@@ -5,7 +5,8 @@ async function miSaldo(req, res) {
 }
 
 async function saldoDeEmpleado(req, res) {
-  res.json(await servicio.consultarSaldo(req.params.idEmpleado.toLowerCase()));
+  // ?fecha=AAAA-MM-DD: saldo al corte de esa fecha (liquidación de un retiro, KAN-77).
+  res.json(await servicio.consultarSaldo(req.params.idEmpleado.toLowerCase(), new Date(), req.query.fecha));
 }
 
 module.exports = { miSaldo, saldoDeEmpleado };

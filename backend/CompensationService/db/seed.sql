@@ -997,7 +997,11 @@ ON CONFLICT DO NOTHING;
 COMMIT;
 
 -- Datos de prueba de planillas cerradas de los últimos meses para cálculo del sueldo promedio indemnizable (RF-55, KAN-75).
--- Requiere que NO existan planillas generadas manualmente de 2026-07 a 2026-10 (una planilla por periodo: uq_planilla_periodo).
+-- Hay una sola planilla por periodo (uq_planilla_periodo): estos colaboradores se agregan a la planilla que ya
+-- exista de cada mes (la de 2026-07 a 2026-09 del bloque de boletas de arriba) y solo se crea la de 2026-10.
+-- La de 2026-09 está APROBADA (Pagos aún no confirma), así que todavía no cuenta para el promedio: mientras
+-- tanto, cada caso informa que falta la planilla cerrada de 2026-09. Al confirmar Pagos esa planilla (Planilla
+-- mensual > Simular confirmación) se cierra y, al recalcular, salen los resultados de la lista de abajo.
 -- Primero ejecute el seed de EmployeeService para contar con Fernando Choque Ticona en EmployeeDB:
 --   Get-Content -Encoding UTF8 backend/EmployeeService/db/seed.sql | docker exec -i rrhh-postgres psql -U adminRRHH -d EmployeeDB
 --
@@ -1007,6 +1011,7 @@ COMMIT;
 --   - Valeria Nina Quisbert (...742): 3 meses completos (30 días) con horas extra y recargo nocturno, sin observaciones.
 --   - Rodrigo Apaza Calle (...743): cambio de haber mensual (4000 -> 4400) y retiro en 2026-11 sin planilla cerrada de 2026-11.
 --   - Fernando Choque Ticona (...744): antigüedad menor a tres meses (ingresó 2026-09-01, solo 2 planillas cerradas).
+-- Con 2026-09 todavía APROBADA, el promedio usa 2026-07, 2026-08 y 2026-10 (Fernando, solo 2026-10: 1 mes).
 BEGIN;
 
 INSERT INTO PROCESOS_DESVINCULACION (
@@ -1093,126 +1098,126 @@ INSERT INTO PLANILLA_EMPLEADOS (
   total_ganado, total_descuentos, liquido_pagable, total_aportes
 ) VALUES
   (
-    'c0000000-0000-4000-8000-000000000771', 'c0000000-0000-4000-8000-000000000761', 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
+    'c0000000-0000-4000-8000-000000000771', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-07'), 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000791', 'CTR-2019-037', 4500.00,
     DATE '2026-07-01', DATE '2026-07-31', 30, 30,
     0, 0, 0,
     4900.00, 622.79, 4277.21, 818.79
   ),
   (
-    'c0000000-0000-4000-8000-000000000772', 'c0000000-0000-4000-8000-000000000762', 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
+    'c0000000-0000-4000-8000-000000000772', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-08'), 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000791', 'CTR-2019-037', 4500.00,
     DATE '2026-08-01', DATE '2026-08-31', 30, 30,
     600, 0, 0,
     5275.00, 670.46, 4604.54, 881.45
   ),
   (
-    'c0000000-0000-4000-8000-000000000773', 'c0000000-0000-4000-8000-000000000763', 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
+    'c0000000-0000-4000-8000-000000000773', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000791', 'CTR-2019-037', 4500.00,
     DATE '2026-09-01', DATE '2026-09-30', 30, 30,
     0, 0, 0,
     5200.00, 660.92, 4539.08, 868.92
   ),
   (
-    'c0000000-0000-4000-8000-000000000774', 'c0000000-0000-4000-8000-000000000764', 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
+    'c0000000-0000-4000-8000-000000000774', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000791', 'CTR-2019-037', 4500.00,
     DATE '2026-10-01', DATE '2026-10-15', 15, 15,
     0, 0, 0,
     2450.00, 311.40, 2138.60, 409.40
   ),
   (
-    'c0000000-0000-4000-8000-000000000775', 'c0000000-0000-4000-8000-000000000761', 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
+    'c0000000-0000-4000-8000-000000000775', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-07'), 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000792', 'CTR-2022-741', 3800.00,
     DATE '2026-07-01', DATE '2026-07-31', 30, 30,
     0, 0, 0,
     4050.00, 514.76, 3535.24, 676.76
   ),
   (
-    'c0000000-0000-4000-8000-000000000776', 'c0000000-0000-4000-8000-000000000762', 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
+    'c0000000-0000-4000-8000-000000000776', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-08'), 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000792', 'CTR-2022-741', 3800.00,
     DATE '2026-08-01', DATE '2026-08-31', 30, 30,
     0, 600, 0,
     4208.33, 534.87, 3673.46, 703.21
   ),
   (
-    'c0000000-0000-4000-8000-000000000777', 'c0000000-0000-4000-8000-000000000763', 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
+    'c0000000-0000-4000-8000-000000000777', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000792', 'CTR-2022-741', 3800.00,
     DATE '2026-09-01', DATE '2026-09-30', 30, 30,
     0, 0, 0,
     4050.00, 514.76, 3535.24, 676.76
   ),
   (
-    'c0000000-0000-4000-8000-000000000778', 'c0000000-0000-4000-8000-000000000764', 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
+    'c0000000-0000-4000-8000-000000000778', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000792', 'CTR-2022-741', 3800.00,
     DATE '2026-10-01', DATE '2026-10-20', 20, 20,
     0, 0, 0,
     2700.00, 343.17, 2356.83, 451.17
   ),
   (
-    'c0000000-0000-4000-8000-000000000779', 'c0000000-0000-4000-8000-000000000761', 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
+    'c0000000-0000-4000-8000-000000000779', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-07'), 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000793', 'CTR-2024-742', 3200.00,
     DATE '2026-07-01', DATE '2026-07-31', 30, 30,
     450, 0, 0,
     3400.00, 432.14, 2967.86, 568.14
   ),
   (
-    'c0000000-0000-4000-8000-000000000780', 'c0000000-0000-4000-8000-000000000762', 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
+    'c0000000-0000-4000-8000-000000000780', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-08'), 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000793', 'CTR-2024-742', 3200.00,
     DATE '2026-08-01', DATE '2026-08-31', 30, 30,
     270, 0, 0,
     3320.00, 421.97, 2898.03, 554.77
   ),
   (
-    'c0000000-0000-4000-8000-000000000781', 'c0000000-0000-4000-8000-000000000763', 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
+    'c0000000-0000-4000-8000-000000000781', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000793', 'CTR-2024-742', 3200.00,
     DATE '2026-09-01', DATE '2026-09-30', 30, 30,
     0, 0, 0,
     3200.00, 406.72, 2793.28, 534.72
   ),
   (
-    'c0000000-0000-4000-8000-000000000782', 'c0000000-0000-4000-8000-000000000764', 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
+    'c0000000-0000-4000-8000-000000000782', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000793', 'CTR-2024-742', 3200.00,
     DATE '2026-10-01', DATE '2026-10-31', 30, 30,
     630, 0, 900,
     3530.00, 448.66, 3081.34, 589.86
   ),
   (
-    'c0000000-0000-4000-8000-000000000783', 'c0000000-0000-4000-8000-000000000761', 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
+    'c0000000-0000-4000-8000-000000000783', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-07'), 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
     'Cajero', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000794', 'CTR-2021-743', 4000.00,
     DATE '2026-07-01', DATE '2026-07-31', 30, 30,
     0, 0, 0,
     4250.00, 540.18, 3709.82, 710.18
   ),
   (
-    'c0000000-0000-4000-8000-000000000784', 'c0000000-0000-4000-8000-000000000762', 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
+    'c0000000-0000-4000-8000-000000000784', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-08'), 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
     'Cajero', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000794', 'CTR-2021-743', 4000.00,
     DATE '2026-08-01', DATE '2026-08-31', 30, 30,
     0, 0, 0,
     4600.00, 584.66, 4015.34, 768.66
   ),
   (
-    'c0000000-0000-4000-8000-000000000785', 'c0000000-0000-4000-8000-000000000763', 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
+    'c0000000-0000-4000-8000-000000000785', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
     'Cajero', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000794', 'CTR-2021-743', 4400.00,
     DATE '2026-09-01', DATE '2026-09-30', 30, 30,
     0, 0, 0,
     4650.00, 591.02, 4058.98, 777.02
   ),
   (
-    'c0000000-0000-4000-8000-000000000786', 'c0000000-0000-4000-8000-000000000764', 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
+    'c0000000-0000-4000-8000-000000000786', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
     'Cajero', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000794', 'CTR-2021-743', 4400.00,
     DATE '2026-10-01', DATE '2026-10-31', 30, 30,
     300, 0, 0,
     4833.33, 614.32, 4219.01, 807.65
   ),
   (
-    'c0000000-0000-4000-8000-000000000787', 'c0000000-0000-4000-8000-000000000763', 'f0000000-0000-4000-8000-000000000744', 'Fernando Choque Ticona', '7108744',
+    'c0000000-0000-4000-8000-000000000787', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'f0000000-0000-4000-8000-000000000744', 'Fernando Choque Ticona', '7108744',
     'Asesor de Atención', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000795', 'CTR-2026-744', 3000.00,
     DATE '2026-09-01', DATE '2026-09-30', 30, 30,
     0, 0, 0,
     3000.00, 381.30, 2618.70, 501.30
   ),
   (
-    'c0000000-0000-4000-8000-000000000788', 'c0000000-0000-4000-8000-000000000764', 'f0000000-0000-4000-8000-000000000744', 'Fernando Choque Ticona', '7108744',
+    'c0000000-0000-4000-8000-000000000788', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'f0000000-0000-4000-8000-000000000744', 'Fernando Choque Ticona', '7108744',
     'Asesor de Atención', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000795', 'CTR-2026-744', 3000.00,
     DATE '2026-10-01', DATE '2026-10-31', 30, 30,
     300, 0, 0,
@@ -1416,8 +1421,9 @@ COMMIT;
 -- desde la pantalla: registrar su baja (proceso INICIADO) -> calcular el sueldo promedio (pasa a EN_CURSO).
 --   - Gabriela Rocha Mendoza (...745): mismos montos que Valeria Nina Quisbert de 2026-07 a 2026-10.
 --     Con retiro en 2026-11, el promedio es 3350.00 con la observación de que no hay planilla cerrada de 2026-11;
---     con retiro en 2026-10, el promedio es 3350.00 sin observaciones.
--- Requiere el bloque anterior (planillas c...761 a c...764) y que Gabriela exista en EmployeeDB.
+--     con retiro en 2026-10, el promedio es 3350.00 sin observaciones (una vez cerrada la planilla de 2026-09;
+--     antes, 3416.67 con 2026-07, 2026-08 y 2026-10 y la observación de que falta 2026-09).
+-- Requiere el bloque anterior (planillas de 2026-07 a 2026-10) y que Gabriela exista en EmployeeDB.
 BEGIN;
 
 INSERT INTO PLANILLA_EMPLEADOS (
@@ -1428,28 +1434,28 @@ INSERT INTO PLANILLA_EMPLEADOS (
   total_ganado, total_descuentos, liquido_pagable, total_aportes
 ) VALUES
   (
-    'c0000000-0000-4000-8000-000000000801', 'c0000000-0000-4000-8000-000000000761', 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
+    'c0000000-0000-4000-8000-000000000801', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-07'), 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000796', 'CTR-2025-745', 3200.00,
     DATE '2026-07-01', DATE '2026-07-31', 30, 30,
     450, 0, 0,
     3400.00, 432.14, 2967.86, 568.14
   ),
   (
-    'c0000000-0000-4000-8000-000000000802', 'c0000000-0000-4000-8000-000000000762', 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
+    'c0000000-0000-4000-8000-000000000802', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-08'), 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000796', 'CTR-2025-745', 3200.00,
     DATE '2026-08-01', DATE '2026-08-31', 30, 30,
     270, 0, 0,
     3320.00, 421.97, 2898.03, 554.77
   ),
   (
-    'c0000000-0000-4000-8000-000000000803', 'c0000000-0000-4000-8000-000000000763', 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
+    'c0000000-0000-4000-8000-000000000803', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000796', 'CTR-2025-745', 3200.00,
     DATE '2026-09-01', DATE '2026-09-30', 30, 30,
     0, 0, 0,
     3200.00, 406.72, 2793.28, 534.72
   ),
   (
-    'c0000000-0000-4000-8000-000000000804', 'c0000000-0000-4000-8000-000000000764', 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
+    'c0000000-0000-4000-8000-000000000804', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000796', 'CTR-2025-745', 3200.00,
     DATE '2026-10-01', DATE '2026-10-31', 30, 30,
     630, 0, 900,
@@ -1611,4 +1617,176 @@ SELECT v.id_planilla_empleado::uuid, p.id_planilla, v.id_empleado::uuid, v.nombr
   JOIN PLANILLAS p ON p.periodo = v.periodo
 ON CONFLICT DO NOTHING;
 
+COMMIT;
+
+-- Planilla tributaria y de aportes de ejemplo (RF-48, KAN-68): entidades con su formato de archivo, parametros
+-- tributarios con vigencias (el salario minimo cambio el 1 de mayo de 2025), valores de la UFV, creditos fiscales declarados
+-- y dos planillas mensuales CERRADAS (2026-04 y 2026-05) de 10 colaboradores, calculadas con las tasas vigentes del catalogo.
+--   Con salario minimo 2.750 el minimo no imponible es 5.500 y el computo del 13 % de 2 salarios minimos es 715: en la
+--   practica solo retiene quien tiene un sueldo neto mayor a 11.000.
+--   22 Jorge: en mayo cobra un bono de productividad de 6.500 (total ganado 15.000, con el Aporte Nacional Solidario sobre
+--      el excedente de 13.000). Declara facturas de Bs 1.000: el credito reduce su retencion pero no la cubre.
+--   21 Marcela: trae un saldo a favor inicial de 80 del sistema anterior y declara facturas en abril y mayo. No tiene
+--      impuesto despues del computo, asi que todo su credito pasa como saldo a favor al mes siguiente.
+--   23 Andrea: declara Bs 4.000 en abril y 3.000 en mayo. El saldo de abril pasa solo a mayo, actualizado con la UFV,
+--      si se genera primero la planilla tributaria de abril.
+-- Los valores de la UFV son de ejemplo: reemplacelos con los que publica el Banco Central de Bolivia.
+BEGIN;
+INSERT INTO ENTIDADES_APORTE (codigo, nombre, formato_archivo, orden) VALUES
+  ('LARGO_PLAZO', 'Gestora Publica de la Seguridad Social de Largo Plazo', 'TXT', 1),
+  ('CAJA_SALUD', 'Caja Nacional de Salud', 'XLSX', 2),
+  ('RIESGO_PROFESIONAL', 'Seguro de Riesgo Profesional', 'TXT', 3),
+  ('VIVIENDA', 'Fondo de Vivienda (Pro-Vivienda)', 'XLSX', 4),
+  ('SOLIDARIO', 'Fondo Solidario (aporte solidario y nacional solidario)', 'TXT', 5)
+ON CONFLICT DO NOTHING;
+INSERT INTO CONCEPTOS_ENTIDAD_APORTE (codigo_concepto, codigo_entidad, deduce_sueldo_neto) VALUES
+  ('SIP-VEJEZ', 'LARGO_PLAZO', TRUE),
+  ('SIP-RIESGO', 'LARGO_PLAZO', TRUE),
+  ('SIP-COMISION', 'LARGO_PLAZO', TRUE),
+  ('SIP-SOLIDARIO', 'SOLIDARIO', TRUE),
+  ('SIP-SOLIDARIO-PAT', 'SOLIDARIO', FALSE),
+  ('ANS-13000', 'SOLIDARIO', FALSE),
+  ('ANS-25000', 'SOLIDARIO', FALSE),
+  ('ANS-35000', 'SOLIDARIO', FALSE),
+  ('CNS-SALUD', 'CAJA_SALUD', FALSE),
+  ('SIP-RIESGO-PROF', 'RIESGO_PROFESIONAL', FALSE),
+  ('PRO-VIVIENDA', 'VIVIENDA', FALSE)
+ON CONFLICT DO NOTHING;
+INSERT INTO PARAMETROS_TRIBUTARIOS (codigo, nombre, valor, vigente_desde, vigente_hasta) VALUES
+  ('SALARIO_MINIMO_NACIONAL', 'Salario minimo nacional (Bs)', 2500, '2024-05-01', '2025-04-30'),
+  ('SALARIO_MINIMO_NACIONAL', 'Salario minimo nacional (Bs)', 2750, '2025-05-01', NULL),
+  ('MULTIPLO_MINIMO_NO_IMPONIBLE', 'Salarios minimos que forman el minimo no imponible', 2, '2000-01-01', NULL),
+  ('ALICUOTA_RCIVA', 'Alicuota del RC-IVA (%)', 13, '2000-01-01', NULL),
+  ('ALICUOTA_CREDITO_FISCAL', 'Alicuota del credito fiscal de las facturas (%)', 13, '2000-01-01', NULL)
+ON CONFLICT DO NOTHING;
+INSERT INTO VALORES_UFV (fecha, valor) VALUES
+  ('2026-03-31', 2.71250),
+  ('2026-04-30', 2.71840),
+  ('2026-05-31', 2.72460),
+  ('2026-06-30', 2.73010),
+  ('2026-07-31', 2.73590),
+  ('2026-08-31', 2.74120),
+  ('2026-09-30', 2.74700),
+  ('2026-10-31', 2.75260)
+ON CONFLICT DO NOTHING;
+INSERT INTO CREDITOS_FISCALES_DECLARADOS (id_empleado, periodo, monto_facturas, saldo_inicial_favor) VALUES
+  ('f0000000-0000-4000-8000-000000000021', '2026-04', 1200.00, 80.00),
+  ('f0000000-0000-4000-8000-000000000021', '2026-05', 1500.00, 0),
+  ('f0000000-0000-4000-8000-000000000022', '2026-05', 1000.00, 0),
+  ('f0000000-0000-4000-8000-000000000023', '2026-04', 4000.00, 0),
+  ('f0000000-0000-4000-8000-000000000023', '2026-05', 3000.00, 0),
+  ('f0000000-0000-4000-8000-000000000024', '2026-04', 800.00, 0),
+  ('f0000000-0000-4000-8000-000000000026', '2026-05', 500.00, 0)
+ON CONFLICT DO NOTHING;
+DO $$
+DECLARE
+  periodos text[] := ARRAY['2026-04', '2026-05'];
+  p text;
+  v_inicio date;
+  v_fin date;
+  v_planilla uuid;
+  v_pe uuid;
+  v_orden int;
+  v_descuentos numeric(12,2);
+  v_aportes numeric(12,2);
+  v_bono numeric(12,2);
+  v_total numeric(12,2);
+  emp record;
+  c record;
+BEGIN
+  FOREACH p IN ARRAY periodos LOOP
+    IF EXISTS (SELECT 1 FROM planillas WHERE periodo = p) THEN
+      CONTINUE;
+    END IF;
+    v_inicio := to_date(p || '-01', 'YYYY-MM-DD');
+    v_fin := (v_inicio + interval '1 month' - interval '1 day')::date;
+    INSERT INTO planillas (
+      periodo, fecha_inicio, fecha_fin, datos_hasta, estado, generada_por, generada_por_nombre, generada_en,
+      aprobada_por, aprobada_por_nombre, aprobada_en, estado_contabilidad, estado_pagos, referencia_contabilidad,
+      respondida_contabilidad_en, referencia_pagos, respondida_pagos_en, cerrada_en
+    ) VALUES (
+      p, v_inicio, v_fin, v_fin, 'CERRADA', 'f0000000-0000-4000-8000-000000000023', 'Andrea Salazar Vega',
+      (v_fin + 1)::timestamptz + interval '9 hours', 'f0000000-0000-4000-8000-000000000023', 'Andrea Salazar Vega',
+      (v_fin + 2)::timestamptz + interval '9 hours', 'CONFIRMADA', 'CONFIRMADA', 'ASI-' || replace(p, '-', ''),
+      (v_fin + 2)::timestamptz + interval '10 hours', 'ORD-' || replace(p, '-', ''),
+      (v_fin + 2)::timestamptz + interval '11 hours', (v_fin + 2)::timestamptz + interval '11 hours'
+    ) RETURNING id_planilla INTO v_planilla;
+
+    FOR emp IN
+      SELECT * FROM (VALUES
+        ('f0000000-0000-4000-8000-000000000021'::uuid, 'Marcela Quiroga Peña', '7102877', 'Jefe de Atención al Cliente', 'Atención al cliente', 'Sopocachi', 8500.00),
+        ('f0000000-0000-4000-8000-000000000022'::uuid, 'Jorge Mamani Condori', '7103014', 'Jefe de Atención al Cliente', 'Atención al cliente', 'Miraflores', 8500.00),
+        ('f0000000-0000-4000-8000-000000000023'::uuid, 'Andrea Salazar Vega', '7103151', 'Jefe de Recursos Humanos', 'Recursos Humanos', 'Sopocachi', 9500.00),
+        ('f0000000-0000-4000-8000-000000000024'::uuid, 'Rosa Mendoza Ticona', '7103288', 'Supervisor de Cajas', 'Atención al cliente', 'Sopocachi', 5800.00),
+        ('f0000000-0000-4000-8000-000000000025'::uuid, 'Luis Vargas Apaza', '7103425', 'Supervisor de Cajas', 'Atención al cliente', 'Miraflores', 5800.00),
+        ('f0000000-0000-4000-8000-000000000026'::uuid, 'Sofía Condori Mamani', '7103562', 'Analista de Recursos Humanos', 'Recursos Humanos', 'Sopocachi', 5200.00),
+        ('f0000000-0000-4000-8000-000000000031'::uuid, 'Carlos Rojas Vargas', '7104247', 'Cajero', 'Atención al cliente', 'Sopocachi', 3200.00),
+        ('f0000000-0000-4000-8000-000000000032'::uuid, 'Lucía Flores Choque', '7104384', 'Cajero', 'Atención al cliente', 'Sopocachi', 3200.00),
+        ('f0000000-0000-4000-8000-000000000033'::uuid, 'Diego Quispe Mamani', '7104521', 'Cajero', 'Atención al cliente', 'Miraflores', 3200.00),
+        ('f0000000-0000-4000-8000-000000000034'::uuid, 'Paola Gutiérrez Limachi', '7104658', 'Asesor de Atención', 'Atención al cliente', 'Miraflores', 3400.00)
+      ) AS e (id_empleado, nombre, documento, cargo, area, sucursal, haber)
+    LOOP
+      INSERT INTO planilla_empleados (
+        id_planilla, id_empleado, nombre_empleado, numero_documento, cargo, area, sucursal, id_contrato, numero_contrato,
+        haber_mensual, contrato_desde, contrato_hasta, dias_contrato, dias_pagados
+      ) VALUES (
+        v_planilla, emp.id_empleado, emp.nombre, emp.documento, emp.cargo, emp.area, emp.sucursal,
+        overlay('f0000000-0000-4000-8000-000000000b00' placing right(emp.id_empleado::text, 2) from 35 for 2)::uuid,
+        'CT-2026-00' || right(emp.id_empleado::text, 2), emp.haber, '2026-01-01', '2026-12-31', 30, 30
+      ) RETURNING id_planilla_empleado INTO v_pe;
+
+      v_bono := CASE WHEN p = '2026-05' AND emp.id_empleado = 'f0000000-0000-4000-8000-000000000022' THEN 6500.00 ELSE 0 END;
+      v_total := emp.haber + v_bono;
+
+      INSERT INTO calculos_planilla (id_planilla_empleado, id_vigencia, orden, tipo, codigo, nombre, forma_calculo, base, cantidad, valor, resultado)
+      SELECT v_pe, vg.id_vigencia, 1, 'INGRESO', co.codigo, co.nombre, 'PORCENTAJE', emp.haber, 30, vg.valor, emp.haber
+      FROM conceptos_planilla co
+      JOIN vigencias_concepto vg ON vg.id_concepto = co.id_concepto
+        AND v_fin BETWEEN vg.vigente_desde AND COALESCE(vg.vigente_hasta, 'infinity'::date)
+      WHERE co.codigo = 'HABER-BASICO';
+
+      v_orden := 1;
+      IF v_bono > 0 THEN
+        v_orden := v_orden + 1;
+        INSERT INTO calculos_planilla (id_planilla_empleado, id_vigencia, orden, tipo, codigo, nombre, forma_calculo, base, cantidad, valor, resultado)
+        SELECT v_pe, NULL, v_orden, 'INGRESO', co.codigo, co.nombre, 'MONTO_FIJO', NULL, NULL, v_bono, v_bono
+        FROM conceptos_planilla co WHERE co.codigo = 'BONO-PRODUCTIVIDAD';
+      END IF;
+      FOR c IN
+        SELECT co.codigo, co.nombre, co.tipo, vg.id_vigencia, vg.valor
+        FROM conceptos_planilla co
+        JOIN vigencias_concepto vg ON vg.id_concepto = co.id_concepto
+          AND v_fin BETWEEN vg.vigente_desde AND COALESCE(vg.vigente_hasta, 'infinity'::date)
+        WHERE co.tipo IN ('DESCUENTO', 'APORTE') AND co.esta_activo AND co.codigo NOT LIKE 'ANS-%'
+        ORDER BY co.tipo, co.codigo
+      LOOP
+        v_orden := v_orden + 1;
+        INSERT INTO calculos_planilla (id_planilla_empleado, id_vigencia, orden, tipo, codigo, nombre, forma_calculo, base, cantidad, valor, resultado)
+        VALUES (v_pe, c.id_vigencia, v_orden, c.tipo, c.codigo, c.nombre, 'PORCENTAJE', v_total, NULL, c.valor, round(v_total * c.valor / 100, 2));
+      END LOOP;
+
+      FOR c IN
+        SELECT co.codigo, co.nombre, vg.id_vigencia, vg.valor, substr(co.codigo, 5)::numeric AS umbral
+        FROM conceptos_planilla co
+        JOIN vigencias_concepto vg ON vg.id_concepto = co.id_concepto
+          AND v_fin BETWEEN vg.vigente_desde AND COALESCE(vg.vigente_hasta, 'infinity'::date)
+        WHERE co.codigo LIKE 'ANS-%' AND co.esta_activo
+        ORDER BY co.codigo
+      LOOP
+        CONTINUE WHEN v_total <= c.umbral;
+        v_orden := v_orden + 1;
+        INSERT INTO calculos_planilla (id_planilla_empleado, id_vigencia, orden, tipo, codigo, nombre, forma_calculo, base, cantidad, valor, resultado)
+        VALUES (v_pe, c.id_vigencia, v_orden, 'DESCUENTO', c.codigo, c.nombre, 'PORCENTAJE', v_total - c.umbral, NULL, c.valor,
+                round((v_total - c.umbral) * c.valor / 100, 2));
+      END LOOP;
+
+      SELECT COALESCE(sum(resultado) FILTER (WHERE tipo = 'DESCUENTO'), 0), COALESCE(sum(resultado) FILTER (WHERE tipo = 'APORTE'), 0)
+        INTO v_descuentos, v_aportes
+      FROM calculos_planilla WHERE id_planilla_empleado = v_pe;
+      UPDATE planilla_empleados
+      SET total_ganado = v_total, total_descuentos = v_descuentos, liquido_pagable = v_total - v_descuentos, total_aportes = v_aportes
+      WHERE id_planilla_empleado = v_pe;
+    END LOOP;
+  END LOOP;
+END $$;
 COMMIT;

@@ -39,9 +39,9 @@ INSERT INTO USUARIOS (id_usuario, id_empleado, correo, hash_contrasena, rol, est
   -- Ana Torrez Villca, Cajero
   ('b0000000-0000-4000-8000-000000000035', 'f0000000-0000-4000-8000-000000000035', 'ana.torrez@correo.test',
    'scrypt$f31e9086c9aa357dcb790d92d14dc2a4$9be4e22f1304fc7719a434a23cad199f798d4601b79547c4f69af39c4b5dc187229a78e8e4a91d25645171818dbf2e7528d096dd6fdccb8d9303ba70c4268272', 'empleado', TRUE),
-  -- Mario Fernández Cruz, Asesor de Atención
+  -- Mario Fernández Cruz, Asesor de Atención; en el portal opera como Contador / Encargado de planillas
   ('b0000000-0000-4000-8000-000000000036', 'f0000000-0000-4000-8000-000000000036', 'mario.fernandez@correo.test',
-   'scrypt$c42da0bc0a45d28496c1daa744d2a320$462bd51e3c84f2adf3eaf1ef1b3e61b7b85ba4526a8d8000b413eee4c15caf9cbb46ad3f18502346b2245862f4f6d282eefade53517e335731b92972f98a1c05', 'empleado', TRUE),
+   'scrypt$c42da0bc0a45d28496c1daa744d2a320$462bd51e3c84f2adf3eaf1ef1b3e61b7b85ba4526a8d8000b413eee4c15caf9cbb46ad3f18502346b2245862f4f6d282eefade53517e335731b92972f98a1c05', 'contador', TRUE),
   -- Elena Paredes Gómez, Cajero (de baja: cuenta desactivada)
   ('b0000000-0000-4000-8000-000000000037', 'f0000000-0000-4000-8000-000000000037', 'elena.paredes@correo.test',
    'scrypt$cda485cb2cd7ceaa75b0a29cb9eda13c$f778913a0ea15bbf59f965750fd5663f98196a5b2178a38aa76ddcd1db95dcc43399a5715cadb065a2b9afc53603b93c9cea7f1511a1ccc22871a094648019b0', 'empleado', FALSE),

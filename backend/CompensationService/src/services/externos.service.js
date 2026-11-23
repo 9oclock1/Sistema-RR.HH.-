@@ -94,7 +94,27 @@ async function listarLicencias(desde, hasta) {
   return datos.licencias;
 }
 
+// Saldo de vacaciones de un colaborador al corte de `fecha` (módulo de vacaciones de AttendanceService, KAN-77):
+// { fecha_ingreso, anios_servicio, saldo: { acumulados, gozados, en_proceso, disponibles }, periodos, proximo_periodo }.
+async function saldoVacaciones(idEmpleado, fecha) {
+  const url = `${URL_ASISTENCIA}/vacaciones/empleados/${encodeURIComponent(idEmpleado)}/saldo?${new URLSearchParams({ fecha })}`;
+  let respuesta;
+  try {
+    respuesta = await fetch(url, { headers: COMO_RRHH, signal: AbortSignal.timeout(TIEMPO_ESPERA_MS) });
+  } catch {
+    throw new ErrorApp(503, "No se pudo consultar el saldo de vacaciones: el módulo de vacaciones no responde. Intente nuevamente.");
+  }
+  if (respuesta.status === 404) {
+    throw new ErrorApp(409, "El colaborador no está registrado en el módulo de vacaciones: no se puede calcular su saldo.");
+  }
+  if (!respuesta.ok) throw new ErrorApp(503, "No se pudo consultar el saldo de vacaciones. Intente nuevamente.");
+  return respuesta.json().catch(() => {
+    throw new ErrorApp(503, "No se pudo consultar el saldo de vacaciones. Intente nuevamente.");
+  });
+}
+
 module.exports = {
+  saldoVacaciones,
   listarPersonal,
   listarJornadas,
   listarContratos,

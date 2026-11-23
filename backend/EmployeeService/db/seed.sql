@@ -130,6 +130,97 @@ INSERT INTO PLANES_ASCENSO (id_plan, id_empleado, id_cargo_destino, observacione
 ON CONFLICT DO NOTHING;
 COMMIT;
 
+-- Convocatorias internas de ascenso de ejemplo (KAN-80, RF-60). Las fechas se calculan respecto del día en que se carga este archivo.
+-- Cada una es para un cargo vacante en su sucursal: ningún empleado activo lo ocupa allí. El Alto es una sucursal nueva,
+-- todavía sin personal, así que todos sus cargos están vacantes.
+--   801 vigente, publicada hace 5 días: Supervisor de Cajas en El Alto (24 meses de antigüedad, nota 75), cierra en 25 días.
+--   802 vigente que cierra en 2 días: Jefe de Atención al Cliente en El Alto (36 meses, nota 80).
+--   803 programada, empieza en 7 días: Analista de RR. HH. en Miraflores (12 meses, nota 70). Sus avisos quedaron pendientes (FALLIDA) para probar el reintento.
+--   804 cerrada hace 10 días (la cerró el job): Asesor de Atención en El Alto (6 meses, nota 60).
+--   805 Cajero principal en El Alto, con la fecha de cierre vencida ayer pero aún marcada como abierta: el job diario la cierra y mientras tanto se informa como cerrada.
+--   806 vigente, la más exigente: Jefe de RR. HH. en Miraflores (60 meses, nota 85), publicada hoy.
+-- Los avisos van a los elegibles (DESTINATARIOS_CONVOCATORIA): activos, sin el cargo ofertado y con la antigüedad mínima a la
+-- fecha de cierre; destinatarios_notificados se recalcula con ellos.
+BEGIN;
+INSERT INTO SUCURSALES (id_sucursal, codigo_sucursal, nombre, direccion, ciudad) VALUES
+  ('f0000000-0000-4000-8000-000000000013', 'SUC-ALT', 'El Alto', 'Av. 6 de Marzo 1020', 'El Alto')
+ON CONFLICT DO NOTHING;
+INSERT INTO CONVOCATORIAS_ASCENSO (
+  id_convocatoria, id_cargo, id_sucursal, id_empleado_publicador, titulo, descripcion_requisitos, meses_antiguedad_minima,
+  nota_minima_desempeno, fecha_inicio_postulacion, fecha_cierre_postulacion, esta_abierta, publicada_en, cerrada_en,
+  estado_notificacion, destinatarios_notificados, notificada_en, ultimo_error_notificacion
+) VALUES
+  ('f0000000-0000-4000-8000-000000000801', 'f0000000-0000-4000-8000-000000000104', 'f0000000-0000-4000-8000-000000000013', 'f0000000-0000-4000-8000-000000000023', 'Supervisor de Cajas - El Alto',
+   'Dos años como cajero, curso de liderazgo y manejo de arqueos de caja, sin llamadas de atención vigentes.', 24, 75.00,
+   CURRENT_DATE - 5, CURRENT_DATE + 25, TRUE, (CURRENT_DATE - 6)::timestamptz + interval '9 hours', NULL,
+   'ENTREGADA', 12, (CURRENT_DATE - 6)::timestamptz + interval '9 hours 1 minute', NULL),
+  ('f0000000-0000-4000-8000-000000000802', 'f0000000-0000-4000-8000-000000000103', 'f0000000-0000-4000-8000-000000000013', 'f0000000-0000-4000-8000-000000000023', 'Jefe de Atención al Cliente - El Alto',
+   'Tres años como supervisor o asesor, experiencia dirigiendo equipos y resolviendo reclamos de clientes.', 36, 80.00,
+   CURRENT_DATE - 2, CURRENT_DATE + 2, TRUE, (CURRENT_DATE - 3)::timestamptz + interval '10 hours', NULL,
+   'ENTREGADA', 12, (CURRENT_DATE - 3)::timestamptz + interval '10 hours 1 minute', NULL),
+  ('f0000000-0000-4000-8000-000000000803', 'f0000000-0000-4000-8000-000000000102', 'f0000000-0000-4000-8000-000000000012', 'f0000000-0000-4000-8000-000000000023', 'Analista de Recursos Humanos - Miraflores',
+   'Un año en el área de atención o administración, manejo de planillas y conocimiento de la normativa laboral.', 12, 70.00,
+   CURRENT_DATE + 7, CURRENT_DATE + 30, TRUE, CURRENT_DATE::timestamptz + interval '8 hours', NULL,
+   'FALLIDA', NULL, NULL, 'No se entregaron los avisos: No se pudo contactar a NotificationService: fetch failed'),
+  ('f0000000-0000-4000-8000-000000000804', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000013', NULL, 'Asesor de Atención - El Alto',
+   'Seis meses de antigüedad y buen trato con el cliente.', 6, 60.00,
+   CURRENT_DATE - 40, CURRENT_DATE - 10, FALSE, (CURRENT_DATE - 41)::timestamptz + interval '9 hours', (CURRENT_DATE - 9)::timestamptz + interval '0 hours 5 minutes',
+   'ENTREGADA', 12, (CURRENT_DATE - 41)::timestamptz + interval '9 hours 1 minute', NULL),
+  ('f0000000-0000-4000-8000-000000000805', 'f0000000-0000-4000-8000-000000000105', 'f0000000-0000-4000-8000-000000000013', 'f0000000-0000-4000-8000-000000000023', 'Cajero principal - El Alto',
+   'Un año como cajero y conocimiento del cierre diario de caja.', 12, 65.00,
+   CURRENT_DATE - 20, CURRENT_DATE - 1, TRUE, (CURRENT_DATE - 21)::timestamptz + interval '9 hours', NULL,
+   'ENTREGADA', 12, (CURRENT_DATE - 21)::timestamptz + interval '9 hours 1 minute', NULL),
+  ('f0000000-0000-4000-8000-000000000806', 'f0000000-0000-4000-8000-000000000101', 'f0000000-0000-4000-8000-000000000012', 'f0000000-0000-4000-8000-000000000023', 'Jefe de Recursos Humanos - Miraflores',
+   'Cinco años en el área, experiencia en procesos de selección y liquidaciones, y título en administración o afín.', 60, 85.00,
+   CURRENT_DATE, CURRENT_DATE + 14, TRUE, now(), NULL,
+   'ENTREGADA', 12, now(), NULL)
+ON CONFLICT DO NOTHING;
+INSERT INTO DESTINATARIOS_CONVOCATORIA (id_convocatoria, id_empleado, meses_antiguedad, notificado_en, ultimo_error)
+SELECT c.id_convocatoria, e.id_empleado, m.meses, c.notificada_en,
+       CASE WHEN c.estado_notificacion = 'FALLIDA' THEN 'No se pudo contactar a NotificationService: fetch failed' END
+  FROM CONVOCATORIAS_ASCENSO c
+  JOIN EMPLEADOS e ON e.id_cargo_actual <> c.id_cargo
+  JOIN ESTADOS_EMPLEADO ee ON ee.id_estado_empleado = e.id_estado_empleado AND ee.permite_acceso
+  CROSS JOIN LATERAL (
+    SELECT (EXTRACT(YEAR FROM age(c.fecha_cierre_postulacion, e.fecha_ingreso)) * 12
+          + EXTRACT(MONTH FROM age(c.fecha_cierre_postulacion, e.fecha_ingreso)))::int AS meses
+  ) m
+ WHERE c.id_convocatoria BETWEEN 'f0000000-0000-4000-8000-000000000801' AND 'f0000000-0000-4000-8000-000000000806'
+   AND m.meses >= c.meses_antiguedad_minima
+ON CONFLICT DO NOTHING;
+UPDATE CONVOCATORIAS_ASCENSO c
+   SET destinatarios_notificados = (SELECT count(*) FROM DESTINATARIOS_CONVOCATORIA d WHERE d.id_convocatoria = c.id_convocatoria)
+ WHERE c.estado_notificacion = 'ENTREGADA'
+   AND c.id_convocatoria BETWEEN 'f0000000-0000-4000-8000-000000000801' AND 'f0000000-0000-4000-8000-000000000806';
+-- KAN-81: postulaciones de ejemplo a la convocatoria ya cerrada «Asesor de Atención - El Alto» (mínimo 6 meses y
+-- nota 60), validadas al postularse. Las notas son de ejemplo (en producción vienen del historial de PerformanceService).
+-- Meses de permanencia y puntaje se calculan con la misma regla que el código: 70 % nota + 30 % antigüedad (tope 60 meses).
+--   Ranking: Carlos (86) > Ana (91, menos antigüedad) > Lucía (78,5). No aptos: Diego (nota 55) y Rosa (sin evaluaciones).
+INSERT INTO POSTULACIONES_ASCENSO (
+  id_postulacion, id_convocatoria, id_empleado, fecha_postulacion, estado_postulacion, meses_permanencia, cumple_antiguedad,
+  nota_ultima_evaluacion, ciclo_ultima_evaluacion, cumple_nota_evaluacion, puntaje_meritos, motivos_no_apto, validada_en
+)
+SELECT p.id_postulacion::uuid, 'f0000000-0000-4000-8000-000000000804'::uuid, e.id_empleado, p.fecha, p.estado,
+       m.meses, TRUE, p.nota, p.ciclo, p.nota IS NOT NULL AND p.nota >= 60,
+       CASE WHEN p.estado = 'APTO' THEN round(0.7 * p.nota + 0.3 * LEAST(m.meses, 60) / 60.0 * 100, 2) END,
+       p.motivos, p.fecha + interval '1 second'
+  FROM (VALUES
+    ('f0000000-0000-4000-8000-000000000981', 'f0000000-0000-4000-8000-000000000031', (CURRENT_DATE - 35)::timestamptz + interval '10 hours', 'APTO', 86.00, 'Evaluación trimestral 2026-T3', NULL::text[]),
+    ('f0000000-0000-4000-8000-000000000982', 'f0000000-0000-4000-8000-000000000035', (CURRENT_DATE - 33)::timestamptz + interval '15 hours', 'APTO', 91.00, 'Evaluación trimestral 2026-T3', NULL::text[]),
+    ('f0000000-0000-4000-8000-000000000983', 'f0000000-0000-4000-8000-000000000032', (CURRENT_DATE - 30)::timestamptz + interval '9 hours', 'APTO', 78.50, 'Evaluación trimestral 2026-T3', NULL::text[]),
+    ('f0000000-0000-4000-8000-000000000984', 'f0000000-0000-4000-8000-000000000033', (CURRENT_DATE - 28)::timestamptz + interval '11 hours', 'NO_APTO', 55.00, 'Evaluación trimestral 2026-T3',
+      ARRAY['Nota de la última evaluación insuficiente: obtuvo 55 (Evaluación trimestral 2026-T3) y la mínima es 60.']),
+    ('f0000000-0000-4000-8000-000000000985', 'f0000000-0000-4000-8000-000000000024', (CURRENT_DATE - 25)::timestamptz + interval '16 hours', 'NO_APTO', NULL, NULL,
+      ARRAY['No tiene evaluaciones de desempeño cerradas: no hay una nota que comparar con la mínima.'])
+  ) AS p(id_postulacion, id_empleado, fecha, estado, nota, ciclo, motivos)
+  JOIN EMPLEADOS e ON e.id_empleado = p.id_empleado::uuid
+  CROSS JOIN LATERAL (
+    SELECT (EXTRACT(YEAR FROM age((p.fecha AT TIME ZONE 'America/La_Paz')::date, e.fecha_ingreso)) * 12
+          + EXTRACT(MONTH FROM age((p.fecha AT TIME ZONE 'America/La_Paz')::date, e.fecha_ingreso)))::int AS meses
+  ) m
+ON CONFLICT DO NOTHING;
+COMMIT;
+
 -- Colaborador con menos de tres meses de antigüedad para pruebas de sueldo promedio indemnizable (RF-55, KAN-75).
 BEGIN;
 INSERT INTO EMPLEADOS (id_empleado, numero_documento, nombres, primer_apellido, segundo_apellido, fecha_nacimiento, genero, telefono_celular, correo_personal, direccion_domicilio, fecha_ingreso, id_cargo_actual, id_sucursal_actual, id_estado_empleado) VALUES

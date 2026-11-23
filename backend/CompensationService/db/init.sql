@@ -323,15 +323,109 @@ CREATE TABLE CALCULOS_PLANILLA (
     CONSTRAINT chk_calculo_valores CHECK (valor > 0 AND resultado >= 0 AND (base IS NULL OR base >= 0) AND (cantidad IS NULL OR cantidad >= 0))
 );
 CREATE INDEX idx_calculos_planilla_empleado ON CALCULOS_PLANILLA (id_planilla_empleado);
+
+-- Tabla: PLANILLA_AGUINALDO (RF-47, KAN-67)
+-- Cabecera de la planilla de aguinaldos de una gestión (1 de diciembre del año anterior al 30 de noviembre
+-- de `gestion`). Mismo ciclo de vida y las mismas integraciones asíncronas que PLANILLAS: BORRADOR →
+-- APROBADA (se publica el asiento y la orden de dispersión) → CERRADA (ambas confirmaciones llegaron).
+CREATE TABLE PLANILLA_AGUINALDO (
+    id_aguinaldo UUID NOT NULL DEFAULT gen_random_uuid(),
+    gestion smallint NOT NULL,
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'BORRADOR',
+    generada_por UUID NOT NULL,
+    generada_por_nombre varchar(150) NOT NULL,
+    generada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    aprobada_por UUID NULL,
+    aprobada_por_nombre varchar(150) NULL,
+    aprobada_en TIMESTAMPTZ NULL,
+    estado_contabilidad varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    referencia_contabilidad varchar(60) NULL,
+    motivo_contabilidad varchar(255) NULL,
+    respondida_contabilidad_en TIMESTAMPTZ NULL,
+    estado_pagos varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    referencia_pagos varchar(60) NULL,
+    motivo_pagos varchar(255) NULL,
+    respondida_pagos_en TIMESTAMPTZ NULL,
+    cerrada_en TIMESTAMPTZ NULL,
+    CONSTRAINT PLANILLA_AGUINALDO_pk PRIMARY KEY (id_aguinaldo),
+    CONSTRAINT uq_aguinaldo_gestion UNIQUE (gestion),
+    CONSTRAINT chk_aguinaldo_gestion CHECK (gestion BETWEEN 2000 AND 2100),
+    CONSTRAINT chk_aguinaldo_estado CHECK (estado IN ('BORRADOR', 'APROBADA', 'CERRADA')),
+    CONSTRAINT chk_aguinaldo_fechas CHECK (fecha_fin >= fecha_inicio),
+    CONSTRAINT chk_aguinaldo_aprobacion CHECK (
+        (estado = 'BORRADOR') = (aprobada_en IS NULL)
+        AND (aprobada_en IS NULL) = (aprobada_por IS NULL)
+        AND (aprobada_por IS NULL) = (aprobada_por_nombre IS NULL)
+    ),
+    CONSTRAINT chk_aguinaldo_integraciones CHECK (
+        estado_contabilidad IN ('PENDIENTE', 'CONFIRMADA', 'RECHAZADA')
+        AND estado_pagos IN ('PENDIENTE', 'CONFIRMADA', 'RECHAZADA')
+    ),
+    CONSTRAINT chk_aguinaldo_cierre CHECK (
+        (estado = 'CERRADA') = (cerrada_en IS NOT NULL)
+        AND (estado <> 'CERRADA' OR (estado_contabilidad = 'CONFIRMADA' AND estado_pagos = 'CONFIRMADA'))
+    ),
+    CONSTRAINT chk_aguinaldo_respuestas CHECK (
+        (estado <> 'BORRADOR' OR (estado_contabilidad = 'PENDIENTE' AND estado_pagos = 'PENDIENTE'))
+        AND (estado_contabilidad = 'PENDIENTE') = (respondida_contabilidad_en IS NULL)
+        AND (estado_contabilidad = 'RECHAZADA') = (motivo_contabilidad IS NOT NULL)
+        AND (referencia_contabilidad IS NULL OR estado_contabilidad = 'CONFIRMADA')
+        AND (estado_pagos = 'PENDIENTE') = (respondida_pagos_en IS NULL)
+        AND (estado_pagos = 'RECHAZADA') = (motivo_pagos IS NOT NULL)
+        AND (referencia_pagos IS NULL OR estado_pagos = 'CONFIRMADA')
+    )
+);
+-- Tabla: AGUINALDO_EMPLEADOS
+-- Un renglón por colaborador: el promedio de sus tres últimos sueldos y las duodécimas (meses y días
+-- comerciales de 30 días) trabajados en la gestión. Un colaborador con menos de 3 meses queda excluido con
+-- el motivo (criterio 2), en vez de con un monto en cero indistinguible de "no le corresponde nada".
+CREATE TABLE AGUINALDO_EMPLEADOS (
+    id_aguinaldo_empleado UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_aguinaldo UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    nombre_empleado varchar(150) NOT NULL,
+    numero_documento varchar(20) NULL,
+    fecha_ingreso date NOT NULL,
+    meses_trabajados smallint NOT NULL,
+    dias_trabajados smallint NOT NULL,
+    promedio_sueldo numeric(12,2) NOT NULL,
+    -- PLANILLAS: total ganado de sus últimas planillas mensuales (meses_promedio = cuántas, 1 a 3);
+    -- CONTRATO: sin planillas, el haber pactado; NULL: sin sueldo registrado (queda excluido).
+    origen_promedio varchar(10) NULL,
+    meses_promedio smallint NULL,
+    monto numeric(12,2) NOT NULL,
+    excluido boolean NOT NULL DEFAULT FALSE,
+    motivo_exclusion varchar(255) NULL,
+    CONSTRAINT AGUINALDO_EMPLEADOS_pk PRIMARY KEY (id_aguinaldo_empleado),
+    CONSTRAINT chk_aguinaldo_empleado_origen CHECK (
+        (origen_promedio IS NULL OR origen_promedio IN ('PLANILLAS', 'CONTRATO'))
+        AND (origen_promedio = 'PLANILLAS') = (meses_promedio IS NOT NULL)
+        AND (meses_promedio IS NULL OR meses_promedio BETWEEN 1 AND 3)
+    ),
+    CONSTRAINT uq_aguinaldo_empleado UNIQUE (id_aguinaldo, id_empleado),
+    CONSTRAINT fk_aguinaldo_empleado_aguinaldo FOREIGN KEY (id_aguinaldo)
+        REFERENCES PLANILLA_AGUINALDO (id_aguinaldo) ON DELETE CASCADE,
+    CONSTRAINT chk_aguinaldo_empleado_exclusion CHECK (excluido = (motivo_exclusion IS NOT NULL)),
+    CONSTRAINT chk_aguinaldo_empleado_valores CHECK (
+        meses_trabajados >= 0 AND dias_trabajados BETWEEN 0 AND 29 AND promedio_sueldo >= 0 AND monto >= 0
+        AND (NOT excluido OR monto = 0)
+    )
+);
+CREATE INDEX idx_aguinaldo_empleados_aguinaldo ON AGUINALDO_EMPLEADOS (id_aguinaldo);
+
 -- Tabla: EVENTOS_SALIENTES
 -- Bandeja de salida (outbox): el evento se guarda en la misma transacción que la aprobación y se envía
 -- después al broker, con reintentos, hasta que se entrega. id_evento es el id_mensaje del mensaje enviado.
--- destino: CONTABILIDAD (asiento de la planilla, grupo D) o PAGOS (orden de dispersión, grupo A).
+-- destino: CONTABILIDAD (asiento, grupo D) o PAGOS (orden de dispersión, grupo A). id_planilla (planilla
+-- mensual) o id_aguinaldo (RF-47, KAN-67): nunca los dos, la misma bandeja sirve para ambas (criterio 5).
 CREATE TABLE EVENTOS_SALIENTES (
     id_evento UUID NOT NULL DEFAULT gen_random_uuid(),
     topico varchar(60) NOT NULL,
     tipo_evento varchar(60) NOT NULL,
     id_planilla UUID NULL,
+    id_aguinaldo UUID NULL,
     destino varchar(15) NULL,
     carga JSONB NOT NULL,
     estado varchar(10) NOT NULL DEFAULT 'PENDIENTE',
@@ -342,14 +436,17 @@ CREATE TABLE EVENTOS_SALIENTES (
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT EVENTOS_SALIENTES_pk PRIMARY KEY (id_evento),
     CONSTRAINT fk_evento_planilla FOREIGN KEY (id_planilla) REFERENCES PLANILLAS (id_planilla),
+    CONSTRAINT fk_evento_aguinaldo FOREIGN KEY (id_aguinaldo) REFERENCES PLANILLA_AGUINALDO (id_aguinaldo),
     CONSTRAINT chk_evento_estado CHECK (estado IN ('PENDIENTE', 'ENTREGADO', 'FALLIDO')),
     CONSTRAINT chk_evento_intentos CHECK (intentos >= 0),
     CONSTRAINT chk_evento_entrega CHECK ((estado = 'ENTREGADO') = (entregado_en IS NOT NULL)),
     CONSTRAINT chk_evento_destino CHECK (destino IN ('CONTABILIDAD', 'PAGOS')),
-    CONSTRAINT chk_evento_planilla_destino CHECK ((id_planilla IS NULL) = (destino IS NULL))
+    CONSTRAINT chk_evento_recurso_destino CHECK ((id_planilla IS NULL AND id_aguinaldo IS NULL) = (destino IS NULL)),
+    CONSTRAINT chk_evento_recurso_unico CHECK (NOT (id_planilla IS NOT NULL AND id_aguinaldo IS NOT NULL))
 );
 CREATE INDEX idx_eventos_salientes_pendientes ON EVENTOS_SALIENTES (estado, proximo_intento_en);
 CREATE INDEX idx_eventos_salientes_planilla ON EVENTOS_SALIENTES (id_planilla, destino, creado_en);
+CREATE INDEX idx_eventos_salientes_aguinaldo ON EVENTOS_SALIENTES (id_aguinaldo, destino, creado_en);
 -- Tabla: EVENTOS_ENTRANTES
 -- Bandeja de entrada: confirmaciones de Contabilidad y Pagos. id_mensaje (del remitente) evita procesar dos veces
 -- el mismo mensaje. RECIBIDO: en proceso o esperando reintento; PROCESADO: aplicado a la planilla; IGNORADO: no
@@ -362,6 +459,7 @@ CREATE TABLE EVENTOS_ENTRANTES (
     tipo_evento varchar(60) NOT NULL,
     origen varchar(10) NULL,
     id_planilla UUID NULL,
+    id_aguinaldo UUID NULL,
     destino varchar(15) NULL,
     carga JSONB NOT NULL,
     estado varchar(10) NOT NULL DEFAULT 'RECIBIDO',
@@ -372,13 +470,16 @@ CREATE TABLE EVENTOS_ENTRANTES (
     CONSTRAINT EVENTOS_ENTRANTES_pk PRIMARY KEY (id_evento_entrante),
     CONSTRAINT uq_evento_entrante_mensaje UNIQUE (id_mensaje),
     CONSTRAINT fk_evento_entrante_planilla FOREIGN KEY (id_planilla) REFERENCES PLANILLAS (id_planilla),
+    CONSTRAINT fk_evento_entrante_aguinaldo FOREIGN KEY (id_aguinaldo) REFERENCES PLANILLA_AGUINALDO (id_aguinaldo),
     CONSTRAINT chk_evento_entrante_estado CHECK (estado IN ('RECIBIDO', 'PROCESADO', 'IGNORADO', 'FALLIDO')),
     CONSTRAINT chk_evento_entrante_destino CHECK (destino IN ('CONTABILIDAD', 'PAGOS')),
     CONSTRAINT chk_evento_entrante_intentos CHECK (intentos >= 0),
-    CONSTRAINT chk_evento_entrante_procesado CHECK ((estado IN ('PROCESADO', 'IGNORADO')) = (procesado_en IS NOT NULL))
+    CONSTRAINT chk_evento_entrante_procesado CHECK ((estado IN ('PROCESADO', 'IGNORADO')) = (procesado_en IS NOT NULL)),
+    CONSTRAINT chk_evento_entrante_recurso_unico CHECK (NOT (id_planilla IS NOT NULL AND id_aguinaldo IS NOT NULL))
 );
 CREATE INDEX idx_eventos_entrantes_estado ON EVENTOS_ENTRANTES (estado, recibido_en);
 CREATE INDEX idx_eventos_entrantes_planilla ON EVENTOS_ENTRANTES (id_planilla);
+CREATE INDEX idx_eventos_entrantes_aguinaldo ON EVENTOS_ENTRANTES (id_aguinaldo);
 -- datos iniciales
 -- Aportes de ley sobre el total ganado (Ley 065 de Pensiones y seguridad social de corto plazo).
 -- Cuentas contables referenciales: ajustar al plan de cuentas de Contabilidad.
@@ -925,3 +1026,239 @@ CREATE TABLE DETALLE_BENEFICIOS_SOCIALES (
     CONSTRAINT chk_detalle_beneficios_divisor CHECK (divisor IN (1, 12, 360)),
     CONSTRAINT chk_detalle_beneficios_monto CHECK (monto >= 0)
 );
+
+-- Saldos proporcionales del finiquito (KAN-77)
+
+-- Tabla: SALDOS_PROPORCIONALES
+-- Último cálculo de las duodécimas de aguinaldo y las vacaciones truncas de un proceso de liquidación (1 a 1).
+-- Copia el sueldo promedio, el saldo de vacaciones y los tiempos al momento del cálculo; recalcular mientras el
+-- proceso está abierto reemplaza el registro.
+CREATE TABLE SALDOS_PROPORCIONALES (
+    id_proceso UUID NOT NULL,
+    promedio numeric(12,2) NOT NULL,
+    salario_diario numeric(12,2) NOT NULL,
+    -- Aguinaldo: gestión en curso al retiro (1 de diciembre al 30 de noviembre)
+    gestion_aguinaldo smallint NOT NULL,
+    aguinaldo_desde date NOT NULL,
+    aguinaldo_hasta date NOT NULL,
+    aguinaldo_meses smallint NOT NULL,
+    aguinaldo_dias smallint NOT NULL,
+    monto_aguinaldo numeric(12,2) NOT NULL,
+    -- Vacaciones: días no gozados del módulo de vacaciones (AttendanceService) y duodécima del año en curso
+    anios_servicio smallint NOT NULL,
+    dias_acumulados smallint NOT NULL,
+    dias_gozados smallint NOT NULL,
+    dias_pendientes smallint NOT NULL,
+    monto_vacaciones_pendientes numeric(12,2) NOT NULL,
+    anio_en_curso_desde date NOT NULL,
+    anio_en_curso_meses smallint NOT NULL,
+    anio_en_curso_dias smallint NOT NULL,
+    dias_escala smallint NOT NULL,
+    dias_duodecima numeric(6,2) NOT NULL,
+    monto_duodecima_vacaciones numeric(12,2) NOT NULL,
+    total numeric(12,2) NOT NULL,
+    observaciones text[] NOT NULL DEFAULT '{}',
+    calculado_por UUID NULL,
+    calculado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT SALDOS_PROPORCIONALES_pk PRIMARY KEY (id_proceso),
+    CONSTRAINT fk_saldos_proceso FOREIGN KEY (id_proceso)
+        REFERENCES PROCESOS_DESVINCULACION (id_proceso) ON DELETE CASCADE,
+    CONSTRAINT chk_saldos_montos CHECK (
+        promedio >= 0 AND salario_diario >= 0 AND monto_aguinaldo >= 0 AND monto_vacaciones_pendientes >= 0
+        AND monto_duodecima_vacaciones >= 0 AND total >= 0
+    ),
+    CONSTRAINT chk_saldos_tiempos CHECK (
+        aguinaldo_meses BETWEEN 0 AND 12 AND aguinaldo_dias BETWEEN 0 AND 30
+        AND anio_en_curso_meses BETWEEN 0 AND 12 AND anio_en_curso_dias BETWEEN 0 AND 30
+        AND dias_escala IN (15, 20, 30) AND dias_duodecima >= 0
+        AND dias_pendientes >= 0 AND dias_acumulados >= 0 AND dias_gozados >= 0
+    )
+);
+
+-- Tabla: PARAMETROS_TRIBUTARIOS
+CREATE TABLE PARAMETROS_TRIBUTARIOS (
+    id_parametro UUID NOT NULL DEFAULT gen_random_uuid(),
+    codigo varchar(30) NOT NULL,
+    nombre varchar(100) NOT NULL,
+    valor numeric(12,4) NOT NULL,
+    vigente_desde date NOT NULL,
+    vigente_hasta date NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PARAMETROS_TRIBUTARIOS_pk PRIMARY KEY (id_parametro),
+    CONSTRAINT chk_parametro_codigo CHECK (
+        codigo IN ('SALARIO_MINIMO_NACIONAL', 'MULTIPLO_MINIMO_NO_IMPONIBLE', 'ALICUOTA_RCIVA', 'ALICUOTA_CREDITO_FISCAL')
+    ),
+    CONSTRAINT chk_parametro_valor CHECK (valor > 0),
+    CONSTRAINT chk_parametro_fechas CHECK (vigente_hasta IS NULL OR vigente_hasta >= vigente_desde),
+    CONSTRAINT ex_parametro_sin_solapamiento EXCLUDE USING gist (
+        codigo WITH =,
+        daterange(vigente_desde, vigente_hasta, '[]') WITH &&
+    )
+);
+-- Tabla: VALORES_UFV
+CREATE TABLE VALORES_UFV (
+    fecha date NOT NULL,
+    valor numeric(10,5) NOT NULL,
+    CONSTRAINT VALORES_UFV_pk PRIMARY KEY (fecha),
+    CONSTRAINT chk_ufv_valor CHECK (valor > 0)
+);
+-- Tabla: ENTIDADES_APORTE
+CREATE TABLE ENTIDADES_APORTE (
+    codigo varchar(20) NOT NULL,
+    nombre varchar(100) NOT NULL,
+    formato_archivo varchar(4) NOT NULL,
+    orden smallint NOT NULL,
+    CONSTRAINT ENTIDADES_APORTE_pk PRIMARY KEY (codigo),
+    CONSTRAINT uq_entidad_aporte_orden UNIQUE (orden),
+    CONSTRAINT chk_entidad_aporte_formato CHECK (formato_archivo IN ('XLSX', 'TXT'))
+);
+-- Tabla: CONCEPTOS_ENTIDAD_APORTE
+CREATE TABLE CONCEPTOS_ENTIDAD_APORTE (
+    codigo_concepto varchar(20) NOT NULL,
+    codigo_entidad varchar(20) NOT NULL,
+    deduce_sueldo_neto boolean NOT NULL DEFAULT FALSE,
+    CONSTRAINT CONCEPTOS_ENTIDAD_APORTE_pk PRIMARY KEY (codigo_concepto),
+    CONSTRAINT fk_concepto_entidad_concepto FOREIGN KEY (codigo_concepto)
+        REFERENCES CONCEPTOS_PLANILLA (codigo),
+    CONSTRAINT fk_concepto_entidad_entidad FOREIGN KEY (codigo_entidad)
+        REFERENCES ENTIDADES_APORTE (codigo)
+);
+-- Tabla: CREDITOS_FISCALES_DECLARADOS
+CREATE TABLE CREDITOS_FISCALES_DECLARADOS (
+    id_credito UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    periodo char(7) NOT NULL,
+    monto_facturas numeric(12,2) NOT NULL DEFAULT 0,
+    saldo_inicial_favor numeric(12,2) NOT NULL DEFAULT 0,
+    declarado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT CREDITOS_FISCALES_DECLARADOS_pk PRIMARY KEY (id_credito),
+    CONSTRAINT uq_credito_empleado_periodo UNIQUE (id_empleado, periodo),
+    CONSTRAINT chk_credito_periodo CHECK (periodo ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
+    CONSTRAINT chk_credito_montos CHECK (monto_facturas >= 0 AND saldo_inicial_favor >= 0)
+);
+-- Tabla: PLANILLAS_TRIBUTARIAS
+CREATE TABLE PLANILLAS_TRIBUTARIAS (
+    id_planilla_tributaria UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla UUID NOT NULL,
+    periodo char(7) NOT NULL,
+    salario_minimo numeric(12,2) NOT NULL,
+    multiplo_minimo_no_imponible numeric(6,2) NOT NULL,
+    minimo_no_imponible numeric(12,2) NOT NULL,
+    alicuota_rciva numeric(7,4) NOT NULL,
+    alicuota_credito_fiscal numeric(7,4) NOT NULL,
+    computo_salarios_minimos numeric(12,2) NOT NULL,
+    periodo_saldo_anterior char(7) NULL,
+    ufv_inicial numeric(10,5) NULL,
+    ufv_final numeric(10,5) NULL,
+    cantidad_dependientes int NOT NULL DEFAULT 0,
+    total_sueldo_neto numeric(14,2) NOT NULL DEFAULT 0,
+    total_base_imponible numeric(14,2) NOT NULL DEFAULT 0,
+    total_impuesto_determinado numeric(14,2) NOT NULL DEFAULT 0,
+    total_computo_salarios_minimos numeric(14,2) NOT NULL DEFAULT 0,
+    total_credito_aplicado numeric(14,2) NOT NULL DEFAULT 0,
+    total_impuesto_retenido numeric(14,2) NOT NULL DEFAULT 0,
+    total_actualizacion_ufv numeric(14,2) NOT NULL DEFAULT 0,
+    advertencias text[] NOT NULL DEFAULT '{}',
+    generada_por UUID NULL,
+    generada_por_nombre varchar(150) NULL,
+    generada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PLANILLAS_TRIBUTARIAS_pk PRIMARY KEY (id_planilla_tributaria),
+    CONSTRAINT uq_planilla_tributaria_planilla UNIQUE (id_planilla),
+    CONSTRAINT fk_planilla_tributaria_planilla FOREIGN KEY (id_planilla)
+        REFERENCES PLANILLAS (id_planilla) ON DELETE CASCADE,
+    CONSTRAINT chk_planilla_tributaria_parametros CHECK (
+        salario_minimo > 0 AND multiplo_minimo_no_imponible > 0 AND minimo_no_imponible > 0
+        AND alicuota_rciva > 0 AND alicuota_credito_fiscal > 0 AND computo_salarios_minimos >= 0
+    ),
+    CONSTRAINT chk_planilla_tributaria_ufv CHECK (
+        (ufv_inicial IS NULL) = (ufv_final IS NULL) AND (ufv_inicial IS NULL OR (ufv_inicial > 0 AND ufv_final > 0))
+        AND (ufv_inicial IS NULL OR periodo_saldo_anterior IS NOT NULL)
+    ),
+    CONSTRAINT chk_planilla_tributaria_totales CHECK (
+        cantidad_dependientes >= 0 AND total_sueldo_neto >= 0 AND total_base_imponible >= 0
+        AND total_impuesto_determinado >= 0 AND total_computo_salarios_minimos >= 0 AND total_credito_aplicado >= 0
+        AND total_impuesto_retenido >= 0 AND total_actualizacion_ufv >= 0
+        AND total_impuesto_determinado = total_computo_salarios_minimos + total_credito_aplicado + total_impuesto_retenido
+    )
+);
+-- Tabla: RETENCIONES_RCIVA
+CREATE TABLE RETENCIONES_RCIVA (
+    id_retencion UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla_tributaria UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    nombre_empleado varchar(150) NOT NULL,
+    numero_documento varchar(20) NULL,
+    total_ganado numeric(12,2) NOT NULL,
+    aportes_laborales numeric(12,2) NOT NULL,
+    sueldo_neto numeric(12,2) NOT NULL,
+    base_imponible numeric(12,2) NOT NULL,
+    impuesto_determinado numeric(12,2) NOT NULL,
+    computo_salarios_minimos numeric(12,2) NOT NULL DEFAULT 0,
+    monto_facturas numeric(12,2) NOT NULL DEFAULT 0,
+    credito_fiscal_facturas numeric(12,2) NOT NULL DEFAULT 0,
+    origen_saldo varchar(15) NOT NULL,
+    saldo_mes_anterior numeric(12,2) NOT NULL DEFAULT 0,
+    actualizacion_ufv numeric(12,2) NOT NULL DEFAULT 0,
+    saldo_anterior_favor numeric(12,2) NOT NULL DEFAULT 0,
+    credito_aplicado numeric(12,2) NOT NULL,
+    impuesto_retenido numeric(12,2) NOT NULL,
+    saldo_favor_siguiente numeric(12,2) NOT NULL,
+    CONSTRAINT RETENCIONES_RCIVA_pk PRIMARY KEY (id_retencion),
+    CONSTRAINT uq_retencion_empleado UNIQUE (id_planilla_tributaria, id_empleado),
+    CONSTRAINT fk_retencion_planilla_tributaria FOREIGN KEY (id_planilla_tributaria)
+        REFERENCES PLANILLAS_TRIBUTARIAS (id_planilla_tributaria) ON DELETE CASCADE,
+    CONSTRAINT chk_retencion_montos CHECK (
+        total_ganado >= 0 AND aportes_laborales >= 0 AND sueldo_neto >= 0 AND base_imponible >= 0
+        AND impuesto_determinado >= 0 AND computo_salarios_minimos >= 0 AND monto_facturas >= 0
+        AND credito_fiscal_facturas >= 0 AND saldo_mes_anterior >= 0 AND actualizacion_ufv >= 0
+        AND saldo_anterior_favor >= 0 AND credito_aplicado >= 0 AND impuesto_retenido >= 0 AND saldo_favor_siguiente >= 0
+    ),
+    CONSTRAINT chk_retencion_origen_saldo CHECK (origen_saldo IN ('MES_ANTERIOR', 'SALDO_INICIAL')),
+    CONSTRAINT chk_retencion_balance CHECK (
+        impuesto_determinado = computo_salarios_minimos + credito_aplicado + impuesto_retenido
+        AND saldo_anterior_favor = saldo_mes_anterior + actualizacion_ufv
+        AND credito_fiscal_facturas + saldo_anterior_favor = credito_aplicado + saldo_favor_siguiente
+    )
+);
+-- Tabla: PLANILLAS_APORTES
+CREATE TABLE PLANILLAS_APORTES (
+    id_planilla_aportes UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla UUID NOT NULL,
+    periodo char(7) NOT NULL,
+    cantidad_empleados int NOT NULL DEFAULT 0,
+    total_laboral numeric(14,2) NOT NULL DEFAULT 0,
+    total_patronal numeric(14,2) NOT NULL DEFAULT 0,
+    advertencias text[] NOT NULL DEFAULT '{}',
+    generada_por UUID NULL,
+    generada_por_nombre varchar(150) NULL,
+    generada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PLANILLAS_APORTES_pk PRIMARY KEY (id_planilla_aportes),
+    CONSTRAINT uq_planilla_aportes_planilla UNIQUE (id_planilla),
+    CONSTRAINT fk_planilla_aportes_planilla FOREIGN KEY (id_planilla)
+        REFERENCES PLANILLAS (id_planilla) ON DELETE CASCADE,
+    CONSTRAINT chk_planilla_aportes_totales CHECK (cantidad_empleados >= 0 AND total_laboral >= 0 AND total_patronal >= 0)
+);
+-- Tabla: DETALLE_APORTES
+CREATE TABLE DETALLE_APORTES (
+    id_detalle UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla_aportes UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    nombre_empleado varchar(150) NOT NULL,
+    numero_documento varchar(20) NULL,
+    codigo_entidad varchar(20) NOT NULL,
+    tipo varchar(8) NOT NULL,
+    codigo_concepto varchar(20) NOT NULL,
+    nombre_concepto varchar(80) NOT NULL,
+    id_vigencia UUID NULL,
+    base numeric(12,2) NULL,
+    tasa numeric(12,4) NOT NULL,
+    monto numeric(12,2) NOT NULL,
+    CONSTRAINT DETALLE_APORTES_pk PRIMARY KEY (id_detalle),
+    CONSTRAINT fk_detalle_aportes_planilla FOREIGN KEY (id_planilla_aportes)
+        REFERENCES PLANILLAS_APORTES (id_planilla_aportes) ON DELETE CASCADE,
+    CONSTRAINT fk_detalle_aportes_entidad FOREIGN KEY (codigo_entidad) REFERENCES ENTIDADES_APORTE (codigo),
+    CONSTRAINT fk_detalle_aportes_vigencia FOREIGN KEY (id_vigencia) REFERENCES VIGENCIAS_CONCEPTO (id_vigencia),
+    CONSTRAINT chk_detalle_aportes_tipo CHECK (tipo IN ('LABORAL', 'PATRONAL')),
+    CONSTRAINT chk_detalle_aportes_valores CHECK (tasa > 0 AND monto >= 0 AND (base IS NULL OR base >= 0))
+);
+CREATE INDEX idx_detalle_aportes_entidad ON DETALLE_APORTES (id_planilla_aportes, codigo_entidad);
