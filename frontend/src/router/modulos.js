@@ -375,7 +375,8 @@ export const SECCIONES = [
         etiqueta: "Desvinculaciones",
         descripcion: "Registro de la causal formal de baja, fecha de retiro y respaldo, que inicia el proceso de liquidación.",
         icono: UserMinus,
-        roles: ["admin"],
+        // El Contador consulta los procesos y el desglose del sueldo promedio en solo lectura (RF-55).
+        roles: ["admin", "contador"],
         pagina: DesvinculacionesPage,
       },
     ],

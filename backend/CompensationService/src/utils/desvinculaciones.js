@@ -7,11 +7,20 @@ const ESTADOS_ABIERTOS = ["INICIADO", "EN_CURSO"];
 const TIPOS_RESPALDO = ["application/pdf", "image/jpeg", "image/png"];
 const MAX_OBSERVACIONES = 500;
 const ROL_ADMIN = "admin";
+// RF-55: el Contador / Encargado de planillas consulta los procesos y el desglose del sueldo promedio (solo lectura).
+const ROLES_CONSULTA = [ROL_ADMIN, "contador"];
 
 function validarAdmin({ rol } = {}) {
   const normalizado = (rol ?? "").trim().toLowerCase();
   if (normalizado !== ROL_ADMIN) {
     throw new ErrorApp(403, "Solo el Administrador de RRHH puede gestionar las desvinculaciones.");
+  }
+}
+
+function validarConsulta({ rol } = {}) {
+  const normalizado = (rol ?? "").trim().toLowerCase();
+  if (!ROLES_CONSULTA.includes(normalizado)) {
+    throw new ErrorApp(403, "Solo el Administrador de RRHH o el Contador pueden consultar las desvinculaciones.");
   }
 }
 
@@ -98,6 +107,7 @@ module.exports = {
   TIPOS_RESPALDO,
   MAX_OBSERVACIONES,
   validarAdmin,
+  validarConsulta,
   identidadRegistro,
   validarFiltros,
   validarDatosDesvinculacion,

@@ -30,3 +30,14 @@ export const descargarDocumentoDesvinculacion = (idProceso, identidad) =>
     cabeceras: cabeceras(identidad),
     respuestaBinaria: true,
   });
+
+export const obtenerPromedioIndemnizable = (idProceso, identidad) =>
+  solicitar(`${RUTA}/${idProceso}/promedio-indemnizable`, {
+    cabeceras: cabeceras(identidad),
+  });
+
+export const calcularPromedioIndemnizable = (idProceso, identidad) =>
+  solicitar(`${RUTA}/${idProceso}/promedio-indemnizable`, {
+    metodo: "POST",
+    cabeceras: cabeceras(identidad),
+  });

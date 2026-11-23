@@ -18,7 +18,9 @@ import {
   useAvisos,
 } from "../../components/ui";
 import { useRol, useUsuario } from "../../context/sesion";
+import { puedeAcceder } from "../../utils/permisos";
 import DesvinculacionFormulario from "./DesvinculacionFormulario";
+import PromedioIndemnizableModal from "./PromedioIndemnizableModal";
 import TablaDesvinculaciones from "./TablaDesvinculaciones";
 import { ESTADOS, opciones } from "./formato";
 import "./desvinculaciones.css";
@@ -30,6 +32,8 @@ export default function DesvinculacionesPage() {
   const rol = useRol();
   const idEmpleado = useUsuario();
   const identidad = useMemo(() => ({ idEmpleado, rol }), [idEmpleado, rol]);
+  // El Contador solo consulta: registrar bajas, descargar respaldos y calcular el promedio son del Administrador.
+  const puedeGestionar = puedeAcceder(rol, ["admin"]);
 
   const [procesos, setProcesos] = useState([]);
   const [causales, setCausales] = useState([]);
@@ -39,6 +43,7 @@ export default function DesvinculacionesPage() {
   const [filtros, setFiltros] = useState(FILTROS_VACIOS);
   const [formularioAbierto, setFormularioAbierto] = useState(false);
   const [descargandoId, setDescargandoId] = useState(null);
+  const [procesoPromedio, setProcesoPromedio] = useState(null);
 
   const cargar = useCallback(
     () =>
@@ -132,8 +137,12 @@ export default function DesvinculacionesPage() {
     <EstadoVacio
       icono={UserMinus}
       titulo="Aún no hay desvinculaciones registradas"
-      mensaje="Registre la causal formal de baja, la fecha de retiro y el documento de respaldo para iniciar el proceso de liquidación."
-      accion={botonRegistrar}
+      mensaje={
+        puedeGestionar
+          ? "Registre la causal formal de baja, la fecha de retiro y el documento de respaldo para iniciar el proceso de liquidación."
+          : "Aquí aparecerán los procesos de liquidación que registre el Administrador de RRHH."
+      }
+      accion={puedeGestionar && botonRegistrar}
     />
   );
 
@@ -145,7 +154,7 @@ export default function DesvinculacionesPage() {
         titulo="Desvinculaciones"
         idTitulo="desv-titulo"
         descripcion="Registro de la causal formal de baja, fecha de retiro y respaldo, que inicia el proceso de liquidación."
-        acciones={!errorCarga && procesos.length > 0 && botonRegistrar}
+        acciones={puedeGestionar && !errorCarga && procesos.length > 0 && botonRegistrar}
       />
 
       {errorCarga ? (
@@ -195,6 +204,8 @@ export default function DesvinculacionesPage() {
             vacio={vacio}
             onDescargar={descargar}
             descargandoId={descargandoId}
+            puedeDescargar={puedeGestionar}
+            onVerPromedio={setProcesoPromedio}
           />
         </Tarjeta>
       )}
@@ -205,6 +216,16 @@ export default function DesvinculacionesPage() {
           causales={causales}
           onGuardar={guardar}
           onCancelar={() => setFormularioAbierto(false)}
+        />
+      )}
+
+      {procesoPromedio && (
+        <PromedioIndemnizableModal
+          proceso={procesoPromedio}
+          identidad={identidad}
+          onCerrar={() => setProcesoPromedio(null)}
+          onCalculado={cargar}
+          puedeCalcular={puedeGestionar}
         />
       )}
     </section>
