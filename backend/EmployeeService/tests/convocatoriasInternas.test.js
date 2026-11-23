@@ -499,3 +499,19 @@ describe('cierre automático al vencer la fecha de cierre', () => {
     expect(titulos(cerradas)).toContain('Vencida sin cerrar');
   });
 });
+
+describe('el día de cierre se cuenta con la hora de La Paz, no con la del servidor de base de datos', () => {
+  afterAll(() => pool.query("SET TimeZone = 'America/La_Paz'"));
+
+  test.each(['Etc/GMT+12', 'Etc/GMT-14'])('con la base en %s, la que cierra hoy sigue abierta y no se cierra', async (zona) => {
+    await pool.query(`SET TimeZone = '${zona}'`);
+    const res = await request(app).get('/convocatorias').set(cabecerasEmpleado(ACTIVA));
+    expect(res.body.convocatorias.find((c) => c.titulo === 'Abierta que cierra hoy')).toMatchObject({
+      estado: 'ABIERTA',
+      acepta_postulaciones: true,
+      dias_para_cierre: 0,
+    });
+    expect(res.body.convocatorias.find((c) => c.titulo === 'Programada')).toMatchObject({ estado: 'PROGRAMADA', dias_para_cierre: 20 });
+    expect(await cerrarConvocatoriasVencidas()).toEqual([]);
+  });
+});
