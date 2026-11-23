@@ -5,7 +5,9 @@ const { rangoPeriodo } = require("./condiciones");
 
 // Mes comercial: un mes completo de contrato se paga como 30 días.
 const DIAS_MES_COMERCIAL = 30;
-const ROLES_PLANILLA = ["admin"];
+// RF-44 (planilla mensual), RF-47 (aguinaldos) y RF-49 (reporte contable) nombran al Contador como
+// responsable; antes solo "admin" podía generar, aprobar o consultar, porque el rol de Contador no existía.
+const ROLES_PLANILLA = ["admin", "contador"];
 const MAXIMO_NOMBRES = 5;
 
 const CAMPOS_MINUTOS = [
@@ -55,10 +57,15 @@ function tramoSinConsolidar(periodos, desde, hasta) {
   return { desde: dia, hasta: siguiente ? diaAnterior(siguiente.fecha_inicio) : hasta };
 }
 
-// Quién genera o aprueba: el Administrador de RRHH con su usuario de prueba.
-function validarResponsable({ idEmpleado, rol }) {
+// Quién genera, aprueba o consulta: el Administrador de RRHH o el Contador, con su usuario de prueba.
+// `mensaje` deja personalizar el texto del error para una acción que no sea "generar, aprobar o descartar"
+// (por ejemplo, solo consultar el reporte contable).
+function validarResponsable(
+  { idEmpleado, rol },
+  mensaje = "Solo el Administrador de RRHH o el Contador pueden generar, aprobar o descartar planillas."
+) {
   if (!ROLES_PLANILLA.includes((rol ?? "").trim().toLowerCase())) {
-    throw new ErrorApp(403, "Solo el Administrador de RRHH puede generar, aprobar o descartar planillas.");
+    throw new ErrorApp(403, mensaje);
   }
   if (!idEmpleado) throw new ErrorApp(401, "Identifíquese: elija su usuario en la barra superior.");
   if (!UUID_RE.test(idEmpleado)) throw new ErrorApp(401, "El usuario indicado no es válido.");

@@ -13,6 +13,7 @@ import {
   Tarjeta,
   useAvisos,
 } from "../../components/ui";
+import { useRol, useUsuario } from "../../context/sesion";
 import { formatearBs } from "../planillas/formato";
 import "../planillas/planillas.css";
 import "../conceptos/conceptos.css";
@@ -99,6 +100,9 @@ function TablaCentro({ centro }) {
 
 export default function ReporteContablePage() {
   const avisar = useAvisos();
+  const rol = useRol();
+  const idEmpleado = useUsuario();
+  const identidad = { idEmpleado, rol };
   const [recurso, setRecurso] = useState("planilla");
   const [periodo, setPeriodo] = useState(mesAnterior);
   const [gestion, setGestion] = useState(gestionAnterior);
@@ -115,13 +119,14 @@ export default function ReporteContablePage() {
     if (!valido) return undefined;
     let vigente = true;
     setCarga(null);
-    generarReporteContable(recurso, identificador)
+    generarReporteContable(recurso, identificador, identidad)
       .then((reporte) => vigente && setCarga({ recurso, identificador, reporte }))
       .catch((e) => vigente && setCarga({ recurso, identificador, error: e.message }));
     return () => {
       vigente = false;
     };
-  }, [recurso, identificador, valido, intento]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recurso, identificador, valido, intento, idEmpleado, rol]);
 
   const actual = valido && carga?.recurso === recurso && carga?.identificador === identificador ? carga : null;
   const cargando = valido && !actual;
@@ -141,7 +146,7 @@ export default function ReporteContablePage() {
   const descargar = async (formato) => {
     setDescargando(formato);
     try {
-      const blob = await descargarReporteContable(recurso, identificador, formato);
+      const blob = await descargarReporteContable(recurso, identificador, formato, identidad);
       const url = URL.createObjectURL(blob);
       const enlace = document.createElement("a");
       enlace.href = url;

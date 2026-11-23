@@ -6,6 +6,9 @@ export const ROLES = {
   supervisor: { nombre: "Supervisor de área", incluye: ["empleado"] },
   empleado: { nombre: "Empleado", incluye: [] },
   auditor: { nombre: "Auditor (TI)", incluye: [] },
+  // RF-47 y RF-49 nombran al Contador como responsable de planillas de aguinaldos y del reporte contable;
+  // antes de este rol, solo admin podía usar esas pantallas.
+  contador: { nombre: "Contador", incluye: ["empleado"] },
 };
 
 export const ROL_PREDETERMINADO = "admin";

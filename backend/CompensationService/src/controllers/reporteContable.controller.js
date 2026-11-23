@@ -4,6 +4,12 @@ const { ErrorApp } = require("../utils/errores");
 
 const FORMATOS = ["json", "csv", "pdf"];
 
+// Temporal: el portal envía quién actúa (X-Empleado-Id) y su rol (X-Rol) hasta contar con autenticación.
+const identidad = (req) => ({
+  idEmpleado: req.get("X-Empleado-Id")?.trim() || null,
+  rol: req.get("X-Rol")?.trim() || null,
+});
+
 const descarga = (res, tipo, { nombre, contenido }) => {
   res.set({
     "Content-Type": tipo,
@@ -30,12 +36,12 @@ async function enviar(res, formato, reporte) {
 // RF-49: consolidado en pantalla (JSON) o descargable con ?formato=csv | pdf.
 async function planilla(req, res) {
   const formato = formatoDe(req);
-  await enviar(res, formato, await servicio.generarPlanilla(req.params.periodo));
+  await enviar(res, formato, await servicio.generarPlanilla(req.params.periodo, identidad(req)));
 }
 
 async function aguinaldo(req, res) {
   const formato = formatoDe(req);
-  await enviar(res, formato, await servicio.generarAguinaldo(req.params.gestion));
+  await enviar(res, formato, await servicio.generarAguinaldo(req.params.gestion, identidad(req)));
 }
 
 module.exports = { planilla, aguinaldo };
