@@ -24,3 +24,12 @@ export const aprobarPlanilla = (id, identidad) =>
 // destino: "contabilidad" o "pagos".
 export const reenviarIntegracion = (id, destino, identidad) =>
   solicitar(`${RUTA}/${id}/integraciones/${destino}/reenviar`, { metodo: "POST", cabeceras: cabeceras(identidad) });
+
+// Contabilidad y Pagos no existen en este sistema: se simula su respuesta en vez de esperarla de verdad.
+// datos: { resultado: "CONFIRMADA" | "RECHAZADA", referencia?, motivo? (obligatorio si se rechaza) }.
+export const simularConfirmacionPlanilla = (id, destino, datos, identidad) =>
+  solicitar(`${RUTA}/${id}/integraciones/${destino}/simular-confirmacion`, {
+    metodo: "POST",
+    cuerpo: datos,
+    cabeceras: cabeceras(identidad),
+  });

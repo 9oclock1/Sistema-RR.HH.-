@@ -1,7 +1,7 @@
 const modelo = require("../models/eventos.model");
 const pubsub = require("../config/pubsub");
 const mensajesPublicados = require("../utils/mensajesPublicados");
-const { atributosDe, esperaReintento, errorDePublicacion } = require("../utils/integraciones");
+const { DESTINOS, atributosDe, esperaReintento, errorDePublicacion } = require("../utils/integraciones");
 
 const LOTE = 10;
 const SEGUNDOS_RESERVA = 60;
@@ -48,18 +48,31 @@ async function despachar() {
   return eventos.length;
 }
 
-// Solo para el emulador de desarrollo (PUBSUB_EMULATOR_HOST): crea el tópico propio si falta, para no tener
-// que provisionarlo a mano cada vez que se reinicia el emulador. Contra el proyecto real nunca se llama (las
-// credenciales de la app no deberían poder crear tópicos; eso lo provisiona la infraestructura).
+// El tópico donde Contabilidad o Pagos publicarían de verdad su confirmación (mismo tópico que
+// confirmaciones.service suscribe). Lo usan las simulaciones de confirmación (planilla mensual y
+// aguinaldos) para publicar ahí en vez de aplicar el resultado en el proceso: así la suscripción real de
+// este mismo servicio es la que lo recibe.
+const topicoDeDestino = (destino) => `ucb-sis323-sub-${DESTINOS[destino].grupo.toLowerCase()}`;
+
+// Solo para el emulador de desarrollo: crea el tópico si falta (genérico, para el propio o el de un
+// destino), para no depender de que alguien lo haya provisionado a mano. Contra el proyecto real nunca se
+// llama (las credenciales de la app no deberían poder crear tópicos; eso lo provisiona la infraestructura).
+async function asegurarTopico(clientePubSub, topico) {
+  if (!process.env.PUBSUB_EMULATOR_HOST) return false;
+  try {
+    await clientePubSub.topic(topico).get({ autoCreate: true });
+    return true;
+  } catch (error) {
+    console.error(`No se pudo asegurar el tópico ${topico} en el emulador:`, error.message);
+    return false;
+  }
+}
+
 async function asegurarTopicoEnEmulador() {
-  if (!process.env.PUBSUB_EMULATOR_HOST) return;
   const clientePubSub = pubsub.obtenerCliente();
   if (!clientePubSub) return;
-  try {
-    await clientePubSub.topic(topicoPropio()).get({ autoCreate: true });
+  if (await asegurarTopico(clientePubSub, topicoPropio())) {
     console.log(`Tópico ${topicoPropio()} listo en el emulador de Pub/Sub.`);
-  } catch (error) {
-    console.error(`No se pudo asegurar el tópico ${topicoPropio()} en el emulador:`, error.message);
   }
 }
 
@@ -80,4 +93,4 @@ function iniciarDespachador() {
   }, intervalo).unref();
 }
 
-module.exports = { topicoPropio, despachar, iniciarDespachador };
+module.exports = { topicoPropio, despachar, iniciarDespachador, topicoDeDestino, asegurarTopico };

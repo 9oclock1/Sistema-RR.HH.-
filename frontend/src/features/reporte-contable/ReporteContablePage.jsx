@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Download, FileSpreadsheet, FileText, Landmark } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, FlaskConical, Landmark } from "lucide-react";
 import { descargarReporteContable, generarReporteContable } from "../../api/reporteContable";
+import { listarAguinaldos, simularConfirmacionAguinaldo } from "../../api/aguinaldo";
+import { listarPlanillas, simularConfirmacionPlanilla } from "../../api/planillas";
 import {
   Alerta,
   Boton,
@@ -17,6 +19,8 @@ import { useRol, useUsuario } from "../../context/sesion";
 import { formatearBs } from "../planillas/formato";
 import "../planillas/planillas.css";
 import "../conceptos/conceptos.css";
+
+const DESTINOS_SIMULAR = ["contabilidad", "pagos"];
 
 const RECURSOS = [
   { valor: "planilla", etiqueta: "Planilla mensual" },
@@ -110,6 +114,7 @@ export default function ReporteContablePage() {
   const [carga, setCarga] = useState(null);
   const [intento, setIntento] = useState(0);
   const [descargando, setDescargando] = useState(null);
+  const [simulando, setSimulando] = useState(false);
 
   const identificador = recurso === "planilla" ? periodo : gestion;
   const anioValido = Number.isInteger(gestion) && gestion >= 2000 && gestion <= 2100;
@@ -121,7 +126,7 @@ export default function ReporteContablePage() {
     setCarga(null);
     generarReporteContable(recurso, identificador, identidad)
       .then((reporte) => vigente && setCarga({ recurso, identificador, reporte }))
-      .catch((e) => vigente && setCarga({ recurso, identificador, error: e.message }));
+      .catch((e) => vigente && setCarga({ recurso, identificador, error: e.message, codigo: e.codigo }));
     return () => {
       vigente = false;
     };
@@ -142,6 +147,38 @@ export default function ReporteContablePage() {
     () => (reporte?.centros_costo ?? []).map((c) => ({ valor: c.centro_costo, etiqueta: c.centro_costo })),
     [reporte]
   );
+
+  // El reporte exige el recurso CERRADA (ambas confirmaciones ya llegaron): mientras eso no pase, no hay
+  // nada que mostrar. Este botón simula que Contabilidad y Pagos aceptan, pero de la misma forma real que ya
+  // usan las pantallas de Planillas/Aguinaldos: PUBLICA la confirmación en Pub/Sub (no la aplica directo), y
+  // la suscripción real de este mismo servicio la recibe y la cierra, igual que una confirmación genuina.
+  const simularAceptacion = async () => {
+    setSimulando(true);
+    try {
+      const recursoActual =
+        recurso === "planilla"
+          ? (await listarPlanillas(periodo))[0]
+          : (await listarAguinaldos()).find((a) => a.gestion === gestion);
+      if (!recursoActual) throw new Error("No se encontró el recurso para simular la aceptación.");
+      const simular = recurso === "planilla" ? simularConfirmacionPlanilla : simularConfirmacionAguinaldo;
+      const pendientes = DESTINOS_SIMULAR.filter((d) => recursoActual.integraciones[d].estado !== "CONFIRMADA");
+      if (pendientes.length === 0) {
+        avisar({ tono: "info", titulo: "Ya estaba todo confirmado", mensaje: "Debería cerrarse en unos segundos." });
+      } else {
+        await Promise.all(pendientes.map((d) => simular(recursoActual.id_planilla ?? recursoActual.id_aguinaldo, d, { resultado: "CONFIRMADA" }, identidad)));
+        avisar({
+          tono: "info",
+          titulo: "Simulación enviada",
+          mensaje: "Se publicó la aceptación de Contabilidad y Pagos; el reporte se podrá generar en unos segundos.",
+        });
+      }
+      setTimeout(() => setIntento((n) => n + 1), 2500);
+    } catch (e) {
+      avisar({ tono: "peligro", titulo: "No se pudo simular la aceptación", mensaje: e.message });
+    } finally {
+      setSimulando(false);
+    }
+  };
 
   const descargar = async (formato) => {
     setDescargando(formato);
@@ -215,7 +252,7 @@ export default function ReporteContablePage() {
           )}
           {reporte && (
             <div className="planilla-barra__acciones">
-              <Boton variante="sutil" icono={FileSpreadsheet} cargando={descargando === "csv"} onClick={() => descargar("csv")}>
+              <Boton variante="sutil" icono={FileSpreadsheet} cargando={descargando === "xlsx"} onClick={() => descargar("xlsx")}>
                 Excel
               </Boton>
               <Boton variante="sutil" icono={FileText} cargando={descargando === "pdf"} onClick={() => descargar("pdf")}>
@@ -231,9 +268,16 @@ export default function ReporteContablePage() {
             role="alert"
             titulo="No se pudo generar el reporte"
             acciones={
-              <Boton tamano="sm" onClick={() => setIntento((n) => n + 1)}>
-                Reintentar
-              </Boton>
+              <>
+                {actual.codigo === "NO_CERRADA" && (
+                  <Boton tamano="sm" variante="sutil" icono={FlaskConical} cargando={simulando} onClick={simularAceptacion}>
+                    Simular aceptación
+                  </Boton>
+                )}
+                <Boton tamano="sm" onClick={() => setIntento((n) => n + 1)}>
+                  Reintentar
+                </Boton>
+              </>
             }
           >
             {actual.error}
