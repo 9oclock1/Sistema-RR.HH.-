@@ -6,6 +6,7 @@ const DIA_MS = 24 * 60 * 60 * 1000;
 // Más de 90 días de trabajo continuo dan derecho a la indemnización (DS 110).
 const DIAS_MINIMOS = 90;
 const DIVISORES = { ANIO: 1, MES: 12, DIA: 360, SUELDO: 1 };
+const SUELDOS_DESAHUCIO = 3;
 // Despido por causa justificada: no hay indemnización ni desahucio (LGT, art. 16).
 const CAUSALES_SIN_INDEMNIZACION = new Set(["DESPIDO_LEGAL"]);
 
@@ -58,6 +59,30 @@ function reglaIndemnizacion(codigoCausal, diasServicio) {
   };
 }
 
+// AC3, AC4: el desahucio sale de corresponde_desahucio, copiado de la causal al registrar la baja (KAN-74).
+function reglaDesahucio(proceso, diasServicio) {
+  if (CAUSALES_SIN_INDEMNIZACION.has(proceso.codigo_causal)) {
+    return {
+      corresponde: false,
+      motivo: "Despido por causa justificada: no corresponde desahucio (LGT, art. 16).",
+    };
+  }
+  if (!proceso.corresponde_desahucio) {
+    const causal = proceso.causal_nombre ? `«${proceso.causal_nombre}»` : "registrada";
+    return { corresponde: false, motivo: `La causal ${causal} no da lugar a desahucio.` };
+  }
+  if (diasServicio <= DIAS_MINIMOS) {
+    return {
+      corresponde: false,
+      motivo: `Retiro dentro del período de prueba de ${DIAS_MINIMOS} días: no corresponde desahucio (LGT, art. 13).`,
+    };
+  }
+  return {
+    corresponde: true,
+    motivo: `Retiro sin causa justificada: corresponden ${SUELDOS_DESAHUCIO} sueldos promedio (LGT, art. 12).`,
+  };
+}
+
 function renglon(concepto, unidad, cantidad, descripcion, baseCentavos) {
   const divisor = DIVISORES[unidad];
   return {
@@ -84,7 +109,7 @@ function calcularBeneficios(proceso, promedio) {
   const tiempo = tiempoDeServicio(proceso.fecha_ingreso, proceso.fecha_retiro);
   const baseCentavos = aCentavos(Number(promedio));
   const indemnizacion = reglaIndemnizacion(proceso.codigo_causal, tiempo.dias_servicio);
-  const desahucio = { corresponde: false, motivo: "El desahucio aún no se calcula." };
+  const desahucio = reglaDesahucio(proceso, tiempo.dias_servicio);
 
   const renglones = [];
   if (indemnizacion.corresponde) {
@@ -96,6 +121,11 @@ function calcularBeneficios(proceso, promedio) {
     for (const [unidad, cantidad, descripcion] of partes) {
       if (cantidad > 0) renglones.push(renglon("INDEMNIZACION", unidad, cantidad, descripcion, baseCentavos));
     }
+  }
+  if (desahucio.corresponde) {
+    renglones.push(
+      renglon("DESAHUCIO", "SUELDO", SUELDOS_DESAHUCIO, "Desahucio (tres sueldos promedio)", baseCentavos)
+    );
   }
 
   const sumar = (concepto) =>
@@ -124,7 +154,9 @@ function calcularBeneficios(proceso, promedio) {
 
 module.exports = {
   DIAS_MINIMOS,
+  SUELDOS_DESAHUCIO,
   tiempoDeServicio,
   reglaIndemnizacion,
+  reglaDesahucio,
   calcularBeneficios,
 };
