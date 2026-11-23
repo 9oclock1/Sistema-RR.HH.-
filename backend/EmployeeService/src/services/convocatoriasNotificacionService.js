@@ -5,26 +5,26 @@ const URL_NOTIFICACIONES = process.env.NOTIFICATION_SERVICE_URL || 'http://notif
 const TIEMPO_ESPERA_MS = 15000;
 const REMITENTE = 'Recursos Humanos - Convocatorias internas';
 
-const describirAntiguedad = (meses) => `${meses} ${meses === 1 ? 'mes' : 'meses'} de antigüedad`;
+const describirMeses = (meses) => `${meses} ${meses === 1 ? 'mes' : 'meses'}`;
 
-const armarMensaje = (convocatoria) => ({
+const armarMensaje = (convocatoria, destinatario) => ({
   asunto: `Convocatoria interna: ${convocatoria.titulo}`,
   contenido: [
-    `Recursos Humanos abrió una convocatoria de ascenso para el cargo «${convocatoria.cargo}» en la sucursal ${convocatoria.sucursal}.`,
+    `${destinatario.nombres}, Recursos Humanos abrió una convocatoria de ascenso para el cargo «${convocatoria.cargo}» en la sucursal ${convocatoria.sucursal}.`,
+    `Le llega este aviso porque cumple la antigüedad mínima de ${describirMeses(convocatoria.meses_antiguedad_minima)} (usted tiene ${describirMeses(destinatario.meses_antiguedad)} al cierre).`,
     '',
     `Requisitos: ${convocatoria.descripcion_requisitos}`,
-    `Antigüedad mínima: ${describirAntiguedad(convocatoria.meses_antiguedad_minima)}.`,
-    `Nota mínima de desempeño: ${convocatoria.nota_minima_desempeno} sobre 100.`,
+    `Nota mínima de desempeño: ${convocatoria.nota_minima_desempeno} sobre 100. Se valida con su última evaluación al postularse.`,
     '',
     `Postulaciones del ${formatearFecha(convocatoria.fecha_inicio_postulacion)} al ${formatearFecha(convocatoria.fecha_cierre_postulacion)}.`,
-    'Consulte el detalle en «Convocatorias de ascenso» del portal del empleado. Es exclusiva para empleados activos.',
+    'Consulte el detalle y postúlese en «Convocatorias de ascenso» del portal del empleado.',
   ].join('\n'),
 });
 
-const notificarConvocatoria = async (convocatoria, { idPublicador } = {}) => {
-  const { asunto, contenido } = armarMensaje(convocatoria);
+const avisarElegible = async (convocatoria, destinatario, { idPublicador } = {}) => {
+  const { asunto, contenido } = armarMensaje(convocatoria, destinatario);
   try {
-    const respuesta = await fetch(`${URL_NOTIFICACIONES}/comunicaciones/institucional`, {
+    const respuesta = await fetch(`${URL_NOTIFICACIONES}/comunicaciones/directa`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -32,8 +32,7 @@ const notificarConvocatoria = async (convocatoria, { idPublicador } = {}) => {
         'X-Usuario-Id': idPublicador || USUARIO_SISTEMA,
       },
       body: JSON.stringify({
-        tipo_codigo: 'COMUNICADO',
-        alcance_codigo: 'GENERAL',
+        id_empleado_destinatario: destinatario.id_empleado,
         asunto,
         contenido,
         requiere_confirmacion: false,
@@ -41,14 +40,12 @@ const notificarConvocatoria = async (convocatoria, { idPublicador } = {}) => {
       }),
       signal: AbortSignal.timeout(TIEMPO_ESPERA_MS),
     });
+    if (respuesta.ok) return { entregada: true };
     const cuerpo = await respuesta.json().catch(() => null);
-    if (!respuesta.ok) {
-      return { entregada: false, error: `NotificationService respondió ${respuesta.status}: ${cuerpo?.error || 'sin detalle'}` };
-    }
-    return { entregada: true, destinatarios: Number(cuerpo?.cantidad_destinatarios) || 0 };
+    return { entregada: false, error: `NotificationService respondió ${respuesta.status}: ${cuerpo?.error || 'sin detalle'}` };
   } catch (error) {
     return { entregada: false, error: `No se pudo contactar a NotificationService: ${error.message}` };
   }
 };
 
-module.exports = { notificarConvocatoria, armarMensaje };
+module.exports = { avisarElegible, armarMensaje };
