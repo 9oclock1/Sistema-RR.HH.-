@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ChartLine, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, Gift, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Scale, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ChartLine, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, Gift, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, Landmark, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Scale, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
@@ -51,6 +51,7 @@ import MisBoletasPage from "../features/boletas/MisBoletasPage";
 import AguinaldoPage from "../features/aguinaldo/AguinaldoPage";
 import PlanillasFiscalesPage from "../features/planillas-fiscales/PlanillasFiscalesPage";
 import { RUTA_PLANILLAS_FISCALES } from "../features/planillas-fiscales/planillasFiscales";
+import ReporteContablePage from "../features/reporte-contable/ReporteContablePage";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import ContratosView from "../features/Contratos/ContratosView";
 import { RUTA_CONTRATOS } from "../features/Contratos/utils/opciones";
@@ -370,6 +371,14 @@ export const SECCIONES = [
         icono: Gift,
         roles: ["admin", "contador"],
         pagina: AguinaldoPage,
+      },
+      {
+        ruta: "/planillas/reporte-contable",
+        etiqueta: "Reporte contable",
+        descripcion: "Gastos y pasivos de nómina por cuenta contable y centro de costo, con el estado de conciliación con Contabilidad y Pagos.",
+        icono: Landmark,
+        roles: ["admin", "contador"],
+        pagina: ReporteContablePage,
       },
       {
         ruta: RUTA_AUDITORIA_BONOS,

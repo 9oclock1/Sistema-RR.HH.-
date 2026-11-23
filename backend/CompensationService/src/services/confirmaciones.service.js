@@ -6,17 +6,15 @@ const eventos = require("../models/eventos.model");
 const pubsub = require("../config/pubsub");
 const externos = require("./externos.service");
 const { responsableEn } = require("./planillas.service");
+// topicoDeDestino/asegurarTopico viven en eventos.service.js (no en este archivo) porque planillas.service.js
+// también los necesita para su propia simulación de confirmación, y planillas.service.js no puede requerir
+// este archivo sin crear un ciclo (confirmaciones.service ya requiere a planillas.service arriba).
+const { topicoDeDestino, asegurarTopico: asegurarTopicoEnEmulador } = require("./eventos.service");
 const { enTransaccion } = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const { validarResponsable } = require("../utils/planillas");
-const {
-  DESTINOS,
-  MAXIMO_INTENTOS_ENTRADA,
-  esperaNuevaEntrega,
-  esConfirmacion,
-  leerConfirmacion,
-} = require("../utils/integraciones");
+const { MAXIMO_INTENTOS_ENTRADA, esperaNuevaEntrega, esConfirmacion, leerConfirmacion } = require("../utils/integraciones");
 
 const ESTADOS = ["RECIBIDO", "PROCESADO", "IGNORADO", "FALLIDO"];
 const LIMITE_CONSULTA = 100;
@@ -140,23 +138,6 @@ function topicosDeConfirmacion() {
     .split(",")
     .map((t) => t.trim())
     .filter(Boolean);
-}
-
-// El tópico donde Contabilidad o Pagos publicarían de verdad su confirmación (mismo tópico que escuchar()
-// suscribe). Lo usa la simulación de confirmación del aguinaldo (RF-47, KAN-67) para publicar ahí en vez de
-// aplicar el resultado en el proceso: así la suscripción real de este mismo servicio es la que lo recibe.
-const topicoDeDestino = (destino) => `ucb-sis323-sub-${DESTINOS[destino].grupo.toLowerCase()}`;
-
-// Solo para el emulador de desarrollo: crea el tópico si falta, para no depender de que alguien lo haya
-// provisionado a mano (scripts/configurar-pubsub-emulador.sh) antes de arrancar. Contra el proyecto real
-// nunca se llama (las credenciales de la app no deberían poder crear tópicos).
-async function asegurarTopicoEnEmulador(clientePubSub, topico) {
-  if (!process.env.PUBSUB_EMULATOR_HOST) return;
-  try {
-    await clientePubSub.topic(topico).get({ autoCreate: true });
-  } catch (error) {
-    console.error(`No se pudo asegurar el tópico ${topico} en el emulador:`, error.message);
-  }
 }
 
 async function escuchar(clientePubSub, topico) {
