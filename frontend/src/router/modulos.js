@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, UserCheck, UserMinus, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
@@ -31,6 +31,8 @@ import ApplicantRegistration from "../features/recruitment/ApplicantRegistration
 import BandejaMensajesPage from "../features/comunicaciones/BandejaMensajesPage";
 import CapacitacionesView from "../features/Capacitaciones/CapacitacionesView";
 import { RUTA_CAPACITACIONES } from "../features/Capacitaciones/utils/opciones";
+import PlanesAscensoPage from "../features/planes-ascenso/PlanesAscensoPage";
+import { RUTA_PLANES_ASCENSO } from "../features/planes-ascenso/planesAscenso";
 import NotificacionesPage from "../features/notificaciones/NotificacionesPage";
 import CargosList from "../features/Cargos/CargosList";
 import ConceptosPage from "../features/conceptos/ConceptosPage";
@@ -373,6 +375,14 @@ export const SECCIONES = [
         icono: GraduationCap,
         roles: ["gerente"],
         pagina: CapacitacionesView,
+      },
+      {
+        ruta: RUTA_PLANES_ASCENSO,
+        etiqueta: "Planes de ascenso",
+        descripcion: "Seguimiento de las capacitaciones requeridas antes de un ascenso, con el avance de cada candidato.",
+        icono: TrendingUp,
+        roles: ["gerente"],
+        pagina: PlanesAscensoPage,
       },
       {
         ruta: RUTA_CONTRATOS,

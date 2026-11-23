@@ -645,3 +645,34 @@ CREATE INDEX IF NOT EXISTS ix_solicitud_servicio_curso_estado
     ON SOLICITUDES_SERVICIO_CAPACITACION (id_curso, estado);
 CREATE INDEX IF NOT EXISTS ix_historial_solicitud_servicio_fecha
     ON HISTORIAL_SOLICITUD_SERVICIO (id_solicitud_servicio, registrado_en DESC);
+
+-- Table: PLANES_ASCENSO (KAN-83)
+-- Plan de capacitación previo a un ascenso: el Administrador lo asigna a un empleado con el cargo al que aspira.
+-- Los cursos del plan son los de REQUISITOS_CAPACITACION_CARGO del cargo destino y su estado (pendiente o cumplido)
+-- se calcula al consultar contra el Kardex (CAPACITACIONES_CERTIFICACION), así refleja al instante lo que se registre.
+-- Un empleado tiene a lo sumo un plan EN_CURSO. Al formalizar el ascenso queda FORMALIZADO, con constancia de si se
+-- formalizó con cursos pendientes (tras la advertencia) y cuántos eran.
+CREATE TABLE PLANES_ASCENSO (
+    id_plan UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    id_cargo_destino UUID NOT NULL,
+    estado varchar(15) NOT NULL DEFAULT 'EN_CURSO',
+    observaciones varchar(500) NULL,
+    asignado_por UUID NULL,
+    asignado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    formalizado_en TIMESTAMPTZ NULL,
+    formalizado_por UUID NULL,
+    cursos_pendientes_al_formalizar int NULL,
+    CONSTRAINT PLANES_ASCENSO_pk PRIMARY KEY (id_plan),
+    CONSTRAINT ck_plan_ascenso_estado CHECK (estado IN ('EN_CURSO', 'FORMALIZADO')),
+    CONSTRAINT ck_plan_ascenso_formalizado CHECK (
+        (estado = 'FORMALIZADO') = (formalizado_en IS NOT NULL)
+        AND (estado = 'FORMALIZADO') = (cursos_pendientes_al_formalizar IS NOT NULL)
+    ),
+    CONSTRAINT ck_plan_ascenso_pendientes CHECK (cursos_pendientes_al_formalizar IS NULL OR cursos_pendientes_al_formalizar >= 0),
+    CONSTRAINT PLANES_ASCENSO_EMPLEADOS FOREIGN KEY (id_empleado) REFERENCES EMPLEADOS (id_empleado),
+    CONSTRAINT PLANES_ASCENSO_CARGOS FOREIGN KEY (id_cargo_destino) REFERENCES CARGOS (id_cargo)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_plan_ascenso_en_curso
+    ON PLANES_ASCENSO (id_empleado)
+    WHERE estado = 'EN_CURSO';

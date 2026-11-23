@@ -93,4 +93,39 @@ INSERT INTO ASIGNACIONES_EMPLEADO (id_asignacion, id_empleado, id_cargo, id_sucu
   ('f0000000-0000-4000-8000-000000000752', 'f0000000-0000-4000-8000-000000000742', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', '2024-02-01'),
   ('f0000000-0000-4000-8000-000000000753', 'f0000000-0000-4000-8000-000000000743', 'f0000000-0000-4000-8000-000000000105', 'f0000000-0000-4000-8000-000000000012', '2021-08-01')
 ON CONFLICT DO NOTHING;
+-- KAN-83: seguimiento del plan de capacitación previo al ascenso.
+-- Cursos requeridos: Supervisor de Cajas (104) exige arqueo, liderazgo y seguridad (este último vence a los 24 meses);
+-- Jefe de Atención al Cliente (103) exige atención avanzada y liderazgo.
+--   Carlos (cajero -> Supervisor): los 3 cursos al día                              -> 100 %
+--   Ana (cajero -> Supervisor): arqueo y liderazgo; su certificado de seguridad venció -> 67 % (1 pendiente)
+--   Paola (asesora -> Jefe de Atención): solo atención avanzada                       -> 50 %
+--   Diego (cajero -> Supervisor): ningún curso todavía                                -> 0 %
+INSERT INTO CURSOS_CAPACITACION (id_curso, codigo, nombre, descripcion, horas_academicas, tipo_capacitacion, requiere_vencimiento, meses_vigencia) VALUES
+  ('f0000000-0000-4000-8000-000000000c01', 'ATC-AVZ', 'Atención al cliente avanzada', 'Manejo de reclamos y fidelización.', 24, 'TECNICA', FALSE, NULL),
+  ('f0000000-0000-4000-8000-000000000c02', 'CAJ-ARQ', 'Arqueo y control de caja', 'Cuadre, faltantes y sobrantes, custodia de valores.', 16, 'TECNICA', FALSE, NULL),
+  ('f0000000-0000-4000-8000-000000000c03', 'LID-EQ', 'Liderazgo de equipos', 'Conducción de equipos, delegación y retroalimentación.', 32, 'TECNICA', FALSE, NULL),
+  ('f0000000-0000-4000-8000-000000000c04', 'SEG-PA', 'Seguridad y primeros auxilios', 'Evacuación, extintores y primeros auxilios.', 12, 'CERTIFICACION', TRUE, 24)
+ON CONFLICT DO NOTHING;
+INSERT INTO REQUISITOS_CAPACITACION_CARGO (id_requisito_cargo, id_cargo, id_curso, es_obligatorio, meses_validez_requerida) VALUES
+  ('f0000000-0000-4000-8000-000000000c11', 'f0000000-0000-4000-8000-000000000104', 'f0000000-0000-4000-8000-000000000c02', TRUE, NULL),
+  ('f0000000-0000-4000-8000-000000000c12', 'f0000000-0000-4000-8000-000000000104', 'f0000000-0000-4000-8000-000000000c03', TRUE, NULL),
+  ('f0000000-0000-4000-8000-000000000c13', 'f0000000-0000-4000-8000-000000000104', 'f0000000-0000-4000-8000-000000000c04', TRUE, NULL),
+  ('f0000000-0000-4000-8000-000000000c14', 'f0000000-0000-4000-8000-000000000103', 'f0000000-0000-4000-8000-000000000c01', TRUE, NULL),
+  ('f0000000-0000-4000-8000-000000000c15', 'f0000000-0000-4000-8000-000000000103', 'f0000000-0000-4000-8000-000000000c03', TRUE, NULL)
+ON CONFLICT DO NOTHING;
+INSERT INTO CAPACITACIONES_CERTIFICACION (id_capacitacion, id_empleado, id_curso, institucion_emisora, fecha_inicio, fecha_fin, fecha_emision, fecha_vencimiento) VALUES
+  ('f0000000-0000-4000-8000-000000000c21', 'f0000000-0000-4000-8000-000000000031', 'f0000000-0000-4000-8000-000000000c02', 'Instituto de Formación Financiera', '2025-08-04', '2025-08-15', '2025-08-20', NULL),
+  ('f0000000-0000-4000-8000-000000000c22', 'f0000000-0000-4000-8000-000000000031', 'f0000000-0000-4000-8000-000000000c03', 'Escuela de Gestión Andina', '2026-02-02', '2026-03-13', '2026-03-20', NULL),
+  ('f0000000-0000-4000-8000-000000000c23', 'f0000000-0000-4000-8000-000000000031', 'f0000000-0000-4000-8000-000000000c04', 'Cruz Roja Boliviana', '2025-09-08', '2025-09-10', '2025-09-12', '2027-09-12'),
+  ('f0000000-0000-4000-8000-000000000c24', 'f0000000-0000-4000-8000-000000000035', 'f0000000-0000-4000-8000-000000000c02', 'Instituto de Formación Financiera', '2025-06-02', '2025-06-13', '2025-06-18', NULL),
+  ('f0000000-0000-4000-8000-000000000c25', 'f0000000-0000-4000-8000-000000000035', 'f0000000-0000-4000-8000-000000000c03', 'Escuela de Gestión Andina', '2026-02-02', '2026-03-13', '2026-03-20', NULL),
+  ('f0000000-0000-4000-8000-000000000c26', 'f0000000-0000-4000-8000-000000000035', 'f0000000-0000-4000-8000-000000000c04', 'Cruz Roja Boliviana', '2024-05-06', '2024-05-08', '2024-05-10', '2026-05-10'),
+  ('f0000000-0000-4000-8000-000000000c27', 'f0000000-0000-4000-8000-000000000034', 'f0000000-0000-4000-8000-000000000c01', 'Cámara Nacional de Comercio', '2026-04-06', '2026-04-24', '2026-04-30', NULL)
+ON CONFLICT DO NOTHING;
+INSERT INTO PLANES_ASCENSO (id_plan, id_empleado, id_cargo_destino, observaciones, asignado_por, asignado_en) VALUES
+  ('f0000000-0000-4000-8000-000000000c31', 'f0000000-0000-4000-8000-000000000031', 'f0000000-0000-4000-8000-000000000104', 'Candidato a la supervisión de cajas de Sopocachi.', 'f0000000-0000-4000-8000-000000000023', '2026-07-01 09:00:00-04'),
+  ('f0000000-0000-4000-8000-000000000c32', 'f0000000-0000-4000-8000-000000000035', 'f0000000-0000-4000-8000-000000000104', 'Candidata a la supervisión de cajas de Miraflores.', 'f0000000-0000-4000-8000-000000000023', '2026-07-01 09:00:00-04'),
+  ('f0000000-0000-4000-8000-000000000c33', 'f0000000-0000-4000-8000-000000000034', 'f0000000-0000-4000-8000-000000000103', NULL, 'f0000000-0000-4000-8000-000000000023', '2026-08-03 09:00:00-04'),
+  ('f0000000-0000-4000-8000-000000000c34', 'f0000000-0000-4000-8000-000000000033', 'f0000000-0000-4000-8000-000000000104', NULL, 'f0000000-0000-4000-8000-000000000023', '2026-10-05 09:00:00-04')
+ON CONFLICT DO NOTHING;
 COMMIT;
