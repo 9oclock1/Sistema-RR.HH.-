@@ -7,6 +7,8 @@ const CODIGOS_PARAMETRO = {
   ALICUOTA_CREDITO: "ALICUOTA_CREDITO_FISCAL",
 };
 
+const ORIGEN_SALDO = { MES_ANTERIOR: "MES_ANTERIOR", SALDO_INICIAL: "SALDO_INICIAL" };
+
 const ESCALA_PORCENTAJE = 10000;
 
 const deCentavos = (centavos) => centavos / 100;
@@ -23,26 +25,44 @@ function resolverParametros(filas) {
 
   const salarioMinimo = valores.get(CODIGOS_PARAMETRO.SALARIO_MINIMO);
   const multiplo = valores.get(CODIGOS_PARAMETRO.MULTIPLO);
+  const alicuotaRciva = valores.get(CODIGOS_PARAMETRO.ALICUOTA_RCIVA);
+  const minimoNoImponible = Math.round(aCentavos(salarioMinimo) * multiplo);
   return {
     faltantes: [],
     salarioMinimo,
     multiplo,
-    minimoNoImponible: deCentavos(Math.round(aCentavos(salarioMinimo) * multiplo)),
-    alicuotaRciva: valores.get(CODIGOS_PARAMETRO.ALICUOTA_RCIVA),
+    minimoNoImponible: deCentavos(minimoNoImponible),
+    computoSalariosMinimos: deCentavos(porcentajeDe(minimoNoImponible, alicuotaRciva)),
+    alicuotaRciva,
     alicuotaCredito: valores.get(CODIGOS_PARAMETRO.ALICUOTA_CREDITO),
   };
 }
 
-function calcularRetencion({ totalGanado, aportesLaborales, montoFacturas = 0, saldoAnterior = 0 }, parametros) {
+function actualizarConUfv(centavos, ufv) {
+  if (!ufv || centavos === 0) return centavos;
+  const inicial = Number(ufv.inicial);
+  const final = Number(ufv.final);
+  if (!(inicial > 0) || !(final > inicial)) return centavos;
+  return Math.round((centavos * final) / inicial);
+}
+
+function calcularRetencion(
+  { totalGanado, aportesLaborales, montoFacturas = 0, saldoMesAnterior = 0, ufv = null },
+  parametros
+) {
   const ganado = aCentavos(totalGanado);
   const aportes = aCentavos(aportesLaborales);
   const sueldoNeto = Math.max(0, ganado - aportes);
   const base = Math.max(0, sueldoNeto - aCentavos(parametros.minimoNoImponible));
   const impuesto = porcentajeDe(base, parametros.alicuotaRciva);
+  const computo = Math.min(impuesto, aCentavos(parametros.computoSalariosMinimos));
+  const impuestoTrasComputo = impuesto - computo;
+
   const creditoFacturas = porcentajeDe(aCentavos(montoFacturas), parametros.alicuotaCredito);
-  const saldoPrevio = aCentavos(saldoAnterior);
-  const disponible = creditoFacturas + saldoPrevio;
-  const aplicado = Math.min(impuesto, disponible);
+  const saldoPrevio = aCentavos(saldoMesAnterior);
+  const saldoActualizado = actualizarConUfv(saldoPrevio, ufv);
+  const disponible = creditoFacturas + saldoActualizado;
+  const aplicado = Math.min(impuestoTrasComputo, disponible);
 
   return {
     total_ganado: deCentavos(ganado),
@@ -50,11 +70,14 @@ function calcularRetencion({ totalGanado, aportesLaborales, montoFacturas = 0, s
     sueldo_neto: deCentavos(sueldoNeto),
     base_imponible: deCentavos(base),
     impuesto_determinado: deCentavos(impuesto),
+    computo_salarios_minimos: deCentavos(computo),
     monto_facturas: deCentavos(aCentavos(montoFacturas)),
     credito_fiscal_facturas: deCentavos(creditoFacturas),
-    saldo_anterior_favor: deCentavos(saldoPrevio),
+    saldo_mes_anterior: deCentavos(saldoPrevio),
+    actualizacion_ufv: deCentavos(saldoActualizado - saldoPrevio),
+    saldo_anterior_favor: deCentavos(saldoActualizado),
     credito_aplicado: deCentavos(aplicado),
-    impuesto_retenido: deCentavos(impuesto - aplicado),
+    impuesto_retenido: deCentavos(impuestoTrasComputo - aplicado),
     saldo_favor_siguiente: deCentavos(disponible - aplicado),
   };
 }
@@ -67,9 +90,32 @@ function resumirRetenciones(retenciones) {
     total_sueldo_neto: sumar("sueldo_neto"),
     total_base_imponible: sumar("base_imponible"),
     total_impuesto_determinado: sumar("impuesto_determinado"),
+    total_computo_salarios_minimos: sumar("computo_salarios_minimos"),
     total_credito_aplicado: sumar("credito_aplicado"),
     total_impuesto_retenido: sumar("impuesto_retenido"),
+    total_actualizacion_ufv: sumar("actualizacion_ufv"),
   };
 }
 
-module.exports = { CODIGOS_PARAMETRO, resolverParametros, calcularRetencion, resumirRetenciones, porcentajeDe, deCentavos };
+function periodoAnterior(periodo) {
+  const [anio, mes] = periodo.split("-").map(Number);
+  return mes === 1 ? `${anio - 1}-12` : `${anio}-${String(mes - 1).padStart(2, "0")}`;
+}
+
+function finDePeriodo(periodo) {
+  const [anio, mes] = periodo.split("-").map(Number);
+  return new Date(Date.UTC(anio, mes, 0)).toISOString().slice(0, 10);
+}
+
+module.exports = {
+  CODIGOS_PARAMETRO,
+  ORIGEN_SALDO,
+  resolverParametros,
+  calcularRetencion,
+  resumirRetenciones,
+  porcentajeDe,
+  deCentavos,
+  actualizarConUfv,
+  periodoAnterior,
+  finDePeriodo,
+};

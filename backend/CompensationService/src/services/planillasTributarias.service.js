@@ -4,14 +4,21 @@ const modelo = require("../models/planillasTributarias.model");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const { validarResponsable } = require("../utils/planillas");
-const { calcularRetencion, resolverParametros, resumirRetenciones } = require("../utils/tributario");
+const {
+  ORIGEN_SALDO,
+  calcularRetencion,
+  finDePeriodo,
+  periodoAnterior,
+  resolverParametros,
+  resumirRetenciones,
+} = require("../utils/tributario");
 const { construirTxt, construirXlsx } = require("../utils/archivos");
 const {
   FORMATOS,
   cargarPlanilla,
   cargarPlanillaCerrada,
   elegirFormato,
-  exigirAdministrador,
+  exigirResponsable,
   nombreDelResponsable,
   nombreMes,
   sinGenerar,
@@ -29,8 +36,11 @@ const COLUMNAS_ARCHIVO = [
   { clave: "minimo_no_imponible", titulo: "Minimo no imponible", ancho: 19, monto: true },
   { clave: "base_imponible", titulo: "Base imponible", ancho: 16, monto: true },
   { clave: "impuesto_determinado", titulo: "Impuesto determinado", ancho: 20, monto: true },
+  { clave: "computo_salarios_minimos", titulo: "Computo 13% de 2 SMN", ancho: 20, monto: true },
   { clave: "credito_fiscal_facturas", titulo: "Credito de facturas", ancho: 19, monto: true },
-  { clave: "saldo_anterior_favor", titulo: "Saldo anterior a favor", ancho: 21, monto: true },
+  { clave: "saldo_mes_anterior", titulo: "Saldo del mes anterior", ancho: 21, monto: true },
+  { clave: "actualizacion_ufv", titulo: "Actualizacion UFV", ancho: 18, monto: true },
+  { clave: "saldo_anterior_favor", titulo: "Saldo anterior actualizado", ancho: 25, monto: true },
   { clave: "credito_aplicado", titulo: "Credito aplicado", ancho: 17, monto: true },
   { clave: "impuesto_retenido", titulo: "Impuesto retenido", ancho: 17, monto: true },
   { clave: "saldo_favor_siguiente", titulo: "Saldo a favor siguiente", ancho: 22, monto: true },
@@ -47,6 +57,12 @@ function formatear({ cabecera, retenciones }) {
       minimo_no_imponible: cabecera.minimo_no_imponible,
       alicuota_rciva: cabecera.alicuota_rciva,
       alicuota_credito_fiscal: cabecera.alicuota_credito_fiscal,
+      computo_salarios_minimos: cabecera.computo_salarios_minimos,
+    },
+    saldo_anterior: {
+      periodo: cabecera.periodo_saldo_anterior,
+      ufv_inicial: cabecera.ufv_inicial,
+      ufv_final: cabecera.ufv_final,
     },
     totales: {
       cantidad_dependientes: cabecera.cantidad_dependientes,
@@ -54,8 +70,10 @@ function formatear({ cabecera, retenciones }) {
       total_sueldo_neto: cabecera.total_sueldo_neto,
       total_base_imponible: cabecera.total_base_imponible,
       total_impuesto_determinado: cabecera.total_impuesto_determinado,
+      total_computo_salarios_minimos: cabecera.total_computo_salarios_minimos,
       total_credito_aplicado: cabecera.total_credito_aplicado,
       total_impuesto_retenido: cabecera.total_impuesto_retenido,
+      total_actualizacion_ufv: cabecera.total_actualizacion_ufv,
     },
     advertencias: cabecera.advertencias,
     generada_por: cabecera.generada_por,
@@ -63,6 +81,43 @@ function formatear({ cabecera, retenciones }) {
     generada_en: cabecera.generada_en,
     retenciones,
   };
+}
+
+function periodoSiguiente(periodo) {
+  const [anio, mes] = periodo.split("-").map(Number);
+  return mes === 12 ? `${anio + 1}-01` : `${anio}-${String(mes + 1).padStart(2, "0")}`;
+}
+
+async function resolverSaldoAnterior(periodo, previo) {
+  const advertencias = [];
+  const [hayTributariaPrevia, hayPlanillaPrevia, haySiguiente] = await Promise.all([
+    modelo.existeTributaria(pool, previo),
+    modelo.existePlanilla(pool, previo),
+    modelo.existeTributaria(pool, periodoSiguiente(periodo)),
+  ]);
+  if (haySiguiente) {
+    advertencias.push(
+      `La planilla tributaria de ${nombreMes(periodoSiguiente(periodo))} ya se generó con el saldo de este mes: vuelva a generarla para que tome los cambios.`
+    );
+  }
+  if (!hayTributariaPrevia) {
+    if (hayPlanillaPrevia) {
+      advertencias.push(
+        `Todavía no se generó la planilla tributaria de ${nombreMes(previo)}: el saldo a favor se toma del saldo inicial declarado. Genere primero la de ${nombreMes(previo)} para arrastrar su saldo.`
+      );
+    }
+    return { origen: ORIGEN_SALDO.SALDO_INICIAL, ufv: null, advertencias };
+  }
+
+  const fechaInicial = finDePeriodo(previo);
+  const fechaFinal = finDePeriodo(periodo);
+  const [inicial, final] = await Promise.all([modelo.valorUfv(pool, fechaInicial), modelo.valorUfv(pool, fechaFinal)]);
+  if (inicial === null || final === null) {
+    const faltante = inicial === null ? fechaInicial : fechaFinal;
+    advertencias.push(`Falta el valor de la UFV al ${faltante}: el saldo a favor de ${nombreMes(previo)} pasa sin actualizar.`);
+    return { origen: ORIGEN_SALDO.MES_ANTERIOR, ufv: null, advertencias };
+  }
+  return { origen: ORIGEN_SALDO.MES_ANTERIOR, ufv: { inicial, final }, advertencias };
 }
 
 async function generar(idPlanilla, identidad) {
@@ -79,36 +134,45 @@ async function generar(idPlanilla, identidad) {
     );
   }
 
-  const [bases, sinEntidad] = await Promise.all([
-    modelo.listarBasesRciva(pool, planilla.id_planilla, planilla.periodo),
+  const previo = periodoAnterior(planilla.periodo);
+  const [bases, sinEntidad, saldoAnterior] = await Promise.all([
+    modelo.listarBasesRciva(pool, planilla.id_planilla, planilla.periodo, previo),
     modelo.conceptosDeLeySinEntidad(pool, planilla.id_planilla),
+    resolverSaldoAnterior(planilla.periodo, previo),
   ]);
   if (bases.length === 0) throw new ErrorApp(409, "La planilla no tiene colaboradores: no hay RC-IVA que calcular.");
 
+  const arrastra = saldoAnterior.origen === ORIGEN_SALDO.MES_ANTERIOR;
   const retenciones = bases.map((base) => ({
     id_empleado: base.id_empleado,
     nombre_empleado: base.nombre_empleado,
     numero_documento: base.numero_documento,
+    origen_saldo: saldoAnterior.origen,
     ...calcularRetencion(
       {
         totalGanado: base.total_ganado,
         aportesLaborales: base.aportes_laborales,
         montoFacturas: base.monto_facturas,
-        saldoAnterior: base.saldo_anterior_favor,
+        saldoMesAnterior: arrastra ? base.saldo_mes_anterior : base.saldo_inicial_favor,
+        ufv: arrastra ? saldoAnterior.ufv : null,
       },
       parametros
     ),
   }));
-  const advertencias = sinEntidad.map(
-    (concepto) =>
-      `El concepto ${concepto.codigo} (${concepto.nombre}) no está asociado a una entidad de aporte: no se descontó del sueldo neto para el RC-IVA.`
-  );
+  const advertencias = [
+    ...saldoAnterior.advertencias,
+    ...sinEntidad.map(
+      (concepto) =>
+        `El concepto ${concepto.codigo} (${concepto.nombre}) no está asociado a una entidad de aporte: no se descontó del sueldo neto para el RC-IVA.`
+    ),
+  ];
   const responsable = { id: idResponsable, nombre: await nombreDelResponsable(idResponsable) };
 
   await enTransaccion((cliente) =>
     modelo.reemplazar(cliente, {
       planilla,
       parametros,
+      saldoAnterior: { periodo: arrastra ? previo : null, ufv: arrastra ? saldoAnterior.ufv : null },
       totales: resumirRetenciones(retenciones),
       advertencias,
       responsable,
@@ -119,7 +183,7 @@ async function generar(idPlanilla, identidad) {
 }
 
 async function obtener(idPlanilla, identidad) {
-  exigirAdministrador(identidad);
+  exigirResponsable(identidad);
   const planilla = await cargarPlanilla(pool, idPlanilla);
   const guardada = await modelo.obtenerGuardada(pool, planilla.id_planilla);
   if (!guardada) throw sinGenerar("la planilla tributaria", planilla.periodo);
@@ -136,6 +200,8 @@ async function exportar(idPlanilla, identidad, formatoPedido) {
     sueldo_neto: planilla.totales.total_sueldo_neto,
     base_imponible: planilla.totales.total_base_imponible,
     impuesto_determinado: planilla.totales.total_impuesto_determinado,
+    computo_salarios_minimos: planilla.totales.total_computo_salarios_minimos,
+    actualizacion_ufv: planilla.totales.total_actualizacion_ufv,
     credito_aplicado: planilla.totales.total_credito_aplicado,
     impuesto_retenido: planilla.totales.total_impuesto_retenido,
   };
@@ -166,18 +232,18 @@ function validarCredito(cuerpo = {}) {
     return Number(texto);
   };
   const montoFacturas = monto("monto_facturas", cuerpo.monto_facturas);
-  const saldoAnteriorFavor = monto("saldo_anterior_favor", cuerpo.saldo_anterior_favor);
+  const saldoInicialFavor = monto("saldo_inicial_favor", cuerpo.saldo_inicial_favor);
   if (errores.length > 0) throw new ErrorApp(400, "Revise los datos del crédito fiscal.", errores);
-  return { idEmpleado, periodo: cuerpo.periodo, montoFacturas, saldoAnteriorFavor };
+  return { idEmpleado, periodo: cuerpo.periodo, montoFacturas, saldoInicialFavor };
 }
 
 async function registrarCredito(cuerpo, identidad) {
-  exigirAdministrador(identidad);
+  exigirResponsable(identidad);
   return modelo.guardarCredito(pool, validarCredito(cuerpo));
 }
 
 async function listarCreditos(periodo, identidad) {
-  exigirAdministrador(identidad);
+  exigirResponsable(identidad);
   if (typeof periodo !== "string" || !PERIODO_RE.test(periodo)) {
     throw new ErrorApp(400, "Indique el periodo con el formato AAAA-MM.", [{ campo: "periodo", mensaje: "Use el formato AAAA-MM." }]);
   }
@@ -185,7 +251,7 @@ async function listarCreditos(periodo, identidad) {
 }
 
 async function listarParametros(identidad) {
-  exigirAdministrador(identidad);
+  exigirResponsable(identidad);
   return { parametros: await modelo.listarParametros(pool) };
 }
 
