@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ChartLine, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
@@ -14,6 +14,7 @@ import { RUTA_DASHBOARD_QUEJAS } from "../features/dashboard-quejas/dashboardQue
 import { RUTA_DASHBOARD_DESEMPENO } from "../features/dashboard-desempeno/dashboardDesempeno";
 import DesempenoGlobalPage from "../features/desempeno-global/DesempenoGlobalPage";
 import DesvinculacionesPage from "../features/desvinculaciones/DesvinculacionesPage";
+import RotacionPersonalPage from "../features/rotacion-personal/RotacionPersonalPage";
 import { RUTA_DESEMPENO_GLOBAL } from "../features/desempeno-global/desempenoGlobal";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
 import MisResultadosPage from "../features/evaluaciones/MisResultadosPage";
@@ -564,6 +565,14 @@ export const SECCIONES = [
         icono: MessageSquareWarning,
         roles: ["admin"],
         pagina: DashboardQuejasPage,
+      },
+      {
+        ruta: "/dashboards/rotacion",
+        etiqueta: "Rotación de personal",
+        descripcion: "Rotación mensual, retención y rotación temprana con semáforo, tendencia de 12 meses y motivos de baja.",
+        icono: ChartLine,
+        roles: ["supervisor"],
+        pagina: RotacionPersonalPage,
       },
     ],
   },

@@ -226,3 +226,10 @@ El Administrador la envía desde Bonos por productividad (`POST /bonos-productiv
 - **Copia por mes:** `DETALLE_PROMEDIO_INDEMNIZABLE` guarda `dias_pagados`, `haber_mensual` y `total_ganado` al momento del cálculo para dejar fija la base legal del finiquito.
 - **Recálculo:** mientras el proceso siga abierto, volver a calcular reemplaza la cabecera en `PROMEDIOS_INDEMNIZABLES` y su detalle, útil cuando se cierra posteriormente la planilla del mes de retiro.
 - **Estado del proceso:** al realizar el primer cálculo, el proceso pasa automáticamente de `INICIADO` a `EN_CURSO`.
+
+## Rotación de personal (RF-75, KAN-95)
+
+- No agrega tablas. `GET /indicadores/rotacion` lee las bajas de `PROCESOS_DESVINCULACION` (todo estado salvo `ANULADO`; si un colaborador tiene varias, la de retiro más reciente) con su causal, y cruza el personal de EmployeeService (`GET /empleados`: fecha de ingreso, sucursal y área actuales, estado).
+- `fecha_retiro` es el último día trabajado: la baja cuenta en ese mes y el colaborador ya no está en la plantilla al cierre de ese día. Un colaborador en `BAJA` sin proceso registrado no tiene fecha de retiro y queda fuera de los cálculos; la respuesta lo informa en `avisos.bajas_sin_registro`.
+- Acceso: exige sesión real (`middlewares/autenticar.js`, el mismo JWT de AuthService que usan las boletas); el colaborador y su rol salen del token y se ignoran `X-Empleado-Id` y `X-Rol`. Administrador y Gerente ven toda la cadena; un supervisor, solo la sucursal donde trabaja según EmployeeService (pedir otra responde 403); los demás roles, 403.
+- Datos de ejemplo: `seed-rotacion.sql` de EmployeeService (sucursal Calacoto y 65 colaboradores, con ingresos mes a mes), el de AuthService (cuenta de la supervisora de Calacoto, ver `CUENTAS-DE-PRUEBA.md`) y luego el de este servicio (10 bajas con las 4 causales). Las fechas de los últimos 12 meses son relativas al mes actual de La Paz. Con los seeds base de ambos servicios, el mes actual muestra rotación 3% (verde), retención 90,3% (verde) y rotación temprana 15,8% (amarillo).
