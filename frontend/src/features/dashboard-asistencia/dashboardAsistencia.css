@@ -1,0 +1,164 @@
+.da-sutil {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+/* ---------- Indicadores (KPI-04/KPI-05) ---------- */
+.da-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: var(--space-4);
+}
+
+.da-kpi {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.da-kpi__valor {
+  margin: 0;
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.da-kpi__valor--verde {
+  color: var(--color-success-text);
+}
+
+.da-kpi__valor--amarillo {
+  color: var(--color-warning-text);
+}
+
+.da-kpi__valor--rojo {
+  color: var(--color-danger-text);
+}
+
+/* ---------- Comparativo por sucursal ---------- */
+.da-comparativo {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.da-comparativo caption {
+  text-align: left;
+  margin-bottom: var(--space-2);
+}
+
+.da-comparativo th,
+.da-comparativo td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border-bottom: var(--border-width) solid var(--color-border-input);
+}
+
+.da-comparativo thead th {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+}
+
+.da-celda-barra {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 12rem;
+}
+
+.da-barra {
+  position: relative;
+  flex: 1;
+  height: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-neutral);
+  overflow: hidden;
+}
+
+.da-barra__relleno {
+  height: 100%;
+  border-radius: var(--radius-control);
+}
+
+.da-barra__relleno--verde {
+  background: var(--color-success);
+}
+
+.da-barra__relleno--amarillo {
+  background: var(--color-warning);
+}
+
+.da-barra__relleno--rojo {
+  background: var(--color-danger);
+}
+
+.da-barra__relleno--sin_datos {
+  background: var(--color-border-input);
+}
+
+.da-barra__meta {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-text);
+  opacity: 0.6;
+}
+
+.da-celda-barra__valor {
+  min-width: 3.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Mapa de calor diario ---------- */
+.da-heatmap {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.5rem, 1fr));
+  gap: var(--space-2);
+}
+
+.da-heatmap__dia {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-control);
+  border: var(--border-width) solid var(--color-border-input);
+  background: var(--color-bg-surface);
+}
+
+.da-heatmap__fecha {
+  font-size: var(--font-size-small);
+  color: var(--color-text-subtle);
+}
+
+.da-heatmap__total {
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.da-heatmap__dia--1 {
+  background: color-mix(in srgb, var(--color-danger) 15%, var(--color-bg-surface));
+}
+
+.da-heatmap__dia--2 {
+  background: color-mix(in srgb, var(--color-danger) 35%, var(--color-bg-surface));
+}
+
+.da-heatmap__dia--3 {
+  background: color-mix(in srgb, var(--color-danger) 55%, var(--color-bg-surface));
+  color: var(--color-text-on-accent, inherit);
+}
+
+.da-heatmap__dia--4 {
+  background: color-mix(in srgb, var(--color-danger) 75%, var(--color-bg-surface));
+  color: var(--color-text-on-accent, inherit);
+}
