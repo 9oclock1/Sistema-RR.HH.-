@@ -57,3 +57,27 @@ INSERT INTO USUARIOS (id_usuario, id_empleado, correo, hash_contrasena, rol, est
 ON CONFLICT DO NOTHING;
 
 COMMIT;
+
+-- Cuentas de ejemplo para el cierre definitivo de desvinculación y revocación de accesos (RF-59, KAN-79).
+-- Cargar en PowerShell siempre con UTF-8 para conservar tildes:
+--   Get-Content -Encoding UTF8 backend/AuthService/db/seed.sql | docker exec -i rrhh-postgres psql -U adminRRHH -d AuthDB -v ON_ERROR_STOP=1
+BEGIN;
+
+INSERT INTO USUARIOS (id_usuario, id_empleado, correo, hash_contrasena, rol, esta_activo) VALUES
+  -- Patricia Limachi Rojas (activa, lista para cerrar definitivamente)
+  ('b0000000-0000-4000-8000-000000000746', 'f0000000-0000-4000-8000-000000000746', 'patricia.limachi@correo.test',
+   'scrypt$217794500417ffd944910fc156b4d85a$d6ae52748b2200df1b35839eb1d8a33785e5b313342e0144988836cbf987c4b8b48234b3889aea7b01293eb1087ddf1bee0c552ce39abd2f564e7217a0107bef', 'empleado', TRUE),
+  -- Hugo Ticona Vargas (activo, con finiquito aprobado listo para cerrar)
+  ('b0000000-0000-4000-8000-000000000747', 'f0000000-0000-4000-8000-000000000747', 'hugo.ticona@correo.test',
+   'scrypt$819dbbe9219e36db2a5f53be9c14fc70$ae684213d22f4bb34d1e6660553e6f256a9ccf4e2d1728825b6a2adf7226560714a67506d54b7ade3e7e5f7d06dc90cfeaaa50a426ecd080d76a4ed86604ac7f', 'empleado', TRUE),
+  -- Daniela Cruz Huanca (ya cerrada con alertas: cuenta revocada)
+  ('b0000000-0000-4000-8000-000000000748', 'f0000000-0000-4000-8000-000000000748', 'daniela.cruz@correo.test',
+   'scrypt$568959efa6cc9d5e2ad8998a6dc100fe$917b8c1494d894cd5903cba1543216afcd7f86128457ef17e76801aa9924719f14fe0c8060ebdb5bcd654e5956a282665163bef4f0c6868ed9821140f533b0f0', 'empleado', FALSE)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO REVOCACIONES_ACCESO (id_revocacion, id_empleado, id_usuario, motivo, id_proceso, solicitado_por, revocado_en) VALUES
+  ('b0000000-0000-4000-8000-000000000901', 'f0000000-0000-4000-8000-000000000037', 'b0000000-0000-4000-8000-000000000037', 'DESVINCULACION', 'c0000000-0000-4000-8000-000000000741', 'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-10-18T11:10:00-04:00'),
+  ('b0000000-0000-4000-8000-000000000902', 'f0000000-0000-4000-8000-000000000748', 'b0000000-0000-4000-8000-000000000748', 'DESVINCULACION', 'c0000000-0000-4000-8000-000000000749', 'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-11-14T15:00:00-04:00')
+ON CONFLICT DO NOTHING;
+
+COMMIT;
