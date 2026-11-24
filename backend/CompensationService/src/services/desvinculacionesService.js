@@ -41,7 +41,7 @@ async function obtenerDocumento(id, identidad) {
   return doc;
 }
 
-// AC1: colaborador activo + causal + fecha de retiro + respaldo -> crea proceso INICIADO y pasa a BAJA en EmployeeService.
+// AC1: colaborador activo + causal + fecha de retiro + respaldo -> crea proceso INICIADO; el colaborador sigue activo hasta el cierre definitivo.
 // AC2: corresponde_desahucio se copia de la causal (FALSE para renuncia, conclusión o despido legal; TRUE para desahucio).
 // AC3: si ya existe un proceso abierto (INICIADO o EN_CURSO), impide registrar otro (validado y protegido por índice único).
 async function registrar(datos, archivo, identidad) {
@@ -119,9 +119,6 @@ async function registrar(datos, archivo, identidad) {
       tamano_bytes: archivo.size ?? archivo.buffer.length,
       contenido: archivo.buffer,
     });
-
-    // Todavía dentro de la transacción: si EmployeeService falla, se revierte todo el proceso.
-    await empleadosCliente.darDeBaja(entrada.id_empleado);
 
     return modelo.obtenerProceso(idProceso, cliente);
   });

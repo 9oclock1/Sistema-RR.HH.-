@@ -203,7 +203,7 @@ describe("integracionFiniquitosService (despachador y caída)", () => {
 });
 
 describe("confirmacionesFiniquitoService (consumidor, duplicados, préstamos y DLQ)", () => {
-  test("éxito: Pagos deja APROBADO y luego Contabilidad deja PAGADO y proceso CERRADO", async () => {
+  test("éxito: Pagos deja APROBADO y luego Contabilidad deja PAGADO sin cerrar el proceso", async () => {
     mock.method(pool, "connect", async () => crearClienteFalso());
     const finAprobado = {
       id_finiquito: ID_FINIQUITO,
@@ -223,7 +223,7 @@ describe("confirmacionesFiniquitoService (consumidor, duplicados, préstamos y D
       CONTABILIDAD: { id_mensaje: ID_ENVIO_CONT },
     }));
     mock.method(modelo, "marcarMensajeEntranteProcesado", async () => {});
-    const pagado = mock.method(modelo, "marcarFiniquitoPagadoYCerrarProceso", async () => {});
+    const pagado = mock.method(modelo, "marcarFiniquitoPagado", async () => {});
     mock.method(modelo, "listarPrestamosEmpleado", async () => []);
 
     const msgPagos = armarRespuestaSimulada({
@@ -287,7 +287,7 @@ describe("confirmacionesFiniquitoService (consumidor, duplicados, préstamos y D
     mock.method(modelo, "ultimosEnviosPorDestino", async () => ({ CONTABILIDAD: { id_mensaje: ID_ENVIO_CONT } }));
     mock.method(modelo, "actualizarRespuestaIntegracion", async () => ({ estado_pagos: "CONFIRMADA", estado_contabilidad: "CONFIRMADA" }));
     mock.method(modelo, "marcarMensajeEntranteProcesado", async () => {});
-    mock.method(modelo, "marcarFiniquitoPagadoYCerrarProceso", async () => {});
+    mock.method(modelo, "marcarFiniquitoPagado", async () => {});
 
     const msg = armarRespuestaSimulada({
       idMensaje: "cccccccc-cccc-4ccc-8ccc-ccccccccccc1",
@@ -415,7 +415,7 @@ describe("confirmacionesFiniquitoService (consumidor, duplicados, préstamos y D
     mock.method(modelo, "bloquearFiniquitoPorId", async () => ({ id_finiquito: ID_FINIQUITO, id_proceso: ID_PROCESO, estado: "APROBADO", estado_contabilidad: "PENDIENTE", estado_pagos: "CONFIRMADA" }));
     mock.method(modelo, "actualizarRespuestaIntegracion", async () => ({ estado_pagos: "CONFIRMADA", estado_contabilidad: "RECHAZADA" }));
     mock.method(modelo, "marcarMensajeEntranteProcesado", async () => {});
-    const pagado = mock.method(modelo, "marcarFiniquitoPagadoYCerrarProceso", async () => {});
+    const pagado = mock.method(modelo, "marcarFiniquitoPagado", async () => {});
     const rRech = await confirmaciones.aplicar("rech-1");
     assert.equal(rRech.resultado, "RECHAZADA");
     assert.equal(pagado.mock.callCount(), 0);
