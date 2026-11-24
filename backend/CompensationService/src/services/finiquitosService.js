@@ -21,6 +21,7 @@ const {
   validarDestinoFiniquito,
   validarSimulacionEscenario,
   validarCaidaBroker,
+  clasificarPrestamosAlPagar,
 } = require("../utils/finiquitos");
 
 const noEncontrado = () => new ErrorApp(404, "Proceso de desvinculación no encontrado.");
@@ -115,6 +116,12 @@ async function obtener(idProceso, identidad) {
     modelo.obtenerPorProceso(id),
   ]);
   const envios = finiquito ? await modelo.ultimosEnviosPorDestino(finiquito.id_finiquito) : {};
+  let prestamosPendientes = [];
+  if (finiquito?.estado === "PAGADO") {
+    const prestamos = await modelo.listarPrestamosEmpleado(proceso.id_empleado);
+    const descuentos = (finiquito.renglones ?? []).filter((r) => r.tipo === "DESCUENTO");
+    prestamosPendientes = clasificarPrestamosAlPagar(descuentos, prestamos).pendientes;
+  }
 
   return {
     proceso: {
@@ -131,6 +138,7 @@ async function obtener(idProceso, identidad) {
     requisitos: construirRequisitos(insumos),
     finiquito,
     integraciones: construirIntegraciones(finiquito, envios),
+    prestamos_pendientes: prestamosPendientes,
     simulacion_activa: simulacionFiniquitoActiva(),
     caida_simulada_hasta: integracion.obtenerCaidaBroker(),
   };

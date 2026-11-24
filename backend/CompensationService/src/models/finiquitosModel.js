@@ -464,6 +464,255 @@ async function obtenerUltimaRespuestaEntrante(idFiniquito, destino, db = pool) {
   return rows[0] || null;
 }
 
+async function registrarMensajeEntrante({ idMensaje, origen, tipoEvento, idFiniquito, destino, carga }, db = pool) {
+  const { rows } = await db.query(
+    `INSERT INTO MENSAJES_FINIQUITO_ENTRANTES (
+       id_mensaje, origen, tipo_evento, id_finiquito, destino, carga, estado
+     )
+     VALUES (
+       $1, $2, $3,
+       (SELECT id_finiquito FROM FINIQUITOS WHERE id_finiquito = $4),
+       $5, $6, 'RECIBIDO'
+     )
+     ON CONFLICT (id_mensaje) DO NOTHING
+     RETURNING id_entrante, id_mensaje, origen, tipo_evento, id_finiquito, destino, carga, estado, intentos, ultimo_error, recibido_en, procesado_en`,
+    [idMensaje, origen, tipoEvento, idFiniquito, destino, carga]
+  );
+  if (rows[0]) return { fila: rows[0], duplicado: false };
+
+  const { rows: existentes } = await db.query(
+    `SELECT id_entrante, id_mensaje, origen, tipo_evento, id_finiquito, destino, carga, estado, intentos, ultimo_error, recibido_en, procesado_en
+       FROM MENSAJES_FINIQUITO_ENTRANTES
+      WHERE id_mensaje = $1`,
+    [idMensaje]
+  );
+  return { fila: existentes[0], duplicado: true };
+}
+
+async function obtenerMensajeEntrante(idEntrante, db = pool) {
+  const { rows } = await db.query(
+    `SELECT id_entrante, id_mensaje, origen, tipo_evento, id_finiquito, destino, carga, estado, intentos, ultimo_error, recibido_en, procesado_en
+       FROM MENSAJES_FINIQUITO_ENTRANTES
+      WHERE id_entrante = $1`,
+    [idEntrante]
+  );
+  return rows[0] || null;
+}
+
+async function bloquearMensajeEntrante(cliente, idEntrante) {
+  const { rows } = await cliente.query(
+    `SELECT id_entrante, id_mensaje, origen, tipo_evento, id_finiquito, destino, carga, estado, intentos
+       FROM MENSAJES_FINIQUITO_ENTRANTES
+      WHERE id_entrante = $1
+      FOR UPDATE`,
+    [idEntrante]
+  );
+  return rows[0] || null;
+}
+
+async function marcarMensajeEntranteProcesado(cliente, idEntrante, idFiniquito, destino) {
+  await cliente.query(
+    `UPDATE MENSAJES_FINIQUITO_ENTRANTES
+        SET estado = 'PROCESADO',
+            id_finiquito = $2,
+            destino = $3,
+            procesado_en = CURRENT_TIMESTAMP,
+            intentos = intentos + 1,
+            ultimo_error = NULL
+      WHERE id_entrante = $1
+        AND estado = 'RECIBIDO'`,
+    [idEntrante, idFiniquito, destino]
+  );
+}
+
+async function marcarMensajeEntranteIgnorado(cliente, idEntrante, idFiniquito, destino, motivo) {
+  await cliente.query(
+    `UPDATE MENSAJES_FINIQUITO_ENTRANTES
+        SET estado = 'IGNORADO',
+            id_finiquito = $2,
+            destino = $3,
+            procesado_en = CURRENT_TIMESTAMP,
+            intentos = intentos + 1,
+            ultimo_error = left($4, 255)
+      WHERE id_entrante = $1
+        AND estado = 'RECIBIDO'`,
+    [idEntrante, idFiniquito, destino, motivo]
+  );
+}
+
+async function registrarFalloMensajeEntrante(idEntrante, error, db = pool) {
+  const { rows } = await db.query(
+    `UPDATE MENSAJES_FINIQUITO_ENTRANTES
+        SET intentos = intentos + 1,
+            ultimo_error = left($2, 255)
+      WHERE id_entrante = $1
+        AND estado = 'RECIBIDO'
+      RETURNING intentos`,
+    [idEntrante, error]
+  );
+  return rows[0]?.intentos ?? null;
+}
+
+async function enviarMensajeEntranteADlq(idEntrante, db = pool) {
+  await db.query(
+    `UPDATE MENSAJES_FINIQUITO_ENTRANTES
+        SET estado = 'EN_DLQ'
+      WHERE id_entrante = $1
+        AND estado = 'RECIBIDO'`,
+    [idEntrante]
+  );
+}
+
+async function reabrirMensajeEntrante(idEntrante, db = pool) {
+  const { rowCount } = await db.query(
+    `UPDATE MENSAJES_FINIQUITO_ENTRANTES
+        SET estado = 'RECIBIDO',
+            intentos = 0,
+            ultimo_error = NULL
+      WHERE id_entrante = $1
+        AND estado = 'EN_DLQ'`,
+    [idEntrante]
+  );
+  return rowCount > 0;
+}
+
+async function listarMensajesEntrantes({ estado = null, idFiniquito = null, limite = 100 } = {}, db = pool) {
+  const condiciones = [];
+  const params = [];
+  if (estado) {
+    params.push(estado);
+    condiciones.push(`m.estado = $${params.length}`);
+  }
+  if (idFiniquito) {
+    params.push(idFiniquito);
+    condiciones.push(`m.id_finiquito = $${params.length}`);
+  }
+  params.push(limite);
+  const where = condiciones.length ? `WHERE ${condiciones.join(" AND ")}` : "";
+  const { rows } = await db.query(
+    `SELECT m.id_entrante, m.id_mensaje, m.origen, m.tipo_evento, m.id_finiquito, m.destino,
+            m.carga, m.estado, m.intentos, m.ultimo_error, m.recibido_en, m.procesado_en
+       FROM MENSAJES_FINIQUITO_ENTRANTES m
+       ${where}
+      ORDER BY m.recibido_en DESC, m.id_entrante DESC
+      LIMIT $${params.length}`,
+    params
+  );
+  return rows;
+}
+
+async function listarRecibidosAntiguos(segundos = 30, db = pool) {
+  const { rows } = await db.query(
+    `SELECT id_entrante
+       FROM MENSAJES_FINIQUITO_ENTRANTES
+      WHERE estado = 'RECIBIDO'
+        AND recibido_en < CURRENT_TIMESTAMP - make_interval(secs => $1)
+      ORDER BY recibido_en ASC`,
+    [segundos]
+  );
+  return rows;
+}
+
+async function bloquearFiniquitoPorId(cliente, idFiniquito) {
+  const { rows } = await cliente.query(
+    `SELECT f.id_finiquito, f.id_proceso, f.numero_documento, f.estado,
+            to_char(f.fecha_retiro, 'YYYY-MM-DD') AS fecha_retiro,
+            f.codigo_causal, f.total_ingresos, f.total_descuentos, f.liquido_pagable,
+            f.estado_pagos, f.referencia_pagos, f.motivo_pagos, f.respondida_pagos_en,
+            f.estado_contabilidad, f.referencia_contabilidad, f.motivo_contabilidad, f.respondida_contabilidad_en,
+            f.aprobado_por, f.aprobado_por_rol, f.aprobado_en,
+            p.id_empleado, p.nombre_empleado
+       FROM FINIQUITOS f
+       JOIN PROCESOS_DESVINCULACION p ON p.id_proceso = f.id_proceso
+      WHERE f.id_finiquito = $1
+      FOR UPDATE OF f`,
+    [idFiniquito]
+  );
+  const cabecera = rows[0];
+  if (!cabecera) return null;
+
+  const { rows: renglones } = await cliente.query(
+    `SELECT orden, tipo, codigo, concepto, detalle, monto, id_prestamo, saldo_prestamo
+       FROM DETALLE_FINIQUITO
+      WHERE id_finiquito = $1
+      ORDER BY orden ASC`,
+    [idFiniquito]
+  );
+  return {
+    ...cabecera,
+    renglones: renglones.map((r) => ({
+      ...r,
+      monto: Number(r.monto),
+      saldo_prestamo: r.saldo_prestamo !== null ? Number(r.saldo_prestamo) : null,
+    })),
+  };
+}
+
+async function actualizarRespuestaIntegracion(cliente, idFiniquito, { destino, resultado, referencia, motivo }) {
+  const prefijo = destino === "PAGOS" ? "pagos" : "contabilidad";
+  const { rows } = await cliente.query(
+    `UPDATE FINIQUITOS
+        SET estado_${prefijo} = $2,
+            referencia_${prefijo} = $3,
+            motivo_${prefijo} = $4,
+            respondida_${prefijo}_en = CURRENT_TIMESTAMP
+      WHERE id_finiquito = $1
+      RETURNING estado_pagos, estado_contabilidad`,
+    [idFiniquito, resultado, referencia, motivo]
+  );
+  return rows[0];
+}
+
+async function marcarFiniquitoPagadoYCerrarProceso(cliente, idFiniquito, idProceso) {
+  await cliente.query(
+    `UPDATE FINIQUITOS
+        SET estado = 'PAGADO',
+            pagado_en = CURRENT_TIMESTAMP
+      WHERE id_finiquito = $1`,
+    [idFiniquito]
+  );
+  await cliente.query(
+    `UPDATE PROCESOS_DESVINCULACION
+        SET estado = 'CERRADO',
+            actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_proceso = $1
+        AND estado <> 'CERRADO'`,
+    [idProceso]
+  );
+}
+
+async function listarPrestamosEmpleado(idEmpleado, db = pool, { bloquear = false } = {}) {
+  const { rows } = await db.query(
+    `SELECT id_prestamo, tipo, monto, saldo_pendiente, estado,
+            to_char(mes_inicio, 'YYYY-MM-DD') AS mes_inicio, creado_en
+       FROM PRESTAMOS
+      WHERE id_empleado = $1
+      ORDER BY creado_en ASC, mes_inicio ASC, id_prestamo ASC${bloquear ? " FOR UPDATE" : ""}`,
+    [idEmpleado]
+  );
+  return rows;
+}
+
+async function saldarPrestamo(cliente, idPrestamo) {
+  await cliente.query(
+    `UPDATE PRESTAMOS
+        SET saldo_pendiente = 0,
+            estado = 'COMPLETADO',
+            actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_prestamo = $1
+        AND estado = 'ACTIVO'`,
+    [idPrestamo]
+  );
+  await cliente.query(
+    `UPDATE CUOTAS_PRESTAMO
+        SET estado = 'PAGADA',
+            pagada_en = CURRENT_TIMESTAMP
+      WHERE id_prestamo = $1
+        AND estado = 'PENDIENTE'`,
+    [idPrestamo]
+  );
+}
+
 module.exports = {
   asegurarEditable,
   bloquearProceso,
@@ -483,4 +732,19 @@ module.exports = {
   ultimosEnviosPorDestino,
   limpiarRespuestaParaReenvio,
   obtenerUltimaRespuestaEntrante,
+  registrarMensajeEntrante,
+  obtenerMensajeEntrante,
+  bloquearMensajeEntrante,
+  marcarMensajeEntranteProcesado,
+  marcarMensajeEntranteIgnorado,
+  registrarFalloMensajeEntrante,
+  enviarMensajeEntranteADlq,
+  reabrirMensajeEntrante,
+  listarMensajesEntrantes,
+  listarRecibidosAntiguos,
+  bloquearFiniquitoPorId,
+  actualizarRespuestaIntegracion,
+  marcarFiniquitoPagadoYCerrarProceso,
+  listarPrestamosEmpleado,
+  saldarPrestamo,
 };

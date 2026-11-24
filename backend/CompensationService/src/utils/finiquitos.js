@@ -1,15 +1,22 @@
+const { createHash } = require("node:crypto");
 const { ErrorApp } = require("./errores");
-const { ORIGEN, DESTINOS } = require("./integraciones");
+const { UUID_RE } = require("./formatos");
+const { ORIGEN, DESTINOS, RESULTADOS } = require("./integraciones");
 
 const ESTADOS_FINIQUITO = ["BORRADOR", "APROBADO", "PAGADO"];
 const FILTROS_ESTADO_FINIQUITO = ["SIN_GENERAR", ...ESTADOS_FINIQUITO];
 const DESTINOS_FINIQUITO = ["PAGOS", "CONTABILIDAD"];
 const ESCENARIOS_SIMULACION = ["CONFIRMADA", "RECHAZADA", "DUPLICADO", "INVALIDO"];
+const ESTADOS_MENSAJE_ENTRANTE = ["RECIBIDO", "PROCESADO", "IGNORADO", "EN_DLQ"];
 
 const TIPO_FINIQUITO_ORDEN_PAGO = "FINIQUITO_APROBADO_ORDEN_PAGO";
 const TIPO_FINIQUITO_ASIENTO = "FINIQUITO_APROBADO_ASIENTO";
 const TIPO_CONFIRMACION_FINIQUITO_PAGOS = "CONFIRMACION_ORDEN_PAGO_FINIQUITO";
 const TIPO_CONFIRMACION_FINIQUITO_CONTABILIDAD = "CONFIRMACION_ASIENTO_FINIQUITO";
+const TIPOS_CONFIRMACION_FINIQUITO = {
+  [TIPO_CONFIRMACION_FINIQUITO_PAGOS]: "PAGOS",
+  [TIPO_CONFIRMACION_FINIQUITO_CONTABILIDAD]: "CONTABILIDAD",
+};
 const VERSION_ESQUEMA = 1;
 
 // Cuentas contables referenciales para la desafectación de provisiones del finiquito: ajustar al plan de cuentas de Contabilidad.
@@ -509,21 +516,226 @@ function validarCaidaBroker(datos = {}) {
   return segundos;
 }
 
+const finiquitoMaximoIntentos = () => {
+  const texto = process.env.FINIQUITO_MAXIMO_INTENTOS;
+  if (texto === undefined || texto.trim() === "") return 3;
+  const n = Number(texto);
+  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 3;
+};
+
+const esperaReentregaFiniquito = (intentos) => {
+  const baseTexto = process.env.FINIQUITO_REINTENTO_BASE_MS;
+  const base = baseTexto !== undefined && baseTexto.trim() !== "" && Number.isFinite(Number(baseTexto))
+    ? Math.max(0, Number(baseTexto))
+    : 1000;
+  return Math.min(base * 2 ** Math.max(intentos - 1, 0), 30 * 1000);
+};
+
+const esObjeto = (valor) => valor !== null && typeof valor === "object" && !Array.isArray(valor);
+
+function analizarJson(texto) {
+  try {
+    return JSON.parse(texto);
+  } catch {
+    return undefined;
+  }
+}
+
+function identificarMensajeFiniquito(texto) {
+  const cuerpo = analizarJson(texto);
+  const idRaw = cuerpo?.encabezado?.id_mensaje;
+  const hash = createHash("sha256").update(String(texto ?? "")).digest("hex").slice(0, 16);
+  const idMensaje =
+    typeof idRaw === "string" && idRaw.trim() !== "" && idRaw.trim().length <= 100
+      ? idRaw.trim()
+      : `invalido-${hash}`;
+  const origenRaw = cuerpo?.encabezado?.origen?.grupo;
+  const tipoRaw = cuerpo?.encabezado?.tipo;
+  const idFinRaw = cuerpo?.datos?.id_finiquito;
+  const tipoEvento = typeof tipoRaw === "string" && tipoRaw.trim() !== "" ? tipoRaw.trim().slice(0, 60) : null;
+  return {
+    cuerpo: cuerpo === undefined ? null : cuerpo,
+    idMensaje,
+    origen: typeof origenRaw === "string" && origenRaw.trim() !== "" ? origenRaw.trim().slice(0, 10) : null,
+    tipoEvento,
+    idFiniquito: typeof idFinRaw === "string" && UUID_RE.test(idFinRaw) ? idFinRaw.toLowerCase() : null,
+    destino: tipoEvento && Object.hasOwn(TIPOS_CONFIRMACION_FINIQUITO, tipoEvento)
+      ? TIPOS_CONFIRMACION_FINIQUITO[tipoEvento]
+      : null,
+  };
+}
+
+const textoRecortado = (valor, max) => (typeof valor === "string" && valor.trim() ? valor.trim().slice(0, max) : null);
+
+function leerConfirmacionFiniquito(texto) {
+  const cuerpo = analizarJson(texto);
+  if (cuerpo === undefined) return { errores: ["El mensaje no es un JSON válido."] };
+  if (!esObjeto(cuerpo)) return { errores: ["El mensaje debe ser un objeto JSON."] };
+
+  const errores = [];
+  const encabezado = cuerpo.encabezado;
+  let destino = null;
+
+  if (!esObjeto(encabezado)) {
+    errores.push("Falta el encabezado del mensaje.");
+  } else {
+    const tipo = encabezado.tipo;
+    if (!Object.hasOwn(TIPOS_CONFIRMACION_FINIQUITO, tipo ?? "")) {
+      errores.push(`Tipo de evento no reconocido para finiquitos: ${tipo ?? "(vacío)"}.`);
+    } else {
+      destino = TIPOS_CONFIRMACION_FINIQUITO[tipo];
+      const grupoEsperado = DESTINOS[destino].grupo;
+      if (encabezado.origen?.grupo !== grupoEsperado) {
+        errores.push(`El tipo ${tipo} solo lo envía el grupo ${grupoEsperado}.`);
+      }
+    }
+    if (encabezado.destino?.grupo !== ORIGEN.grupo) {
+      errores.push(`El destino debe ser el grupo ${ORIGEN.grupo} (RRHH).`);
+    }
+  }
+
+  const datos = cuerpo.datos;
+  if (!esObjeto(datos)) {
+    errores.push("Faltan los datos del mensaje.");
+    return { errores };
+  }
+  if (typeof datos.id_finiquito !== "string" || !UUID_RE.test(datos.id_finiquito)) {
+    errores.push("datos.id_finiquito debe ser un UUID válido.");
+  }
+  if (typeof datos.id_mensaje_origen !== "string" || !UUID_RE.test(datos.id_mensaje_origen)) {
+    errores.push("datos.id_mensaje_origen debe ser el UUID del mensaje enviado por RRHH.");
+  }
+  if (!RESULTADOS.includes(datos.resultado)) {
+    errores.push("datos.resultado debe ser CONFIRMADA o RECHAZADA.");
+  }
+  const motivo = textoRecortado(datos.motivo, 255);
+  if (datos.resultado === "RECHAZADA" && !motivo) {
+    errores.push("Una respuesta RECHAZADA necesita datos.motivo.");
+  }
+
+  if (errores.length > 0) return { errores };
+  const confirmada = datos.resultado === "CONFIRMADA";
+  return {
+    confirmacion: {
+      destino,
+      idFiniquito: datos.id_finiquito.toLowerCase(),
+      idMensajeOrigen: datos.id_mensaje_origen.toLowerCase(),
+      resultado: datos.resultado,
+      referencia: confirmada ? textoRecortado(datos.referencia, 60) : null,
+      motivo: confirmada ? null : motivo,
+    },
+  };
+}
+
+// AC4: clasifica los préstamos/anticipos al pasar el finiquito a PAGADO.
+function clasificarPrestamosAlPagar(renglonesDescuento = [], prestamos = []) {
+  const porId = new Map(prestamos.map((p) => [p.id_prestamo, p]));
+  const idsIncluidos = new Set();
+  const saldados = [];
+  const pendientes = [];
+
+  for (const r of renglonesDescuento) {
+    if (!r.id_prestamo) continue;
+    idsIncluidos.add(r.id_prestamo);
+    const p = porId.get(r.id_prestamo);
+    if (!p) continue;
+
+    const descontadoCents = aCentavos(r.monto);
+    const saldoActualCents = aCentavos(p.saldo_pendiente);
+    const saldoOriginalCents = r.saldo_prestamo !== null && r.saldo_prestamo !== undefined
+      ? aCentavos(r.saldo_prestamo)
+      : saldoActualCents;
+
+    if (p.estado === "ACTIVO" && saldoActualCents === descontadoCents) {
+      saldados.push({
+        id_prestamo: p.id_prestamo,
+        tipo: p.tipo,
+        monto_descontado: deCentavos(descontadoCents),
+      });
+    } else if (p.estado === "ACTIVO") {
+      const motivo =
+        saldoActualCents !== saldoOriginalCents
+          ? "El saldo pendiente cambió después de generar el finiquito"
+          : "Descuento parcial (el líquido del finiquito no cubrió el total)";
+      pendientes.push({
+        id_prestamo: p.id_prestamo,
+        tipo: p.tipo,
+        saldo_pendiente: deCentavos(saldoActualCents),
+        monto_descontado: deCentavos(descontadoCents),
+        motivo,
+      });
+    } else if (saldoActualCents > 0) {
+      pendientes.push({
+        id_prestamo: p.id_prestamo,
+        tipo: p.tipo,
+        saldo_pendiente: deCentavos(saldoActualCents),
+        monto_descontado: deCentavos(descontadoCents),
+        motivo: `El préstamo ya no está activo (estado ${p.estado})`,
+      });
+    }
+  }
+
+  for (const p of prestamos) {
+    if (idsIncluidos.has(p.id_prestamo)) continue;
+    if (p.estado === "ACTIVO" && aCentavos(p.saldo_pendiente) > 0) {
+      pendientes.push({
+        id_prestamo: p.id_prestamo,
+        tipo: p.tipo,
+        saldo_pendiente: Number(p.saldo_pendiente),
+        monto_descontado: 0,
+        motivo: "No incluido en el finiquito",
+      });
+    }
+  }
+
+  return { saldados, pendientes };
+}
+
+function construirContenidoAvisoPrestamos(proceso, finiquito, pendientes) {
+  const lineas = pendientes.map((p) => {
+    const tipoLabel = p.tipo === "ANTICIPO" ? "Anticipo" : "Préstamo";
+    return `- ${tipoLabel}: saldo pendiente ${formatoBs(p.saldo_pendiente)}, descontado en finiquito ${formatoBs(p.monto_descontado)} (${p.motivo}).`;
+  });
+  return [
+    `El finiquito ${finiquito.numero_documento} de ${proceso.nombre_empleado} pasó a estado PAGADO, pero quedaron anticipos o préstamos sin saldar:`,
+    "",
+    ...lineas,
+    "",
+    "Regularice el saldo en Planillas → Anticipos y préstamos.",
+  ].join("\n");
+}
+
+function validarFiltroEstadoEntrante(estado) {
+  if (estado === undefined || estado === null || estado === "") return null;
+  const normalizado = String(estado).trim().toUpperCase();
+  if (!ESTADOS_MENSAJE_ENTRANTE.includes(normalizado)) {
+    throw new ErrorApp(400, "Filtros inválidos", [
+      { campo: "estado", mensaje: `Use uno de: ${ESTADOS_MENSAJE_ENTRANTE.join(", ")}.` },
+    ]);
+  }
+  return normalizado;
+}
+
 module.exports = {
   ESTADOS_FINIQUITO,
   FILTROS_ESTADO_FINIQUITO,
   DESTINOS_FINIQUITO,
   ESCENARIOS_SIMULACION,
+  ESTADOS_MENSAJE_ENTRANTE,
   TIPO_FINIQUITO_ORDEN_PAGO,
   TIPO_FINIQUITO_ASIENTO,
   TIPO_CONFIRMACION_FINIQUITO_PAGOS,
   TIPO_CONFIRMACION_FINIQUITO_CONTABILIDAD,
+  TIPOS_CONFIRMACION_FINIQUITO,
   CUENTAS_FINIQUITO,
   simulacionFiniquitoActiva,
   demoraSimulacionFiniquitoMs,
+  finiquitoMaximoIntentos,
+  esperaReentregaFiniquito,
   aCentavos,
   deCentavos,
   validarFiltroEstadoFiniquito,
+  validarFiltroEstadoEntrante,
   formatearNumeroDocumento,
   textoTiempoServicio,
   consolidarFiniquito,
@@ -536,4 +748,8 @@ module.exports = {
   validarDestinoFiniquito,
   validarSimulacionEscenario,
   validarCaidaBroker,
+  identificarMensajeFiniquito,
+  leerConfirmacionFiniquito,
+  clasificarPrestamosAlPagar,
+  construirContenidoAvisoPrestamos,
 };

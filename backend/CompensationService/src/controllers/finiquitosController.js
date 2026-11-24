@@ -1,4 +1,5 @@
 const servicio = require("../services/finiquitosService");
+const confirmaciones = require("../services/confirmacionesFiniquitoService");
 
 // req.identidad viene del JWT verificado por el middleware autenticar.
 async function listar(req, res) {
@@ -40,6 +41,22 @@ async function descargarPdf(req, res) {
   res.send(contenido);
 }
 
+async function listarMensajesProceso(req, res) {
+  res.json(await confirmaciones.listarMensajesProceso(req.params.idProceso, req.identidad));
+}
+
+async function listarMensajesEntrantes(req, res) {
+  res.json(await confirmaciones.listarMensajesEntrantes(req.query, req.identidad));
+}
+
+async function reprocesarMensaje(req, res) {
+  res.json(await confirmaciones.reprocesarMensaje(req.params.id, req.identidad));
+}
+
+async function simularLlegadaMensaje(req, res) {
+  res.status(202).json(await confirmaciones.simularLlegada(req.body, req.identidad));
+}
+
 module.exports = {
   listar,
   obtener,
@@ -49,4 +66,8 @@ module.exports = {
   simularRespuesta,
   simularCaidaBroker,
   descargarPdf,
+  listarMensajesProceso,
+  listarMensajesEntrantes,
+  reprocesarMensaje,
+  simularLlegadaMensaje,
 };
