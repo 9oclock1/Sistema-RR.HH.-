@@ -663,21 +663,13 @@ async function actualizarRespuestaIntegracion(cliente, idFiniquito, { destino, r
   return rows[0];
 }
 
-async function marcarFiniquitoPagadoYCerrarProceso(cliente, idFiniquito, idProceso) {
+async function marcarFiniquitoPagado(cliente, idFiniquito) {
   await cliente.query(
     `UPDATE FINIQUITOS
         SET estado = 'PAGADO',
             pagado_en = CURRENT_TIMESTAMP
       WHERE id_finiquito = $1`,
     [idFiniquito]
-  );
-  await cliente.query(
-    `UPDATE PROCESOS_DESVINCULACION
-        SET estado = 'CERRADO',
-            actualizado_en = CURRENT_TIMESTAMP
-      WHERE id_proceso = $1
-        AND estado <> 'CERRADO'`,
-    [idProceso]
   );
 }
 
@@ -744,7 +736,7 @@ module.exports = {
   listarRecibidosAntiguos,
   bloquearFiniquitoPorId,
   actualizarRespuestaIntegracion,
-  marcarFiniquitoPagadoYCerrarProceso,
+  marcarFiniquitoPagado,
   listarPrestamosEmpleado,
   saldarPrestamo,
 };

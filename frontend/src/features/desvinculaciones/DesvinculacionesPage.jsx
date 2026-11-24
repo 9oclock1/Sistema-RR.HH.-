@@ -99,7 +99,7 @@ export default function DesvinculacionesPage() {
     avisar({
       tono: "exito",
       titulo: "Proceso de liquidación iniciado",
-      mensaje: `${creado.nombre_empleado} quedó dado de baja.`,
+      mensaje: `Se inició el proceso de liquidación de ${creado.nombre_empleado}.`,
     });
   };
 

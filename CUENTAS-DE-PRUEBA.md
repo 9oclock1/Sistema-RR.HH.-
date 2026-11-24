@@ -30,6 +30,9 @@ Por ahora **Mis boletas de pago** y **Rotación de personal** exigen sesión rea
 | `luciano.morales@correo.test` | Luciano Morales Chávez | Cajero | `empleado` | Desactivada (de baja) |
 | `valeria.nina@correo.test` | Valeria Nina Quisbert | Asesor de Atención | `empleado` | Desactivada (de baja) |
 | `rodrigo.apaza@correo.test` | Rodrigo Apaza Calle | Cajero | `empleado` | Desactivada (de baja) |
+| `patricia.limachi@correo.test` | Patricia Limachi Rojas | Cajero | `empleado` | Activa (lista para cierre definitivo) |
+| `hugo.ticona@correo.test` | Hugo Ticona Vargas | Asesor de Atención | `empleado` | Activa (finiquito aprobado, lista para cierre) |
+| `daniela.cruz@correo.test` | Daniela Cruz Huanca | Asesor de Atención | `empleado` | Revocada (desvinculación cerrada con alertas) |
 | `carla.mamani.100@correo.test` | Carla Mamani Condori (Calacoto) | Jefe de Atención al Cliente | `supervisor` | Activa (solo con los datos de rotación) |
 
 Los colaboradores de baja tienen la cuenta desactivada: el inicio de sesión se rechaza.

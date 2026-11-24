@@ -102,7 +102,7 @@ describe("desvinculacionesService.registrar", () => {
     ["DESPIDO_LEGAL", false],
     ["DESAHUCIO", true],
   ]) {
-    test(`registra proceso INICIADO para causal ${codigo} (desahucio=${esperadoDesahucio}) y da de baja en EmployeeService`, async () => {
+    test(`registra proceso INICIADO para causal ${codigo} (desahucio=${esperadoDesahucio}) sin dar de baja todavía`, async () => {
       const clienteFalso = crearClienteFalso();
       mock.method(pool, "connect", async () => clienteFalso);
       mock.method(modelo, "obtenerCausalActiva", async () => CAUSALES[codigo]);
@@ -136,8 +136,7 @@ describe("desvinculacionesService.registrar", () => {
       assert.equal(resultado.estado, "INICIADO");
       assert.equal(resultado.corresponde_desahucio, esperadoDesahucio);
       assert.equal(procesoInsertado.corresponde_desahucio, esperadoDesahucio);
-      assert.equal(bajaMock.mock.callCount(), 1);
-      assert.deepEqual(bajaMock.mock.calls[0].arguments, [ID_EMPLEADO]);
+      assert.equal(bajaMock.mock.callCount(), 0);
       assert.ok(clienteFalso.comandos.includes("BEGIN"));
       assert.ok(clienteFalso.comandos.includes("COMMIT"));
       assert.ok(!clienteFalso.comandos.includes("ROLLBACK"));
@@ -185,21 +184,20 @@ describe("desvinculacionesService.registrar", () => {
     );
   });
 
-  test("si darDeBaja falla con 503, la transacción hace ROLLBACK y no COMMIT", async () => {
+  test("si crearDocumento falla, la transacción hace ROLLBACK y no COMMIT", async () => {
     const clienteFalso = crearClienteFalso();
     mock.method(pool, "connect", async () => clienteFalso);
     mock.method(modelo, "obtenerCausalActiva", async () => CAUSALES.RENUNCIA);
     mock.method(empleadosCliente, "obtenerEmpleado", async () => EMPLEADO_ACTIVO);
     mock.method(modelo, "obtenerProcesoAbiertoPorEmpleado", async () => null);
     mock.method(modelo, "crearProceso", async () => ID_PROCESO);
-    mock.method(modelo, "crearDocumento", async () => {});
-    mock.method(empleadosCliente, "darDeBaja", async () => {
-      throw new ErrorApp(503, "EmployeeService no disponible");
+    mock.method(modelo, "crearDocumento", async () => {
+      throw new ErrorApp(500, "Fallo al guardar documento");
     });
 
     await assert.rejects(
       () => servicio.registrar(datosValidos(), ARCHIVO_PDF, IDENTIDAD_ADMIN),
-      (err) => err.estado === 503
+      (err) => err.estado === 500
     );
 
     assert.ok(clienteFalso.comandos.includes("BEGIN"));

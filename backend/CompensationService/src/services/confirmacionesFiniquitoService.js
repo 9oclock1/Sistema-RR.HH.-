@@ -122,7 +122,7 @@ async function aplicar(idEntrante) {
         estados.estado_pagos === "CONFIRMADA" &&
         estados.estado_contabilidad === "CONFIRMADA"
       ) {
-        await modelo.marcarFiniquitoPagadoYCerrarProceso(cliente, idFiniquito, finiquito.id_proceso);
+        await modelo.marcarFiniquitoPagado(cliente, idFiniquito);
 
         const prestamos = await modelo.listarPrestamosEmpleado(finiquito.id_empleado, cliente, { bloquear: true });
         const descuentos = (finiquito.renglones ?? []).filter((r) => r.tipo === "DESCUENTO");

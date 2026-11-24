@@ -1436,3 +1436,122 @@ CREATE TABLE MENSAJES_FINIQUITO_ENTRANTES (
 );
 CREATE INDEX idx_mensajes_finiquito_entrantes_estado ON MENSAJES_FINIQUITO_ENTRANTES (estado, recibido_en);
 CREATE INDEX idx_mensajes_finiquito_entrantes_finiquito ON MENSAJES_FINIQUITO_ENTRANTES (id_finiquito, recibido_en);
+
+-- Cierre definitivo de desvinculación y bloqueo de accesos (RF-59, KAN-79)
+
+-- Tabla: CIERRES_DESVINCULACION
+-- Cierre definitivo manual de un proceso de desvinculación (1 a 1 con el proceso), cuando su finiquito está
+-- APROBADO o PAGADO. Registra la inactivación en EmployeeService, la revocación en AuthService y el avance
+-- consolidado de las revocaciones en Ventas/POS (E), Inventarios (I), Entregas (H) y CRM (B).
+CREATE TABLE CIERRES_DESVINCULACION (
+    id_cierre UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_proceso UUID NOT NULL,
+    id_finiquito UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    estado_finiquito_al_cerrar varchar(10) NOT NULL,
+    empleado_inactivado_en TIMESTAMPTZ NOT NULL,
+    cuenta_estado varchar(15) NOT NULL,
+    cuenta_revocada_en TIMESTAMPTZ NULL,
+    estado_revocaciones varchar(12) NOT NULL DEFAULT 'EN_PROCESO',
+    cerrado_por UUID NOT NULL,
+    cerrado_por_rol varchar(20) NOT NULL,
+    cerrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completado_en TIMESTAMPTZ NULL,
+    CONSTRAINT CIERRES_DESVINCULACION_pk PRIMARY KEY (id_cierre),
+    CONSTRAINT uq_cierre_proceso UNIQUE (id_proceso),
+    CONSTRAINT fk_cierre_proceso FOREIGN KEY (id_proceso)
+        REFERENCES PROCESOS_DESVINCULACION (id_proceso),
+    CONSTRAINT fk_cierre_finiquito FOREIGN KEY (id_finiquito)
+        REFERENCES FINIQUITOS (id_finiquito),
+    CONSTRAINT chk_cierre_estado_finiquito CHECK (estado_finiquito_al_cerrar IN ('APROBADO', 'PAGADO')),
+    CONSTRAINT chk_cierre_cuenta_estado CHECK (cuenta_estado IN ('REVOCADA', 'SIN_CUENTA')),
+    CONSTRAINT chk_cierre_cuenta_fecha CHECK ((cuenta_estado = 'REVOCADA') = (cuenta_revocada_en IS NOT NULL)),
+    CONSTRAINT chk_cierre_estado_revocaciones CHECK (estado_revocaciones IN ('EN_PROCESO', 'COMPLETADO', 'CON_ALERTAS')),
+    CONSTRAINT chk_cierre_completado CHECK ((estado_revocaciones = 'COMPLETADO') = (completado_en IS NOT NULL))
+);
+
+-- Tabla: REVOCACIONES_SISTEMA
+-- Estado de la revocación de accesos en cada módulo operativo externo (4 filas por cierre).
+-- PENDIENTE: esperando publicación en Pub/Sub; ENVIADA: publicada, corre el plazo de confirmación;
+-- CONFIRMADA: módulo confirmó; RECHAZADA: módulo rechazó con motivo; VENCIDA: agotó los reenvíos por plazo.
+CREATE TABLE REVOCACIONES_SISTEMA (
+    id_revocacion UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_cierre UUID NOT NULL,
+    destino varchar(15) NOT NULL,
+    estado varchar(12) NOT NULL DEFAULT 'PENDIENTE',
+    plazo_vence_en TIMESTAMPTZ NULL,
+    reenvios_por_plazo smallint NOT NULL DEFAULT 0,
+    recursos_revocados JSONB NULL,
+    referencia varchar(60) NULL,
+    motivo varchar(255) NULL,
+    respondida_en TIMESTAMPTZ NULL,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT REVOCACIONES_SISTEMA_pk PRIMARY KEY (id_revocacion),
+    CONSTRAINT uq_rev_sistema_cierre_destino UNIQUE (id_cierre, destino),
+    CONSTRAINT fk_rev_sistema_cierre FOREIGN KEY (id_cierre)
+        REFERENCES CIERRES_DESVINCULACION (id_cierre) ON DELETE CASCADE,
+    CONSTRAINT chk_rev_sistema_destino CHECK (destino IN ('VENTAS', 'INVENTARIOS', 'ENTREGAS', 'CRM')),
+    CONSTRAINT chk_rev_sistema_estado CHECK (estado IN ('PENDIENTE', 'ENVIADA', 'CONFIRMADA', 'RECHAZADA', 'VENCIDA')),
+    CONSTRAINT chk_rev_sistema_reenvios CHECK (reenvios_por_plazo >= 0)
+);
+CREATE INDEX idx_rev_sistema_plazos ON REVOCACIONES_SISTEMA (estado, plazo_vence_en);
+
+-- Tabla: EVENTOS_CIERRE
+-- Bandeja de salida propia del cierre definitivo (outbox): guarda los envíos SALIENTE y las respuestas
+-- simuladas RESPUESTA_SIMULADA hacia/desde Ventas/POS, Inventarios, Entregas y CRM en el tópico F.
+-- id_mensaje no es único para permitir reenvíos y escenarios duplicados.
+CREATE TABLE EVENTOS_CIERRE (
+    id_evento UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_mensaje varchar(100) NOT NULL,
+    id_cierre UUID NOT NULL,
+    sentido varchar(20) NOT NULL,
+    destino varchar(15) NOT NULL,
+    tipo_evento varchar(60) NOT NULL,
+    topico varchar(60) NOT NULL,
+    carga JSONB NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    intentos smallint NOT NULL DEFAULT 0,
+    ultimo_error varchar(255) NULL,
+    proximo_intento_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id_pubsub varchar(100) NULL,
+    entregado_en TIMESTAMPTZ NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT EVENTOS_CIERRE_pk PRIMARY KEY (id_evento),
+    CONSTRAINT fk_evento_cierre FOREIGN KEY (id_cierre)
+        REFERENCES CIERRES_DESVINCULACION (id_cierre),
+    CONSTRAINT chk_evento_cierre_sentido CHECK (sentido IN ('SALIENTE', 'RESPUESTA_SIMULADA')),
+    CONSTRAINT chk_evento_cierre_destino CHECK (destino IN ('VENTAS', 'INVENTARIOS', 'ENTREGAS', 'CRM')),
+    CONSTRAINT chk_evento_cierre_estado CHECK (estado IN ('PENDIENTE', 'ENTREGADO', 'FALLIDO')),
+    CONSTRAINT chk_evento_cierre_intentos CHECK (intentos >= 0),
+    CONSTRAINT chk_evento_cierre_entrega CHECK ((estado = 'ENTREGADO') = (entregado_en IS NOT NULL))
+);
+CREATE INDEX idx_eventos_cierre_pendientes ON EVENTOS_CIERRE (estado, proximo_intento_en);
+CREATE INDEX idx_eventos_cierre_destino ON EVENTOS_CIERRE (id_cierre, destino, creado_en);
+
+-- Tabla: MENSAJES_CIERRE_ENTRANTES
+-- Bandeja de entrada y cola de errores (DLQ) de las confirmaciones de revocación de los sistemas externos.
+-- carga es text para registrar incluso JSON inválido. id_mensaje único descarta duplicados.
+CREATE TABLE MENSAJES_CIERRE_ENTRANTES (
+    id_entrante UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_mensaje varchar(100) NOT NULL,
+    origen varchar(10) NULL,
+    tipo_evento varchar(60) NULL,
+    id_cierre UUID NULL,
+    destino varchar(15) NULL,
+    carga text NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'RECIBIDO',
+    intentos smallint NOT NULL DEFAULT 0,
+    ultimo_error varchar(255) NULL,
+    recibido_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    procesado_en TIMESTAMPTZ NULL,
+    CONSTRAINT MENSAJES_CIERRE_ENTRANTES_pk PRIMARY KEY (id_entrante),
+    CONSTRAINT uq_mensaje_cierre_entrante UNIQUE (id_mensaje),
+    CONSTRAINT fk_mensaje_cierre_entrante FOREIGN KEY (id_cierre)
+        REFERENCES CIERRES_DESVINCULACION (id_cierre),
+    CONSTRAINT chk_mensaje_cierre_destino CHECK (destino IS NULL OR destino IN ('VENTAS', 'INVENTARIOS', 'ENTREGAS', 'CRM')),
+    CONSTRAINT chk_mensaje_cierre_estado CHECK (estado IN ('RECIBIDO', 'PROCESADO', 'IGNORADO', 'EN_DLQ')),
+    CONSTRAINT chk_mensaje_cierre_intentos CHECK (intentos >= 0),
+    CONSTRAINT chk_mensaje_cierre_procesado CHECK ((estado IN ('PROCESADO', 'IGNORADO')) = (procesado_en IS NOT NULL))
+);
+CREATE INDEX idx_mensajes_cierre_entrantes_estado ON MENSAJES_CIERRE_ENTRANTES (estado, recibido_en);
+CREATE INDEX idx_mensajes_cierre_entrantes_cierre ON MENSAJES_CIERRE_ENTRANTES (id_cierre, recibido_en);

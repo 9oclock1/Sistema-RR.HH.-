@@ -794,14 +794,19 @@ function DetalleFiniquito({ idProceso }) {
               </Boton>
             )}
             {finiquito && finiquito.estado !== "BORRADOR" && (
-              <Boton
-                variante="primario"
-                icono={Download}
-                cargando={procesando === "pdf"}
-                onClick={alDescargarPdf}
-              >
-                Descargar PDF
-              </Boton>
+              <>
+                <Boton
+                  variante="primario"
+                  icono={Download}
+                  cargando={procesando === "pdf"}
+                  onClick={alDescargarPdf}
+                >
+                  Descargar PDF
+                </Boton>
+                <Boton as={Link} to={`/desvinculacion/cierre/${idProceso}`} variante="predeterminado">
+                  Ir al cierre definitivo
+                </Boton>
+              </>
             )}
           </div>
         }
@@ -821,8 +826,16 @@ function DetalleFiniquito({ idProceso }) {
       )}
 
       {finiquito?.estado === "PAGADO" && (
-        <Alerta tono="exito" titulo="Finiquito pagado">
-          Finiquito pagado: Pagos y Contabilidad confirmaron. El proceso quedó cerrado.
+        <Alerta
+          tono="exito"
+          titulo="Finiquito pagado"
+          acciones={
+            <Boton as={Link} to={`/desvinculacion/cierre/${idProceso}`} tamano="sm">
+              Ir al cierre definitivo
+            </Boton>
+          }
+        >
+          Finiquito pagado: Pagos y Contabilidad confirmaron.
         </Alerta>
       )}
 

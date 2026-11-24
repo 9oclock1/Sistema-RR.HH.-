@@ -16,10 +16,16 @@ const { iniciarDespachador } = require("./src/services/eventos.service");
 const { iniciarConsumidor } = require("./src/services/confirmaciones.service");
 const { iniciarDespachadorFiniquitos } = require("./src/services/integracionFiniquitosService");
 const { reanudarRecibidos: reanudarMensajesFiniquito } = require("./src/services/confirmacionesFiniquitoService");
+const { iniciarDespachadorCierres } = require("./src/services/integracionCierresService");
+const {
+  reanudarRecibidos: reanudarMensajesCierre,
+  iniciarVigilantePlazos,
+} = require("./src/services/confirmacionesCierreService");
 const ventasProductividadRoutes = require("./src/routes/ventasProductividad.routes");
 const boletasRoutes = require("./src/routes/boletas.routes");
 const desvinculacionesRoutes = require("./src/routes/desvinculacionesRoutes");
 const finiquitosRoutes = require("./src/routes/finiquitosRoutes");
+const cierresRoutes = require("./src/routes/cierresRoutes");
 const rotacionRoutes = require("./src/routes/rotacion.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 const ventasProductividad = require("./src/services/ventasProductividad.service");
@@ -68,6 +74,7 @@ app.use(ventasProductividadRoutes);
 app.use(boletasRoutes);
 app.use(desvinculacionesRoutes);
 app.use(finiquitosRoutes);
+app.use(cierresRoutes);
 app.use(rotacionRoutes);
 app.use(manejadorErrores);
 
@@ -78,6 +85,9 @@ app.listen(PORT, "0.0.0.0", () => {
   iniciarConsumidor();
   iniciarDespachadorFiniquitos();
   reanudarMensajesFiniquito();
+  iniciarDespachadorCierres();
+  reanudarMensajesCierre();
+  iniciarVigilantePlazos();
 });
 
 // RF-51: se suscribe al cierre de ventas del periodo publicado por Ventas y Marketing (grupo E).

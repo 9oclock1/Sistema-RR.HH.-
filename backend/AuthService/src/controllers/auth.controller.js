@@ -16,4 +16,12 @@ async function obtenerSesion(req, res) {
   res.json({ usuario: await servicio.obtenerSesion(leerCookie(req.headers.cookie)) });
 }
 
-module.exports = { iniciarSesion, cerrarSesion, obtenerSesion };
+async function revocarAcceso(req, res) {
+  res.json(await servicio.revocarAccesoEmpleado(req.params.idEmpleado, req.body));
+}
+
+async function consultarAcceso(req, res) {
+  res.json(await servicio.consultarAccesoEmpleado(req.params.idEmpleado));
+}
+
+module.exports = { iniciarSesion, cerrarSesion, obtenerSesion, revocarAcceso, consultarAcceso };
