@@ -14,9 +14,12 @@ const mensajesPublicadosRoutes = require("./src/routes/mensajesPublicados.routes
 const reporteContableRoutes = require("./src/routes/reporteContable.routes");
 const { iniciarDespachador } = require("./src/services/eventos.service");
 const { iniciarConsumidor } = require("./src/services/confirmaciones.service");
+const { iniciarDespachadorFiniquitos } = require("./src/services/integracionFiniquitosService");
+const { reanudarRecibidos: reanudarMensajesFiniquito } = require("./src/services/confirmacionesFiniquitoService");
 const ventasProductividadRoutes = require("./src/routes/ventasProductividad.routes");
 const boletasRoutes = require("./src/routes/boletas.routes");
 const desvinculacionesRoutes = require("./src/routes/desvinculacionesRoutes");
+const finiquitosRoutes = require("./src/routes/finiquitosRoutes");
 const rotacionRoutes = require("./src/routes/rotacion.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 const ventasProductividad = require("./src/services/ventasProductividad.service");
@@ -64,6 +67,7 @@ app.use(reporteContableRoutes);
 app.use(ventasProductividadRoutes);
 app.use(boletasRoutes);
 app.use(desvinculacionesRoutes);
+app.use(finiquitosRoutes);
 app.use(rotacionRoutes);
 app.use(manejadorErrores);
 
@@ -72,6 +76,8 @@ app.listen(PORT, "0.0.0.0", () => {
   // Bandeja de salida (planilla aprobada) y confirmaciones de Contabilidad y Pagos por Pub/Sub.
   iniciarDespachador();
   iniciarConsumidor();
+  iniciarDespachadorFiniquitos();
+  reanudarMensajesFiniquito();
 });
 
 // RF-51: se suscribe al cierre de ventas del periodo publicado por Ventas y Marketing (grupo E).

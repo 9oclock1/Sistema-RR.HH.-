@@ -1,6 +1,7 @@
 const desvinculacionesModel = require("../models/desvinculacionesModel");
 const promedioModelo = require("../models/promedioIndemnizableModel");
 const modelo = require("../models/saldosProporcionalesModel");
+const finiquitosModel = require("../models/finiquitosModel");
 const promedioServicio = require("./promedioIndemnizableService");
 const externos = require("./externos.service");
 const { enTransaccion } = require("../config/transaccion");
@@ -60,6 +61,7 @@ async function calcular(idProceso, identidad) {
   return enTransaccion(async (cliente) => {
     const bloqueado = await promedioModelo.bloquearProceso(cliente, id);
     if (!bloqueado || !ESTADOS_ABIERTOS.includes(bloqueado.estado)) throw procesoNoAbierto();
+    await finiquitosModel.asegurarEditable(cliente, id);
     await modelo.guardar(cliente, id, resultado, calculadoPor);
     if (bloqueado.estado === "INICIADO") await promedioModelo.marcarEnCurso(cliente, id);
     return modelo.obtener(id, cliente);

@@ -1,5 +1,6 @@
 const desvinculacionesModel = require("../models/desvinculacionesModel");
 const modelo = require("../models/promedioIndemnizableModel");
+const finiquitosModel = require("../models/finiquitosModel");
 const { enTransaccion } = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
@@ -40,6 +41,7 @@ async function calcular(idProceso, identidad) {
     if (!bloqueado || !ESTADOS_ABIERTOS.includes(bloqueado.estado)) {
       throw procesoNoAbierto();
     }
+    await finiquitosModel.asegurarEditable(cliente, idNormalizado);
 
     await modelo.guardarPromedio(cliente, idNormalizado, resultado, calculadoPor);
     if (bloqueado.estado === "INICIADO") {

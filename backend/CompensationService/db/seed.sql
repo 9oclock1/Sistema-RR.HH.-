@@ -1790,3 +1790,411 @@ BEGIN
   END LOOP;
 END $$;
 COMMIT;
+
+-- Datos de ejemplo de finiquitos (RF-58, KAN-78):
+--   1. Listos para emitir el finiquito: Valeria Nina Quisbert (...0743) y Rodrigo Apaza Calle (...0744)
+--      con promedio indemnizable, beneficios sociales y saldos proporcionales al día entre sí, más un
+--      anticipo ACTIVO (...0b01) de Rodrigo por Bs 800,00 para demostrar el descuento y su saldo al pagarse.
+--   2. Finiquito PAGADO con cadena completa: Elena Paredes Gómez (...0741, FIN-2026-000001), integraciones
+--      CONFIRMADA, eventos SALIENTE y RESPUESTA_SIMULADA ENTREGADO, mensajes PROCESADO y proceso CERRADO
+--      (sin PDF guardado; se genera al descargarse por primera vez).
+--   3. Finiquito APROBADO con Contabilidad RECHAZADA: Luciano Morales Chávez (...0742, FIN-2026-000002),
+--      Pagos CONFIRMADA y Contabilidad rechazada por cuenta inexistente, listo para probar "Reenviar".
+--   4. Mensajes simulados en bandeja de entrada: un mensaje EN_DLQ sin id_finiquito (3 intentos fallidos)
+--      y un mensaje IGNORADO como respuesta tardía a un envío previo de Luciano.
+BEGIN;
+
+UPDATE PROCESOS_DESVINCULACION
+   SET estado = 'EN_CURSO', actualizado_en = CURRENT_TIMESTAMP
+ WHERE id_proceso IN (
+   'c0000000-0000-4000-8000-000000000742',
+   'c0000000-0000-4000-8000-000000000743',
+   'c0000000-0000-4000-8000-000000000744'
+ )
+   AND estado = 'INICIADO';
+
+UPDATE PROCESOS_DESVINCULACION
+   SET estado = 'CERRADO', actualizado_en = CURRENT_TIMESTAMP
+ WHERE id_proceso = 'c0000000-0000-4000-8000-000000000741'
+   AND estado <> 'CERRADO';
+
+INSERT INTO PRESTAMOS (
+  id_prestamo, id_empleado, tipo, monto, numero_cuotas, mes_inicio, motivo,
+  liquido_pagable_referencial, porcentaje_cuota, saldo_pendiente, estado,
+  registrado_por, creado_en, actualizado_en
+) VALUES (
+  'c0000000-0000-4000-8000-000000000b01',
+  'f0000000-0000-4000-8000-000000000743',
+  'ANTICIPO',
+  800.00,
+  1,
+  DATE '2026-11-01',
+  'Anticipo de sueldo para gastos médicos',
+  4219.01,
+  18.96,
+  800.00,
+  'ACTIVO',
+  'Andrea Salazar Vega',
+  TIMESTAMPTZ '2026-11-02T10:00:00-04:00',
+  TIMESTAMPTZ '2026-11-02T10:00:00-04:00'
+)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO CUOTAS_PRESTAMO (
+  id_cuota, id_prestamo, numero_cuota, periodo, monto, estado, pagada_en
+) VALUES (
+  'c0000000-0000-4000-8000-000000000b02',
+  'c0000000-0000-4000-8000-000000000b01',
+  1,
+  DATE '2026-11-01',
+  800.00,
+  'PENDIENTE',
+  NULL
+)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO PROMEDIOS_INDEMNIZABLES (
+  id_proceso, periodo_limite, meses_considerados, total_considerado, promedio,
+  observaciones, calculado_por, calculado_por_rol, calculado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000741', '2026-10', 3, 12925.00, 4308.33,
+    ARRAY['En 2026-10 se pagaron 15 de 30 días.'],
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-10-18T10:30:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000742', '2026-10', 3, 10958.33, 3652.78,
+    ARRAY['En 2026-10 se pagaron 20 de 30 días.'],
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-10-22T09:30:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000743', '2026-10', 3, 10050.00, 3350.00,
+    '{}'::text[],
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-05T09:30:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000744', '2026-11', 3, 14083.33, 4694.44,
+    ARRAY['No hay una planilla cerrada de 2026-11 (mes del retiro): si se cierra después, recalcule el promedio.'],
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-12T09:30:00-04:00'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO DETALLE_PROMEDIO_INDEMNIZABLE (
+  id_proceso, periodo, id_planilla, id_planilla_empleado, dias_pagados, haber_mensual, total_ganado
+) VALUES
+  ('c0000000-0000-4000-8000-000000000741', '2026-08', 'c0000000-0000-4000-8000-000000000762', 'c0000000-0000-4000-8000-000000000772', 30, 4500.00, 5275.00),
+  ('c0000000-0000-4000-8000-000000000741', '2026-09', 'c0000000-0000-4000-8000-000000000763', 'c0000000-0000-4000-8000-000000000773', 30, 4500.00, 5200.00),
+  ('c0000000-0000-4000-8000-000000000741', '2026-10', 'c0000000-0000-4000-8000-000000000764', 'c0000000-0000-4000-8000-000000000774', 15, 4500.00, 2450.00),
+  ('c0000000-0000-4000-8000-000000000742', '2026-08', 'c0000000-0000-4000-8000-000000000762', 'c0000000-0000-4000-8000-000000000776', 30, 3800.00, 4208.33),
+  ('c0000000-0000-4000-8000-000000000742', '2026-09', 'c0000000-0000-4000-8000-000000000763', 'c0000000-0000-4000-8000-000000000777', 30, 3800.00, 4050.00),
+  ('c0000000-0000-4000-8000-000000000742', '2026-10', 'c0000000-0000-4000-8000-000000000764', 'c0000000-0000-4000-8000-000000000778', 20, 3800.00, 2700.00),
+  ('c0000000-0000-4000-8000-000000000743', '2026-08', 'c0000000-0000-4000-8000-000000000762', 'c0000000-0000-4000-8000-000000000780', 30, 3200.00, 3320.00),
+  ('c0000000-0000-4000-8000-000000000743', '2026-09', 'c0000000-0000-4000-8000-000000000763', 'c0000000-0000-4000-8000-000000000781', 30, 3200.00, 3200.00),
+  ('c0000000-0000-4000-8000-000000000743', '2026-10', 'c0000000-0000-4000-8000-000000000764', 'c0000000-0000-4000-8000-000000000782', 30, 3200.00, 3530.00),
+  ('c0000000-0000-4000-8000-000000000744', '2026-08', 'c0000000-0000-4000-8000-000000000762', 'c0000000-0000-4000-8000-000000000784', 30, 4000.00, 4600.00),
+  ('c0000000-0000-4000-8000-000000000744', '2026-09', 'c0000000-0000-4000-8000-000000000763', 'c0000000-0000-4000-8000-000000000785', 30, 4400.00, 4650.00),
+  ('c0000000-0000-4000-8000-000000000744', '2026-10', 'c0000000-0000-4000-8000-000000000764', 'c0000000-0000-4000-8000-000000000786', 30, 4400.00, 4833.33)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO BENEFICIOS_SOCIALES (
+  id_proceso, promedio_base, fecha_ingreso, fecha_retiro, dias_servicio,
+  anios_servicio, meses_servicio, dias_fraccion,
+  corresponde_indemnizacion, motivo_indemnizacion, monto_indemnizacion,
+  corresponde_desahucio, motivo_desahucio, monto_desahucio, total,
+  calculado_por, calculado_por_rol, calculado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000741', 4308.33, DATE '2019-03-01', DATE '2026-10-15', 2786,
+    7, 7, 15,
+    FALSE, 'Despido por causa justificada: no corresponde indemnización (LGT, art. 16).', 0.00,
+    FALSE, 'Despido por causa justificada: no corresponde desahucio (LGT, art. 16).', 0.00, 0.00,
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-10-18T10:35:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000742', 3652.78, DATE '2022-05-01', DATE '2026-10-20', 1634,
+    4, 5, 20,
+    TRUE, 'Renuncia voluntaria con más de 90 días de antigüedad (DS 110, art. 1).', 16336.04,
+    FALSE, 'Renuncia voluntaria: no corresponde desahucio.', 0.00, 16336.04,
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-10-22T09:35:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000743', 3350.00, DATE '2024-02-01', DATE '2026-10-31', 1004,
+    2, 9, 0,
+    TRUE, 'Conclusión de contrato con más de 90 días de antigüedad (DS 110, art. 1).', 9212.50,
+    FALSE, 'Conclusión de contrato: no corresponde desahucio.', 0.00, 9212.50,
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-05T09:35:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000744', 4694.44, DATE '2021-08-01', DATE '2026-11-10', 1928,
+    5, 3, 10,
+    TRUE, 'Desahucio con más de 90 días de antigüedad (DS 110, art. 1).', 24776.21,
+    TRUE, 'Desahucio sin preaviso de 90 días (LGT, art. 12).', 14083.32, 38859.53,
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-12T09:35:00-04:00'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO DETALLE_BENEFICIOS_SOCIALES (
+  id_proceso, orden, codigo_concepto, descripcion, unidad, cantidad, divisor, monto
+) VALUES
+  ('c0000000-0000-4000-8000-000000000742', 1, 'INDEMNIZACION', 'Años de servicio', 'ANIO', 4, 1, 14611.12),
+  ('c0000000-0000-4000-8000-000000000742', 2, 'INDEMNIZACION', 'Meses de servicio (duodécimas)', 'MES', 5, 12, 1521.99),
+  ('c0000000-0000-4000-8000-000000000742', 3, 'INDEMNIZACION', 'Días de servicio', 'DIA', 20, 360, 202.93),
+  ('c0000000-0000-4000-8000-000000000743', 1, 'INDEMNIZACION', 'Años de servicio', 'ANIO', 2, 1, 6700.00),
+  ('c0000000-0000-4000-8000-000000000743', 2, 'INDEMNIZACION', 'Meses de servicio (duodécimas)', 'MES', 9, 12, 2512.50),
+  ('c0000000-0000-4000-8000-000000000744', 1, 'INDEMNIZACION', 'Años de servicio', 'ANIO', 5, 1, 23472.20),
+  ('c0000000-0000-4000-8000-000000000744', 2, 'INDEMNIZACION', 'Meses de servicio (duodécimas)', 'MES', 3, 12, 1173.61),
+  ('c0000000-0000-4000-8000-000000000744', 3, 'INDEMNIZACION', 'Días de servicio', 'DIA', 10, 360, 130.40),
+  ('c0000000-0000-4000-8000-000000000744', 4, 'DESAHUCIO', 'Desahucio (tres sueldos promedio)', 'SUELDO', 3, 1, 14083.32)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO SALDOS_PROPORCIONALES (
+  id_proceso, promedio, salario_diario, gestion_aguinaldo, aguinaldo_desde, aguinaldo_hasta,
+  aguinaldo_meses, aguinaldo_dias, monto_aguinaldo, anios_servicio, dias_acumulados,
+  dias_gozados, dias_pendientes, monto_vacaciones_pendientes, anio_en_curso_desde,
+  anio_en_curso_meses, anio_en_curso_dias, dias_escala, dias_duodecima,
+  monto_duodecima_vacaciones, total, observaciones, calculado_por, calculado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000741', 4308.33, 143.61, 2026, DATE '2025-12-01', DATE '2026-10-15',
+    10, 15, 3769.79, 7, 115, 0, 115, 16515.27, DATE '2026-03-01',
+    7, 15, 20, 12.50, 1795.14, 22080.20, '{}'::text[],
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-10-18T10:40:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000742', 3652.78, 121.76, 2026, DATE '2025-12-01', DATE '2026-10-20',
+    10, 20, 3246.92, 4, 60, 0, 60, 7305.56, DATE '2026-05-01',
+    5, 20, 15, 7.08, 862.46, 11414.94, '{}'::text[],
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-10-22T09:40:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000743', 3350.00, 111.67, 2026, DATE '2025-12-01', DATE '2026-10-31',
+    11, 0, 3070.83, 2, 30, 0, 30, 3350.00, DATE '2026-02-01',
+    9, 0, 15, 11.25, 1256.25, 7677.08, '{}'::text[],
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-11-05T09:40:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000744', 4694.44, 156.48, 2026, DATE '2025-12-01', DATE '2026-11-10',
+    11, 10, 4433.64, 5, 75, 0, 75, 11736.10, DATE '2026-08-01',
+    3, 10, 20, 5.56, 869.34, 17039.08, '{}'::text[],
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-11-12T09:40:00-04:00'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO FINIQUITOS (
+  id_finiquito, id_proceso, numero_documento, estado, fecha_retiro, codigo_causal,
+  promedio_base, anios_servicio, meses_servicio, dias_fraccion,
+  total_ingresos, total_descuentos, liquido_pagable,
+  estado_pagos, referencia_pagos, motivo_pagos, respondida_pagos_en,
+  estado_contabilidad, referencia_contabilidad, motivo_contabilidad, respondida_contabilidad_en,
+  generado_por, generado_en, aprobado_por, aprobado_por_rol, aprobado_en, pagado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000b11',
+    'c0000000-0000-4000-8000-000000000741',
+    'FIN-2026-000001',
+    'PAGADO',
+    DATE '2026-10-15',
+    'DESPIDO_LEGAL',
+    4308.33, 7, 7, 15,
+    22080.20, 0.00, 22080.20,
+    'CONFIRMADA', 'OP-FIN-2026-000001', NULL, TIMESTAMPTZ '2026-10-18T11:00:10-04:00',
+    'CONFIRMADA', 'AS-FIN-2026-000001', NULL, TIMESTAMPTZ '2026-10-18T11:00:15-04:00',
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-10-18T10:50:00-04:00',
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-10-18T11:00:00-04:00',
+    TIMESTAMPTZ '2026-10-18T11:00:15-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b51',
+    'c0000000-0000-4000-8000-000000000742',
+    'FIN-2026-000002',
+    'APROBADO',
+    DATE '2026-10-20',
+    'RENUNCIA',
+    3652.78, 4, 5, 20,
+    27750.98, 0.00, 27750.98,
+    'CONFIRMADA', 'OP-FIN-2026-000002', NULL, TIMESTAMPTZ '2026-10-22T10:00:10-04:00',
+    'RECHAZADA', NULL, 'La cuenta 2.1.5.03 no existe en el plan de cuentas', TIMESTAMPTZ '2026-10-22T10:05:12-04:00',
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-10-22T09:50:00-04:00',
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-10-22T10:00:00-04:00',
+    NULL
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO DETALLE_FINIQUITO (
+  id_finiquito, orden, tipo, codigo, concepto, detalle, monto, id_prestamo, saldo_prestamo
+) VALUES
+  ('c0000000-0000-4000-8000-000000000b11', 1, 'INGRESO', 'AGUINALDO_DUODECIMAS', 'Aguinaldo (duodécimas)', 'Gestión 2026: 10 meses y 15 días', 3769.79, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000b11', 2, 'INGRESO', 'VACACIONES_PENDIENTES', 'Vacaciones no gozadas', '115 días pendientes', 16515.27, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000b11', 3, 'INGRESO', 'VACACIONES_DUODECIMAS', 'Vacaciones (duodécimas del año en curso)', '7 meses y 15 días', 1795.14, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000b51', 1, 'INGRESO', 'INDEMNIZACION', 'Indemnización por tiempo de servicio', '4 años, 5 meses y 20 días', 16336.04, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000b51', 2, 'INGRESO', 'AGUINALDO_DUODECIMAS', 'Aguinaldo (duodécimas)', 'Gestión 2026: 10 meses y 20 días', 3246.92, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000b51', 3, 'INGRESO', 'VACACIONES_PENDIENTES', 'Vacaciones no gozadas', '60 días pendientes', 7305.56, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000b51', 4, 'INGRESO', 'VACACIONES_DUODECIMAS', 'Vacaciones (duodécimas del año en curso)', '5 meses y 20 días', 862.46, NULL, NULL)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO EVENTOS_FINIQUITO (
+  id_evento, id_mensaje, id_finiquito, sentido, destino, tipo_evento, topico, carga,
+  estado, intentos, ultimo_error, proximo_intento_en, id_pubsub, entregado_en, creado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000b21',
+    'c0000000-0000-4000-8000-000000000b31',
+    'c0000000-0000-4000-8000-000000000b11',
+    'SALIENTE', 'PAGOS', 'FINIQUITO_APROBADO_ORDEN_PAGO', 'ucb-sis323-sub-f',
+    '{
+      "encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b31","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"A","modulo":"Pagos y Facturación"},"tipo":"FINIQUITO_APROBADO_ORDEN_PAGO","fecha":"2026-10-18T15:00:00.000Z","version_esquema":1},
+      "datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b11","numero_documento":"FIN-2026-000001","id_proceso":"c0000000-0000-4000-8000-000000000741","prioridad":"URGENTE","moneda":"BOB","colaborador":{"id_empleado":"f0000000-0000-4000-8000-000000000037","nombre_completo":"Elena Paredes Gómez"},"fecha_retiro":"2026-10-15","causal":{"codigo":"DESPIDO_LEGAL","nombre":"Despido legal (causa justificada)"},"conceptos":[{"codigo":"AGUINALDO_DUODECIMAS","concepto":"Aguinaldo (duodécimas)","monto":3769.79},{"codigo":"VACACIONES_PENDIENTES","concepto":"Vacaciones no gozadas","monto":16515.27},{"codigo":"VACACIONES_DUODECIMAS","concepto":"Vacaciones (duodécimas del año en curso)","monto":1795.14}],"descuentos":[],"total_ingresos":22080.2,"total_descuentos":0,"liquido_pagable":22080.2,"aprobado":{"por":{"id_empleado":"f0000000-0000-4000-8000-000000000023","nombre_completo":"Andrea Salazar Vega"},"en":"2026-10-18T15:00:00.000Z"}}
+    }'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:00:01-04:00', 'seed-elena-pagos-saliente',
+    TIMESTAMPTZ '2026-10-18T11:00:02-04:00', TIMESTAMPTZ '2026-10-18T11:00:01-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b22',
+    'c0000000-0000-4000-8000-000000000b32',
+    'c0000000-0000-4000-8000-000000000b11',
+    'SALIENTE', 'CONTABILIDAD', 'FINIQUITO_APROBADO_ASIENTO', 'ucb-sis323-sub-f',
+    '{
+      "encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b32","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"D","modulo":"Contabilidad"},"tipo":"FINIQUITO_APROBADO_ASIENTO","fecha":"2026-10-18T15:00:00.000Z","version_esquema":1},
+      "datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b11","numero_documento":"FIN-2026-000001","id_proceso":"c0000000-0000-4000-8000-000000000741","colaborador":{"id_empleado":"f0000000-0000-4000-8000-000000000037","nombre_completo":"Elena Paredes Gómez"},"fecha":"2026-10-15","glosa":"Liquidación final de Elena Paredes Gómez según finiquito FIN-2026-000001","asiento":{"renglones":[{"cuenta":{"codigo":"2.1.5.02","nombre":"Provisión para aguinaldos"},"debe":3769.79,"haber":0,"concepto":"Desafectación de provisión para aguinaldos"},{"cuenta":{"codigo":"2.1.5.03","nombre":"Provisión para vacaciones"},"debe":18310.41,"haber":0,"concepto":"Desafectación de provisión para vacaciones"},{"cuenta":{"codigo":"2.1.2.02","nombre":"Finiquitos por pagar"},"debe":0,"haber":22080.2,"concepto":"Finiquitos por pagar"}],"total_debe":22080.2,"total_haber":22080.2}}
+    }'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:00:01-04:00', 'seed-elena-contabilidad-saliente',
+    TIMESTAMPTZ '2026-10-18T11:00:02-04:00', TIMESTAMPTZ '2026-10-18T11:00:01-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b23',
+    'c0000000-0000-4000-8000-000000000b33',
+    'c0000000-0000-4000-8000-000000000b11',
+    'RESPUESTA_SIMULADA', 'PAGOS', 'CONFIRMACION_ORDEN_PAGO_FINIQUITO', 'ucb-sis323-sub-f',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b33","origen":{"grupo":"A","modulo":"Pagos y Facturación"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ORDEN_PAGO_FINIQUITO","fecha":"2026-10-18T15:00:05.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b11","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b31","resultado":"CONFIRMADA","referencia":"OP-FIN-2026-000001","motivo":null}}'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:00:05-04:00', 'seed-elena-pagos-respuesta',
+    TIMESTAMPTZ '2026-10-18T11:00:08-04:00', TIMESTAMPTZ '2026-10-18T11:00:05-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b24',
+    'c0000000-0000-4000-8000-000000000b34',
+    'c0000000-0000-4000-8000-000000000b11',
+    'RESPUESTA_SIMULADA', 'CONTABILIDAD', 'CONFIRMACION_ASIENTO_FINIQUITO', 'ucb-sis323-sub-f',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b34","origen":{"grupo":"D","modulo":"Contabilidad"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ASIENTO_FINIQUITO","fecha":"2026-10-18T15:00:09.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b11","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b32","resultado":"CONFIRMADA","referencia":"AS-FIN-2026-000001","motivo":null}}'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:00:09-04:00', 'seed-elena-contabilidad-respuesta',
+    TIMESTAMPTZ '2026-10-18T11:00:12-04:00', TIMESTAMPTZ '2026-10-18T11:00:09-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b61',
+    'c0000000-0000-4000-8000-000000000b71',
+    'c0000000-0000-4000-8000-000000000b51',
+    'SALIENTE', 'PAGOS', 'FINIQUITO_APROBADO_ORDEN_PAGO', 'ucb-sis323-sub-f',
+    '{
+      "encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b71","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"A","modulo":"Pagos y Facturación"},"tipo":"FINIQUITO_APROBADO_ORDEN_PAGO","fecha":"2026-10-22T14:00:00.000Z","version_esquema":1},
+      "datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","numero_documento":"FIN-2026-000002","id_proceso":"c0000000-0000-4000-8000-000000000742","prioridad":"URGENTE","moneda":"BOB","colaborador":{"id_empleado":"f0000000-0000-4000-8000-000000000741","nombre_completo":"Luciano Morales Chávez"},"fecha_retiro":"2026-10-20","causal":{"codigo":"RENUNCIA","nombre":"Renuncia voluntaria"},"conceptos":[{"codigo":"INDEMNIZACION","concepto":"Indemnización por tiempo de servicio","monto":16336.04},{"codigo":"AGUINALDO_DUODECIMAS","concepto":"Aguinaldo (duodécimas)","monto":3246.92},{"codigo":"VACACIONES_PENDIENTES","concepto":"Vacaciones no gozadas","monto":7305.56},{"codigo":"VACACIONES_DUODECIMAS","concepto":"Vacaciones (duodécimas del año en curso)","monto":862.46}],"descuentos":[],"total_ingresos":27750.98,"total_descuentos":0,"liquido_pagable":27750.98,"aprobado":{"por":{"id_empleado":"f0000000-0000-4000-8000-000000000023","nombre_completo":"Andrea Salazar Vega"},"en":"2026-10-22T14:00:00.000Z"}}
+    }'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:00:01-04:00', 'seed-luciano-pagos-saliente',
+    TIMESTAMPTZ '2026-10-22T10:00:02-04:00', TIMESTAMPTZ '2026-10-22T10:00:01-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b62',
+    'c0000000-0000-4000-8000-000000000b72',
+    'c0000000-0000-4000-8000-000000000b51',
+    'SALIENTE', 'CONTABILIDAD', 'FINIQUITO_APROBADO_ASIENTO', 'ucb-sis323-sub-f',
+    '{
+      "encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b72","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"D","modulo":"Contabilidad"},"tipo":"FINIQUITO_APROBADO_ASIENTO","fecha":"2026-10-22T14:00:00.000Z","version_esquema":1},
+      "datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","numero_documento":"FIN-2026-000002","id_proceso":"c0000000-0000-4000-8000-000000000742","colaborador":{"id_empleado":"f0000000-0000-4000-8000-000000000741","nombre_completo":"Luciano Morales Chávez"},"fecha":"2026-10-20","glosa":"Liquidación final de Luciano Morales Chávez según finiquito FIN-2026-000002","asiento":{"renglones":[{"cuenta":{"codigo":"2.1.5.01","nombre":"Previsión para indemnizaciones"},"debe":16336.04,"haber":0,"concepto":"Desafectación de previsión para indemnizaciones y desahucio"},{"cuenta":{"codigo":"2.1.5.02","nombre":"Provisión para aguinaldos"},"debe":3246.92,"haber":0,"concepto":"Desafectación de provisión para aguinaldos"},{"cuenta":{"codigo":"2.1.5.03","nombre":"Provisión para vacaciones"},"debe":8168.02,"haber":0,"concepto":"Desafectación de provisión para vacaciones"},{"cuenta":{"codigo":"2.1.2.02","nombre":"Finiquitos por pagar"},"debe":0,"haber":27750.98,"concepto":"Finiquitos por pagar"}],"total_debe":27750.98,"total_haber":27750.98}}
+    }'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:00:01-04:00', 'seed-luciano-contabilidad-saliente-1',
+    TIMESTAMPTZ '2026-10-22T10:00:02-04:00', TIMESTAMPTZ '2026-10-22T10:00:01-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b63',
+    'c0000000-0000-4000-8000-000000000b73',
+    'c0000000-0000-4000-8000-000000000b51',
+    'RESPUESTA_SIMULADA', 'PAGOS', 'CONFIRMACION_ORDEN_PAGO_FINIQUITO', 'ucb-sis323-sub-f',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b73","origen":{"grupo":"A","modulo":"Pagos y Facturación"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ORDEN_PAGO_FINIQUITO","fecha":"2026-10-22T14:00:05.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b71","resultado":"CONFIRMADA","referencia":"OP-FIN-2026-000002","motivo":null}}'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:00:05-04:00', 'seed-luciano-pagos-respuesta',
+    TIMESTAMPTZ '2026-10-22T10:00:08-04:00', TIMESTAMPTZ '2026-10-22T10:00:05-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b64',
+    'c0000000-0000-4000-8000-000000000b74',
+    'c0000000-0000-4000-8000-000000000b51',
+    'SALIENTE', 'CONTABILIDAD', 'FINIQUITO_APROBADO_ASIENTO', 'ucb-sis323-sub-f',
+    '{
+      "encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b74","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"D","modulo":"Contabilidad"},"tipo":"FINIQUITO_APROBADO_ASIENTO","fecha":"2026-10-22T14:04:00.000Z","version_esquema":1},
+      "datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","numero_documento":"FIN-2026-000002","id_proceso":"c0000000-0000-4000-8000-000000000742","colaborador":{"id_empleado":"f0000000-0000-4000-8000-000000000741","nombre_completo":"Luciano Morales Chávez"},"fecha":"2026-10-20","glosa":"Liquidación final de Luciano Morales Chávez según finiquito FIN-2026-000002","asiento":{"renglones":[{"cuenta":{"codigo":"2.1.5.01","nombre":"Previsión para indemnizaciones"},"debe":16336.04,"haber":0,"concepto":"Desafectación de previsión para indemnizaciones y desahucio"},{"cuenta":{"codigo":"2.1.5.02","nombre":"Provisión para aguinaldos"},"debe":3246.92,"haber":0,"concepto":"Desafectación de provisión para aguinaldos"},{"cuenta":{"codigo":"2.1.5.03","nombre":"Provisión para vacaciones"},"debe":8168.02,"haber":0,"concepto":"Desafectación de provisión para vacaciones"},{"cuenta":{"codigo":"2.1.2.02","nombre":"Finiquitos por pagar"},"debe":0,"haber":27750.98,"concepto":"Finiquitos por pagar"}],"total_debe":27750.98,"total_haber":27750.98}}
+    }'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:04:00-04:00', 'seed-luciano-contabilidad-saliente-2',
+    TIMESTAMPTZ '2026-10-22T10:04:01-04:00', TIMESTAMPTZ '2026-10-22T10:04:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b65',
+    'c0000000-0000-4000-8000-000000000b75',
+    'c0000000-0000-4000-8000-000000000b51',
+    'RESPUESTA_SIMULADA', 'CONTABILIDAD', 'CONFIRMACION_ASIENTO_FINIQUITO', 'ucb-sis323-sub-f',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b75","origen":{"grupo":"D","modulo":"Contabilidad"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ASIENTO_FINIQUITO","fecha":"2026-10-22T14:05:08.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b74","resultado":"RECHAZADA","referencia":null,"motivo":"La cuenta 2.1.5.03 no existe en el plan de cuentas"}}'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:05:08-04:00', 'seed-luciano-contabilidad-rechazo',
+    TIMESTAMPTZ '2026-10-22T10:05:10-04:00', TIMESTAMPTZ '2026-10-22T10:05:08-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b66',
+    'c0000000-0000-4000-8000-000000000b76',
+    'c0000000-0000-4000-8000-000000000b51',
+    'RESPUESTA_SIMULADA', 'CONTABILIDAD', 'CONFIRMACION_ASIENTO_FINIQUITO', 'ucb-sis323-sub-f',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b76","origen":{"grupo":"D","modulo":"Contabilidad"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ASIENTO_FINIQUITO","fecha":"2026-10-22T14:05:25.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b72","resultado":"CONFIRMADA","referencia":"AS-FIN-2026-000002-ANT","motivo":null}}'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:05:25-04:00', 'seed-luciano-contabilidad-tardia',
+    TIMESTAMPTZ '2026-10-22T10:05:30-04:00', TIMESTAMPTZ '2026-10-22T10:05:25-04:00'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO MENSAJES_FINIQUITO_ENTRANTES (
+  id_entrante, id_mensaje, origen, tipo_evento, id_finiquito, destino, carga,
+  estado, intentos, ultimo_error, recibido_en, procesado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000b41',
+    'c0000000-0000-4000-8000-000000000b33',
+    'A', 'CONFIRMACION_ORDEN_PAGO_FINIQUITO', 'c0000000-0000-4000-8000-000000000b11', 'PAGOS',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b33","origen":{"grupo":"A","modulo":"Pagos y Facturación"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ORDEN_PAGO_FINIQUITO","fecha":"2026-10-18T15:00:05.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b11","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b31","resultado":"CONFIRMADA","referencia":"OP-FIN-2026-000001","motivo":null}}',
+    'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:00:09-04:00', TIMESTAMPTZ '2026-10-18T11:00:10-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b42',
+    'c0000000-0000-4000-8000-000000000b34',
+    'D', 'CONFIRMACION_ASIENTO_FINIQUITO', 'c0000000-0000-4000-8000-000000000b11', 'CONTABILIDAD',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b34","origen":{"grupo":"D","modulo":"Contabilidad"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ASIENTO_FINIQUITO","fecha":"2026-10-18T15:00:09.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b11","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b32","resultado":"CONFIRMADA","referencia":"AS-FIN-2026-000001","motivo":null}}',
+    'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:00:14-04:00', TIMESTAMPTZ '2026-10-18T11:00:15-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b81',
+    'c0000000-0000-4000-8000-000000000b73',
+    'A', 'CONFIRMACION_ORDEN_PAGO_FINIQUITO', 'c0000000-0000-4000-8000-000000000b51', 'PAGOS',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b73","origen":{"grupo":"A","modulo":"Pagos y Facturación"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ORDEN_PAGO_FINIQUITO","fecha":"2026-10-22T14:00:05.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b71","resultado":"CONFIRMADA","referencia":"OP-FIN-2026-000002","motivo":null}}',
+    'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:00:09-04:00', TIMESTAMPTZ '2026-10-22T10:00:10-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b82',
+    'c0000000-0000-4000-8000-000000000b75',
+    'D', 'CONFIRMACION_ASIENTO_FINIQUITO', 'c0000000-0000-4000-8000-000000000b51', 'CONTABILIDAD',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b75","origen":{"grupo":"D","modulo":"Contabilidad"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ASIENTO_FINIQUITO","fecha":"2026-10-22T14:05:08.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b74","resultado":"RECHAZADA","referencia":null,"motivo":"La cuenta 2.1.5.03 no existe en el plan de cuentas"}}',
+    'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:05:11-04:00', TIMESTAMPTZ '2026-10-22T10:05:12-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b83',
+    'c0000000-0000-4000-8000-000000000b76',
+    'D', 'CONFIRMACION_ASIENTO_FINIQUITO', 'c0000000-0000-4000-8000-000000000b51', 'CONTABILIDAD',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b76","origen":{"grupo":"D","modulo":"Contabilidad"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ASIENTO_FINIQUITO","fecha":"2026-10-22T14:05:25.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b72","resultado":"CONFIRMADA","referencia":"AS-FIN-2026-000002-ANT","motivo":null}}',
+    'IGNORADO', 1, 'Respuesta a un envío anterior o desconocido.', TIMESTAMPTZ '2026-10-22T10:05:31-04:00', TIMESTAMPTZ '2026-10-22T10:05:32-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b91',
+    'invalido-seed-dlq-0001',
+    NULL, NULL, NULL, NULL,
+    '{"encabezado":{"tipo":"MENSAJE_TRUNCO"}',
+    'EN_DLQ', 3, 'El mensaje no es un JSON válido.', TIMESTAMPTZ '2026-11-10T16:15:00-04:00', NULL
+  )
+ON CONFLICT DO NOTHING;
+
+SELECT setval(
+  'seq_numero_finiquito',
+  GREATEST((SELECT CASE WHEN is_called THEN last_value ELSE 1 END FROM seq_numero_finiquito), 2),
+  true
+);
+
+COMMIT;

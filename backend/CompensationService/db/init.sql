@@ -1267,3 +1267,172 @@ CREATE TABLE DETALLE_APORTES (
     CONSTRAINT chk_detalle_aportes_valores CHECK (tasa > 0 AND monto >= 0 AND (base IS NULL OR base >= 0))
 );
 CREATE INDEX idx_detalle_aportes_entidad ON DETALLE_APORTES (id_planilla_aportes, codigo_entidad);
+
+-- Finiquito (RF-58, KAN-78)
+
+CREATE SEQUENCE seq_numero_finiquito;
+
+-- Tabla: FINIQUITOS
+-- Documento consolidado de liquidación final de un proceso de desvinculación (1 a 1).
+-- Ciclo de vida: BORRADOR -> APROBADO (genera PDF oficial, bloquea cálculos y publica a Pagos y Contabilidad)
+-- -> PAGADO (ambas confirmaciones llegaron, cierra el proceso y salda los préstamos aplicables).
+CREATE TABLE FINIQUITOS (
+    id_finiquito UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_proceso UUID NOT NULL,
+    numero_documento varchar(20) NULL,
+    estado varchar(10) NOT NULL DEFAULT 'BORRADOR',
+    fecha_retiro date NOT NULL,
+    codigo_causal varchar(25) NOT NULL,
+    promedio_base numeric(12,2) NOT NULL,
+    anios_servicio smallint NOT NULL,
+    meses_servicio smallint NOT NULL,
+    dias_fraccion smallint NOT NULL,
+    total_ingresos numeric(12,2) NOT NULL,
+    total_descuentos numeric(12,2) NOT NULL,
+    liquido_pagable numeric(12,2) NOT NULL,
+    estado_pagos varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    referencia_pagos varchar(60) NULL,
+    motivo_pagos varchar(255) NULL,
+    respondida_pagos_en TIMESTAMPTZ NULL,
+    estado_contabilidad varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    referencia_contabilidad varchar(60) NULL,
+    motivo_contabilidad varchar(255) NULL,
+    respondida_contabilidad_en TIMESTAMPTZ NULL,
+    generado_por UUID NULL,
+    generado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    aprobado_por UUID NULL,
+    aprobado_por_rol varchar(20) NULL,
+    aprobado_en TIMESTAMPTZ NULL,
+    pagado_en TIMESTAMPTZ NULL,
+    CONSTRAINT FINIQUITOS_pk PRIMARY KEY (id_finiquito),
+    CONSTRAINT uq_finiquito_proceso UNIQUE (id_proceso),
+    CONSTRAINT uq_finiquito_numero UNIQUE (numero_documento),
+    CONSTRAINT fk_finiquito_proceso FOREIGN KEY (id_proceso)
+        REFERENCES PROCESOS_DESVINCULACION (id_proceso),
+    CONSTRAINT chk_finiquito_estado CHECK (estado IN ('BORRADOR', 'APROBADO', 'PAGADO')),
+    CONSTRAINT chk_finiquito_tiempo CHECK (
+        promedio_base >= 0 AND anios_servicio >= 0 AND meses_servicio BETWEEN 0 AND 11 AND dias_fraccion BETWEEN 0 AND 30
+    ),
+    CONSTRAINT chk_finiquito_totales CHECK (
+        total_ingresos >= 0 AND total_descuentos >= 0 AND liquido_pagable >= 0
+        AND liquido_pagable = total_ingresos - total_descuentos
+    ),
+    CONSTRAINT chk_finiquito_integraciones CHECK (
+        estado_pagos IN ('PENDIENTE', 'CONFIRMADA', 'RECHAZADA')
+        AND estado_contabilidad IN ('PENDIENTE', 'CONFIRMADA', 'RECHAZADA')
+    ),
+    CONSTRAINT chk_finiquito_aprobacion CHECK (
+        (estado = 'BORRADOR') = (aprobado_en IS NULL)
+        AND (estado = 'BORRADOR') = (numero_documento IS NULL)
+    ),
+    CONSTRAINT chk_finiquito_pago CHECK (
+        (estado = 'PAGADO') = (pagado_en IS NOT NULL)
+        AND (estado <> 'PAGADO' OR (estado_pagos = 'CONFIRMADA' AND estado_contabilidad = 'CONFIRMADA'))
+    ),
+    CONSTRAINT chk_finiquito_respuestas CHECK (
+        (estado <> 'BORRADOR' OR (estado_pagos = 'PENDIENTE' AND estado_contabilidad = 'PENDIENTE'))
+        AND (estado_pagos = 'PENDIENTE') = (respondida_pagos_en IS NULL)
+        AND (estado_pagos = 'RECHAZADA') = (motivo_pagos IS NOT NULL)
+        AND (referencia_pagos IS NULL OR estado_pagos = 'CONFIRMADA')
+        AND (estado_contabilidad = 'PENDIENTE') = (respondida_contabilidad_en IS NULL)
+        AND (estado_contabilidad = 'RECHAZADA') = (motivo_contabilidad IS NOT NULL)
+        AND (referencia_contabilidad IS NULL OR estado_contabilidad = 'CONFIRMADA')
+    )
+);
+
+-- Tabla: DETALLE_FINIQUITO
+-- Renglones del formulario consolidado de finiquito (ingresos por beneficios sociales y descuentos por
+-- anticipos o préstamos activos). saldo_prestamo guarda el saldo_pendiente del préstamo al consolidar.
+CREATE TABLE DETALLE_FINIQUITO (
+    id_finiquito UUID NOT NULL,
+    orden smallint NOT NULL,
+    tipo varchar(10) NOT NULL,
+    codigo varchar(30) NOT NULL,
+    concepto varchar(120) NOT NULL,
+    detalle varchar(250) NULL,
+    monto numeric(12,2) NOT NULL,
+    id_prestamo UUID NULL,
+    saldo_prestamo numeric(12,2) NULL,
+    CONSTRAINT DETALLE_FINIQUITO_pk PRIMARY KEY (id_finiquito, orden),
+    CONSTRAINT fk_detalle_finiquito FOREIGN KEY (id_finiquito)
+        REFERENCES FINIQUITOS (id_finiquito) ON DELETE CASCADE,
+    CONSTRAINT fk_detalle_finiquito_prestamo FOREIGN KEY (id_prestamo)
+        REFERENCES PRESTAMOS (id_prestamo),
+    CONSTRAINT chk_detalle_finiquito_tipo CHECK (tipo IN ('INGRESO', 'DESCUENTO')),
+    CONSTRAINT chk_detalle_finiquito_monto CHECK (monto > 0),
+    CONSTRAINT chk_detalle_finiquito_prestamo CHECK ((tipo = 'DESCUENTO') = (id_prestamo IS NOT NULL)),
+    CONSTRAINT chk_detalle_finiquito_saldo CHECK (saldo_prestamo IS NULL OR saldo_prestamo >= monto)
+);
+
+-- Tabla: DOCUMENTOS_FINIQUITO
+-- PDF oficial del finiquito para firma (1 a 1 con FINIQUITOS). Se genera al aprobar y se guarda aparte.
+CREATE TABLE DOCUMENTOS_FINIQUITO (
+    id_finiquito UUID NOT NULL,
+    nombre_archivo varchar(255) NOT NULL,
+    contenido bytea NOT NULL,
+    tamano_bytes integer NOT NULL,
+    generado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT DOCUMENTOS_FINIQUITO_pk PRIMARY KEY (id_finiquito),
+    CONSTRAINT fk_documento_finiquito FOREIGN KEY (id_finiquito)
+        REFERENCES FINIQUITOS (id_finiquito) ON DELETE CASCADE,
+    CONSTRAINT chk_documento_finiquito_tamano CHECK (tamano_bytes > 0)
+);
+
+-- Tabla: EVENTOS_FINIQUITO
+-- Bandeja de salida propia de finiquitos (outbox): guarda envíos hacia Pagos y Contabilidad y las
+-- respuestas simuladas que pasan por el mismo tópico F. id_mensaje no es único para permitir duplicados.
+CREATE TABLE EVENTOS_FINIQUITO (
+    id_evento UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_mensaje varchar(100) NOT NULL,
+    id_finiquito UUID NOT NULL,
+    sentido varchar(20) NOT NULL,
+    destino varchar(15) NOT NULL,
+    tipo_evento varchar(60) NOT NULL,
+    topico varchar(60) NOT NULL,
+    carga JSONB NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    intentos smallint NOT NULL DEFAULT 0,
+    ultimo_error varchar(255) NULL,
+    proximo_intento_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id_pubsub varchar(100) NULL,
+    entregado_en TIMESTAMPTZ NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT EVENTOS_FINIQUITO_pk PRIMARY KEY (id_evento),
+    CONSTRAINT fk_evento_finiquito FOREIGN KEY (id_finiquito)
+        REFERENCES FINIQUITOS (id_finiquito),
+    CONSTRAINT chk_evento_finiquito_sentido CHECK (sentido IN ('SALIENTE', 'RESPUESTA_SIMULADA')),
+    CONSTRAINT chk_evento_finiquito_destino CHECK (destino IN ('PAGOS', 'CONTABILIDAD')),
+    CONSTRAINT chk_evento_finiquito_estado CHECK (estado IN ('PENDIENTE', 'ENTREGADO', 'FALLIDO')),
+    CONSTRAINT chk_evento_finiquito_intentos CHECK (intentos >= 0),
+    CONSTRAINT chk_evento_finiquito_entrega CHECK ((estado = 'ENTREGADO') = (entregado_en IS NOT NULL))
+);
+CREATE INDEX idx_eventos_finiquito_pendientes ON EVENTOS_FINIQUITO (estado, proximo_intento_en);
+CREATE INDEX idx_eventos_finiquito_destino ON EVENTOS_FINIQUITO (id_finiquito, destino, creado_en);
+
+-- Tabla: MENSAJES_FINIQUITO_ENTRANTES
+-- Bandeja de entrada y cola de errores (DLQ) de las confirmaciones de Pagos y Contabilidad para finiquitos.
+-- carga es text para registrar incluso JSON inválido. id_mensaje único descarta duplicados.
+CREATE TABLE MENSAJES_FINIQUITO_ENTRANTES (
+    id_entrante UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_mensaje varchar(100) NOT NULL,
+    origen varchar(10) NULL,
+    tipo_evento varchar(60) NULL,
+    id_finiquito UUID NULL,
+    destino varchar(15) NULL,
+    carga text NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'RECIBIDO',
+    intentos smallint NOT NULL DEFAULT 0,
+    ultimo_error varchar(255) NULL,
+    recibido_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    procesado_en TIMESTAMPTZ NULL,
+    CONSTRAINT MENSAJES_FINIQUITO_ENTRANTES_pk PRIMARY KEY (id_entrante),
+    CONSTRAINT uq_mensaje_finiquito_entrante UNIQUE (id_mensaje),
+    CONSTRAINT fk_mensaje_finiquito_entrante FOREIGN KEY (id_finiquito)
+        REFERENCES FINIQUITOS (id_finiquito),
+    CONSTRAINT chk_mensaje_finiquito_destino CHECK (destino IS NULL OR destino IN ('PAGOS', 'CONTABILIDAD')),
+    CONSTRAINT chk_mensaje_finiquito_estado CHECK (estado IN ('RECIBIDO', 'PROCESADO', 'IGNORADO', 'EN_DLQ')),
+    CONSTRAINT chk_mensaje_finiquito_intentos CHECK (intentos >= 0),
+    CONSTRAINT chk_mensaje_finiquito_procesado CHECK ((estado IN ('PROCESADO', 'IGNORADO')) = (procesado_en IS NOT NULL))
+);
+CREATE INDEX idx_mensajes_finiquito_entrantes_estado ON MENSAJES_FINIQUITO_ENTRANTES (estado, recibido_en);
+CREATE INDEX idx_mensajes_finiquito_entrantes_finiquito ON MENSAJES_FINIQUITO_ENTRANTES (id_finiquito, recibido_en);
