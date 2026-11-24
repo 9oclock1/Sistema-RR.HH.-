@@ -1,0 +1,50 @@
+@startuml sec-08-kan83-formalizar-con-advertencia
+!include _estilo-secuencia.iuml
+title KAN-83 · Formalizar el ascenso con cursos pendientes (RF-63, criterio 3)
+
+actor "Administrador\nde RRHH" as RRHH
+participant "DetallePlanModal\n(React)" as FE PANTALLA
+participant "exigirRol('admin')" as MW MIDDLEWARE
+participant "planesAscenso\nController" as CT CONTROLADOR
+participant "planesAscenso\nService" as SV SERVICIO
+participant "utils/\nplanesAscenso" as UT SERVICIO
+participant "planesAscenso\nModel" as MD MODELO
+participant "asignaciones\nService" as AS SERVICIO
+database "EmployeeDB" as DB BD
+
+RRHH -> FE : «Formalizar ascenso» (sucursal, fecha de inicio)
+FE -> MW : POST /planes-ascenso/{id}/formalizacion\n{ id_sucursal, fecha_inicio }
+MW -> CT : formalizar
+activate CT
+CT -> SV : formalizar(idPlan, datos, identidad)
+activate SV
+SV -> DB : BEGIN
+SV -> MD : bloquear(idPlan) (FOR UPDATE)
+alt no existe
+  SV --> CT : <color:#B85450>404</color>
+else ya FORMALIZADO
+  SV --> CT : <color:#B85450>409 PLAN_FORMALIZADO</color>
+end
+SV -> SV : obtenerDesde(client, idPlan): cursos contra el Kardex
+SV -> UT : pendientesDe(cursos)
+alt hay cursos pendientes y no se confirmó
+  SV -> UT : advertenciaPendientes(plan, pendientes)
+  SV -> DB : ROLLBACK
+  SV --> CT : <color:#B85450>409 CURSOS_PENDIENTES</color>\n<color:#B85450>advertencia · lista de pendientes · avance</color>
+  CT --> FE : 409
+  FE --> RRHH : «{Nombre} tiene N cursos pendientes del plan para\n«{cargo}»: …» · ¿Formalizar de todos modos?
+  RRHH -> FE : confirma
+  FE -> CT : POST /planes-ascenso/{id}/formalizacion\n{ …, confirmar_pendientes: true }
+  CT -> SV : formalizar(…) (vuelve a validar desde el inicio)
+end
+SV -> AS : aplicarAsignacion(cargo destino, sucursal, fecha_inicio)
+AS -> DB : cierra la asignación vigente · inserta la nueva\n· actualiza cargo y sucursal actuales
+SV -> MD : marcarFormalizado(formalizadoPor,\npendientes = N)
+note right of DB : queda constancia de cuántos cursos\nfaltaban al formalizar
+SV -> DB : COMMIT
+SV --> CT : plan FORMALIZADO + advertencia (si la hubo)
+deactivate SV
+CT --> FE : 200
+deactivate CT
+FE --> RRHH : ascenso formalizado
+@enduml

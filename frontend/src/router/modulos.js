@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ChartLine, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, Gift, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ChartLine, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, Gift, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, Landmark, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Scale, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus, UserX } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
@@ -8,12 +8,16 @@ import ConvocatoriasRrhhPage from "../features/convocatorias-internas/Convocator
 import { RUTA_CONVOCATORIAS_EMPLEADO, RUTA_CONVOCATORIAS_RRHH } from "../features/convocatorias-internas/convocatorias";
 import CiclosEvaluacionPage from "../features/ciclos-evaluacion/CiclosEvaluacionPage";
 import { RUTA_CICLOS } from "../features/ciclos-evaluacion/ciclo";
+import DashboardAsistenciaPage from "../features/dashboard-asistencia/DashboardAsistenciaPage";
 import DashboardDesempenoPage from "../features/dashboard-desempeno/DashboardDesempenoPage";
 import DashboardQuejasPage from "../features/dashboard-quejas/DashboardQuejasPage";
+import DashboardConflictividadPage from "../features/dashboard-conflictividad/DashboardConflictividadPage";
 import { RUTA_DASHBOARD_QUEJAS } from "../features/dashboard-quejas/dashboardQuejas";
 import { RUTA_DASHBOARD_DESEMPENO } from "../features/dashboard-desempeno/dashboardDesempeno";
 import DesempenoGlobalPage from "../features/desempeno-global/DesempenoGlobalPage";
 import DesvinculacionesPage from "../features/desvinculaciones/DesvinculacionesPage";
+import FiniquitosPage from "../features/finiquitos/FiniquitosPage";
+import CierresPage from "../features/cierres/CierresPage";
 import RotacionPersonalPage from "../features/rotacion-personal/RotacionPersonalPage";
 import { RUTA_DESEMPENO_GLOBAL } from "../features/desempeno-global/desempenoGlobal";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
@@ -47,6 +51,9 @@ import { RUTA_AUDITORIA_BONOS } from "../features/bonificaciones/auditoria";
 import PlanillaMensualPage from "../features/planillas/PlanillaMensualPage";
 import MisBoletasPage from "../features/boletas/MisBoletasPage";
 import AguinaldoPage from "../features/aguinaldo/AguinaldoPage";
+import PlanillasFiscalesPage from "../features/planillas-fiscales/PlanillasFiscalesPage";
+import { RUTA_PLANILLAS_FISCALES } from "../features/planillas-fiscales/planillasFiscales";
+import ReporteContablePage from "../features/reporte-contable/ReporteContablePage";
 import HorasExtraPage from "../features/horas-extra/HorasExtraPage";
 import ContratosView from "../features/Contratos/ContratosView";
 import { RUTA_CONTRATOS } from "../features/Contratos/utils/opciones";
@@ -312,6 +319,14 @@ export const SECCIONES = [
         pagina: PlanillaMensualPage,
       },
       {
+        ruta: RUTA_PLANILLAS_FISCALES,
+        etiqueta: "Planilla tributaria y aportes",
+        descripcion: "RC-IVA de cada dependiente y aportes laborales y patronales del periodo, exportables en el formato de cada entidad.",
+        icono: FileChartColumn,
+        roles: ["admin", "contador"],
+        pagina: PlanillasFiscalesPage,
+      },
+      {
         ruta: "/planillas/conceptos",
         etiqueta: "Conceptos de pago",
         descripcion: "Ingresos, descuentos y aportes de la planilla con su valor, vigencia y cuenta contable.",
@@ -360,6 +375,14 @@ export const SECCIONES = [
         pagina: AguinaldoPage,
       },
       {
+        ruta: "/planillas/reporte-contable",
+        etiqueta: "Reporte contable",
+        descripcion: "Gastos y pasivos de nómina por cuenta contable y centro de costo, con el estado de conciliación con Contabilidad y Pagos.",
+        icono: Landmark,
+        roles: ["admin", "contador"],
+        pagina: ReporteContablePage,
+      },
+      {
         ruta: RUTA_AUDITORIA_BONOS,
         etiqueta: "Auditoría de bonificaciones",
         descripcion: "Altas, modificaciones y anulaciones de bonos, y el historial por colaborador o por sucursal, con exportación.",
@@ -388,6 +411,24 @@ export const SECCIONES = [
         // El Contador consulta los procesos y el desglose del sueldo promedio en solo lectura (RF-55).
         roles: ["admin", "contador"],
         pagina: DesvinculacionesPage,
+      },
+      {
+        ruta: "/desvinculacion/finiquitos",
+        parametroOpcional: "idProceso",
+        etiqueta: "Finiquitos",
+        descripcion: "Formulario consolidado de liquidación, aprobación con el documento oficial para firma y estado de la orden de pago y del asiento contable.",
+        icono: FileSignature,
+        roles: ["admin", "contador"],
+        pagina: FiniquitosPage,
+      },
+      {
+        ruta: "/desvinculacion/cierre",
+        parametroOpcional: "idProceso",
+        etiqueta: "Cierre y accesos",
+        descripcion: "Cierre definitivo de la desvinculación, inactivación del colaborador, revocación de su cuenta y bloqueo de accesos en los sistemas operativos.",
+        icono: UserX,
+        roles: ["admin", "contador"],
+        pagina: CierresPage,
       },
     ],
   },
@@ -560,6 +601,14 @@ export const SECCIONES = [
     titulo: "Dashboards",
     modulos: [
       {
+        ruta: "/dashboards/asistencia",
+        etiqueta: "Ausentismo y puntualidad",
+        descripcion: "KPI-04 (ausentismo) y KPI-05 (puntualidad) por sucursal, con semáforo, comparativo y detalle diario de faltas y atrasos.",
+        icono: AlarmClock,
+        roles: ["supervisor"],
+        pagina: DashboardAsistenciaPage,
+      },
+      {
         ruta: RUTA_DASHBOARD_DESEMPENO,
         etiqueta: "Dashboard de desempeño",
         descripcion: "Indicadores de puntaje promedio, cumplimiento de evaluaciones y alto desempeño por ciclo, con histograma, ranking de áreas y comparativo entre ciclos.",
@@ -574,6 +623,14 @@ export const SECCIONES = [
         icono: MessageSquareWarning,
         roles: ["admin"],
         pagina: DashboardQuejasPage,
+      },
+      {
+        ruta: "/dashboards/conflictividad",
+        etiqueta: "Conflictividad y puntualidad",
+        descripcion: "Índice de quejas por cada 100 empleados y minutos de atraso promedio, con semáforo y comparativo por área y sucursal.",
+        icono: Scale,
+        roles: ["supervisor"],
+        pagina: DashboardConflictividadPage,
       },
       {
         ruta: "/dashboards/rotacion",

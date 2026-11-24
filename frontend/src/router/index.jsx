@@ -3,6 +3,8 @@ import MainLayout from "../layouts/MainLayout";
 import InicioPage from "../features/inicio/InicioPage";
 import PaginaModulo from "../features/inicio/PaginaModulo";
 import PaginaNoEncontrada from "../features/inicio/PaginaNoEncontrada";
+import InicioSesionPage from "../features/sesion/InicioSesionPage";
+import { RUTA_INICIO_SESION } from "../features/sesion/ruta";
 import { SECCIONES } from "./modulos";
 
 const modulos = SECCIONES.flatMap((seccion) => seccion.modulos.map((modulo) => ({ seccion, modulo })));
@@ -19,6 +21,7 @@ const rutasPublicas = modulos
   .map(({ modulo: { ruta, pagina: Pagina } }) => ({ path: ruta, element: <Pagina /> }));
 
 export const router = createBrowserRouter([
+  { path: RUTA_INICIO_SESION, element: <InicioSesionPage /> },
   ...rutasPublicas,
   {
     path: "/",

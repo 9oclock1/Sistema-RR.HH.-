@@ -241,3 +241,34 @@ INSERT INTO ASIGNACIONES_EMPLEADO (id_asignacion, id_empleado, id_cargo, id_sucu
   ('f0000000-0000-4000-8000-000000000755', 'f0000000-0000-4000-8000-000000000745', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', '2025-03-03')
 ON CONFLICT DO NOTHING;
 COMMIT;
+
+-- Colaboradores desvinculados por desahucio con 1 año exacto, 91 y 90 días de servicio, para probar la indemnización
+-- y el desahucio (RF-56, KAN-76).
+BEGIN;
+INSERT INTO EMPLEADOS (id_empleado, numero_documento, nombres, primer_apellido, segundo_apellido, fecha_nacimiento, genero, telefono_celular, correo_personal, direccion_domicilio, fecha_ingreso, id_cargo_actual, id_sucursal_actual, id_estado_empleado) VALUES
+  ('f0000000-0000-4000-8000-000000000a61', '7108761', 'Sofía', 'Mamani', 'Lima', '1994-07-21', 'Femenino', '71008761', 'sofia.mamani@correo.test', 'Zona Sopocachi, La Paz', '2025-11-01', 'f0000000-0000-4000-8000-000000000105', 'f0000000-0000-4000-8000-000000000011', 4),
+  ('f0000000-0000-4000-8000-000000000a62', '7108762', 'Marco', 'Condori', 'Flores', '1998-01-09', 'Masculino', '71008762', 'marco.condori@correo.test', 'Zona Miraflores, La Paz', '2026-08-02', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', 4),
+  ('f0000000-0000-4000-8000-000000000a63', '7108763', 'Lucía', 'Vargas', 'Ríos', '1999-10-30', 'Femenino', '71008763', 'lucia.vargas@correo.test', 'Zona Miraflores, La Paz', '2026-08-03', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', 4)
+ON CONFLICT DO NOTHING;
+INSERT INTO ASIGNACIONES_EMPLEADO (id_asignacion, id_empleado, id_cargo, id_sucursal, fecha_inicio) VALUES
+  ('f0000000-0000-4000-8000-000000000a71', 'f0000000-0000-4000-8000-000000000a61', 'f0000000-0000-4000-8000-000000000105', 'f0000000-0000-4000-8000-000000000011', '2025-11-01'),
+  ('f0000000-0000-4000-8000-000000000a72', 'f0000000-0000-4000-8000-000000000a62', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', '2026-08-02'),
+  ('f0000000-0000-4000-8000-000000000a73', 'f0000000-0000-4000-8000-000000000a63', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', '2026-08-03')
+ON CONFLICT DO NOTHING;
+COMMIT;
+
+-- Colaboradores de ejemplo para cierre definitivo de desvinculación y bloqueo de accesos (RF-59, KAN-79).
+-- Cargar en PowerShell siempre con UTF-8 para conservar tildes:
+--   Get-Content -Encoding UTF8 backend/EmployeeService/db/seed.sql | docker exec -i rrhh-postgres psql -U adminRRHH -d EmployeeDB -v ON_ERROR_STOP=1
+BEGIN;
+INSERT INTO EMPLEADOS (id_empleado, numero_documento, nombres, primer_apellido, segundo_apellido, fecha_nacimiento, genero, telefono_celular, correo_personal, direccion_domicilio, fecha_ingreso, id_cargo_actual, id_sucursal_actual, id_estado_empleado) VALUES
+  ('f0000000-0000-4000-8000-000000000746', '7108746', 'Patricia', 'Limachi', 'Rojas', '1994-03-18', 'Femenino', '71008746', 'patricia.limachi@correo.test', 'Zona Sopocachi, La Paz', '2022-04-01', 'f0000000-0000-4000-8000-000000000105', 'f0000000-0000-4000-8000-000000000011', 1),
+  ('f0000000-0000-4000-8000-000000000747', '7108747', 'Hugo', 'Ticona', 'Vargas', '1992-07-24', 'Masculino', '71008747', 'hugo.ticona@correo.test', 'Zona Miraflores, La Paz', '2021-06-01', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', 1),
+  ('f0000000-0000-4000-8000-000000000748', '7108748', 'Daniela', 'Cruz', 'Huanca', '1995-11-12', 'Femenino', '71008748', 'daniela.cruz@correo.test', 'Zona Sopocachi, La Paz', '2023-02-01', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000011', 4)
+ON CONFLICT DO NOTHING;
+INSERT INTO ASIGNACIONES_EMPLEADO (id_asignacion, id_empleado, id_cargo, id_sucursal, fecha_inicio) VALUES
+  ('f0000000-0000-4000-8000-000000000756', 'f0000000-0000-4000-8000-000000000746', 'f0000000-0000-4000-8000-000000000105', 'f0000000-0000-4000-8000-000000000011', '2022-04-01'),
+  ('f0000000-0000-4000-8000-000000000757', 'f0000000-0000-4000-8000-000000000747', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000012', '2021-06-01'),
+  ('f0000000-0000-4000-8000-000000000758', 'f0000000-0000-4000-8000-000000000748', 'f0000000-0000-4000-8000-000000000106', 'f0000000-0000-4000-8000-000000000011', '2023-02-01')
+ON CONFLICT DO NOTHING;
+COMMIT;

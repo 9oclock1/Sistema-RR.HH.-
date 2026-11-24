@@ -86,7 +86,14 @@ const formatearAguinaldo = (a, envios = {}) => ({
 
 const formatearEmpleado = (e) => ({
   id_aguinaldo_empleado: e.id_aguinaldo_empleado,
-  empleado: { id_empleado: e.id_empleado, nombre_completo: e.nombre_empleado, numero_documento: e.numero_documento },
+  empleado: {
+    id_empleado: e.id_empleado,
+    nombre_completo: e.nombre_empleado,
+    numero_documento: e.numero_documento,
+    cargo: e.cargo,
+    area: e.area,
+    sucursal: e.sucursal,
+  },
   fecha_ingreso: e.fecha_ingreso,
   meses_trabajados: e.meses_trabajados,
   dias_trabajados: e.dias_trabajados,
@@ -206,6 +213,9 @@ async function generar(datos = {}, identidad = {}) {
       id_empleado: id,
       nombre_empleado: persona.nombre_completo,
       numero_documento: persona.numero_documento ?? null,
+      cargo: persona.cargo ?? null,
+      area: persona.area ?? null,
+      sucursal: persona.sucursal ?? null,
       fecha_ingreso: fechaIngreso,
       ...resultado,
     });

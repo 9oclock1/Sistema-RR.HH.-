@@ -1,0 +1,257 @@
+@startuml clases-2-capas
+!pragma layout smetana
+title Épica 10 · Diseño por capas (KAN-80 a KAN-83)
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam nodesep 40
+skinparam ranksep 60
+skinparam class {
+  BorderColor #555555
+  ArrowColor #444444
+  StereotypeFontColor #555555
+}
+skinparam class<<route>> {
+  BackgroundColor #F5F5F5
+}
+skinparam class<<middleware>> {
+  BackgroundColor #FFE6CC
+  BorderColor #D79B00
+}
+skinparam class<<controller>> {
+  BackgroundColor #D5E8D4
+  BorderColor #82B366
+}
+skinparam class<<service>> {
+  BackgroundColor #DAE8FC
+  BorderColor #6C8EBF
+}
+skinparam class<<util>> {
+  BackgroundColor #EEF4FC
+  BorderColor #6C8EBF
+}
+skinparam class<<model>> {
+  BackgroundColor #E1D5E7
+  BorderColor #9673A6
+}
+skinparam class<<job>> {
+  BackgroundColor #F8CECC
+  BorderColor #B85450
+}
+skinparam class<<externo>> {
+  BackgroundColor #F8CECC
+  BorderColor #B85450
+}
+skinparam package {
+  BackgroundColor #FCFCFC
+  BorderColor #BBBBBB
+  FontColor #555555
+}
+
+package "Rutas y middlewares" {
+  class "routes/convocatorias" as rConv <<route>> {
+    GET /convocatorias/gestion
+    POST /convocatorias
+    POST /convocatorias/:id/notificacion
+    GET /convocatorias · GET /convocatorias/:id
+    POST /convocatorias/:id/postulaciones
+    GET /convocatorias/:id/postulaciones/mia
+    GET /convocatorias/:id/postulaciones
+    POST …/postulaciones/:idPostulacion/validacion
+    POST …/postulaciones/:idPostulacion/formalizacion
+    POST …/formalizacion/notificacion
+  }
+  class "routes/planesAscenso" as rPlan <<route>> {
+    GET /planes-ascenso · GET /planes-ascenso/:id
+    POST /planes-ascenso
+    POST /planes-ascenso/:id/formalizacion
+  }
+  class autenticar <<middleware>> {
+    {method} + autenticar: JWT (cookie o Bearer)
+    {method} + exigirRolSesion(...roles)
+  }
+  class exigirRol <<middleware>> {
+    {method} + exigirRol(...roles): cabecera X-Rol
+  }
+  class identificarEmpleado <<middleware>> {
+    {method} + cabecera X-Empleado-Id
+  }
+}
+
+package "KAN-80 · Convocatorias" {
+  class convocatoriasController <<controller>> {
+    {method} + publicar · reintentarNotificacion
+    {method} + listarGestion · listarParaEmpleado · obtener
+  }
+  class convocatoriasService <<service>> {
+    + publicar(cuerpo, identidad)
+    + reintentarNotificacion(idConvocatoria, identidad)
+    + listarGestion(query)
+    + listarParaEmpleado(idEmpleado, query)
+    + obtener(idConvocatoria, identidad)
+    + cerrarVencidas()
+    - exigirVacante(datos, cargo, sucursal)
+    - elegiblesPara(candidatos, convocatoria)
+    - enviarAvisos(convocatoria, idPublicador)
+  }
+  class convocatoriasModel <<model>> {
+    + insertar · insertarDestinatarios(cliente, …)
+    + listarCandidatosAviso(db, idCargo)
+    + listarOcupantesActivos(db, puesto)
+    + buscarVigenteMismoPuesto(db, puesto)
+    + listarDestinatariosPendientes(db, id)
+    + registrarAvisoEntregado · registrarAvisoFallido
+    + registrarNotificacionEntregada · Fallida
+    + cerrarVencidas(db)
+  }
+  class cierreConvocatoriasCron <<job>> {
+    {method} + «5 0 * * *» (America/La_Paz)
+  }
+  class convocatoriasValidator <<util>> {
+    + validarConvocatoria(cuerpo)
+    + validarFiltroEstado(estado, porDefecto)
+  }
+}
+
+package "KAN-81 · Postulaciones y méritos" {
+  class postulacionesController <<controller>> {
+    {method} + postular · obtenerMia · listar · revalidar
+  }
+  class postulacionesService <<service>> {
+    + postular(idConvocatoria, idEmpleado)
+    + obtenerMia(idConvocatoria, idEmpleado)
+    + revalidar(idConvocatoria, idPostulacion)
+    + listar(idConvocatoria): ranking
+    + adjuntarMisPostulaciones(convocatorias, idEmpleado)
+    - validar(postulacion, convocatoria)
+  }
+  class "utils/meritos" as uMer <<util>> {
+    {field} + PESO_NOTA = 0.7
+    {field} + PESO_ANTIGUEDAD = 0.3
+    {field} + MESES_ANTIGUEDAD_TOPE = 60
+    + mesesCompletos(desde, hasta)
+    + puntajeMeritos(nota, meses)
+    + evaluarRequisitos(datos, convocatoria)
+    + ordenarRanking(aptos)
+  }
+  class desempenoService <<service>> {
+    + obtenerUltimaEvaluacion(idEmpleado)
+  }
+  class postulacionesModel <<model>> {
+    + insertar · obtener · obtenerDeEmpleado
+    + listarDeConvocatoria · listarDeEmpleado
+    + guardarValidacion(db, id, resultado)
+    + registrarErrorValidacion(db, id, error)
+  }
+}
+
+package "KAN-82 · Formalización del ascenso" {
+  class ascensosController <<controller>> {
+    {method} + formalizar · reintentarNotificacion
+  }
+  class ascensosService <<service>> {
+    + formalizar(idConvocatoria, idPostulacion, datos, identidad)
+    + reintentarNotificacion(idConvocatoria, idPostulacion)
+    + aplicarProgramados()
+    - verificarFormalizable(client, datos)
+    - prepararAdenda(client, datos)
+    - avisar(idPostulacion, idRemitente)
+  }
+  class ascensosModel <<model>> {
+    + bloquearConvocatoria · bloquearPostulacion
+    + obtenerFormalizadaDeConvocatoria
+    + obtenerProgramadoDeEmpleado
+    + registrarFormalizacion(client, id, datos)
+    + cerrarConvocatoria(client, id)
+    + listarProgramadosVencidos · marcarAplicado
+    + registrarNotificacion(db, id, resultado)
+  }
+  class ascensosProgramadosCron <<job>> {
+    {method} + «10 0 * * *» (America/La_Paz)
+  }
+}
+
+package "KAN-83 · Plan de capacitación" {
+  class planesAscensoController <<controller>> {
+    {method} + listar · obtener · asignar · formalizar
+  }
+  class planesAscensoService <<service>> {
+    + listar({ estado })
+    + obtener(idPlan)
+    + asignar(datos, identidad)
+    + formalizar(idPlan, datos, identidad)
+    - conCursos(db, filas)
+  }
+  class "utils/planesAscenso" as uPlan <<util>> {
+    + estadoCurso(certificado, hoy)
+    + calcularAvance(cursos)
+    + pendientesDe(cursos)
+    + advertenciaPendientes(plan, pendientes)
+  }
+  class planesAscensoModel <<model>> {
+    + listar · obtener · bloquear
+    + listarCursos(db, idsPlan): requisitos ⋈ Kardex
+    + obtenerPlanEnCurso(db, idEmpleado)
+    + insertar · marcarFormalizado
+  }
+}
+
+package "Compartidos y externos" {
+  class asignacionesService <<service>> {
+    + aplicarAsignacion(client, datos)
+  }
+  class contratosModel <<model>> {
+    + obtenerVersionActual · insertar · existeNumero
+  }
+  class convocatoriasNotificacionService <<service>> {
+    + avisarElegible(convocatoria, destinatario)
+    + avisarAscenso(datos)
+  }
+  class PerformanceService <<externo>> {
+    GET /evaluaciones/historial/:idEmpleado
+  }
+  class NotificationService <<externo>> {
+    POST /comunicaciones/directa
+  }
+}
+
+rConv ..> autenticar
+rConv ..> exigirRol
+rConv ..> identificarEmpleado
+rPlan ..> exigirRol
+rConv --> convocatoriasController
+rConv --> postulacionesController
+rConv --> ascensosController
+rPlan --> planesAscensoController
+
+convocatoriasController --> convocatoriasService
+convocatoriasService ..> convocatoriasValidator
+convocatoriasService --> convocatoriasModel
+convocatoriasService --> convocatoriasNotificacionService
+convocatoriasService --> postulacionesService : mi_postulacion
+cierreConvocatoriasCron --> convocatoriasService
+
+postulacionesController --> postulacionesService
+postulacionesService ..> uMer
+postulacionesService --> desempenoService
+postulacionesService --> postulacionesModel
+desempenoService ..> PerformanceService : <<HTTP>>
+
+ascensosController --> ascensosService
+ascensosService --> ascensosModel
+ascensosService --> contratosModel
+ascensosService --> asignacionesService
+ascensosService --> convocatoriasNotificacionService
+ascensosProgramadosCron --> ascensosService
+
+planesAscensoController --> planesAscensoService
+planesAscensoService ..> uPlan
+planesAscensoService --> planesAscensoModel
+planesAscensoService --> asignacionesService
+
+convocatoriasNotificacionService ..> NotificationService : <<HTTP>>
+@enduml

@@ -1,0 +1,69 @@
+@startuml sec-05-kan82-formalizar-ascenso
+!include _estilo-secuencia.iuml
+title KAN-82 · Formalizar el ascenso del postulante apto (RF-62, criterios 1, 2 y 4)
+
+actor "Administrador\nde RRHH" as RRHH
+participant "FormalizarAscensoModal\n(React)" as FE PANTALLA
+participant "autenticar ·\nexigirRolSesion('admin')" as MW MIDDLEWARE
+participant "ascensos\nController" as CT CONTROLADOR
+participant "ascensos\nService" as SV SERVICIO
+participant "ascensosModel ·\ncontratosModel" as MD MODELO
+participant "asignaciones\nService" as AS SERVICIO
+database "EmployeeDB" as DB BD
+participant "NotificationService" as NS EXTERNO
+actor "Empleado\npromovido" as EMP
+
+RRHH -> FE : elige al postulante apto del ranking:\nfecha de vigencia, haber, observaciones
+FE -> MW : POST /convocatorias/{id}/postulaciones/{idPostulacion}/formalizacion [JWT]
+MW -> CT : formalizar
+activate CT
+CT -> SV : formalizar(idConvocatoria, idPostulacion, datos, identidad)
+activate SV
+SV -> DB : BEGIN
+SV -> MD : bloquearConvocatoria · bloquearPostulacion (FOR UPDATE)
+SV -> SV : verificarFormalizable
+alt ya formalizado / la convocatoria ya tiene un ascenso
+  SV --> CT : <color:#B85450>409 YA_FORMALIZADO · CONVOCATORIA_RESUELTA</color>
+else no es APTO / empleado inactivo / ya ocupa el cargo
+  SV --> CT : <color:#B85450>409 POSTULANTE_NO_APTO · EMPLEADO_INACTIVO · MISMO_CARGO</color>
+else tiene otro ascenso programado / cargo o sucursal inactivos / puesto ocupado
+  SV --> CT : <color:#B85450>409 ASCENSO_PROGRAMADO · CARGO_INACTIVO · CARGO_OCUPADO</color>
+end
+SV -> SV : prepararAdenda
+SV -> MD : obtenerVersionActual(contrato)
+alt vigencia anterior a hoy
+  SV --> CT : <color:#B85450>400 FECHA_PASADA</color>
+else sin contrato / vigencia fuera del contrato
+  SV --> CT : <color:#B85450>409 SIN_CONTRATO · FECHA_ANTERIOR_A_CONTRATO · FECHA_FUERA_DE_CONTRATO</color>
+else haber menor al vigente / número repetido
+  SV --> CT : <color:#B85450>409 HABER_MENOR · NUMERO_DUPLICADO</color>
+end
+note right of SV
+  Haber por defecto: el mayor entre el salario
+  base del cargo y el haber vigente.
+  Número por defecto: ASC-{idPostulacion}.
+end note
+SV -> MD : contratosModel.insertar(adenda tipo ASCENSO,\nes_adenda, id_contrato_anterior) (criterio 2)
+alt vigencia = hoy
+  SV -> AS : aplicarAsignacion(cargo y sucursal de la convocatoria)
+  AS -> DB : cierra la asignación vigente · inserta la nueva\n· actualiza cargo y sucursal actuales
+  SV -> MD : registrarFormalizacion(APLICADO)
+else vigencia futura
+  SV -> MD : registrarFormalizacion(PROGRAMADO)
+end
+SV -> MD : cerrarConvocatoria (criterio 4)
+SV -> DB : COMMIT
+note right of DB : índice único parcial: dos formalizaciones\nsimultáneas → 23505 → 409 CONVOCATORIA_RESUELTA
+SV -> NS : avisarAscenso · POST /comunicaciones/directa
+alt entregado
+  NS ->> EMP : aviso de su ascenso (cargo, sucursal, vigencia)
+  SV -> MD : registrarNotificacion(notificado_en)
+else falla
+  SV -> MD : registrarNotificacion(error) · el ascenso igual queda formalizado
+end
+SV --> CT : postulación con ascenso, cargo y sucursal destino
+deactivate SV
+CT --> FE : 200
+deactivate CT
+FE --> RRHH : ascenso formalizado (APLICADO o PROGRAMADO)\ny «Reintentar aviso» si no se entregó
+@enduml

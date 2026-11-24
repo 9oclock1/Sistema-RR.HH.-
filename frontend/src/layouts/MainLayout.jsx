@@ -1,22 +1,14 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
-import { House, Menu, Search } from "lucide-react";
-import { cerrarSesion, obtenerSesion } from "../api/auth";
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { House, LogOut, Menu, Search } from "lucide-react";
+import { obtenerSesion } from "../api/auth";
 import { iniciarConsolaPubSub } from "../api/mensajesPublicados";
-import { Boton, Casilla, ElementoNavegacion, Selector, useAvisos } from "../components/ui";
-import {
-  abrirInicioSesion,
-  cambiarRol,
-  cambiarUsuario,
-  fijarSesion,
-  useFormularioSesion,
-  useRol,
-  useSesion,
-  useUsuario,
-} from "../context/sesion";
+import { Boton, ElementoNavegacion, useAvisos } from "../components/ui";
+import { abrirInicioSesion, fijarSesion, useFormularioSesion, useRol, useSesion } from "../context/sesion";
 import { useEmpleados } from "../features/Asignaciones/hooks/useEmpleados";
 import CampanaNotificaciones from "../features/notificaciones/CampanaNotificaciones";
-import DialogoInicioSesion from "../features/sesion/DialogoInicioSesion";
+import { RUTA_INICIO_SESION } from "../features/sesion/ruta";
+import { useCerrarSesion } from "../features/sesion/useCerrarSesion";
 import { seccionesPara } from "../router/modulos";
 import { ROLES } from "../utils/permisos";
 import "./MainLayout.css";
@@ -50,8 +42,6 @@ function guardarPlegado(plegado) {
 
 const normalizar = (texto) => texto.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
-const OPCIONES_ROL = Object.entries(ROLES).map(([valor, rol]) => ({ valor, etiqueta: rol.nombre }));
-
 function filtrarSecciones(secciones, consulta) {
   if (!consulta) return secciones;
   return secciones
@@ -73,13 +63,12 @@ export default function MainLayout() {
   const { pathname } = useLocation();
   const rutaAnterior = useRef(pathname);
   const navegar = useNavigate();
-  const avisar = useAvisos();
   const rol = useRol();
-  const usuario = useUsuario();
   const sesion = useSesion();
   const formularioSesion = useFormularioSesion();
-  const [cerrandoSesion, setCerrandoSesion] = useState(false);
+  const { salir: salirDeSesion, cerrando: cerrandoSesion } = useCerrarSesion();
   const empleados = useEmpleados();
+  const avisar = useAvisos();
 
   const consulta = normalizar(busqueda.trim());
   const secciones = filtrarSecciones(seccionesPara(rol), consulta);
@@ -92,12 +81,50 @@ export default function MainLayout() {
     iniciarConsolaPubSub();
   }, []);
 
-  // Sesión real ya abierta (cookie de AuthService); sin ella el portal sigue con el usuario y el rol de prueba.
+  // El portal exige sesión (cookie de AuthService): sin ella se va a la pantalla de inicio de sesión. El rol y el
+  // usuario son siempre los de la cuenta.
   useEffect(() => {
     obtenerSesion()
       .then(({ usuario: activo }) => fijarSesion(activo))
       .catch(() => fijarSesion(null));
   }, []);
+
+  // AC1: mientras haya sesión abierta, valida cada 60 s y al volver el foco si fue revocada.
+  useEffect(() => {
+    if (!sesion) return undefined;
+    let vigente = true;
+    const verificarVigencia = () => {
+      obtenerSesion()
+        .then(({ usuario }) => {
+          if (!vigente || usuario) return;
+          vigente = false;
+          fijarSesion(null);
+          avisar({
+            tono: "aviso",
+            titulo: "Sesión finalizada",
+            mensaje: "Su sesión terminó. Si fue desvinculado, su acceso al ERP fue revocado.",
+          });
+        })
+        .catch(() => {});
+    };
+    const alCambiarVisibilidad = () => {
+      if (!document.hidden) verificarVigencia();
+    };
+    const id = setInterval(verificarVigencia, 60000);
+    document.addEventListener("visibilitychange", alCambiarVisibilidad);
+    return () => {
+      vigente = false;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", alCambiarVisibilidad);
+    };
+  }, [sesion, avisar]);
+
+  // Las páginas que piden el inicio con abrirInicioSesion() llevan a la pantalla de inicio de sesión.
+  useEffect(() => {
+    if (!formularioSesion) return;
+    abrirInicioSesion(false);
+    navegar(RUTA_INICIO_SESION);
+  }, [formularioSesion, navegar]);
 
   // Al cambiar de página, el foco pasa al contenido para los lectores de pantalla.
   useEffect(() => {
@@ -132,37 +159,8 @@ export default function MainLayout() {
     setBusqueda("");
   };
 
-  const alCambiarRol = (evento) => {
-    const nuevo = evento.target.value;
-    cambiarRol(nuevo);
-    avisar({ tono: "info", titulo: "Rol de prueba cambiado", mensaje: ROLES[nuevo].nombre });
-  };
-
-  const alCambiarUsuario = (evento) => {
-    const nuevo = evento.target.value;
-    cambiarUsuario(nuevo);
-    const nombre = empleados.empleados.find((e) => e.id_empleado === nuevo)?.nombre_completo;
-    avisar({ tono: "info", titulo: "Usuario de prueba cambiado", mensaje: nombre ?? "Sin usuario" });
-  };
-
-  const alternarSesion = async (evento) => {
-    if (evento.target.checked) {
-      abrirInicioSesion();
-      return;
-    }
-    setCerrandoSesion(true);
-    try {
-      await cerrarSesion();
-      fijarSesion(null);
-      avisar({ tono: "info", titulo: "Sesión cerrada", mensaje: "Vuelve el usuario y el rol de prueba." });
-    } catch (error) {
-      avisar({ tono: "peligro", titulo: "No se pudo cerrar la sesión", mensaje: error.message });
-    } finally {
-      setCerrandoSesion(false);
-    }
-  };
-
-  const nombreSesion = sesion && (empleados.empleados.find((e) => e.id_empleado === sesion.id_empleado)?.nombre_completo ?? sesion.correo);
+  const nombreSesion =
+    sesion && ((empleados.empleados ?? []).find((e) => e.id_empleado === sesion.id_empleado)?.nombre_completo ?? sesion.correo);
 
   const alPresionarEnBusqueda = (evento) => {
     if (evento.key === "Enter" && resultados.length > 0) {
@@ -172,6 +170,18 @@ export default function MainLayout() {
     }
     if (evento.key === "Escape") setBusqueda("");
   };
+
+  // Mientras se consulta la sesión no se muestra el portal; sin sesión, a la pantalla de inicio de sesión.
+  if (sesion === undefined) {
+    return (
+      <p className="app-verificando" role="status">
+        Verificando la sesión…
+      </p>
+    );
+  }
+  if (sesion === null) {
+    return <Navigate to={RUTA_INICIO_SESION} replace />;
+  }
 
   return (
     <div className={`app ${lateralVisible ? "app--lateral-visible" : ""}`}>
@@ -242,39 +252,20 @@ export default function MainLayout() {
         </nav>
 
         <div className="app-lateral__pie">
-          <Casilla
-            role="switch"
-            etiqueta="Inicio de sesión real"
-            ayuda={
-              sesion
-                ? `Sesión de ${nombreSesion} (${ROLES[sesion.rol]?.nombre ?? sesion.rol}). Desactívela para volver al usuario de prueba.`
-                : "Necesario para Mis boletas de pago y Rotación de personal. El resto funciona con el usuario de prueba."
-            }
-            checked={Boolean(sesion)}
-            onChange={alternarSesion}
-            disabled={sesion === undefined || cerrandoSesion}
-          />
-          <Selector etiqueta="Rol de prueba" opciones={OPCIONES_ROL} value={rol} onChange={alCambiarRol} disabled={Boolean(sesion)} />
-          <Selector
-            etiqueta="Usuario de prueba"
-            ayuda={
-              sesion
-                ? "Fijados por la sesión iniciada."
-                : "Temporal hasta contar con inicio de sesión. Queda como autor de los registros."
-            }
-            value={usuario ?? ""}
-            onChange={alCambiarUsuario}
-            disabled={empleados.cargando || Boolean(empleados.error) || Boolean(sesion)}
-            textoVacio={empleados.cargando ? "Cargando…" : "Sin usuario"}
-            opciones={empleados.empleados.map((e) => ({ valor: e.id_empleado, etiqueta: e.nombre_completo }))}
-            error={empleados.error ? "No se pudieron cargar los empleados." : undefined}
-          />
+          <div className="app-sesion">
+            <p className="app-sesion__texto">
+              Sesión de <strong>{nombreSesion}</strong>.
+              <br />
+              Rol: <strong>{ROLES[sesion.rol]?.nombre ?? sesion.rol}</strong>
+            </p>
+            <Boton icono={LogOut} onClick={salirDeSesion} cargando={cerrandoSesion} className="app-sesion__boton">
+              Cerrar sesión
+            </Boton>
+          </div>
         </div>
       </aside>
 
       {superpuesto && <div className="app-velo" aria-hidden="true" onClick={cerrarSuperpuesto} />}
-
-      <DialogoInicioSesion abierto={formularioSesion} onCerrar={() => abrirInicioSesion(false)} />
 
       <main id="contenido" ref={refContenido} tabIndex={-1} className="app-contenido" inert={superpuesto}>
         <Outlet />

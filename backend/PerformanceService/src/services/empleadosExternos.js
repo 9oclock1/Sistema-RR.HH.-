@@ -77,4 +77,19 @@ async function listarResponsables() {
     .filter(Boolean);
 }
 
-module.exports = { consultarEmpleado, listarResponsables };
+// RF-72 (KPI-03): plantilla del alcance del dashboard de conflictividad, con la misma forma de filtrar que
+// GET /empleados (sucursal actual y área del cargo actual). Incluye inactivos: quien llama cuenta los activos.
+async function listarPlantilla({ idSucursal = null, idDepartamento = null } = {}) {
+  const parametros = new URLSearchParams();
+  if (idSucursal) parametros.set("id_sucursal", idSucursal);
+  if (idDepartamento) parametros.set("id_departamento", idDepartamento);
+  const consulta = parametros.toString();
+  try {
+    return await pedirLista(`/empleados${consulta ? `?${consulta}` : ""}`);
+  } catch (error) {
+    console.error("No se pudo obtener la plantilla desde EmployeeService:", error.name, error.message);
+    throw new ErrorApp(503, "No se pudo consultar la plantilla de empleados. Intente nuevamente en unos minutos.");
+  }
+}
+
+module.exports = { consultarEmpleado, listarResponsables, listarPlantilla };

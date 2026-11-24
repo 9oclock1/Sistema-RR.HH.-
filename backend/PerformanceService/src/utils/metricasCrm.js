@@ -36,6 +36,7 @@ const demoraRespuestaMs = () => numeroDeEntorno("SIMULAR_CRM_DEMORA_MS", 2000);
 // Solo rotula la consola: el CRM publicaría en su propio tópico, pero aquí la respuesta se simula.
 const topicoCrm = () => process.env.PUBSUB_TOPICO_CRM || "ucb-sis323-sub-b";
 
+
 // Entregas del mismo mensaje antes de mandarlo a la cola de errores (DLQ), con espera creciente entre ellas.
 const maximoIntentos = () => Math.max(1, Math.floor(numeroDeEntorno("CRM_MAXIMO_INTENTOS", 5)));
 const esperaBaseMs = () => numeroDeEntorno("CRM_REINTENTO_BASE_MS", 1000);

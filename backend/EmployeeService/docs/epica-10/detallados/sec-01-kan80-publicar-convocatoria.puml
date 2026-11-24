@@ -1,0 +1,71 @@
+@startuml sec-01-kan80-publicar-convocatoria
+!include _estilo-secuencia.iuml
+title KAN-80 · Publicar una convocatoria interna de ascenso (RF-60, criterios 1 y 2)
+
+actor "Administrador\nde RRHH" as RRHH
+participant "ConvocatoriaFormulario\n(React)" as FE PANTALLA
+participant "autenticar ·\nexigirRolSesion('admin')" as MW MIDDLEWARE
+participant "convocatorias\nController" as CT CONTROLADOR
+participant "convocatorias\nService" as SV SERVICIO
+participant "convocatorias\nModel" as MD MODELO
+database "EmployeeDB" as DB BD
+participant "convocatorias\nNotificacionService" as NT SERVICIO
+participant "NotificationService" as NS EXTERNO
+actor "Empleados\nelegibles" as EMP
+
+RRHH -> FE : título, cargo, sucursal, requisitos,\nantigüedad y nota mínimas, fechas
+FE -> MW : POST /convocatorias [JWT]
+alt sin sesión / rol distinto de admin
+  MW --> FE : <color:#B85450>401 / 403</color>
+end
+MW -> CT : publicar(req, res)
+activate CT
+CT -> SV : publicar(cuerpo, identidad)
+activate SV
+SV -> SV : validarConvocatoria(cuerpo)
+alt datos inválidos (fechas, nota 0–100, campos vacíos)
+  SV --> CT : <color:#B85450>400</color>
+end
+SV -> MD : buscarCargoActivo · buscarSucursalActiva
+alt cargo o sucursal inexistente o inactivo
+  SV --> CT : <color:#B85450>400</color>
+end
+SV -> MD : listarOcupantesActivos · buscarVigenteMismoPuesto
+alt el puesto tiene ocupante
+  SV --> CT : <color:#B85450>409 CARGO_OCUPADO</color>
+else ya hay una convocatoria vigente para el puesto
+  SV --> CT : <color:#B85450>409 CONVOCATORIA_DUPLICADA</color>
+end
+SV -> MD : listarCandidatosAviso(idCargo)
+MD -> DB : empleados activos que no ocupan el cargo
+SV -> SV : elegiblesPara: meses de antigüedad\nal cierre ≥ antigüedad mínima
+SV -> DB : BEGIN
+SV -> MD : insertar(convocatoria) · insertarDestinatarios(elegibles)
+SV -> DB : COMMIT
+loop destinatarios pendientes, de 4 en 4
+  SV -> NT : avisarElegible(convocatoria, destinatario)
+  NT -> NS : POST /comunicaciones/directa
+  alt entregado
+    NS ->> EMP : aviso de la nueva convocatoria
+    SV -> MD : registrarAvisoEntregado
+  else falla
+    SV -> MD : registrarAvisoFallido(error)
+  end
+end
+SV -> MD : registrarNotificacionEntregada / Fallida
+SV --> CT : convocatoria + resumen de la notificación
+deactivate SV
+CT --> FE : 201
+deactivate CT
+FE --> RRHH : convocatoria publicada · avisos entregados\n(si hubo fallas: «Reintentar notificación»)
+
+== Reintento de la notificación ==
+RRHH -> CT : POST /convocatorias/{id}/notificacion
+CT -> SV : reintentarNotificacion(id)
+alt ya ENTREGADA o la convocatoria cerró
+  SV --> CT : <color:#B85450>409</color>
+else
+  SV -> NT : vuelve a avisar solo a los pendientes
+  SV --> CT : 200
+end
+@enduml

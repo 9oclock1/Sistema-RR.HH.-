@@ -11,7 +11,11 @@ export function useEmpleados() {
     const controller = new AbortController();
 
     getEmpleados({ signal: controller.signal })
-      .then((empleados) => setResultado({ version, empleados, error: null }))
+      .then((empleados) => setResultado({
+        version,
+        empleados: Array.isArray(empleados) ? empleados : [],
+        error: null,
+      }))
       .catch((error) => {
         if (error.name === 'AbortError') return;
         setResultado((previo) => ({ version, empleados: previo.empleados, error }));

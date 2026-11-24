@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { ArrowRight, Banknote, ChevronDown, ChevronUp, Clock, Download, FilePen, FileText, Plus, RefreshCw } from 'lucide-react';
+import { ArrowRight, Banknote, ChevronDown, ChevronUp, Clock, Download, FilePen, FileText, Plus, RefreshCw, TrendingUp } from 'lucide-react';
 import { descargarDocumentoContrato } from '../../../api/kardexApi';
 import { Alerta, Boton, Esqueleto, EstadoVacio, Etiqueta, Selector, TextoTruncado, useAvisos } from '../../../components/ui';
 import { useRol } from '../../../context/sesion';
@@ -19,6 +19,7 @@ const ICONOS = {
   CAMBIO_JORNADA: Clock,
   AJUSTE_SALARIAL: Banknote,
   AJUSTE_CONDICIONES: FilePen,
+  ASCENSO: TrendingUp,
 };
 
 const FILTROS = [

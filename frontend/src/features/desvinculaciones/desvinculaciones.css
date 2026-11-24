@@ -28,8 +28,9 @@
   line-height: var(--size-control);
 }
 
+/* Ocho columnas y cuatro acciones: la tabla se desplaza dentro de la tarjeta antes de apretar al colaborador. */
 .desv-tabla .ds-tabla {
-  min-width: calc(var(--size-sidebar) * 4.5);
+  min-width: calc(var(--size-sidebar) * 5.5);
 }
 
 .desv-nombre {
@@ -140,6 +141,15 @@
   display: flex;
   justify-content: space-between;
   gap: var(--space-3);
+}
+
+/* Saldos proporcionales (KAN-77): concepto con su cálculo debajo */
+.desv-saldo-concepto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  white-space: normal;
 }
 
 /* Formulario dentro del modal */
@@ -263,4 +273,48 @@
     margin: 0;
     line-height: var(--line-height-small);
   }
+}
+
+/* Modal de indemnización y desahucio */
+.desv-beneficios {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--size-sidebar)), 1fr));
+  gap: var(--space-3);
+}
+
+.desv-beneficio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.desv-beneficio-cabecera {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.desv-beneficio-titulo {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.desv-beneficio .desv-nota {
+  margin: 0;
+}
+
+.desv-beneficio-monto {
+  margin: auto 0 0;
+  color: var(--color-text);
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
 }

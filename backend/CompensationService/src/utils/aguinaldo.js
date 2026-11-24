@@ -4,7 +4,7 @@ const { ErrorApp } = require("./errores");
 const { UUID_RE } = require("./formatos");
 const { sumarDias, sumarMeses } = require("./fechas");
 const { DIAS_MES_COMERCIAL } = require("./planillas");
-const { CUENTAS, RESULTADOS } = require("./integraciones");
+const { CUENTAS, validarSimulacionConfirmacion } = require("./integraciones");
 
 const GESTION_MINIMA = 2000;
 const GESTION_MAXIMA = 2100;
@@ -236,16 +236,30 @@ const TIPO_CONFIRMACION_AGUINALDO = {
   PAGOS: "CONFIRMACION_ORDEN_PAGO_AGUINALDO",
 };
 
-function validarSimulacionConfirmacion(datos = {}) {
-  const errores = [];
-  if (!RESULTADOS.includes(datos.resultado)) errores.push({ campo: "resultado", mensaje: "Use CONFIRMADA o RECHAZADA." });
-  const motivo = typeof datos.motivo === "string" ? datos.motivo.trim() : "";
-  if (datos.resultado === "RECHAZADA" && !motivo) {
-    errores.push({ campo: "motivo", mensaje: "Indique el motivo del rechazo." });
-  }
-  if (errores.length > 0) throw new ErrorApp(400, "Datos de la simulación inválidos", errores);
-  const referencia = typeof datos.referencia === "string" ? datos.referencia.trim() : "";
-  return { resultado: datos.resultado, referencia: referencia || null, motivo: datos.resultado === "RECHAZADA" ? motivo : null };
+// Reporte contable consolidado por centro de costo (RF-49, KAN-69, criterio 1): el aguinaldo no tiene
+// descuentos ni aportes (es un monto neto), así que el asiento por centro es siempre el mismo par de
+// renglones que armarAsientoAguinaldo, solo que uno por centro en vez de un único total. El centro de costo
+// es el par (sucursal, área) del colaborador, igual que en la planilla mensual (utils/integraciones.js).
+// `filasPorCentro` viene de montosPorCentroDeCosto: [{ sucursal, area, monto, colaboradores }].
+function agruparAguinaldoPorCentroDeCosto(filasPorCentro) {
+  return filasPorCentro
+    .map((f) => {
+      const cents = centavos(f.monto);
+      const sucursal = f.sucursal || "(sin sucursal)";
+      const area = f.area || "(sin área)";
+      return {
+        centro_costo: `${sucursal} · ${area}`,
+        sucursal,
+        area,
+        renglones: [
+          { cuenta: CUENTA_AGUINALDO, debe: bs(cents), haber: 0 },
+          { cuenta: CUENTAS.SUELDOS_POR_PAGAR, debe: 0, haber: bs(cents) },
+        ],
+        total_debe: bs(cents),
+        total_haber: bs(cents),
+      };
+    })
+    .sort((a, b) => a.centro_costo.localeCompare(b.centro_costo, "es"));
 }
 
 function armarConfirmacionSimulada({ idMensaje, idAguinaldo, idMensajeOrigen, destino, resultado, referencia, motivo }) {
@@ -282,6 +296,8 @@ module.exports = {
   armarMensajeAguinaldo,
   armarAsientoAguinaldo,
   armarOrdenPagoAguinaldo,
+  agruparAguinaldoPorCentroDeCosto,
+  CUENTA_AGUINALDO,
   validarSimulacionConfirmacion,
   armarConfirmacionSimulada,
 };

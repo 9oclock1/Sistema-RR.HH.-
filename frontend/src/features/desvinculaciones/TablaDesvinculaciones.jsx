@@ -1,8 +1,8 @@
-import { Calculator, Download, UserMinus } from "lucide-react";
+import { Calculator, Download, HandCoins, Scale, UserMinus } from "lucide-react";
 import { Boton, EstadoVacio, Etiqueta, Tabla } from "../../components/ui";
 import { ESTADOS, formatearBs, formatearFecha, formatearFechaHora } from "./formato";
 
-const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, puedeDescargar }) => [
+const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, onVerBeneficios, onVerSaldos, puedeDescargar }) => [
   {
     clave: "colaborador",
     titulo: "Colaborador",
@@ -16,19 +16,19 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, puedeDescargar })
   {
     clave: "causal",
     titulo: "Causal",
-    ancho: "16%",
+    ancho: "13%",
     celda: (p) => p.causal?.nombre ?? "—",
   },
   {
     clave: "fecha_retiro",
     titulo: "Fecha de retiro",
-    ancho: "10%",
+    ancho: "8%",
     celda: (p) => formatearFecha(p.fecha_retiro),
   },
   {
     clave: "desahucio",
     titulo: "Desahucio",
-    ancho: "17%",
+    ancho: "12%",
     celda: (p) => (
       <Etiqueta tono={p.corresponde_desahucio ? "aviso" : "neutral"}>
         {p.corresponde_desahucio ? "Corresponde desahucio" : "No corresponde desahucio"}
@@ -38,7 +38,7 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, puedeDescargar })
   {
     clave: "promedio_indemnizable",
     titulo: "Sueldo promedio",
-    ancho: "11%",
+    ancho: "10%",
     celda: (p) =>
       p.promedio_indemnizable ? (
         <div className="desv-nombre">
@@ -53,9 +53,23 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, puedeDescargar })
       ),
   },
   {
+    clave: "beneficios_sociales",
+    titulo: "Indemnización y desahucio",
+    ancho: "14%",
+    celda: (p) =>
+      p.beneficios_sociales ? (
+        <div className="desv-nombre">
+          <span className="desv-monto">{formatearBs(p.beneficios_sociales.total)}</span>
+          {p.beneficios_sociales.desactualizado && <span className="desv-nota">Desactualizado</span>}
+        </div>
+      ) : (
+        <span className="desv-nota">Sin calcular</span>
+      ),
+  },
+  {
     clave: "estado",
     titulo: "Estado",
-    ancho: "9%",
+    ancho: "8%",
     celda: (p) => {
       const cfg = ESTADOS[p.estado] ?? { etiqueta: p.estado, tono: "neutral" };
       return <Etiqueta tono={cfg.tono}>{cfg.etiqueta}</Etiqueta>;
@@ -64,13 +78,13 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, puedeDescargar })
   {
     clave: "creado_en",
     titulo: "Registrado",
-    ancho: "9%",
+    ancho: "8%",
     celda: (p) => formatearFechaHora(p.creado_en),
   },
   {
     clave: "acciones",
     titulo: <span className="ds-solo-lector">Acciones</span>,
-    ancho: "96px",
+    ancho: "180px",
     alinear: "fin",
     celda: (p) => (
       <div className="desv-acciones">
@@ -81,6 +95,22 @@ const COLUMNAS = ({ onDescargar, descargandoId, onVerPromedio, puedeDescargar })
           aria-label={`Ver sueldo promedio de ${p.nombre_empleado}`}
           title="Ver sueldo promedio indemnizable"
           onClick={() => onVerPromedio(p)}
+        />
+        <Boton
+          variante="sutil"
+          soloIcono
+          icono={HandCoins}
+          aria-label={`Ver indemnización y desahucio de ${p.nombre_empleado}`}
+          title="Ver indemnización y desahucio"
+          onClick={() => onVerBeneficios(p)}
+        />
+        <Boton
+          variante="sutil"
+          soloIcono
+          icono={Scale}
+          aria-label={`Ver saldos proporcionales de ${p.nombre_empleado}`}
+          title="Ver duodécimas de aguinaldo y vacaciones truncas"
+          onClick={() => onVerSaldos(p)}
         />
         {puedeDescargar && (
           <Boton
@@ -105,13 +135,15 @@ export default function TablaDesvinculaciones({
   onDescargar,
   descargandoId,
   onVerPromedio,
+  onVerBeneficios,
+  onVerSaldos,
   puedeDescargar = true,
 }) {
   return (
     <Tabla
       className="desv-tabla"
       descripcion="Procesos de desvinculación registrados"
-      columnas={COLUMNAS({ onDescargar, descargandoId, onVerPromedio, puedeDescargar })}
+      columnas={COLUMNAS({ onDescargar, descargandoId, onVerPromedio, onVerBeneficios, onVerSaldos, puedeDescargar })}
       filas={procesos}
       claveFila="id_proceso"
       cargando={cargando}

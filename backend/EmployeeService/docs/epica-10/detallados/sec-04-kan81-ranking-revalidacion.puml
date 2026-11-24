@@ -1,0 +1,58 @@
+@startuml sec-04-kan81-ranking-revalidacion
+!include _estilo-secuencia.iuml
+title KAN-81 · Ranking de postulantes y nueva validación (RF-61, criterio 4)
+
+actor "Administrador de RRHH\no Gerente" as RRHH
+participant "PostulacionesModal\n(React)" as FE PANTALLA
+participant "exigirRol\n('admin', 'gerente')" as MW MIDDLEWARE
+participant "postulaciones\nController" as CT CONTROLADOR
+participant "postulaciones\nService" as SV SERVICIO
+participant "utils/meritos" as UT SERVICIO
+participant "postulaciones\nModel" as MD MODELO
+database "EmployeeDB" as DB BD
+
+RRHH -> FE : abre las postulaciones de la convocatoria
+FE -> MW : GET /convocatorias/{id}/postulaciones [X-Rol]
+alt otro rol
+  MW --> FE : <color:#B85450>403</color>
+end
+MW -> CT : listar
+activate CT
+CT -> SV : listar(idConvocatoria)
+activate SV
+SV -> DB : convocatoria
+alt no existe
+  SV --> CT : <color:#B85450>404</color>
+end
+SV -> MD : listarDeConvocatoria(id)
+MD -> DB : postulaciones + datos del empleado
+SV -> UT : ordenarRanking(aptos)
+UT --> SV : por puntaje ↓, nota ↓, antigüedad ↓,\nfecha de postulación ↑ · con posición
+SV --> CT : convocatoria, ranking_definitivo (si CERRADA),\nfórmula de méritos, totales, ranking,\nno aptos con motivos, pendientes,\nascenso_formalizado (o null)
+deactivate SV
+CT --> FE : 200
+deactivate CT
+FE --> RRHH : ranking (provisional mientras la convocatoria está abierta)
+
+== Volver a validar (por ejemplo, si PerformanceService no respondía) ==
+RRHH -> FE : «Validar de nuevo»
+FE -> CT : POST /convocatorias/{id}/postulaciones/{idPostulacion}/validacion\n[exigirRol('admin')]
+activate CT
+CT -> SV : revalidar(idConvocatoria, idPostulacion)
+activate SV
+alt postulación de otra convocatoria
+  SV --> CT : <color:#B85450>404</color>
+else su ascenso ya fue formalizado
+  SV --> CT : <color:#B85450>409 YA_FORMALIZADO</color>
+else
+  SV -> SV : validar(postulación, convocatoria)\n(misma lógica que al postular)
+  alt PerformanceService sigue sin responder y ya estaba validada
+    SV --> CT : <color:#B85450>503 la validación anterior se mantiene</color>
+  else
+    SV --> CT : postulación actualizada
+  end
+end
+deactivate SV
+CT --> FE : 200
+deactivate CT
+@enduml

@@ -997,7 +997,11 @@ ON CONFLICT DO NOTHING;
 COMMIT;
 
 -- Datos de prueba de planillas cerradas de los últimos meses para cálculo del sueldo promedio indemnizable (RF-55, KAN-75).
--- Requiere que NO existan planillas generadas manualmente de 2026-07 a 2026-10 (una planilla por periodo: uq_planilla_periodo).
+-- Hay una sola planilla por periodo (uq_planilla_periodo): estos colaboradores se agregan a la planilla que ya
+-- exista de cada mes (la de 2026-07 a 2026-09 del bloque de boletas de arriba) y solo se crea la de 2026-10.
+-- La de 2026-09 está APROBADA (Pagos aún no confirma), así que todavía no cuenta para el promedio: mientras
+-- tanto, cada caso informa que falta la planilla cerrada de 2026-09. Al confirmar Pagos esa planilla (Planilla
+-- mensual > Simular confirmación) se cierra y, al recalcular, salen los resultados de la lista de abajo.
 -- Primero ejecute el seed de EmployeeService para contar con Fernando Choque Ticona en EmployeeDB:
 --   Get-Content -Encoding UTF8 backend/EmployeeService/db/seed.sql | docker exec -i rrhh-postgres psql -U adminRRHH -d EmployeeDB
 --
@@ -1007,6 +1011,7 @@ COMMIT;
 --   - Valeria Nina Quisbert (...742): 3 meses completos (30 días) con horas extra y recargo nocturno, sin observaciones.
 --   - Rodrigo Apaza Calle (...743): cambio de haber mensual (4000 -> 4400) y retiro en 2026-11 sin planilla cerrada de 2026-11.
 --   - Fernando Choque Ticona (...744): antigüedad menor a tres meses (ingresó 2026-09-01, solo 2 planillas cerradas).
+-- Con 2026-09 todavía APROBADA, el promedio usa 2026-07, 2026-08 y 2026-10 (Fernando, solo 2026-10: 1 mes).
 BEGIN;
 
 INSERT INTO PROCESOS_DESVINCULACION (
@@ -1093,126 +1098,126 @@ INSERT INTO PLANILLA_EMPLEADOS (
   total_ganado, total_descuentos, liquido_pagable, total_aportes
 ) VALUES
   (
-    'c0000000-0000-4000-8000-000000000771', 'c0000000-0000-4000-8000-000000000761', 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
+    'c0000000-0000-4000-8000-000000000771', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-07'), 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000791', 'CTR-2019-037', 4500.00,
     DATE '2026-07-01', DATE '2026-07-31', 30, 30,
     0, 0, 0,
     4900.00, 622.79, 4277.21, 818.79
   ),
   (
-    'c0000000-0000-4000-8000-000000000772', 'c0000000-0000-4000-8000-000000000762', 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
+    'c0000000-0000-4000-8000-000000000772', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-08'), 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000791', 'CTR-2019-037', 4500.00,
     DATE '2026-08-01', DATE '2026-08-31', 30, 30,
     600, 0, 0,
     5275.00, 670.46, 4604.54, 881.45
   ),
   (
-    'c0000000-0000-4000-8000-000000000773', 'c0000000-0000-4000-8000-000000000763', 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
+    'c0000000-0000-4000-8000-000000000773', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000791', 'CTR-2019-037', 4500.00,
     DATE '2026-09-01', DATE '2026-09-30', 30, 30,
     0, 0, 0,
     5200.00, 660.92, 4539.08, 868.92
   ),
   (
-    'c0000000-0000-4000-8000-000000000774', 'c0000000-0000-4000-8000-000000000764', 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
+    'c0000000-0000-4000-8000-000000000774', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'f0000000-0000-4000-8000-000000000037', 'Elena Paredes Gómez', '7105069',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000791', 'CTR-2019-037', 4500.00,
     DATE '2026-10-01', DATE '2026-10-15', 15, 15,
     0, 0, 0,
     2450.00, 311.40, 2138.60, 409.40
   ),
   (
-    'c0000000-0000-4000-8000-000000000775', 'c0000000-0000-4000-8000-000000000761', 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
+    'c0000000-0000-4000-8000-000000000775', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-07'), 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000792', 'CTR-2022-741', 3800.00,
     DATE '2026-07-01', DATE '2026-07-31', 30, 30,
     0, 0, 0,
     4050.00, 514.76, 3535.24, 676.76
   ),
   (
-    'c0000000-0000-4000-8000-000000000776', 'c0000000-0000-4000-8000-000000000762', 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
+    'c0000000-0000-4000-8000-000000000776', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-08'), 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000792', 'CTR-2022-741', 3800.00,
     DATE '2026-08-01', DATE '2026-08-31', 30, 30,
     0, 600, 0,
     4208.33, 534.87, 3673.46, 703.21
   ),
   (
-    'c0000000-0000-4000-8000-000000000777', 'c0000000-0000-4000-8000-000000000763', 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
+    'c0000000-0000-4000-8000-000000000777', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000792', 'CTR-2022-741', 3800.00,
     DATE '2026-09-01', DATE '2026-09-30', 30, 30,
     0, 0, 0,
     4050.00, 514.76, 3535.24, 676.76
   ),
   (
-    'c0000000-0000-4000-8000-000000000778', 'c0000000-0000-4000-8000-000000000764', 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
+    'c0000000-0000-4000-8000-000000000778', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'f0000000-0000-4000-8000-000000000741', 'Luciano Morales Chávez', '7108741',
     'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000792', 'CTR-2022-741', 3800.00,
     DATE '2026-10-01', DATE '2026-10-20', 20, 20,
     0, 0, 0,
     2700.00, 343.17, 2356.83, 451.17
   ),
   (
-    'c0000000-0000-4000-8000-000000000779', 'c0000000-0000-4000-8000-000000000761', 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
+    'c0000000-0000-4000-8000-000000000779', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-07'), 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000793', 'CTR-2024-742', 3200.00,
     DATE '2026-07-01', DATE '2026-07-31', 30, 30,
     450, 0, 0,
     3400.00, 432.14, 2967.86, 568.14
   ),
   (
-    'c0000000-0000-4000-8000-000000000780', 'c0000000-0000-4000-8000-000000000762', 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
+    'c0000000-0000-4000-8000-000000000780', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-08'), 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000793', 'CTR-2024-742', 3200.00,
     DATE '2026-08-01', DATE '2026-08-31', 30, 30,
     270, 0, 0,
     3320.00, 421.97, 2898.03, 554.77
   ),
   (
-    'c0000000-0000-4000-8000-000000000781', 'c0000000-0000-4000-8000-000000000763', 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
+    'c0000000-0000-4000-8000-000000000781', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000793', 'CTR-2024-742', 3200.00,
     DATE '2026-09-01', DATE '2026-09-30', 30, 30,
     0, 0, 0,
     3200.00, 406.72, 2793.28, 534.72
   ),
   (
-    'c0000000-0000-4000-8000-000000000782', 'c0000000-0000-4000-8000-000000000764', 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
+    'c0000000-0000-4000-8000-000000000782', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'f0000000-0000-4000-8000-000000000742', 'Valeria Nina Quisbert', '7108742',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000793', 'CTR-2024-742', 3200.00,
     DATE '2026-10-01', DATE '2026-10-31', 30, 30,
     630, 0, 900,
     3530.00, 448.66, 3081.34, 589.86
   ),
   (
-    'c0000000-0000-4000-8000-000000000783', 'c0000000-0000-4000-8000-000000000761', 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
+    'c0000000-0000-4000-8000-000000000783', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-07'), 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
     'Cajero', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000794', 'CTR-2021-743', 4000.00,
     DATE '2026-07-01', DATE '2026-07-31', 30, 30,
     0, 0, 0,
     4250.00, 540.18, 3709.82, 710.18
   ),
   (
-    'c0000000-0000-4000-8000-000000000784', 'c0000000-0000-4000-8000-000000000762', 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
+    'c0000000-0000-4000-8000-000000000784', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-08'), 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
     'Cajero', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000794', 'CTR-2021-743', 4000.00,
     DATE '2026-08-01', DATE '2026-08-31', 30, 30,
     0, 0, 0,
     4600.00, 584.66, 4015.34, 768.66
   ),
   (
-    'c0000000-0000-4000-8000-000000000785', 'c0000000-0000-4000-8000-000000000763', 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
+    'c0000000-0000-4000-8000-000000000785', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
     'Cajero', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000794', 'CTR-2021-743', 4400.00,
     DATE '2026-09-01', DATE '2026-09-30', 30, 30,
     0, 0, 0,
     4650.00, 591.02, 4058.98, 777.02
   ),
   (
-    'c0000000-0000-4000-8000-000000000786', 'c0000000-0000-4000-8000-000000000764', 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
+    'c0000000-0000-4000-8000-000000000786', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'f0000000-0000-4000-8000-000000000743', 'Rodrigo Apaza Calle', '7108743',
     'Cajero', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000794', 'CTR-2021-743', 4400.00,
     DATE '2026-10-01', DATE '2026-10-31', 30, 30,
     300, 0, 0,
     4833.33, 614.32, 4219.01, 807.65
   ),
   (
-    'c0000000-0000-4000-8000-000000000787', 'c0000000-0000-4000-8000-000000000763', 'f0000000-0000-4000-8000-000000000744', 'Fernando Choque Ticona', '7108744',
+    'c0000000-0000-4000-8000-000000000787', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'f0000000-0000-4000-8000-000000000744', 'Fernando Choque Ticona', '7108744',
     'Asesor de Atención', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000795', 'CTR-2026-744', 3000.00,
     DATE '2026-09-01', DATE '2026-09-30', 30, 30,
     0, 0, 0,
     3000.00, 381.30, 2618.70, 501.30
   ),
   (
-    'c0000000-0000-4000-8000-000000000788', 'c0000000-0000-4000-8000-000000000764', 'f0000000-0000-4000-8000-000000000744', 'Fernando Choque Ticona', '7108744',
+    'c0000000-0000-4000-8000-000000000788', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'f0000000-0000-4000-8000-000000000744', 'Fernando Choque Ticona', '7108744',
     'Asesor de Atención', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000795', 'CTR-2026-744', 3000.00,
     DATE '2026-10-01', DATE '2026-10-31', 30, 30,
     300, 0, 0,
@@ -1416,8 +1421,9 @@ COMMIT;
 -- desde la pantalla: registrar su baja (proceso INICIADO) -> calcular el sueldo promedio (pasa a EN_CURSO).
 --   - Gabriela Rocha Mendoza (...745): mismos montos que Valeria Nina Quisbert de 2026-07 a 2026-10.
 --     Con retiro en 2026-11, el promedio es 3350.00 con la observación de que no hay planilla cerrada de 2026-11;
---     con retiro en 2026-10, el promedio es 3350.00 sin observaciones.
--- Requiere el bloque anterior (planillas c...761 a c...764) y que Gabriela exista en EmployeeDB.
+--     con retiro en 2026-10, el promedio es 3350.00 sin observaciones (una vez cerrada la planilla de 2026-09;
+--     antes, 3416.67 con 2026-07, 2026-08 y 2026-10 y la observación de que falta 2026-09).
+-- Requiere el bloque anterior (planillas de 2026-07 a 2026-10) y que Gabriela exista en EmployeeDB.
 BEGIN;
 
 INSERT INTO PLANILLA_EMPLEADOS (
@@ -1428,28 +1434,28 @@ INSERT INTO PLANILLA_EMPLEADOS (
   total_ganado, total_descuentos, liquido_pagable, total_aportes
 ) VALUES
   (
-    'c0000000-0000-4000-8000-000000000801', 'c0000000-0000-4000-8000-000000000761', 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
+    'c0000000-0000-4000-8000-000000000801', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-07'), 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000796', 'CTR-2025-745', 3200.00,
     DATE '2026-07-01', DATE '2026-07-31', 30, 30,
     450, 0, 0,
     3400.00, 432.14, 2967.86, 568.14
   ),
   (
-    'c0000000-0000-4000-8000-000000000802', 'c0000000-0000-4000-8000-000000000762', 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
+    'c0000000-0000-4000-8000-000000000802', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-08'), 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000796', 'CTR-2025-745', 3200.00,
     DATE '2026-08-01', DATE '2026-08-31', 30, 30,
     270, 0, 0,
     3320.00, 421.97, 2898.03, 554.77
   ),
   (
-    'c0000000-0000-4000-8000-000000000803', 'c0000000-0000-4000-8000-000000000763', 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
+    'c0000000-0000-4000-8000-000000000803', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000796', 'CTR-2025-745', 3200.00,
     DATE '2026-09-01', DATE '2026-09-30', 30, 30,
     0, 0, 0,
     3200.00, 406.72, 2793.28, 534.72
   ),
   (
-    'c0000000-0000-4000-8000-000000000804', 'c0000000-0000-4000-8000-000000000764', 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
+    'c0000000-0000-4000-8000-000000000804', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'f0000000-0000-4000-8000-000000000745', 'Gabriela Rocha Mendoza', '7108745',
     'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000796', 'CTR-2025-745', 3200.00,
     DATE '2026-10-01', DATE '2026-10-31', 30, 30,
     630, 0, 900,
@@ -1501,6 +1507,1103 @@ INSERT INTO CALCULOS_PLANILLA (
   ('c0000000-0000-4000-8000-000000000804', (SELECT v.id_vigencia FROM VIGENCIAS_CONCEPTO v JOIN CONCEPTOS_PLANILLA c ON c.id_concepto = v.id_concepto WHERE c.codigo = 'SIP-RIESGO-PROF' AND v.vigente_desde <= DATE '2026-10-31' AND (v.vigente_hasta IS NULL OR v.vigente_hasta >= DATE '2026-10-31') LIMIT 1), 9, 'APORTE', 'SIP-RIESGO-PROF', 'Aporte patronal por riesgo profesional', 'PORCENTAJE', 3530.00, NULL, 1.7100, 60.36, NULL),
   ('c0000000-0000-4000-8000-000000000804', (SELECT v.id_vigencia FROM VIGENCIAS_CONCEPTO v JOIN CONCEPTOS_PLANILLA c ON c.id_concepto = v.id_concepto WHERE c.codigo = 'PRO-VIVIENDA' AND v.vigente_desde <= DATE '2026-10-31' AND (v.vigente_hasta IS NULL OR v.vigente_hasta >= DATE '2026-10-31') LIMIT 1), 10, 'APORTE', 'PRO-VIVIENDA', 'Aporte patronal para vivienda', 'PORCENTAJE', 3530.00, NULL, 2.0000, 70.60, NULL),
   ('c0000000-0000-4000-8000-000000000804', (SELECT v.id_vigencia FROM VIGENCIAS_CONCEPTO v JOIN CONCEPTOS_PLANILLA c ON c.id_concepto = v.id_concepto WHERE c.codigo = 'SIP-SOLIDARIO-PAT' AND v.vigente_desde <= DATE '2026-10-31' AND (v.vigente_hasta IS NULL OR v.vigente_hasta >= DATE '2026-10-31') LIMIT 1), 11, 'APORTE', 'SIP-SOLIDARIO-PAT', 'Aporte patronal solidario', 'PORCENTAJE', 3530.00, NULL, 3.0000, 105.90, NULL)
+ON CONFLICT DO NOTHING;
+
+COMMIT;
+
+-- Procesos por desahucio con 1 año exacto, 91 y 90 días de servicio (RF-56, KAN-76). Las líneas de planilla se
+-- enlazan por periodo para usar la planilla que exista de agosto a octubre de 2026.
+BEGIN;
+
+INSERT INTO PROCESOS_DESVINCULACION (
+  id_proceso, id_empleado, nombre_empleado, fecha_ingreso, codigo_causal,
+  fecha_retiro, corresponde_desahucio, observaciones, estado, registrado_por, registrado_por_rol
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000a41',
+    'f0000000-0000-4000-8000-000000000a61',
+    'Sofía Mamani Lima',
+    '2025-11-01',
+    'DESAHUCIO',
+    '2026-10-31',
+    TRUE,
+    'Preaviso de desahucio entregado tras un año de servicio.',
+    'INICIADO',
+    'f0000000-0000-4000-8000-000000000023',
+    'admin'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000a42',
+    'f0000000-0000-4000-8000-000000000a62',
+    'Marco Condori Flores',
+    '2026-08-02',
+    'DESAHUCIO',
+    '2026-10-31',
+    TRUE,
+    'Desahucio comunicado al concluir el tercer mes de servicio.',
+    'INICIADO',
+    'f0000000-0000-4000-8000-000000000023',
+    'admin'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000a43',
+    'f0000000-0000-4000-8000-000000000a63',
+    'Lucía Vargas Ríos',
+    '2026-08-03',
+    'DESAHUCIO',
+    '2026-10-31',
+    TRUE,
+    'Desahucio comunicado dentro del período de prueba.',
+    'INICIADO',
+    'f0000000-0000-4000-8000-000000000023',
+    'admin'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO DOCUMENTOS_DESVINCULACION (
+  id_proceso, nombre_archivo, tipo_mime, tamano_bytes, contenido
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000a41',
+    'desahucio-sofia-mamani.pdf',
+    'application/pdf',
+    octet_length(convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')),
+    convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000a42',
+    'desahucio-marco-condori.pdf',
+    'application/pdf',
+    octet_length(convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')),
+    convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000a43',
+    'desahucio-lucia-vargas.pdf',
+    'application/pdf',
+    octet_length(convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')),
+    convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO PLANILLA_EMPLEADOS (
+  id_planilla_empleado, id_planilla, id_empleado, nombre_empleado, numero_documento,
+  cargo, area, sucursal, id_contrato, numero_contrato, haber_mensual,
+  contrato_desde, contrato_hasta, dias_contrato, dias_pagados,
+  minutos_extra_habil, minutos_domingo, minutos_nocturnos,
+  total_ganado, total_descuentos, liquido_pagable, total_aportes
+)
+SELECT v.id_planilla_empleado::uuid, p.id_planilla, v.id_empleado::uuid, v.nombre_empleado, v.numero_documento,
+       v.cargo, v.area, v.sucursal, v.id_contrato::uuid, v.numero_contrato, v.haber_mensual,
+       v.contrato_desde, v.contrato_hasta, v.dias, v.dias,
+       0, 0, 0,
+       v.total_ganado, v.total_descuentos, v.liquido_pagable, v.total_aportes
+  FROM (VALUES
+    ('c0000000-0000-4000-8000-000000000a81', '2026-08', 'f0000000-0000-4000-8000-000000000a61', 'Sofía Mamani Lima', '7108761', 'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000a91', 'CTR-2025-761', 3800.00, DATE '2026-08-01', DATE '2026-08-31', 30, 30, 3800.00, 482.98, 3317.02, 634.98),
+    ('c0000000-0000-4000-8000-000000000a82', '2026-09', 'f0000000-0000-4000-8000-000000000a61', 'Sofía Mamani Lima', '7108761', 'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000a91', 'CTR-2025-761', 3800.00, DATE '2026-09-01', DATE '2026-09-30', 30, 30, 3800.00, 482.98, 3317.02, 634.98),
+    ('c0000000-0000-4000-8000-000000000a83', '2026-10', 'f0000000-0000-4000-8000-000000000a61', 'Sofía Mamani Lima', '7108761', 'Cajero', 'Atención al cliente', 'Sopocachi', 'c0000000-0000-4000-8000-000000000a91', 'CTR-2025-761', 3800.00, DATE '2026-10-01', DATE '2026-10-31', 30, 30, 3800.00, 482.98, 3317.02, 634.98),
+    ('c0000000-0000-4000-8000-000000000a84', '2026-08', 'f0000000-0000-4000-8000-000000000a62', 'Marco Condori Flores', '7108762', 'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000a92', 'CTR-2026-762', 3300.00, DATE '2026-08-02', DATE '2026-08-31', 29, 29, 3190.00, 405.45, 2784.55, 533.05),
+    ('c0000000-0000-4000-8000-000000000a85', '2026-09', 'f0000000-0000-4000-8000-000000000a62', 'Marco Condori Flores', '7108762', 'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000a92', 'CTR-2026-762', 3300.00, DATE '2026-09-01', DATE '2026-09-30', 30, 30, 3300.00, 419.43, 2880.57, 551.43),
+    ('c0000000-0000-4000-8000-000000000a86', '2026-10', 'f0000000-0000-4000-8000-000000000a62', 'Marco Condori Flores', '7108762', 'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000a92', 'CTR-2026-762', 3300.00, DATE '2026-10-01', DATE '2026-10-31', 30, 30, 3300.00, 419.43, 2880.57, 551.43),
+    ('c0000000-0000-4000-8000-000000000a87', '2026-08', 'f0000000-0000-4000-8000-000000000a63', 'Lucía Vargas Ríos', '7108763', 'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000a93', 'CTR-2026-763', 3300.00, DATE '2026-08-03', DATE '2026-08-31', 28, 28, 3080.00, 391.47, 2688.53, 514.67),
+    ('c0000000-0000-4000-8000-000000000a88', '2026-09', 'f0000000-0000-4000-8000-000000000a63', 'Lucía Vargas Ríos', '7108763', 'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000a93', 'CTR-2026-763', 3300.00, DATE '2026-09-01', DATE '2026-09-30', 30, 30, 3300.00, 419.43, 2880.57, 551.43),
+    ('c0000000-0000-4000-8000-000000000a89', '2026-10', 'f0000000-0000-4000-8000-000000000a63', 'Lucía Vargas Ríos', '7108763', 'Asesor de Atención', 'Atención al cliente', 'Miraflores', 'c0000000-0000-4000-8000-000000000a93', 'CTR-2026-763', 3300.00, DATE '2026-10-01', DATE '2026-10-31', 30, 30, 3300.00, 419.43, 2880.57, 551.43)
+  ) AS v (
+    id_planilla_empleado, periodo, id_empleado, nombre_empleado, numero_documento,
+    cargo, area, sucursal, id_contrato, numero_contrato, haber_mensual,
+    contrato_desde, contrato_hasta, dias, dias_pagados,
+    total_ganado, total_descuentos, liquido_pagable, total_aportes
+  )
+  JOIN PLANILLAS p ON p.periodo = v.periodo
+ON CONFLICT DO NOTHING;
+
+COMMIT;
+
+-- Planilla tributaria y de aportes de ejemplo (RF-48, KAN-68): entidades con su formato de archivo, parametros
+-- tributarios con vigencias (el salario minimo cambio el 1 de mayo de 2025), valores de la UFV, creditos fiscales declarados
+-- y dos planillas mensuales CERRADAS (2026-04 y 2026-05) de 10 colaboradores, calculadas con las tasas vigentes del catalogo.
+--   Con salario minimo 2.750 el minimo no imponible es 5.500 y el computo del 13 % de 2 salarios minimos es 715: en la
+--   practica solo retiene quien tiene un sueldo neto mayor a 11.000.
+--   22 Jorge: en mayo cobra un bono de productividad de 6.500 (total ganado 15.000, con el Aporte Nacional Solidario sobre
+--      el excedente de 13.000). Declara facturas de Bs 1.000: el credito reduce su retencion pero no la cubre.
+--   21 Marcela: trae un saldo a favor inicial de 80 del sistema anterior y declara facturas en abril y mayo. No tiene
+--      impuesto despues del computo, asi que todo su credito pasa como saldo a favor al mes siguiente.
+--   23 Andrea: declara Bs 4.000 en abril y 3.000 en mayo. El saldo de abril pasa solo a mayo, actualizado con la UFV,
+--      si se genera primero la planilla tributaria de abril.
+-- Los valores de la UFV son de ejemplo: reemplacelos con los que publica el Banco Central de Bolivia.
+BEGIN;
+INSERT INTO ENTIDADES_APORTE (codigo, nombre, formato_archivo, orden) VALUES
+  ('LARGO_PLAZO', 'Gestora Publica de la Seguridad Social de Largo Plazo', 'TXT', 1),
+  ('CAJA_SALUD', 'Caja Nacional de Salud', 'XLSX', 2),
+  ('RIESGO_PROFESIONAL', 'Seguro de Riesgo Profesional', 'TXT', 3),
+  ('VIVIENDA', 'Fondo de Vivienda (Pro-Vivienda)', 'XLSX', 4),
+  ('SOLIDARIO', 'Fondo Solidario (aporte solidario y nacional solidario)', 'TXT', 5)
+ON CONFLICT DO NOTHING;
+INSERT INTO CONCEPTOS_ENTIDAD_APORTE (codigo_concepto, codigo_entidad, deduce_sueldo_neto) VALUES
+  ('SIP-VEJEZ', 'LARGO_PLAZO', TRUE),
+  ('SIP-RIESGO', 'LARGO_PLAZO', TRUE),
+  ('SIP-COMISION', 'LARGO_PLAZO', TRUE),
+  ('SIP-SOLIDARIO', 'SOLIDARIO', TRUE),
+  ('SIP-SOLIDARIO-PAT', 'SOLIDARIO', FALSE),
+  ('ANS-13000', 'SOLIDARIO', FALSE),
+  ('ANS-25000', 'SOLIDARIO', FALSE),
+  ('ANS-35000', 'SOLIDARIO', FALSE),
+  ('CNS-SALUD', 'CAJA_SALUD', FALSE),
+  ('SIP-RIESGO-PROF', 'RIESGO_PROFESIONAL', FALSE),
+  ('PRO-VIVIENDA', 'VIVIENDA', FALSE)
+ON CONFLICT DO NOTHING;
+INSERT INTO PARAMETROS_TRIBUTARIOS (codigo, nombre, valor, vigente_desde, vigente_hasta) VALUES
+  ('SALARIO_MINIMO_NACIONAL', 'Salario minimo nacional (Bs)', 2500, '2024-05-01', '2025-04-30'),
+  ('SALARIO_MINIMO_NACIONAL', 'Salario minimo nacional (Bs)', 2750, '2025-05-01', NULL),
+  ('MULTIPLO_MINIMO_NO_IMPONIBLE', 'Salarios minimos que forman el minimo no imponible', 2, '2000-01-01', NULL),
+  ('ALICUOTA_RCIVA', 'Alicuota del RC-IVA (%)', 13, '2000-01-01', NULL),
+  ('ALICUOTA_CREDITO_FISCAL', 'Alicuota del credito fiscal de las facturas (%)', 13, '2000-01-01', NULL)
+ON CONFLICT DO NOTHING;
+INSERT INTO VALORES_UFV (fecha, valor) VALUES
+  ('2026-03-31', 2.71250),
+  ('2026-04-30', 2.71840),
+  ('2026-05-31', 2.72460),
+  ('2026-06-30', 2.73010),
+  ('2026-07-31', 2.73590),
+  ('2026-08-31', 2.74120),
+  ('2026-09-30', 2.74700),
+  ('2026-10-31', 2.75260)
+ON CONFLICT DO NOTHING;
+INSERT INTO CREDITOS_FISCALES_DECLARADOS (id_empleado, periodo, monto_facturas, saldo_inicial_favor) VALUES
+  ('f0000000-0000-4000-8000-000000000021', '2026-04', 1200.00, 80.00),
+  ('f0000000-0000-4000-8000-000000000021', '2026-05', 1500.00, 0),
+  ('f0000000-0000-4000-8000-000000000022', '2026-05', 1000.00, 0),
+  ('f0000000-0000-4000-8000-000000000023', '2026-04', 4000.00, 0),
+  ('f0000000-0000-4000-8000-000000000023', '2026-05', 3000.00, 0),
+  ('f0000000-0000-4000-8000-000000000024', '2026-04', 800.00, 0),
+  ('f0000000-0000-4000-8000-000000000026', '2026-05', 500.00, 0)
+ON CONFLICT DO NOTHING;
+DO $$
+DECLARE
+  periodos text[] := ARRAY['2026-04', '2026-05'];
+  p text;
+  v_inicio date;
+  v_fin date;
+  v_planilla uuid;
+  v_pe uuid;
+  v_orden int;
+  v_descuentos numeric(12,2);
+  v_aportes numeric(12,2);
+  v_bono numeric(12,2);
+  v_total numeric(12,2);
+  emp record;
+  c record;
+BEGIN
+  FOREACH p IN ARRAY periodos LOOP
+    IF EXISTS (SELECT 1 FROM planillas WHERE periodo = p) THEN
+      CONTINUE;
+    END IF;
+    v_inicio := to_date(p || '-01', 'YYYY-MM-DD');
+    v_fin := (v_inicio + interval '1 month' - interval '1 day')::date;
+    INSERT INTO planillas (
+      periodo, fecha_inicio, fecha_fin, datos_hasta, estado, generada_por, generada_por_nombre, generada_en,
+      aprobada_por, aprobada_por_nombre, aprobada_en, estado_contabilidad, estado_pagos, referencia_contabilidad,
+      respondida_contabilidad_en, referencia_pagos, respondida_pagos_en, cerrada_en
+    ) VALUES (
+      p, v_inicio, v_fin, v_fin, 'CERRADA', 'f0000000-0000-4000-8000-000000000023', 'Andrea Salazar Vega',
+      (v_fin + 1)::timestamptz + interval '9 hours', 'f0000000-0000-4000-8000-000000000023', 'Andrea Salazar Vega',
+      (v_fin + 2)::timestamptz + interval '9 hours', 'CONFIRMADA', 'CONFIRMADA', 'ASI-' || replace(p, '-', ''),
+      (v_fin + 2)::timestamptz + interval '10 hours', 'ORD-' || replace(p, '-', ''),
+      (v_fin + 2)::timestamptz + interval '11 hours', (v_fin + 2)::timestamptz + interval '11 hours'
+    ) RETURNING id_planilla INTO v_planilla;
+
+    FOR emp IN
+      SELECT * FROM (VALUES
+        ('f0000000-0000-4000-8000-000000000021'::uuid, 'Marcela Quiroga Peña', '7102877', 'Jefe de Atención al Cliente', 'Atención al cliente', 'Sopocachi', 8500.00),
+        ('f0000000-0000-4000-8000-000000000022'::uuid, 'Jorge Mamani Condori', '7103014', 'Jefe de Atención al Cliente', 'Atención al cliente', 'Miraflores', 8500.00),
+        ('f0000000-0000-4000-8000-000000000023'::uuid, 'Andrea Salazar Vega', '7103151', 'Jefe de Recursos Humanos', 'Recursos Humanos', 'Sopocachi', 9500.00),
+        ('f0000000-0000-4000-8000-000000000024'::uuid, 'Rosa Mendoza Ticona', '7103288', 'Supervisor de Cajas', 'Atención al cliente', 'Sopocachi', 5800.00),
+        ('f0000000-0000-4000-8000-000000000025'::uuid, 'Luis Vargas Apaza', '7103425', 'Supervisor de Cajas', 'Atención al cliente', 'Miraflores', 5800.00),
+        ('f0000000-0000-4000-8000-000000000026'::uuid, 'Sofía Condori Mamani', '7103562', 'Analista de Recursos Humanos', 'Recursos Humanos', 'Sopocachi', 5200.00),
+        ('f0000000-0000-4000-8000-000000000031'::uuid, 'Carlos Rojas Vargas', '7104247', 'Cajero', 'Atención al cliente', 'Sopocachi', 3200.00),
+        ('f0000000-0000-4000-8000-000000000032'::uuid, 'Lucía Flores Choque', '7104384', 'Cajero', 'Atención al cliente', 'Sopocachi', 3200.00),
+        ('f0000000-0000-4000-8000-000000000033'::uuid, 'Diego Quispe Mamani', '7104521', 'Cajero', 'Atención al cliente', 'Miraflores', 3200.00),
+        ('f0000000-0000-4000-8000-000000000034'::uuid, 'Paola Gutiérrez Limachi', '7104658', 'Asesor de Atención', 'Atención al cliente', 'Miraflores', 3400.00)
+      ) AS e (id_empleado, nombre, documento, cargo, area, sucursal, haber)
+    LOOP
+      INSERT INTO planilla_empleados (
+        id_planilla, id_empleado, nombre_empleado, numero_documento, cargo, area, sucursal, id_contrato, numero_contrato,
+        haber_mensual, contrato_desde, contrato_hasta, dias_contrato, dias_pagados
+      ) VALUES (
+        v_planilla, emp.id_empleado, emp.nombre, emp.documento, emp.cargo, emp.area, emp.sucursal,
+        overlay('f0000000-0000-4000-8000-000000000b00' placing right(emp.id_empleado::text, 2) from 35 for 2)::uuid,
+        'CT-2026-00' || right(emp.id_empleado::text, 2), emp.haber, '2026-01-01', '2026-12-31', 30, 30
+      ) RETURNING id_planilla_empleado INTO v_pe;
+
+      v_bono := CASE WHEN p = '2026-05' AND emp.id_empleado = 'f0000000-0000-4000-8000-000000000022' THEN 6500.00 ELSE 0 END;
+      v_total := emp.haber + v_bono;
+
+      INSERT INTO calculos_planilla (id_planilla_empleado, id_vigencia, orden, tipo, codigo, nombre, forma_calculo, base, cantidad, valor, resultado)
+      SELECT v_pe, vg.id_vigencia, 1, 'INGRESO', co.codigo, co.nombre, 'PORCENTAJE', emp.haber, 30, vg.valor, emp.haber
+      FROM conceptos_planilla co
+      JOIN vigencias_concepto vg ON vg.id_concepto = co.id_concepto
+        AND v_fin BETWEEN vg.vigente_desde AND COALESCE(vg.vigente_hasta, 'infinity'::date)
+      WHERE co.codigo = 'HABER-BASICO';
+
+      v_orden := 1;
+      IF v_bono > 0 THEN
+        v_orden := v_orden + 1;
+        INSERT INTO calculos_planilla (id_planilla_empleado, id_vigencia, orden, tipo, codigo, nombre, forma_calculo, base, cantidad, valor, resultado)
+        SELECT v_pe, NULL, v_orden, 'INGRESO', co.codigo, co.nombre, 'MONTO_FIJO', NULL, NULL, v_bono, v_bono
+        FROM conceptos_planilla co WHERE co.codigo = 'BONO-PRODUCTIVIDAD';
+      END IF;
+      FOR c IN
+        SELECT co.codigo, co.nombre, co.tipo, vg.id_vigencia, vg.valor
+        FROM conceptos_planilla co
+        JOIN vigencias_concepto vg ON vg.id_concepto = co.id_concepto
+          AND v_fin BETWEEN vg.vigente_desde AND COALESCE(vg.vigente_hasta, 'infinity'::date)
+        WHERE co.tipo IN ('DESCUENTO', 'APORTE') AND co.esta_activo AND co.codigo NOT LIKE 'ANS-%'
+        ORDER BY co.tipo, co.codigo
+      LOOP
+        v_orden := v_orden + 1;
+        INSERT INTO calculos_planilla (id_planilla_empleado, id_vigencia, orden, tipo, codigo, nombre, forma_calculo, base, cantidad, valor, resultado)
+        VALUES (v_pe, c.id_vigencia, v_orden, c.tipo, c.codigo, c.nombre, 'PORCENTAJE', v_total, NULL, c.valor, round(v_total * c.valor / 100, 2));
+      END LOOP;
+
+      FOR c IN
+        SELECT co.codigo, co.nombre, vg.id_vigencia, vg.valor, substr(co.codigo, 5)::numeric AS umbral
+        FROM conceptos_planilla co
+        JOIN vigencias_concepto vg ON vg.id_concepto = co.id_concepto
+          AND v_fin BETWEEN vg.vigente_desde AND COALESCE(vg.vigente_hasta, 'infinity'::date)
+        WHERE co.codigo LIKE 'ANS-%' AND co.esta_activo
+        ORDER BY co.codigo
+      LOOP
+        CONTINUE WHEN v_total <= c.umbral;
+        v_orden := v_orden + 1;
+        INSERT INTO calculos_planilla (id_planilla_empleado, id_vigencia, orden, tipo, codigo, nombre, forma_calculo, base, cantidad, valor, resultado)
+        VALUES (v_pe, c.id_vigencia, v_orden, 'DESCUENTO', c.codigo, c.nombre, 'PORCENTAJE', v_total - c.umbral, NULL, c.valor,
+                round((v_total - c.umbral) * c.valor / 100, 2));
+      END LOOP;
+
+      SELECT COALESCE(sum(resultado) FILTER (WHERE tipo = 'DESCUENTO'), 0), COALESCE(sum(resultado) FILTER (WHERE tipo = 'APORTE'), 0)
+        INTO v_descuentos, v_aportes
+      FROM calculos_planilla WHERE id_planilla_empleado = v_pe;
+      UPDATE planilla_empleados
+      SET total_ganado = v_total, total_descuentos = v_descuentos, liquido_pagable = v_total - v_descuentos, total_aportes = v_aportes
+      WHERE id_planilla_empleado = v_pe;
+    END LOOP;
+  END LOOP;
+END $$;
+COMMIT;
+
+-- Datos de ejemplo de finiquitos (RF-58, KAN-78):
+--   1. Listos para emitir el finiquito: Valeria Nina Quisbert (...0743) y Rodrigo Apaza Calle (...0744)
+--      con promedio indemnizable, beneficios sociales y saldos proporcionales al día entre sí, más un
+--      anticipo ACTIVO (...0b01) de Rodrigo por Bs 800,00 para demostrar el descuento y su saldo al pagarse.
+--   2. Finiquito PAGADO con cadena completa: Elena Paredes Gómez (...0741, FIN-2026-000001), integraciones
+--      CONFIRMADA, eventos SALIENTE y RESPUESTA_SIMULADA ENTREGADO, mensajes PROCESADO y proceso CERRADO
+--      (sin PDF guardado; se genera al descargarse por primera vez).
+--   3. Finiquito APROBADO con Contabilidad RECHAZADA: Luciano Morales Chávez (...0742, FIN-2026-000002),
+--      Pagos CONFIRMADA y Contabilidad rechazada por cuenta inexistente, listo para probar "Reenviar".
+--   4. Mensajes simulados en bandeja de entrada: un mensaje EN_DLQ sin id_finiquito (3 intentos fallidos)
+--      y un mensaje IGNORADO como respuesta tardía a un envío previo de Luciano.
+BEGIN;
+
+UPDATE PROCESOS_DESVINCULACION
+   SET estado = 'EN_CURSO', actualizado_en = CURRENT_TIMESTAMP
+ WHERE id_proceso IN (
+   'c0000000-0000-4000-8000-000000000742',
+   'c0000000-0000-4000-8000-000000000743',
+   'c0000000-0000-4000-8000-000000000744'
+ )
+   AND estado = 'INICIADO';
+
+UPDATE PROCESOS_DESVINCULACION
+   SET estado = 'CERRADO', actualizado_en = CURRENT_TIMESTAMP
+ WHERE id_proceso = 'c0000000-0000-4000-8000-000000000741'
+   AND estado <> 'CERRADO';
+
+INSERT INTO PRESTAMOS (
+  id_prestamo, id_empleado, tipo, monto, numero_cuotas, mes_inicio, motivo,
+  liquido_pagable_referencial, porcentaje_cuota, saldo_pendiente, estado,
+  registrado_por, creado_en, actualizado_en
+) VALUES (
+  'c0000000-0000-4000-8000-000000000b01',
+  'f0000000-0000-4000-8000-000000000743',
+  'ANTICIPO',
+  800.00,
+  1,
+  DATE '2026-11-01',
+  'Anticipo de sueldo para gastos médicos',
+  4219.01,
+  18.96,
+  800.00,
+  'ACTIVO',
+  'Andrea Salazar Vega',
+  TIMESTAMPTZ '2026-11-02T10:00:00-04:00',
+  TIMESTAMPTZ '2026-11-02T10:00:00-04:00'
+)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO CUOTAS_PRESTAMO (
+  id_cuota, id_prestamo, numero_cuota, periodo, monto, estado, pagada_en
+) VALUES (
+  'c0000000-0000-4000-8000-000000000b02',
+  'c0000000-0000-4000-8000-000000000b01',
+  1,
+  DATE '2026-11-01',
+  800.00,
+  'PENDIENTE',
+  NULL
+)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO PROMEDIOS_INDEMNIZABLES (
+  id_proceso, periodo_limite, meses_considerados, total_considerado, promedio,
+  observaciones, calculado_por, calculado_por_rol, calculado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000741', '2026-10', 3, 12925.00, 4308.33,
+    ARRAY['En 2026-10 se pagaron 15 de 30 días.'],
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-10-18T10:30:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000742', '2026-10', 3, 10958.33, 3652.78,
+    ARRAY['En 2026-10 se pagaron 20 de 30 días.'],
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-10-22T09:30:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000743', '2026-10', 3, 10050.00, 3350.00,
+    '{}'::text[],
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-05T09:30:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000744', '2026-11', 3, 14083.33, 4694.44,
+    ARRAY['No hay una planilla cerrada de 2026-11 (mes del retiro): si se cierra después, recalcule el promedio.'],
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-12T09:30:00-04:00'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO DETALLE_PROMEDIO_INDEMNIZABLE (
+  id_proceso, periodo, id_planilla, id_planilla_empleado, dias_pagados, haber_mensual, total_ganado
+) VALUES
+  ('c0000000-0000-4000-8000-000000000741', '2026-08', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-08'), 'c0000000-0000-4000-8000-000000000772', 30, 4500.00, 5275.00),
+  ('c0000000-0000-4000-8000-000000000741', '2026-09', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'c0000000-0000-4000-8000-000000000773', 30, 4500.00, 5200.00),
+  ('c0000000-0000-4000-8000-000000000741', '2026-10', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'c0000000-0000-4000-8000-000000000774', 15, 4500.00, 2450.00),
+  ('c0000000-0000-4000-8000-000000000742', '2026-08', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-08'), 'c0000000-0000-4000-8000-000000000776', 30, 3800.00, 4208.33),
+  ('c0000000-0000-4000-8000-000000000742', '2026-09', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'c0000000-0000-4000-8000-000000000777', 30, 3800.00, 4050.00),
+  ('c0000000-0000-4000-8000-000000000742', '2026-10', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'c0000000-0000-4000-8000-000000000778', 20, 3800.00, 2700.00),
+  ('c0000000-0000-4000-8000-000000000743', '2026-08', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-08'), 'c0000000-0000-4000-8000-000000000780', 30, 3200.00, 3320.00),
+  ('c0000000-0000-4000-8000-000000000743', '2026-09', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'c0000000-0000-4000-8000-000000000781', 30, 3200.00, 3200.00),
+  ('c0000000-0000-4000-8000-000000000743', '2026-10', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'c0000000-0000-4000-8000-000000000782', 30, 3200.00, 3530.00),
+  ('c0000000-0000-4000-8000-000000000744', '2026-08', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-08'), 'c0000000-0000-4000-8000-000000000784', 30, 4000.00, 4600.00),
+  ('c0000000-0000-4000-8000-000000000744', '2026-09', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-09'), 'c0000000-0000-4000-8000-000000000785', 30, 4400.00, 4650.00),
+  ('c0000000-0000-4000-8000-000000000744', '2026-10', (SELECT id_planilla FROM PLANILLAS WHERE periodo = '2026-10'), 'c0000000-0000-4000-8000-000000000786', 30, 4400.00, 4833.33)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO BENEFICIOS_SOCIALES (
+  id_proceso, promedio_base, fecha_ingreso, fecha_retiro, dias_servicio,
+  anios_servicio, meses_servicio, dias_fraccion,
+  corresponde_indemnizacion, motivo_indemnizacion, monto_indemnizacion,
+  corresponde_desahucio, motivo_desahucio, monto_desahucio, total,
+  calculado_por, calculado_por_rol, calculado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000741', 4308.33, DATE '2019-03-01', DATE '2026-10-15', 2786,
+    7, 7, 15,
+    FALSE, 'Despido por causa justificada: no corresponde indemnización (LGT, art. 16).', 0.00,
+    FALSE, 'Despido por causa justificada: no corresponde desahucio (LGT, art. 16).', 0.00, 0.00,
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-10-18T10:35:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000742', 3652.78, DATE '2022-05-01', DATE '2026-10-20', 1634,
+    4, 5, 20,
+    TRUE, 'Renuncia voluntaria con más de 90 días de antigüedad (DS 110, art. 1).', 16336.04,
+    FALSE, 'Renuncia voluntaria: no corresponde desahucio.', 0.00, 16336.04,
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-10-22T09:35:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000743', 3350.00, DATE '2024-02-01', DATE '2026-10-31', 1004,
+    2, 9, 0,
+    TRUE, 'Conclusión de contrato con más de 90 días de antigüedad (DS 110, art. 1).', 9212.50,
+    FALSE, 'Conclusión de contrato: no corresponde desahucio.', 0.00, 9212.50,
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-05T09:35:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000744', 4694.44, DATE '2021-08-01', DATE '2026-11-10', 1928,
+    5, 3, 10,
+    TRUE, 'Desahucio con más de 90 días de antigüedad (DS 110, art. 1).', 24776.21,
+    TRUE, 'Desahucio sin preaviso de 90 días (LGT, art. 12).', 14083.32, 38859.53,
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-12T09:35:00-04:00'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO DETALLE_BENEFICIOS_SOCIALES (
+  id_proceso, orden, codigo_concepto, descripcion, unidad, cantidad, divisor, monto
+) VALUES
+  ('c0000000-0000-4000-8000-000000000742', 1, 'INDEMNIZACION', 'Años de servicio', 'ANIO', 4, 1, 14611.12),
+  ('c0000000-0000-4000-8000-000000000742', 2, 'INDEMNIZACION', 'Meses de servicio (duodécimas)', 'MES', 5, 12, 1521.99),
+  ('c0000000-0000-4000-8000-000000000742', 3, 'INDEMNIZACION', 'Días de servicio', 'DIA', 20, 360, 202.93),
+  ('c0000000-0000-4000-8000-000000000743', 1, 'INDEMNIZACION', 'Años de servicio', 'ANIO', 2, 1, 6700.00),
+  ('c0000000-0000-4000-8000-000000000743', 2, 'INDEMNIZACION', 'Meses de servicio (duodécimas)', 'MES', 9, 12, 2512.50),
+  ('c0000000-0000-4000-8000-000000000744', 1, 'INDEMNIZACION', 'Años de servicio', 'ANIO', 5, 1, 23472.20),
+  ('c0000000-0000-4000-8000-000000000744', 2, 'INDEMNIZACION', 'Meses de servicio (duodécimas)', 'MES', 3, 12, 1173.61),
+  ('c0000000-0000-4000-8000-000000000744', 3, 'INDEMNIZACION', 'Días de servicio', 'DIA', 10, 360, 130.40),
+  ('c0000000-0000-4000-8000-000000000744', 4, 'DESAHUCIO', 'Desahucio (tres sueldos promedio)', 'SUELDO', 3, 1, 14083.32)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO SALDOS_PROPORCIONALES (
+  id_proceso, promedio, salario_diario, gestion_aguinaldo, aguinaldo_desde, aguinaldo_hasta,
+  aguinaldo_meses, aguinaldo_dias, monto_aguinaldo, anios_servicio, dias_acumulados,
+  dias_gozados, dias_pendientes, monto_vacaciones_pendientes, anio_en_curso_desde,
+  anio_en_curso_meses, anio_en_curso_dias, dias_escala, dias_duodecima,
+  monto_duodecima_vacaciones, total, observaciones, calculado_por, calculado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000741', 4308.33, 143.61, 2026, DATE '2025-12-01', DATE '2026-10-15',
+    10, 15, 3769.79, 7, 115, 0, 115, 16515.27, DATE '2026-03-01',
+    7, 15, 20, 12.50, 1795.14, 22080.20, '{}'::text[],
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-10-18T10:40:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000742', 3652.78, 121.76, 2026, DATE '2025-12-01', DATE '2026-10-20',
+    10, 20, 3246.92, 4, 60, 0, 60, 7305.56, DATE '2026-05-01',
+    5, 20, 15, 7.08, 862.46, 11414.94, '{}'::text[],
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-10-22T09:40:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000743', 3350.00, 111.67, 2026, DATE '2025-12-01', DATE '2026-10-31',
+    11, 0, 3070.83, 2, 30, 0, 30, 3350.00, DATE '2026-02-01',
+    9, 0, 15, 11.25, 1256.25, 7677.08, '{}'::text[],
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-11-05T09:40:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000744', 4694.44, 156.48, 2026, DATE '2025-12-01', DATE '2026-11-10',
+    11, 10, 4433.64, 5, 75, 0, 75, 11736.10, DATE '2026-08-01',
+    3, 10, 20, 5.56, 869.34, 17039.08, '{}'::text[],
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-11-12T09:40:00-04:00'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO FINIQUITOS (
+  id_finiquito, id_proceso, numero_documento, estado, fecha_retiro, codigo_causal,
+  promedio_base, anios_servicio, meses_servicio, dias_fraccion,
+  total_ingresos, total_descuentos, liquido_pagable,
+  estado_pagos, referencia_pagos, motivo_pagos, respondida_pagos_en,
+  estado_contabilidad, referencia_contabilidad, motivo_contabilidad, respondida_contabilidad_en,
+  generado_por, generado_en, aprobado_por, aprobado_por_rol, aprobado_en, pagado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000b11',
+    'c0000000-0000-4000-8000-000000000741',
+    'FIN-2026-000001',
+    'PAGADO',
+    DATE '2026-10-15',
+    'DESPIDO_LEGAL',
+    4308.33, 7, 7, 15,
+    22080.20, 0.00, 22080.20,
+    'CONFIRMADA', 'OP-FIN-2026-000001', NULL, TIMESTAMPTZ '2026-10-18T11:00:10-04:00',
+    'CONFIRMADA', 'AS-FIN-2026-000001', NULL, TIMESTAMPTZ '2026-10-18T11:00:15-04:00',
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-10-18T10:50:00-04:00',
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-10-18T11:00:00-04:00',
+    TIMESTAMPTZ '2026-10-18T11:00:15-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b51',
+    'c0000000-0000-4000-8000-000000000742',
+    'FIN-2026-000002',
+    'APROBADO',
+    DATE '2026-10-20',
+    'RENUNCIA',
+    3652.78, 4, 5, 20,
+    27750.98, 0.00, 27750.98,
+    'CONFIRMADA', 'OP-FIN-2026-000002', NULL, TIMESTAMPTZ '2026-10-22T10:00:10-04:00',
+    'RECHAZADA', NULL, 'La cuenta 2.1.5.03 no existe en el plan de cuentas', TIMESTAMPTZ '2026-10-22T10:05:12-04:00',
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-10-22T09:50:00-04:00',
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-10-22T10:00:00-04:00',
+    NULL
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO DETALLE_FINIQUITO (
+  id_finiquito, orden, tipo, codigo, concepto, detalle, monto, id_prestamo, saldo_prestamo
+) VALUES
+  ('c0000000-0000-4000-8000-000000000b11', 1, 'INGRESO', 'AGUINALDO_DUODECIMAS', 'Aguinaldo (duodécimas)', 'Gestión 2026: 10 meses y 15 días', 3769.79, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000b11', 2, 'INGRESO', 'VACACIONES_PENDIENTES', 'Vacaciones no gozadas', '115 días pendientes', 16515.27, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000b11', 3, 'INGRESO', 'VACACIONES_DUODECIMAS', 'Vacaciones (duodécimas del año en curso)', '7 meses y 15 días', 1795.14, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000b51', 1, 'INGRESO', 'INDEMNIZACION', 'Indemnización por tiempo de servicio', '4 años, 5 meses y 20 días', 16336.04, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000b51', 2, 'INGRESO', 'AGUINALDO_DUODECIMAS', 'Aguinaldo (duodécimas)', 'Gestión 2026: 10 meses y 20 días', 3246.92, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000b51', 3, 'INGRESO', 'VACACIONES_PENDIENTES', 'Vacaciones no gozadas', '60 días pendientes', 7305.56, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000b51', 4, 'INGRESO', 'VACACIONES_DUODECIMAS', 'Vacaciones (duodécimas del año en curso)', '5 meses y 20 días', 862.46, NULL, NULL)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO EVENTOS_FINIQUITO (
+  id_evento, id_mensaje, id_finiquito, sentido, destino, tipo_evento, topico, carga,
+  estado, intentos, ultimo_error, proximo_intento_en, id_pubsub, entregado_en, creado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000b21',
+    'c0000000-0000-4000-8000-000000000b31',
+    'c0000000-0000-4000-8000-000000000b11',
+    'SALIENTE', 'PAGOS', 'FINIQUITO_APROBADO_ORDEN_PAGO', 'ucb-sis323-sub-f',
+    '{
+      "encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b31","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"A","modulo":"Pagos y Facturación"},"tipo":"FINIQUITO_APROBADO_ORDEN_PAGO","fecha":"2026-10-18T15:00:00.000Z","version_esquema":1},
+      "datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b11","numero_documento":"FIN-2026-000001","id_proceso":"c0000000-0000-4000-8000-000000000741","prioridad":"URGENTE","moneda":"BOB","colaborador":{"id_empleado":"f0000000-0000-4000-8000-000000000037","nombre_completo":"Elena Paredes Gómez"},"fecha_retiro":"2026-10-15","causal":{"codigo":"DESPIDO_LEGAL","nombre":"Despido legal (causa justificada)"},"conceptos":[{"codigo":"AGUINALDO_DUODECIMAS","concepto":"Aguinaldo (duodécimas)","monto":3769.79},{"codigo":"VACACIONES_PENDIENTES","concepto":"Vacaciones no gozadas","monto":16515.27},{"codigo":"VACACIONES_DUODECIMAS","concepto":"Vacaciones (duodécimas del año en curso)","monto":1795.14}],"descuentos":[],"total_ingresos":22080.2,"total_descuentos":0,"liquido_pagable":22080.2,"aprobado":{"por":{"id_empleado":"f0000000-0000-4000-8000-000000000023","nombre_completo":"Andrea Salazar Vega"},"en":"2026-10-18T15:00:00.000Z"}}
+    }'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:00:01-04:00', 'seed-elena-pagos-saliente',
+    TIMESTAMPTZ '2026-10-18T11:00:02-04:00', TIMESTAMPTZ '2026-10-18T11:00:01-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b22',
+    'c0000000-0000-4000-8000-000000000b32',
+    'c0000000-0000-4000-8000-000000000b11',
+    'SALIENTE', 'CONTABILIDAD', 'FINIQUITO_APROBADO_ASIENTO', 'ucb-sis323-sub-f',
+    '{
+      "encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b32","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"D","modulo":"Contabilidad"},"tipo":"FINIQUITO_APROBADO_ASIENTO","fecha":"2026-10-18T15:00:00.000Z","version_esquema":1},
+      "datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b11","numero_documento":"FIN-2026-000001","id_proceso":"c0000000-0000-4000-8000-000000000741","colaborador":{"id_empleado":"f0000000-0000-4000-8000-000000000037","nombre_completo":"Elena Paredes Gómez"},"fecha":"2026-10-15","glosa":"Liquidación final de Elena Paredes Gómez según finiquito FIN-2026-000001","asiento":{"renglones":[{"cuenta":{"codigo":"2.1.5.02","nombre":"Provisión para aguinaldos"},"debe":3769.79,"haber":0,"concepto":"Desafectación de provisión para aguinaldos"},{"cuenta":{"codigo":"2.1.5.03","nombre":"Provisión para vacaciones"},"debe":18310.41,"haber":0,"concepto":"Desafectación de provisión para vacaciones"},{"cuenta":{"codigo":"2.1.2.02","nombre":"Finiquitos por pagar"},"debe":0,"haber":22080.2,"concepto":"Finiquitos por pagar"}],"total_debe":22080.2,"total_haber":22080.2}}
+    }'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:00:01-04:00', 'seed-elena-contabilidad-saliente',
+    TIMESTAMPTZ '2026-10-18T11:00:02-04:00', TIMESTAMPTZ '2026-10-18T11:00:01-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b23',
+    'c0000000-0000-4000-8000-000000000b33',
+    'c0000000-0000-4000-8000-000000000b11',
+    'RESPUESTA_SIMULADA', 'PAGOS', 'CONFIRMACION_ORDEN_PAGO_FINIQUITO', 'ucb-sis323-sub-f',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b33","origen":{"grupo":"A","modulo":"Pagos y Facturación"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ORDEN_PAGO_FINIQUITO","fecha":"2026-10-18T15:00:05.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b11","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b31","resultado":"CONFIRMADA","referencia":"OP-FIN-2026-000001","motivo":null}}'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:00:05-04:00', 'seed-elena-pagos-respuesta',
+    TIMESTAMPTZ '2026-10-18T11:00:08-04:00', TIMESTAMPTZ '2026-10-18T11:00:05-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b24',
+    'c0000000-0000-4000-8000-000000000b34',
+    'c0000000-0000-4000-8000-000000000b11',
+    'RESPUESTA_SIMULADA', 'CONTABILIDAD', 'CONFIRMACION_ASIENTO_FINIQUITO', 'ucb-sis323-sub-f',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b34","origen":{"grupo":"D","modulo":"Contabilidad"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ASIENTO_FINIQUITO","fecha":"2026-10-18T15:00:09.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b11","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b32","resultado":"CONFIRMADA","referencia":"AS-FIN-2026-000001","motivo":null}}'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:00:09-04:00', 'seed-elena-contabilidad-respuesta',
+    TIMESTAMPTZ '2026-10-18T11:00:12-04:00', TIMESTAMPTZ '2026-10-18T11:00:09-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b61',
+    'c0000000-0000-4000-8000-000000000b71',
+    'c0000000-0000-4000-8000-000000000b51',
+    'SALIENTE', 'PAGOS', 'FINIQUITO_APROBADO_ORDEN_PAGO', 'ucb-sis323-sub-f',
+    '{
+      "encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b71","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"A","modulo":"Pagos y Facturación"},"tipo":"FINIQUITO_APROBADO_ORDEN_PAGO","fecha":"2026-10-22T14:00:00.000Z","version_esquema":1},
+      "datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","numero_documento":"FIN-2026-000002","id_proceso":"c0000000-0000-4000-8000-000000000742","prioridad":"URGENTE","moneda":"BOB","colaborador":{"id_empleado":"f0000000-0000-4000-8000-000000000741","nombre_completo":"Luciano Morales Chávez"},"fecha_retiro":"2026-10-20","causal":{"codigo":"RENUNCIA","nombre":"Renuncia voluntaria"},"conceptos":[{"codigo":"INDEMNIZACION","concepto":"Indemnización por tiempo de servicio","monto":16336.04},{"codigo":"AGUINALDO_DUODECIMAS","concepto":"Aguinaldo (duodécimas)","monto":3246.92},{"codigo":"VACACIONES_PENDIENTES","concepto":"Vacaciones no gozadas","monto":7305.56},{"codigo":"VACACIONES_DUODECIMAS","concepto":"Vacaciones (duodécimas del año en curso)","monto":862.46}],"descuentos":[],"total_ingresos":27750.98,"total_descuentos":0,"liquido_pagable":27750.98,"aprobado":{"por":{"id_empleado":"f0000000-0000-4000-8000-000000000023","nombre_completo":"Andrea Salazar Vega"},"en":"2026-10-22T14:00:00.000Z"}}
+    }'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:00:01-04:00', 'seed-luciano-pagos-saliente',
+    TIMESTAMPTZ '2026-10-22T10:00:02-04:00', TIMESTAMPTZ '2026-10-22T10:00:01-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b62',
+    'c0000000-0000-4000-8000-000000000b72',
+    'c0000000-0000-4000-8000-000000000b51',
+    'SALIENTE', 'CONTABILIDAD', 'FINIQUITO_APROBADO_ASIENTO', 'ucb-sis323-sub-f',
+    '{
+      "encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b72","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"D","modulo":"Contabilidad"},"tipo":"FINIQUITO_APROBADO_ASIENTO","fecha":"2026-10-22T14:00:00.000Z","version_esquema":1},
+      "datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","numero_documento":"FIN-2026-000002","id_proceso":"c0000000-0000-4000-8000-000000000742","colaborador":{"id_empleado":"f0000000-0000-4000-8000-000000000741","nombre_completo":"Luciano Morales Chávez"},"fecha":"2026-10-20","glosa":"Liquidación final de Luciano Morales Chávez según finiquito FIN-2026-000002","asiento":{"renglones":[{"cuenta":{"codigo":"2.1.5.01","nombre":"Previsión para indemnizaciones"},"debe":16336.04,"haber":0,"concepto":"Desafectación de previsión para indemnizaciones y desahucio"},{"cuenta":{"codigo":"2.1.5.02","nombre":"Provisión para aguinaldos"},"debe":3246.92,"haber":0,"concepto":"Desafectación de provisión para aguinaldos"},{"cuenta":{"codigo":"2.1.5.03","nombre":"Provisión para vacaciones"},"debe":8168.02,"haber":0,"concepto":"Desafectación de provisión para vacaciones"},{"cuenta":{"codigo":"2.1.2.02","nombre":"Finiquitos por pagar"},"debe":0,"haber":27750.98,"concepto":"Finiquitos por pagar"}],"total_debe":27750.98,"total_haber":27750.98}}
+    }'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:00:01-04:00', 'seed-luciano-contabilidad-saliente-1',
+    TIMESTAMPTZ '2026-10-22T10:00:02-04:00', TIMESTAMPTZ '2026-10-22T10:00:01-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b63',
+    'c0000000-0000-4000-8000-000000000b73',
+    'c0000000-0000-4000-8000-000000000b51',
+    'RESPUESTA_SIMULADA', 'PAGOS', 'CONFIRMACION_ORDEN_PAGO_FINIQUITO', 'ucb-sis323-sub-f',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b73","origen":{"grupo":"A","modulo":"Pagos y Facturación"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ORDEN_PAGO_FINIQUITO","fecha":"2026-10-22T14:00:05.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b71","resultado":"CONFIRMADA","referencia":"OP-FIN-2026-000002","motivo":null}}'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:00:05-04:00', 'seed-luciano-pagos-respuesta',
+    TIMESTAMPTZ '2026-10-22T10:00:08-04:00', TIMESTAMPTZ '2026-10-22T10:00:05-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b64',
+    'c0000000-0000-4000-8000-000000000b74',
+    'c0000000-0000-4000-8000-000000000b51',
+    'SALIENTE', 'CONTABILIDAD', 'FINIQUITO_APROBADO_ASIENTO', 'ucb-sis323-sub-f',
+    '{
+      "encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b74","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"D","modulo":"Contabilidad"},"tipo":"FINIQUITO_APROBADO_ASIENTO","fecha":"2026-10-22T14:04:00.000Z","version_esquema":1},
+      "datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","numero_documento":"FIN-2026-000002","id_proceso":"c0000000-0000-4000-8000-000000000742","colaborador":{"id_empleado":"f0000000-0000-4000-8000-000000000741","nombre_completo":"Luciano Morales Chávez"},"fecha":"2026-10-20","glosa":"Liquidación final de Luciano Morales Chávez según finiquito FIN-2026-000002","asiento":{"renglones":[{"cuenta":{"codigo":"2.1.5.01","nombre":"Previsión para indemnizaciones"},"debe":16336.04,"haber":0,"concepto":"Desafectación de previsión para indemnizaciones y desahucio"},{"cuenta":{"codigo":"2.1.5.02","nombre":"Provisión para aguinaldos"},"debe":3246.92,"haber":0,"concepto":"Desafectación de provisión para aguinaldos"},{"cuenta":{"codigo":"2.1.5.03","nombre":"Provisión para vacaciones"},"debe":8168.02,"haber":0,"concepto":"Desafectación de provisión para vacaciones"},{"cuenta":{"codigo":"2.1.2.02","nombre":"Finiquitos por pagar"},"debe":0,"haber":27750.98,"concepto":"Finiquitos por pagar"}],"total_debe":27750.98,"total_haber":27750.98}}
+    }'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:04:00-04:00', 'seed-luciano-contabilidad-saliente-2',
+    TIMESTAMPTZ '2026-10-22T10:04:01-04:00', TIMESTAMPTZ '2026-10-22T10:04:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b65',
+    'c0000000-0000-4000-8000-000000000b75',
+    'c0000000-0000-4000-8000-000000000b51',
+    'RESPUESTA_SIMULADA', 'CONTABILIDAD', 'CONFIRMACION_ASIENTO_FINIQUITO', 'ucb-sis323-sub-f',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b75","origen":{"grupo":"D","modulo":"Contabilidad"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ASIENTO_FINIQUITO","fecha":"2026-10-22T14:05:08.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b74","resultado":"RECHAZADA","referencia":null,"motivo":"La cuenta 2.1.5.03 no existe en el plan de cuentas"}}'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:05:08-04:00', 'seed-luciano-contabilidad-rechazo',
+    TIMESTAMPTZ '2026-10-22T10:05:10-04:00', TIMESTAMPTZ '2026-10-22T10:05:08-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b66',
+    'c0000000-0000-4000-8000-000000000b76',
+    'c0000000-0000-4000-8000-000000000b51',
+    'RESPUESTA_SIMULADA', 'CONTABILIDAD', 'CONFIRMACION_ASIENTO_FINIQUITO', 'ucb-sis323-sub-f',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b76","origen":{"grupo":"D","modulo":"Contabilidad"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ASIENTO_FINIQUITO","fecha":"2026-10-22T14:05:25.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b72","resultado":"CONFIRMADA","referencia":"AS-FIN-2026-000002-ANT","motivo":null}}'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:05:25-04:00', 'seed-luciano-contabilidad-tardia',
+    TIMESTAMPTZ '2026-10-22T10:05:30-04:00', TIMESTAMPTZ '2026-10-22T10:05:25-04:00'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO MENSAJES_FINIQUITO_ENTRANTES (
+  id_entrante, id_mensaje, origen, tipo_evento, id_finiquito, destino, carga,
+  estado, intentos, ultimo_error, recibido_en, procesado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000b41',
+    'c0000000-0000-4000-8000-000000000b33',
+    'A', 'CONFIRMACION_ORDEN_PAGO_FINIQUITO', 'c0000000-0000-4000-8000-000000000b11', 'PAGOS',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b33","origen":{"grupo":"A","modulo":"Pagos y Facturación"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ORDEN_PAGO_FINIQUITO","fecha":"2026-10-18T15:00:05.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b11","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b31","resultado":"CONFIRMADA","referencia":"OP-FIN-2026-000001","motivo":null}}',
+    'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:00:09-04:00', TIMESTAMPTZ '2026-10-18T11:00:10-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b42',
+    'c0000000-0000-4000-8000-000000000b34',
+    'D', 'CONFIRMACION_ASIENTO_FINIQUITO', 'c0000000-0000-4000-8000-000000000b11', 'CONTABILIDAD',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b34","origen":{"grupo":"D","modulo":"Contabilidad"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ASIENTO_FINIQUITO","fecha":"2026-10-18T15:00:09.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b11","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b32","resultado":"CONFIRMADA","referencia":"AS-FIN-2026-000001","motivo":null}}',
+    'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:00:14-04:00', TIMESTAMPTZ '2026-10-18T11:00:15-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b81',
+    'c0000000-0000-4000-8000-000000000b73',
+    'A', 'CONFIRMACION_ORDEN_PAGO_FINIQUITO', 'c0000000-0000-4000-8000-000000000b51', 'PAGOS',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b73","origen":{"grupo":"A","modulo":"Pagos y Facturación"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ORDEN_PAGO_FINIQUITO","fecha":"2026-10-22T14:00:05.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b71","resultado":"CONFIRMADA","referencia":"OP-FIN-2026-000002","motivo":null}}',
+    'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:00:09-04:00', TIMESTAMPTZ '2026-10-22T10:00:10-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b82',
+    'c0000000-0000-4000-8000-000000000b75',
+    'D', 'CONFIRMACION_ASIENTO_FINIQUITO', 'c0000000-0000-4000-8000-000000000b51', 'CONTABILIDAD',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b75","origen":{"grupo":"D","modulo":"Contabilidad"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ASIENTO_FINIQUITO","fecha":"2026-10-22T14:05:08.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b74","resultado":"RECHAZADA","referencia":null,"motivo":"La cuenta 2.1.5.03 no existe en el plan de cuentas"}}',
+    'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-10-22T10:05:11-04:00', TIMESTAMPTZ '2026-10-22T10:05:12-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b83',
+    'c0000000-0000-4000-8000-000000000b76',
+    'D', 'CONFIRMACION_ASIENTO_FINIQUITO', 'c0000000-0000-4000-8000-000000000b51', 'CONTABILIDAD',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000b76","origen":{"grupo":"D","modulo":"Contabilidad"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ASIENTO_FINIQUITO","fecha":"2026-10-22T14:05:25.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000b51","id_mensaje_origen":"c0000000-0000-4000-8000-000000000b72","resultado":"CONFIRMADA","referencia":"AS-FIN-2026-000002-ANT","motivo":null}}',
+    'IGNORADO', 1, 'Respuesta a un envío anterior o desconocido.', TIMESTAMPTZ '2026-10-22T10:05:31-04:00', TIMESTAMPTZ '2026-10-22T10:05:32-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000b91',
+    'invalido-seed-dlq-0001',
+    NULL, NULL, NULL, NULL,
+    '{"encabezado":{"tipo":"MENSAJE_TRUNCO"}',
+    'EN_DLQ', 3, 'El mensaje no es un JSON válido.', TIMESTAMPTZ '2026-11-10T16:15:00-04:00', NULL
+  )
+ON CONFLICT DO NOTHING;
+
+SELECT setval(
+  'seq_numero_finiquito',
+  GREATEST((SELECT CASE WHEN is_called THEN last_value ELSE 1 END FROM seq_numero_finiquito), 2),
+  true
+);
+
+COMMIT;
+
+-- Datos de ejemplo para cierre definitivo de desvinculación y bloqueo de accesos (RF-59, KAN-79).
+-- Cargar en PowerShell siempre con UTF-8 para conservar tildes:
+--   Get-Content -Encoding UTF8 backend/CompensationService/db/seed.sql | docker exec -i rrhh-postgres psql -U adminRRHH -d CompensationDB -v ON_ERROR_STOP=1
+--   1. Patricia Limachi Rojas (c...747): finiquito PAGADO (FIN-2026-000901), proceso EN_CURSO y cuenta activa.
+--   2. Hugo Ticona Vargas (c...748): finiquito APROBADO (FIN-2026-000902) con Pagos CONFIRMADA y Contabilidad PENDIENTE.
+--   3. Daniela Cruz Huanca (c...749): proceso CERRADO con cierre CON_ALERTAS (CRM VENCIDA tras 3 reenvíos y 1 mensaje EN_DLQ).
+--   4. Elena Paredes Gómez (c...741): proceso CERRADO con cierre COMPLETADO (4 revocaciones CONFIRMADA).
+BEGIN;
+
+INSERT INTO PROCESOS_DESVINCULACION (
+  id_proceso, id_empleado, nombre_empleado, fecha_ingreso, codigo_causal,
+  fecha_retiro, corresponde_desahucio, observaciones, estado, registrado_por, registrado_por_rol
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000747',
+    'f0000000-0000-4000-8000-000000000746',
+    'Patricia Limachi Rojas',
+    DATE '2022-04-01',
+    'RENUNCIA',
+    DATE '2026-11-15',
+    FALSE,
+    'Carta de renuncia presentada; finiquito pagado pendiente de cierre definitivo.',
+    'EN_CURSO',
+    'f0000000-0000-4000-8000-000000000023',
+    'admin'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000748',
+    'f0000000-0000-4000-8000-000000000747',
+    'Hugo Ticona Vargas',
+    DATE '2021-06-01',
+    'CONCLUSION_CONTRATO',
+    DATE '2026-11-16',
+    FALSE,
+    'Conclusión de contrato con finiquito aprobado.',
+    'EN_CURSO',
+    'f0000000-0000-4000-8000-000000000023',
+    'admin'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000749',
+    'f0000000-0000-4000-8000-000000000748',
+    'Daniela Cruz Huanca',
+    DATE '2023-02-01',
+    'RENUNCIA',
+    DATE '2026-11-12',
+    FALSE,
+    'Proceso cerrado con alerta pendiente en CRM.',
+    'CERRADO',
+    'f0000000-0000-4000-8000-000000000023',
+    'admin'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO DOCUMENTOS_DESVINCULACION (
+  id_proceso, nombre_archivo, tipo_mime, tamano_bytes, contenido
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000747',
+    'respaldo-patricia-limachi.pdf',
+    'application/pdf',
+    octet_length(convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')),
+    convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000748',
+    'respaldo-hugo-ticona.pdf',
+    'application/pdf',
+    octet_length(convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')),
+    convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000749',
+    'respaldo-daniela-cruz.pdf',
+    'application/pdf',
+    octet_length(convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')),
+    convert_to(E'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'UTF8')
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO PROMEDIOS_INDEMNIZABLES (
+  id_proceso, periodo_limite, meses_considerados, total_considerado, promedio,
+  observaciones, calculado_por, calculado_por_rol, calculado_en
+) VALUES
+  ('c0000000-0000-4000-8000-000000000747', '2026-10', 3, 10350.00, 3450.00, '{}'::text[], 'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-16T09:00:00-04:00'),
+  ('c0000000-0000-4000-8000-000000000748', '2026-10', 3, 10800.00, 3600.00, '{}'::text[], 'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-16T10:00:00-04:00'),
+  ('c0000000-0000-4000-8000-000000000749', '2026-10', 3, 9000.00, 3000.00, '{}'::text[], 'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-13T09:00:00-04:00')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO BENEFICIOS_SOCIALES (
+  id_proceso, promedio_base, fecha_ingreso, fecha_retiro, dias_servicio,
+  anios_servicio, meses_servicio, dias_fraccion,
+  corresponde_indemnizacion, motivo_indemnizacion, monto_indemnizacion,
+  corresponde_desahucio, motivo_desahucio, monto_desahucio, total,
+  calculado_por, calculado_por_rol, calculado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000747', 3450.00, DATE '2022-04-01', DATE '2026-11-15', 1690,
+    4, 7, 15,
+    TRUE, 'Renuncia voluntaria con más de 90 días de antigüedad (DS 110, art. 1).', 15956.25,
+    FALSE, 'Renuncia voluntaria: no corresponde desahucio.', 0.00, 15956.25,
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-16T09:05:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000748', 3600.00, DATE '2021-06-01', DATE '2026-11-16', 1995,
+    5, 5, 16,
+    TRUE, 'Conclusión de contrato con más de 90 días de antigüedad (DS 110, art. 1).', 19660.00,
+    FALSE, 'Conclusión de contrato: no corresponde desahucio.', 0.00, 19660.00,
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-16T10:05:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000749', 3000.00, DATE '2023-02-01', DATE '2026-11-12', 1381,
+    3, 9, 12,
+    TRUE, 'Renuncia voluntaria con más de 90 días de antigüedad (DS 110, art. 1).', 11350.00,
+    FALSE, 'Renuncia voluntaria: no corresponde desahucio.', 0.00, 11350.00,
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-13T09:05:00-04:00'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO DETALLE_BENEFICIOS_SOCIALES (
+  id_proceso, orden, codigo_concepto, descripcion, unidad, cantidad, divisor, monto
+) VALUES
+  ('c0000000-0000-4000-8000-000000000747', 1, 'INDEMNIZACION', 'Años de servicio', 'ANIO', 4, 1, 13800.00),
+  ('c0000000-0000-4000-8000-000000000747', 2, 'INDEMNIZACION', 'Meses de servicio (duodécimas)', 'MES', 7, 12, 2012.50),
+  ('c0000000-0000-4000-8000-000000000747', 3, 'INDEMNIZACION', 'Días de servicio', 'DIA', 15, 360, 143.75),
+  ('c0000000-0000-4000-8000-000000000748', 1, 'INDEMNIZACION', 'Años de servicio', 'ANIO', 5, 1, 18000.00),
+  ('c0000000-0000-4000-8000-000000000748', 2, 'INDEMNIZACION', 'Meses de servicio (duodécimas)', 'MES', 5, 12, 1500.00),
+  ('c0000000-0000-4000-8000-000000000748', 3, 'INDEMNIZACION', 'Días de servicio', 'DIA', 16, 360, 160.00),
+  ('c0000000-0000-4000-8000-000000000749', 1, 'INDEMNIZACION', 'Años de servicio', 'ANIO', 3, 1, 9000.00),
+  ('c0000000-0000-4000-8000-000000000749', 2, 'INDEMNIZACION', 'Meses de servicio (duodécimas)', 'MES', 9, 12, 2250.00),
+  ('c0000000-0000-4000-8000-000000000749', 3, 'INDEMNIZACION', 'Días de servicio', 'DIA', 12, 360, 100.00)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO SALDOS_PROPORCIONALES (
+  id_proceso, promedio, salario_diario, gestion_aguinaldo, aguinaldo_desde, aguinaldo_hasta,
+  aguinaldo_meses, aguinaldo_dias, monto_aguinaldo, anios_servicio, dias_acumulados,
+  dias_gozados, dias_pendientes, monto_vacaciones_pendientes, anio_en_curso_desde,
+  anio_en_curso_meses, anio_en_curso_dias, dias_escala, dias_duodecima,
+  monto_duodecima_vacaciones, total, observaciones, calculado_por, calculado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000747', 3450.00, 115.00, 2026, DATE '2025-12-01', DATE '2026-11-15',
+    11, 15, 3306.25, 4, 60, 40, 20, 2300.00, DATE '2026-04-01',
+    7, 15, 15, 9.38, 1078.13, 6684.38, '{}'::text[],
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-11-16T09:10:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000748', 3600.00, 120.00, 2026, DATE '2025-12-01', DATE '2026-11-16',
+    11, 16, 3460.00, 5, 75, 60, 15, 1800.00, DATE '2026-06-01',
+    5, 16, 15, 6.83, 820.00, 6080.00, '{}'::text[],
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-11-16T10:10:00-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000749', 3000.00, 100.00, 2026, DATE '2025-12-01', DATE '2026-11-12',
+    11, 12, 2850.00, 3, 45, 30, 15, 1500.00, DATE '2026-02-01',
+    9, 12, 15, 11.63, 1162.50, 5512.50, '{}'::text[],
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-11-13T09:10:00-04:00'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO FINIQUITOS (
+  id_finiquito, id_proceso, numero_documento, estado, fecha_retiro, codigo_causal,
+  promedio_base, anios_servicio, meses_servicio, dias_fraccion,
+  total_ingresos, total_descuentos, liquido_pagable,
+  estado_pagos, referencia_pagos, motivo_pagos, respondida_pagos_en,
+  estado_contabilidad, referencia_contabilidad, motivo_contabilidad, respondida_contabilidad_en,
+  generado_por, generado_en, aprobado_por, aprobado_por_rol, aprobado_en, pagado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000c11',
+    'c0000000-0000-4000-8000-000000000747',
+    'FIN-2026-000901',
+    'PAGADO',
+    DATE '2026-11-15',
+    'RENUNCIA',
+    3450.00, 4, 7, 15,
+    22640.63, 0.00, 22640.63,
+    'CONFIRMADA', 'OP-FIN-2026-000901', NULL, TIMESTAMPTZ '2026-11-16T09:30:10-04:00',
+    'CONFIRMADA', 'AS-FIN-2026-000901', NULL, TIMESTAMPTZ '2026-11-16T09:30:15-04:00',
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-11-16T09:20:00-04:00',
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-16T09:30:00-04:00',
+    TIMESTAMPTZ '2026-11-16T09:30:15-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000c12',
+    'c0000000-0000-4000-8000-000000000748',
+    'FIN-2026-000902',
+    'APROBADO',
+    DATE '2026-11-16',
+    'CONCLUSION_CONTRATO',
+    3600.00, 5, 5, 16,
+    25740.00, 0.00, 25740.00,
+    'CONFIRMADA', 'OP-FIN-2026-000902', NULL, TIMESTAMPTZ '2026-11-16T10:30:10-04:00',
+    'PENDIENTE', NULL, NULL, NULL,
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-11-16T10:20:00-04:00',
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-16T10:30:00-04:00',
+    NULL
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000c13',
+    'c0000000-0000-4000-8000-000000000749',
+    'FIN-2026-000903',
+    'PAGADO',
+    DATE '2026-11-12',
+    'RENUNCIA',
+    3000.00, 3, 9, 12,
+    16862.50, 0.00, 16862.50,
+    'CONFIRMADA', 'OP-FIN-2026-000903', NULL, TIMESTAMPTZ '2026-11-13T10:00:10-04:00',
+    'CONFIRMADA', 'AS-FIN-2026-000903', NULL, TIMESTAMPTZ '2026-11-13T10:00:15-04:00',
+    'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-11-13T09:20:00-04:00',
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-13T10:00:00-04:00',
+    TIMESTAMPTZ '2026-11-13T10:00:15-04:00'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO DETALLE_FINIQUITO (
+  id_finiquito, orden, tipo, codigo, concepto, detalle, monto, id_prestamo, saldo_prestamo
+) VALUES
+  ('c0000000-0000-4000-8000-000000000c11', 1, 'INGRESO', 'INDEMNIZACION', 'Indemnización por tiempo de servicio', '4 años, 7 meses y 15 días', 15956.25, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000c11', 2, 'INGRESO', 'AGUINALDO_DUODECIMAS', 'Aguinaldo (duodécimas)', 'Gestión 2026: 11 meses y 15 días', 3306.25, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000c11', 3, 'INGRESO', 'VACACIONES_PENDIENTES', 'Vacaciones no gozadas', '20 días pendientes', 2300.00, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000c11', 4, 'INGRESO', 'VACACIONES_DUODECIMAS', 'Vacaciones (duodécimas del año en curso)', '7 meses y 15 días', 1078.13, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000c12', 1, 'INGRESO', 'INDEMNIZACION', 'Indemnización por tiempo de servicio', '5 años, 5 meses y 16 días', 19660.00, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000c12', 2, 'INGRESO', 'AGUINALDO_DUODECIMAS', 'Aguinaldo (duodécimas)', 'Gestión 2026: 11 meses y 16 días', 3460.00, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000c12', 3, 'INGRESO', 'VACACIONES_PENDIENTES', 'Vacaciones no gozadas', '15 días pendientes', 1800.00, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000c12', 4, 'INGRESO', 'VACACIONES_DUODECIMAS', 'Vacaciones (duodécimas del año en curso)', '5 meses y 16 días', 820.00, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000c13', 1, 'INGRESO', 'INDEMNIZACION', 'Indemnización por tiempo de servicio', '3 años, 9 meses y 12 días', 11350.00, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000c13', 2, 'INGRESO', 'AGUINALDO_DUODECIMAS', 'Aguinaldo (duodécimas)', 'Gestión 2026: 11 meses y 12 días', 2850.00, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000c13', 3, 'INGRESO', 'VACACIONES_PENDIENTES', 'Vacaciones no gozadas', '15 días pendientes', 1500.00, NULL, NULL),
+  ('c0000000-0000-4000-8000-000000000c13', 4, 'INGRESO', 'VACACIONES_DUODECIMAS', 'Vacaciones (duodécimas del año en curso)', '9 meses y 12 días', 1162.50, NULL, NULL)
+ON CONFLICT DO NOTHING;
+
+-- Eventos del finiquito de Hugo (Pagos confirmado, Contabilidad pendiente con envío entregado sin respuesta).
+INSERT INTO EVENTOS_FINIQUITO (
+  id_evento, id_mensaje, id_finiquito, sentido, destino, tipo_evento, topico, carga,
+  estado, intentos, ultimo_error, proximo_intento_en, id_pubsub, entregado_en, creado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000c81', 'c0000000-0000-4000-8000-000000000c91',
+    'c0000000-0000-4000-8000-000000000c12', 'SALIENTE', 'PAGOS', 'FINIQUITO_APROBADO_ORDEN_PAGO', 'ucb-sis323-sub-f',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000c91","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"A","modulo":"Pagos y Facturación"},"tipo":"FINIQUITO_APROBADO_ORDEN_PAGO","fecha":"2026-11-16T14:30:00.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000c12","numero_documento":"FIN-2026-000902","id_proceso":"c0000000-0000-4000-8000-000000000748","liquido_pagable":25740.0}}'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-11-16T10:30:01-04:00', 'seed-hugo-pagos-saliente',
+    TIMESTAMPTZ '2026-11-16T10:30:02-04:00', TIMESTAMPTZ '2026-11-16T10:30:01-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000c82', 'c0000000-0000-4000-8000-000000000c92',
+    'c0000000-0000-4000-8000-000000000c12', 'SALIENTE', 'CONTABILIDAD', 'FINIQUITO_APROBADO_ASIENTO', 'ucb-sis323-sub-f',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000c92","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"D","modulo":"Contabilidad"},"tipo":"FINIQUITO_APROBADO_ASIENTO","fecha":"2026-11-16T14:30:00.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000c12","numero_documento":"FIN-2026-000902","id_proceso":"c0000000-0000-4000-8000-000000000748"}}'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-11-16T10:30:01-04:00', 'seed-hugo-contabilidad-saliente',
+    TIMESTAMPTZ '2026-11-16T10:30:02-04:00', TIMESTAMPTZ '2026-11-16T10:30:01-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000c83', 'c0000000-0000-4000-8000-000000000c93',
+    'c0000000-0000-4000-8000-000000000c12', 'RESPUESTA_SIMULADA', 'PAGOS', 'CONFIRMACION_ORDEN_PAGO_FINIQUITO', 'ucb-sis323-sub-f',
+    '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000c93","origen":{"grupo":"A","modulo":"Pagos y Facturación"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ORDEN_PAGO_FINIQUITO","fecha":"2026-11-16T14:30:08.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000c12","id_mensaje_origen":"c0000000-0000-4000-8000-000000000c91","resultado":"CONFIRMADA","referencia":"OP-FIN-2026-000902","motivo":null}}'::jsonb,
+    'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-11-16T10:30:08-04:00', 'seed-hugo-pagos-respuesta',
+    TIMESTAMPTZ '2026-11-16T10:30:09-04:00', TIMESTAMPTZ '2026-11-16T10:30:08-04:00'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO MENSAJES_FINIQUITO_ENTRANTES (
+  id_entrante, id_mensaje, origen, tipo_evento, id_finiquito, destino, carga,
+  estado, intentos, ultimo_error, recibido_en, procesado_en
+) VALUES (
+  'c0000000-0000-4000-8000-000000000c84', 'c0000000-0000-4000-8000-000000000c93',
+  'A', 'CONFIRMACION_ORDEN_PAGO_FINIQUITO', 'c0000000-0000-4000-8000-000000000c12', 'PAGOS',
+  '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000c93","origen":{"grupo":"A","modulo":"Pagos y Facturación"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_ORDEN_PAGO_FINIQUITO","fecha":"2026-11-16T14:30:08.000Z","version_esquema":1},"datos":{"id_finiquito":"c0000000-0000-4000-8000-000000000c12","id_mensaje_origen":"c0000000-0000-4000-8000-000000000c91","resultado":"CONFIRMADA","referencia":"OP-FIN-2026-000902","motivo":null}}',
+  'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-11-16T10:30:09-04:00', TIMESTAMPTZ '2026-11-16T10:30:10-04:00'
+)
+ON CONFLICT DO NOTHING;
+
+-- Cierres definitivos de ejemplo: Elena (COMPLETADO) y Daniela (CON_ALERTAS).
+INSERT INTO CIERRES_DESVINCULACION (
+  id_cierre, id_proceso, id_finiquito, id_empleado, estado_finiquito_al_cerrar,
+  empleado_inactivado_en, cuenta_estado, cuenta_revocada_en, estado_revocaciones,
+  cerrado_por, cerrado_por_rol, cerrado_en, completado_en
+) VALUES
+  (
+    'c0000000-0000-4000-8000-000000000c20', 'c0000000-0000-4000-8000-000000000741', 'c0000000-0000-4000-8000-000000000b11',
+    'f0000000-0000-4000-8000-000000000037', 'PAGADO',
+    TIMESTAMPTZ '2026-10-18T11:10:00-04:00', 'REVOCADA', TIMESTAMPTZ '2026-10-18T11:10:00-04:00', 'COMPLETADO',
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-10-18T11:10:00-04:00', TIMESTAMPTZ '2026-10-18T11:10:20-04:00'
+  ),
+  (
+    'c0000000-0000-4000-8000-000000000c21', 'c0000000-0000-4000-8000-000000000749', 'c0000000-0000-4000-8000-000000000c13',
+    'f0000000-0000-4000-8000-000000000748', 'PAGADO',
+    TIMESTAMPTZ '2026-11-14T15:00:00-04:00', 'REVOCADA', TIMESTAMPTZ '2026-11-14T15:00:00-04:00', 'CON_ALERTAS',
+    'f0000000-0000-4000-8000-000000000023', 'admin', TIMESTAMPTZ '2026-11-14T15:00:00-04:00', NULL
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO REVOCACIONES_SISTEMA (
+  id_revocacion, id_cierre, destino, estado, plazo_vence_en, reenvios_por_plazo,
+  recursos_revocados, referencia, motivo, respondida_en, actualizado_en
+) VALUES
+  -- Elena (4 confirmadas)
+  ('c0000000-0000-4000-8000-000000000c31', 'c0000000-0000-4000-8000-000000000c20', 'VENTAS', 'CONFIRMADA', TIMESTAMPTZ '2026-10-18T11:10:45-04:00', 0,
+   '[{"tipo":"CREDENCIALES_POS","identificador":"pos.7105069"},{"tipo":"CAJAS_REGISTRADORAS","identificador":"CAJA-03"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7105069"}]'::jsonb,
+   'REV-E-C00000', NULL, TIMESTAMPTZ '2026-10-18T11:10:12-04:00', TIMESTAMPTZ '2026-10-18T11:10:12-04:00'),
+  ('c0000000-0000-4000-8000-000000000c32', 'c0000000-0000-4000-8000-000000000c20', 'INVENTARIOS', 'CONFIRMADA', TIMESTAMPTZ '2026-10-18T11:10:45-04:00', 0,
+   '[{"tipo":"CREDENCIALES_ALMACEN","identificador":"alm.7105069"},{"tipo":"TERMINALES_MOVILES","identificador":"TERM-17"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7105069"}]'::jsonb,
+   'REV-I-C00000', NULL, TIMESTAMPTZ '2026-10-18T11:10:15-04:00', TIMESTAMPTZ '2026-10-18T11:10:15-04:00'),
+  ('c0000000-0000-4000-8000-000000000c33', 'c0000000-0000-4000-8000-000000000c20', 'ENTREGAS', 'CONFIRMADA', TIMESTAMPTZ '2026-10-18T11:10:45-04:00', 0,
+   '[{"tipo":"CREDENCIALES_DESPACHO","identificador":"desp.7105069"},{"tipo":"TERMINALES_MOVILES","identificador":"TERM-17"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7105069"}]'::jsonb,
+   'REV-H-C00000', NULL, TIMESTAMPTZ '2026-10-18T11:10:18-04:00', TIMESTAMPTZ '2026-10-18T11:10:18-04:00'),
+  ('c0000000-0000-4000-8000-000000000c34', 'c0000000-0000-4000-8000-000000000c20', 'CRM', 'CONFIRMADA', TIMESTAMPTZ '2026-10-18T11:10:45-04:00', 0,
+   '[{"tipo":"CREDENCIALES_CRM","identificador":"crm.7105069"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7105069"}]'::jsonb,
+   'REV-B-C00000', NULL, TIMESTAMPTZ '2026-10-18T11:10:20-04:00', TIMESTAMPTZ '2026-10-18T11:10:20-04:00'),
+  -- Daniela (Ventas, Inventarios y Entregas confirmadas; CRM vencida tras 3 reenvíos)
+  ('c0000000-0000-4000-8000-000000000c35', 'c0000000-0000-4000-8000-000000000c21', 'VENTAS', 'CONFIRMADA', TIMESTAMPTZ '2026-11-14T15:00:45-04:00', 0,
+   '[{"tipo":"CREDENCIALES_POS","identificador":"pos.7108748"},{"tipo":"CAJAS_REGISTRADORAS","identificador":"CAJA-03"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7108748"}]'::jsonb,
+   'REV-E-C00000', NULL, TIMESTAMPTZ '2026-11-14T15:00:10-04:00', TIMESTAMPTZ '2026-11-14T15:00:10-04:00'),
+  ('c0000000-0000-4000-8000-000000000c36', 'c0000000-0000-4000-8000-000000000c21', 'INVENTARIOS', 'CONFIRMADA', TIMESTAMPTZ '2026-11-14T15:00:45-04:00', 0,
+   '[{"tipo":"CREDENCIALES_ALMACEN","identificador":"alm.7108748"},{"tipo":"TERMINALES_MOVILES","identificador":"TERM-17"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7108748"}]'::jsonb,
+   'REV-I-C00000', NULL, TIMESTAMPTZ '2026-11-14T15:00:12-04:00', TIMESTAMPTZ '2026-11-14T15:00:12-04:00'),
+  ('c0000000-0000-4000-8000-000000000c37', 'c0000000-0000-4000-8000-000000000c21', 'ENTREGAS', 'CONFIRMADA', TIMESTAMPTZ '2026-11-14T15:00:45-04:00', 0,
+   '[{"tipo":"CREDENCIALES_DESPACHO","identificador":"desp.7108748"},{"tipo":"TERMINALES_MOVILES","identificador":"TERM-17"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7108748"}]'::jsonb,
+   'REV-H-C00000', NULL, TIMESTAMPTZ '2026-11-14T15:00:14-04:00', TIMESTAMPTZ '2026-11-14T15:00:14-04:00'),
+  ('c0000000-0000-4000-8000-000000000c38', 'c0000000-0000-4000-8000-000000000c21', 'CRM', 'VENCIDA', TIMESTAMPTZ '2026-11-14T15:03:00-04:00', 3,
+   NULL, NULL, 'Sin confirmación tras 3 reenvíos.', NULL, TIMESTAMPTZ '2026-11-14T15:03:05-04:00')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO EVENTOS_CIERRE (
+  id_evento, id_mensaje, id_cierre, sentido, destino, tipo_evento, topico, carga,
+  estado, intentos, ultimo_error, proximo_intento_en, id_pubsub, entregado_en, creado_en
+) VALUES
+  -- Elena: 4 salientes + 4 respuestas
+  ('c0000000-0000-4000-8000-000000000d01', 'c0000000-0000-4000-8000-000000000e01', 'c0000000-0000-4000-8000-000000000c20', 'SALIENTE', 'VENTAS', 'EMPLEADO_DESVINCULADO', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e01","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"E","modulo":"Marketplace y Ventas / POS"},"tipo":"EMPLEADO_DESVINCULADO","fecha":"2026-10-18T15:10:00.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c20","empleado":{"id_empleado":"f0000000-0000-4000-8000-000000000037","codigo_empleado":"7105069","nombre_completo":"Elena Paredes Gómez","cargo":"Cajero","sucursal":"Sopocachi"},"fecha_retiro":"2026-10-15","causal":"DESPIDO_LEGAL","cerrado_en":"2026-10-18T15:10:00.000Z","accesos_a_revocar":["CREDENCIALES_POS","CAJAS_REGISTRADORAS","ROLES_OPERATIVOS"]}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:10:01-04:00', 'seed-cierre-elena-e-out', TIMESTAMPTZ '2026-10-18T11:10:02-04:00', TIMESTAMPTZ '2026-10-18T11:10:01-04:00'),
+  ('c0000000-0000-4000-8000-000000000d02', 'c0000000-0000-4000-8000-000000000e02', 'c0000000-0000-4000-8000-000000000c20', 'SALIENTE', 'INVENTARIOS', 'EMPLEADO_DESVINCULADO', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e02","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"I","modulo":"Gestión de Inventarios y Almacén"},"tipo":"EMPLEADO_DESVINCULADO","fecha":"2026-10-18T15:10:00.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c20","empleado":{"id_empleado":"f0000000-0000-4000-8000-000000000037","codigo_empleado":"7105069","nombre_completo":"Elena Paredes Gómez","cargo":"Cajero","sucursal":"Sopocachi"},"fecha_retiro":"2026-10-15","causal":"DESPIDO_LEGAL","cerrado_en":"2026-10-18T15:10:00.000Z","accesos_a_revocar":["CREDENCIALES_ALMACEN","TERMINALES_MOVILES","ROLES_OPERATIVOS"]}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:10:01-04:00', 'seed-cierre-elena-i-out', TIMESTAMPTZ '2026-10-18T11:10:02-04:00', TIMESTAMPTZ '2026-10-18T11:10:01-04:00'),
+  ('c0000000-0000-4000-8000-000000000d03', 'c0000000-0000-4000-8000-000000000e03', 'c0000000-0000-4000-8000-000000000c20', 'SALIENTE', 'ENTREGAS', 'EMPLEADO_DESVINCULADO', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e03","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"H","modulo":"Gestión de Entregas y Despachos"},"tipo":"EMPLEADO_DESVINCULADO","fecha":"2026-10-18T15:10:00.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c20","empleado":{"id_empleado":"f0000000-0000-4000-8000-000000000037","codigo_empleado":"7105069","nombre_completo":"Elena Paredes Gómez","cargo":"Cajero","sucursal":"Sopocachi"},"fecha_retiro":"2026-10-15","causal":"DESPIDO_LEGAL","cerrado_en":"2026-10-18T15:10:00.000Z","accesos_a_revocar":["CREDENCIALES_DESPACHO","TERMINALES_MOVILES","ROLES_OPERATIVOS"]}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:10:01-04:00', 'seed-cierre-elena-h-out', TIMESTAMPTZ '2026-10-18T11:10:02-04:00', TIMESTAMPTZ '2026-10-18T11:10:01-04:00'),
+  ('c0000000-0000-4000-8000-000000000d04', 'c0000000-0000-4000-8000-000000000e04', 'c0000000-0000-4000-8000-000000000c20', 'SALIENTE', 'CRM', 'EMPLEADO_DESVINCULADO', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e04","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"B","modulo":"CRM"},"tipo":"EMPLEADO_DESVINCULADO","fecha":"2026-10-18T15:10:00.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c20","empleado":{"id_empleado":"f0000000-0000-4000-8000-000000000037","codigo_empleado":"7105069","nombre_completo":"Elena Paredes Gómez","cargo":"Cajero","sucursal":"Sopocachi"},"fecha_retiro":"2026-10-15","causal":"DESPIDO_LEGAL","cerrado_en":"2026-10-18T15:10:00.000Z","accesos_a_revocar":["CREDENCIALES_CRM","ROLES_OPERATIVOS"]}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:10:01-04:00', 'seed-cierre-elena-b-out', TIMESTAMPTZ '2026-10-18T11:10:02-04:00', TIMESTAMPTZ '2026-10-18T11:10:01-04:00'),
+  ('c0000000-0000-4000-8000-000000000d05', 'c0000000-0000-4000-8000-000000000e05', 'c0000000-0000-4000-8000-000000000c20', 'RESPUESTA_SIMULADA', 'VENTAS', 'CONFIRMACION_REVOCACION_ACCESOS', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e05","origen":{"grupo":"E","modulo":"Marketplace y Ventas / POS"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-10-18T15:10:12.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c20","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e01","resultado":"CONFIRMADA","recursos_revocados":[{"tipo":"CREDENCIALES_POS","identificador":"pos.7105069"},{"tipo":"CAJAS_REGISTRADORAS","identificador":"CAJA-03"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7105069"}],"referencia":"REV-E-C00000","motivo":null}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:10:11-04:00', 'seed-cierre-elena-e-in', TIMESTAMPTZ '2026-10-18T11:10:12-04:00', TIMESTAMPTZ '2026-10-18T11:10:11-04:00'),
+  ('c0000000-0000-4000-8000-000000000d06', 'c0000000-0000-4000-8000-000000000e06', 'c0000000-0000-4000-8000-000000000c20', 'RESPUESTA_SIMULADA', 'INVENTARIOS', 'CONFIRMACION_REVOCACION_ACCESOS', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e06","origen":{"grupo":"I","modulo":"Gestión de Inventarios y Almacén"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-10-18T15:10:15.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c20","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e02","resultado":"CONFIRMADA","recursos_revocados":[{"tipo":"CREDENCIALES_ALMACEN","identificador":"alm.7105069"},{"tipo":"TERMINALES_MOVILES","identificador":"TERM-17"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7105069"}],"referencia":"REV-I-C00000","motivo":null}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:10:14-04:00', 'seed-cierre-elena-i-in', TIMESTAMPTZ '2026-10-18T11:10:15-04:00', TIMESTAMPTZ '2026-10-18T11:10:14-04:00'),
+  ('c0000000-0000-4000-8000-000000000d07', 'c0000000-0000-4000-8000-000000000e07', 'c0000000-0000-4000-8000-000000000c20', 'RESPUESTA_SIMULADA', 'ENTREGAS', 'CONFIRMACION_REVOCACION_ACCESOS', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e07","origen":{"grupo":"H","modulo":"Gestión de Entregas y Despachos"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-10-18T15:10:18.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c20","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e03","resultado":"CONFIRMADA","recursos_revocados":[{"tipo":"CREDENCIALES_DESPACHO","identificador":"desp.7105069"},{"tipo":"TERMINALES_MOVILES","identificador":"TERM-17"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7105069"}],"referencia":"REV-H-C00000","motivo":null}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:10:17-04:00', 'seed-cierre-elena-h-in', TIMESTAMPTZ '2026-10-18T11:10:18-04:00', TIMESTAMPTZ '2026-10-18T11:10:17-04:00'),
+  ('c0000000-0000-4000-8000-000000000d08', 'c0000000-0000-4000-8000-000000000e08', 'c0000000-0000-4000-8000-000000000c20', 'RESPUESTA_SIMULADA', 'CRM', 'CONFIRMACION_REVOCACION_ACCESOS', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e08","origen":{"grupo":"B","modulo":"CRM"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-10-18T15:10:20.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c20","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e04","resultado":"CONFIRMADA","recursos_revocados":[{"tipo":"CREDENCIALES_CRM","identificador":"crm.7105069"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7105069"}],"referencia":"REV-B-C00000","motivo":null}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:10:19-04:00', 'seed-cierre-elena-b-in', TIMESTAMPTZ '2026-10-18T11:10:20-04:00', TIMESTAMPTZ '2026-10-18T11:10:19-04:00'),
+  -- Daniela: 4 salientes + 3 respuestas (CRM vencida sin respuesta)
+  ('c0000000-0000-4000-8000-000000000d11', 'c0000000-0000-4000-8000-000000000e11', 'c0000000-0000-4000-8000-000000000c21', 'SALIENTE', 'VENTAS', 'EMPLEADO_DESVINCULADO', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e11","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"E","modulo":"Marketplace y Ventas / POS"},"tipo":"EMPLEADO_DESVINCULADO","fecha":"2026-11-14T19:00:00.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c21","empleado":{"id_empleado":"f0000000-0000-4000-8000-000000000748","codigo_empleado":"7108748","nombre_completo":"Daniela Cruz Huanca","cargo":"Asesor de Atención","sucursal":"Sopocachi"},"fecha_retiro":"2026-11-12","causal":"RENUNCIA","cerrado_en":"2026-11-14T19:00:00.000Z","accesos_a_revocar":["CREDENCIALES_POS","CAJAS_REGISTRADORAS","ROLES_OPERATIVOS"]}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-11-14T15:00:01-04:00', 'seed-cierre-daniela-e-out', TIMESTAMPTZ '2026-11-14T15:00:02-04:00', TIMESTAMPTZ '2026-11-14T15:00:01-04:00'),
+  ('c0000000-0000-4000-8000-000000000d12', 'c0000000-0000-4000-8000-000000000e12', 'c0000000-0000-4000-8000-000000000c21', 'SALIENTE', 'INVENTARIOS', 'EMPLEADO_DESVINCULADO', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e12","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"I","modulo":"Gestión de Inventarios y Almacén"},"tipo":"EMPLEADO_DESVINCULADO","fecha":"2026-11-14T19:00:00.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c21","empleado":{"id_empleado":"f0000000-0000-4000-8000-000000000748","codigo_empleado":"7108748","nombre_completo":"Daniela Cruz Huanca","cargo":"Asesor de Atención","sucursal":"Sopocachi"},"fecha_retiro":"2026-11-12","causal":"RENUNCIA","cerrado_en":"2026-11-14T19:00:00.000Z","accesos_a_revocar":["CREDENCIALES_ALMACEN","TERMINALES_MOVILES","ROLES_OPERATIVOS"]}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-11-14T15:00:01-04:00', 'seed-cierre-daniela-i-out', TIMESTAMPTZ '2026-11-14T15:00:02-04:00', TIMESTAMPTZ '2026-11-14T15:00:01-04:00'),
+  ('c0000000-0000-4000-8000-000000000d13', 'c0000000-0000-4000-8000-000000000e13', 'c0000000-0000-4000-8000-000000000c21', 'SALIENTE', 'ENTREGAS', 'EMPLEADO_DESVINCULADO', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e13","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"H","modulo":"Gestión de Entregas y Despachos"},"tipo":"EMPLEADO_DESVINCULADO","fecha":"2026-11-14T19:00:00.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c21","empleado":{"id_empleado":"f0000000-0000-4000-8000-000000000748","codigo_empleado":"7108748","nombre_completo":"Daniela Cruz Huanca","cargo":"Asesor de Atención","sucursal":"Sopocachi"},"fecha_retiro":"2026-11-12","causal":"RENUNCIA","cerrado_en":"2026-11-14T19:00:00.000Z","accesos_a_revocar":["CREDENCIALES_DESPACHO","TERMINALES_MOVILES","ROLES_OPERATIVOS"]}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-11-14T15:00:01-04:00', 'seed-cierre-daniela-h-out', TIMESTAMPTZ '2026-11-14T15:00:02-04:00', TIMESTAMPTZ '2026-11-14T15:00:01-04:00'),
+  ('c0000000-0000-4000-8000-000000000d14', 'c0000000-0000-4000-8000-000000000e14', 'c0000000-0000-4000-8000-000000000c21', 'SALIENTE', 'CRM', 'EMPLEADO_DESVINCULADO', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e14","origen":{"grupo":"F","modulo":"RRHH"},"destino":{"grupo":"B","modulo":"CRM"},"tipo":"EMPLEADO_DESVINCULADO","fecha":"2026-11-14T19:02:15.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c21","empleado":{"id_empleado":"f0000000-0000-4000-8000-000000000748","codigo_empleado":"7108748","nombre_completo":"Daniela Cruz Huanca","cargo":"Asesor de Atención","sucursal":"Sopocachi"},"fecha_retiro":"2026-11-12","causal":"RENUNCIA","cerrado_en":"2026-11-14T19:00:00.000Z","accesos_a_revocar":["CREDENCIALES_CRM","ROLES_OPERATIVOS"]}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-11-14T15:02:15-04:00', 'seed-cierre-daniela-b-out', TIMESTAMPTZ '2026-11-14T15:02:16-04:00', TIMESTAMPTZ '2026-11-14T15:02:15-04:00'),
+  ('c0000000-0000-4000-8000-000000000d15', 'c0000000-0000-4000-8000-000000000e15', 'c0000000-0000-4000-8000-000000000c21', 'RESPUESTA_SIMULADA', 'VENTAS', 'CONFIRMACION_REVOCACION_ACCESOS', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e15","origen":{"grupo":"E","modulo":"Marketplace y Ventas / POS"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-11-14T15:00:10-04:00","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c21","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e11","resultado":"CONFIRMADA","recursos_revocados":[{"tipo":"CREDENCIALES_POS","identificador":"pos.7108748"},{"tipo":"CAJAS_REGISTRADORAS","identificador":"CAJA-03"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7108748"}],"referencia":"REV-E-C00000","motivo":null}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-11-14T15:00:09-04:00', 'seed-cierre-daniela-e-in', TIMESTAMPTZ '2026-11-14T15:00:10-04:00', TIMESTAMPTZ '2026-11-14T15:00:09-04:00'),
+  ('c0000000-0000-4000-8000-000000000d16', 'c0000000-0000-4000-8000-000000000e16', 'c0000000-0000-4000-8000-000000000c21', 'RESPUESTA_SIMULADA', 'INVENTARIOS', 'CONFIRMACION_REVOCACION_ACCESOS', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e16","origen":{"grupo":"I","modulo":"Gestión de Inventarios y Almacén"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-11-14T15:00:12-04:00","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c21","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e12","resultado":"CONFIRMADA","recursos_revocados":[{"tipo":"CREDENCIALES_ALMACEN","identificador":"alm.7108748"},{"tipo":"TERMINALES_MOVILES","identificador":"TERM-17"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7108748"}],"referencia":"REV-I-C00000","motivo":null}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-11-14T15:00:11-04:00', 'seed-cierre-daniela-i-in', TIMESTAMPTZ '2026-11-14T15:00:12-04:00', TIMESTAMPTZ '2026-11-14T15:00:11-04:00'),
+  ('c0000000-0000-4000-8000-000000000d17', 'c0000000-0000-4000-8000-000000000e17', 'c0000000-0000-4000-8000-000000000c21', 'RESPUESTA_SIMULADA', 'ENTREGAS', 'CONFIRMACION_REVOCACION_ACCESOS', 'ucb-sis323-sub-f',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e17","origen":{"grupo":"H","modulo":"Gestión de Entregas y Despachos"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-11-14T15:00:14-04:00","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c21","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e13","resultado":"CONFIRMADA","recursos_revocados":[{"tipo":"CREDENCIALES_DESPACHO","identificador":"desp.7108748"},{"tipo":"TERMINALES_MOVILES","identificador":"TERM-17"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7108748"}],"referencia":"REV-H-C00000","motivo":null}}'::jsonb,
+   'ENTREGADO', 1, NULL, TIMESTAMPTZ '2026-11-14T15:00:13-04:00', 'seed-cierre-daniela-h-in', TIMESTAMPTZ '2026-11-14T15:00:14-04:00', TIMESTAMPTZ '2026-11-14T15:00:13-04:00')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO MENSAJES_CIERRE_ENTRANTES (
+  id_entrante, id_mensaje, origen, tipo_evento, id_cierre, destino, carga,
+  estado, intentos, ultimo_error, recibido_en, procesado_en
+) VALUES
+  -- Elena (4 procesados)
+  ('c0000000-0000-4000-8000-000000000f01', 'c0000000-0000-4000-8000-000000000e05', 'E', 'CONFIRMACION_REVOCACION_ACCESOS', 'c0000000-0000-4000-8000-000000000c20', 'VENTAS',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e05","origen":{"grupo":"E","modulo":"Marketplace y Ventas / POS"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-10-18T15:10:12.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c20","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e01","resultado":"CONFIRMADA","recursos_revocados":[{"tipo":"CREDENCIALES_POS","identificador":"pos.7105069"},{"tipo":"CAJAS_REGISTRADORAS","identificador":"CAJA-03"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7105069"}],"referencia":"REV-E-C00000","motivo":null}}',
+   'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:10:11-04:00', TIMESTAMPTZ '2026-10-18T11:10:12-04:00'),
+  ('c0000000-0000-4000-8000-000000000f02', 'c0000000-0000-4000-8000-000000000e06', 'I', 'CONFIRMACION_REVOCACION_ACCESOS', 'c0000000-0000-4000-8000-000000000c20', 'INVENTARIOS',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e06","origen":{"grupo":"I","modulo":"Gestión de Inventarios y Almacén"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-10-18T15:10:15.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c20","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e02","resultado":"CONFIRMADA","recursos_revocados":[{"tipo":"CREDENCIALES_ALMACEN","identificador":"alm.7105069"},{"tipo":"TERMINALES_MOVILES","identificador":"TERM-17"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7105069"}],"referencia":"REV-I-C00000","motivo":null}}',
+   'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:10:14-04:00', TIMESTAMPTZ '2026-10-18T11:10:15-04:00'),
+  ('c0000000-0000-4000-8000-000000000f03', 'c0000000-0000-4000-8000-000000000e07', 'H', 'CONFIRMACION_REVOCACION_ACCESOS', 'c0000000-0000-4000-8000-000000000c20', 'ENTREGAS',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e07","origen":{"grupo":"H","modulo":"Gestión de Entregas y Despachos"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-10-18T15:10:18.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c20","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e03","resultado":"CONFIRMADA","recursos_revocados":[{"tipo":"CREDENCIALES_DESPACHO","identificador":"desp.7105069"},{"tipo":"TERMINALES_MOVILES","identificador":"TERM-17"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7105069"}],"referencia":"REV-H-C00000","motivo":null}}',
+   'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:10:17-04:00', TIMESTAMPTZ '2026-10-18T11:10:18-04:00'),
+  ('c0000000-0000-4000-8000-000000000f04', 'c0000000-0000-4000-8000-000000000e08', 'B', 'CONFIRMACION_REVOCACION_ACCESOS', 'c0000000-0000-4000-8000-000000000c20', 'CRM',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e08","origen":{"grupo":"B","modulo":"CRM"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-10-18T15:10:20.000Z","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c20","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e04","resultado":"CONFIRMADA","recursos_revocados":[{"tipo":"CREDENCIALES_CRM","identificador":"crm.7105069"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7105069"}],"referencia":"REV-B-C00000","motivo":null}}',
+   'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-10-18T11:10:19-04:00', TIMESTAMPTZ '2026-10-18T11:10:20-04:00'),
+  -- Daniela: 3 procesados + 1 en DLQ (resultado inválido, 3 intentos)
+  ('c0000000-0000-4000-8000-000000000f11', 'c0000000-0000-4000-8000-000000000e15', 'E', 'CONFIRMACION_REVOCACION_ACCESOS', 'c0000000-0000-4000-8000-000000000c21', 'VENTAS',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e15","origen":{"grupo":"E","modulo":"Marketplace y Ventas / POS"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-11-14T15:00:10-04:00","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c21","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e11","resultado":"CONFIRMADA","recursos_revocados":[{"tipo":"CREDENCIALES_POS","identificador":"pos.7108748"},{"tipo":"CAJAS_REGISTRADORAS","identificador":"CAJA-03"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7108748"}],"referencia":"REV-E-C00000","motivo":null}}',
+   'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-11-14T15:00:09-04:00', TIMESTAMPTZ '2026-11-14T15:00:10-04:00'),
+  ('c0000000-0000-4000-8000-000000000f12', 'c0000000-0000-4000-8000-000000000e16', 'I', 'CONFIRMACION_REVOCACION_ACCESOS', 'c0000000-0000-4000-8000-000000000c21', 'INVENTARIOS',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e16","origen":{"grupo":"I","modulo":"Gestión de Inventarios y Almacén"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-11-14T15:00:12-04:00","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c21","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e12","resultado":"CONFIRMADA","recursos_revocados":[{"tipo":"CREDENCIALES_ALMACEN","identificador":"alm.7108748"},{"tipo":"TERMINALES_MOVILES","identificador":"TERM-17"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7108748"}],"referencia":"REV-I-C00000","motivo":null}}',
+   'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-11-14T15:00:11-04:00', TIMESTAMPTZ '2026-11-14T15:00:12-04:00'),
+  ('c0000000-0000-4000-8000-000000000f13', 'c0000000-0000-4000-8000-000000000e17', 'H', 'CONFIRMACION_REVOCACION_ACCESOS', 'c0000000-0000-4000-8000-000000000c21', 'ENTREGAS',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e17","origen":{"grupo":"H","modulo":"Gestión de Entregas y Despachos"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-11-14T15:00:14-04:00","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c21","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e13","resultado":"CONFIRMADA","recursos_revocados":[{"tipo":"CREDENCIALES_DESPACHO","identificador":"desp.7108748"},{"tipo":"TERMINALES_MOVILES","identificador":"TERM-17"},{"tipo":"ROLES_OPERATIVOS","identificador":"rol.7108748"}],"referencia":"REV-H-C00000","motivo":null}}',
+   'PROCESADO', 1, NULL, TIMESTAMPTZ '2026-11-14T15:00:13-04:00', TIMESTAMPTZ '2026-11-14T15:00:14-04:00'),
+  ('c0000000-0000-4000-8000-000000000f14', 'c0000000-0000-4000-8000-000000000e18', 'B', 'CONFIRMACION_REVOCACION_ACCESOS', 'c0000000-0000-4000-8000-000000000c21', 'CRM',
+   '{"encabezado":{"id_mensaje":"c0000000-0000-4000-8000-000000000e18","origen":{"grupo":"B","modulo":"CRM"},"destino":{"grupo":"F","modulo":"RRHH"},"tipo":"CONFIRMACION_REVOCACION_ACCESOS","fecha":"2026-11-14T15:03:10-04:00","version_esquema":1},"datos":{"id_cierre":"c0000000-0000-4000-8000-000000000c21","id_mensaje_origen":"c0000000-0000-4000-8000-000000000e14","resultado":"DESCONOCIDO","recursos_revocados":[],"referencia":null,"motivo":null}}',
+   'EN_DLQ', 3, 'datos.resultado debe ser CONFIRMADA o RECHAZADA.', TIMESTAMPTZ '2026-11-14T15:03:11-04:00', NULL)
 ON CONFLICT DO NOTHING;
 
 COMMIT;

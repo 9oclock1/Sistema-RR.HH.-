@@ -2,22 +2,43 @@ const { randomUUID } = require("node:crypto");
 const pool = require("../config/db");
 const modelo = require("../models/planillas.model");
 const eventos = require("../models/eventos.model");
-const { topicoPropio } = require("./eventos.service");
+const { topicoPropio, topicoDeDestino, asegurarTopico } = require("./eventos.service");
 const externos = require("./externos.service");
 const condiciones = require("./condiciones.service");
 const bonosProductividad = require("./ventasProductividad.service");
 const antiguedad = require("./antiguedad.service");
 const anticiposModelo = require("../models/anticipos.model");
 const empleadosCliente = require("../clients/empleados.cliente");
+const pubsub = require("../config/pubsub");
+const mensajesPublicados = require("../utils/mensajesPublicados");
 const { enTransaccion } = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
 const { hoyLaPaz } = require("../utils/fechas");
 const { CAMPOS_MINUTOS, rangoPlanilla, tramoSinConsolidar, validarResponsable, consolidarPlanilla } = require("../utils/planillas");
 const { antiguedadDelColaborador, calcularEmpleado } = require("../utils/calculo");
-const { DESTINOS, armarMensaje, sinCuenta, armarAsiento, armarOrdenPago } = require("../utils/integraciones");
+const {
+  DESTINOS,
+  armarMensaje,
+  sinCuenta,
+  armarAsiento,
+  armarOrdenPago,
+  validarSimulacionConfirmacion,
+  armarConfirmacionSimuladaPlanilla,
+  atributosDe,
+} = require("../utils/integraciones");
 
 const PERIODO_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+// Igual que la publicación real (eventos.service): sin tope, una llamada a Pub/Sub inalcanzable deja la
+// petición HTTP de simular colgada.
+const tiempoPublicacionMs = () => Number(process.env.PUBSUB_TIMEOUT_MS) || 15000;
+const conLimiteDeTiempo = (promesa) =>
+  Promise.race([
+    promesa,
+    new Promise((_, rechazar) =>
+      setTimeout(() => rechazar(new Error("Pub/Sub no respondió a tiempo")), tiempoPublicacionMs()).unref()
+    ),
+  ]);
 
 const noEncontrada = () => new ErrorApp(404, "Planilla no encontrada");
 const fechaCorta = (fecha) => fecha.split("-").reverse().join("/");
@@ -366,4 +387,62 @@ async function reenviar(id, destinoRuta, identidad = {}) {
   return obtener(id);
 }
 
-module.exports = { listar, obtener, generar, descartar, aprobar, reenviar, responsableEn };
+// Contabilidad y Pagos no existen en este sistema: en vez de esperar su confirmación de verdad, el
+// Administrador o el Contador la simulan desde la pantalla (el botón "Simular aceptación" del reporte
+// contable, RF-49/KAN-69, la usa para poder cerrar una planilla APROBADA y así poder consultar su reporte,
+// que ahora exige CERRADA). El transporte sí es real: se PUBLICA en el tópico propio de ese destino
+// (ucb-sis323-sub-d o -a); la suscripción real que ya mantiene abierta confirmaciones.service.iniciarConsumidor()
+// es la que la recibe y la aplica (misma validación, mismo registro en EVENTOS_ENTRANTES que una confirmación
+// genuina). Mismo mecanismo que ya existía para aguinaldos (aguinaldo.service.js).
+async function simularConfirmacion(id, destinoRuta, datos = {}, identidad = {}) {
+  const idResponsable = validarResponsable(identidad);
+  const destino = DESTINO_RUTA[destinoRuta];
+  if (!UUID_RE.test(id ?? "") || !destino) throw noEncontrada();
+  responsableEn(await externos.listarPersonal(), idResponsable);
+  const planilla = await modelo.obtener(pool, id);
+  if (!planilla) throw noEncontrada();
+  const mes = nombreMes(planilla.periodo);
+  if (planilla.estado === "BORRADOR") {
+    throw new ErrorApp(409, `La planilla de ${mes} está en borrador: todavía no se envió a ${NOMBRE_DESTINO[destino]}.`);
+  }
+  const envio = (await eventos.ultimosDePlanilla(pool, id))[destino];
+  if (!envio) {
+    throw new ErrorApp(409, `Todavía no se registró el envío a ${NOMBRE_DESTINO[destino]}: no hay nada que confirmar.`);
+  }
+  const clientePubSub = pubsub.obtenerCliente();
+  if (!clientePubSub) {
+    throw new ErrorApp(
+      503,
+      "Pub/Sub no está configurado en este ambiente: no se puede simular la confirmación. Configure el emulador o las credenciales."
+    );
+  }
+  const { resultado, referencia, motivo } = validarSimulacionConfirmacion(datos);
+  const idMensaje = randomUUID();
+  const cuerpo = armarConfirmacionSimuladaPlanilla({
+    idMensaje,
+    idPlanilla: id,
+    idMensajeOrigen: envio.id_evento,
+    destino,
+    resultado,
+    referencia,
+    motivo,
+  });
+  const topico = topicoDeDestino(destino);
+  const atributos = atributosDe(cuerpo);
+  await asegurarTopico(clientePubSub, topico);
+  let idPubSub;
+  try {
+    idPubSub = await conLimiteDeTiempo(clientePubSub.topic(topico).publishMessage({ json: cuerpo, attributes: atributos }));
+  } catch (error) {
+    throw new ErrorApp(503, `No se pudo publicar la confirmación simulada en ${topico}: ${error.message}`);
+  }
+  mensajesPublicados.registrar({ topico, idPubSub, atributos, cuerpo });
+  return {
+    simulado: true,
+    topico,
+    id_pubsub: idPubSub,
+    mensaje: `Se publicó en ${topico} la confirmación simulada de ${NOMBRE_DESTINO[destino]}; se aplicará en unos segundos cuando RRHH la reciba por su suscripción.`,
+  };
+}
+
+module.exports = { listar, obtener, generar, descartar, aprobar, reenviar, simularConfirmacion, responsableEn };

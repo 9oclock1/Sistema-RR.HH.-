@@ -1,14 +1,17 @@
 import { MemoryRouter } from "react-router";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  formalizarAscenso,
   listarConvocatoriasEmpleado,
   listarConvocatoriasRrhh,
   listarPostulaciones,
   postularConvocatoria,
+  reintentarAvisoAscenso,
   revalidarPostulacion,
 } from "../../api/convocatoriasInternas";
+import { formatearFecha, hoyLaPaz } from "./convocatorias";
 import { ApiError } from "../../api/httpClient";
 import ProveedorAvisos from "../../components/ui/ProveedorAvisos";
 import { fijarSesion } from "../../context/sesion";
@@ -167,8 +170,8 @@ describe("RRHH: postulaciones y ranking de méritos", () => {
     const tabla = within(dialogo).getByRole("table", { name: /Ranking de postulantes aptos/ });
     const filas = within(tabla).getAllByRole("row").slice(1);
     expect(filas.map((f) => f.textContent)).toEqual([
-      expect.stringMatching(/^1Carlos Rojas.*90,2$/),
-      expect.stringMatching(/^2Ana Torrez.*85,2$/),
+      expect.stringMatching(/^1Carlos Rojas.*90,2Formalizar$/),
+      expect.stringMatching(/^2Ana Torrez.*85,2Formalizar$/),
     ]);
     expect(within(dialogo).getByText(/70 % nota de la última evaluación/)).toBeTruthy();
   });
@@ -199,10 +202,91 @@ describe("RRHH: postulaciones y ranking de méritos", () => {
     expect(await screen.findByText("Validada: cumple los requisitos.")).toBeTruthy();
   });
 
-  it("la gerencia revisa el ranking pero no vuelve a validar", async () => {
+  it("la gerencia revisa el ranking pero no vuelve a validar ni formaliza", async () => {
     fijarSesion({ id_empleado: ANA, correo: "ana.torrez@correo.test", rol: "gerente" });
     const dialogo = await abrirPostulaciones();
     await within(dialogo).findByRole("list", { name: "Postulaciones pendientes de validar" });
     expect(within(dialogo).queryByRole("button", { name: "Volver a validar" })).toBeNull();
+    expect(within(dialogo).queryByRole("button", { name: /Formalizar el ascenso/ })).toBeNull();
+  });
+
+  describe("KAN-84: formalizar el ascenso del postulante apto seleccionado", () => {
+    const enQuinceDias = hoyLaPaz(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000));
+    const ascenso = (cambios = {}) => ({
+      estado: "PROGRAMADO",
+      fecha_formalizacion: hoyLaPaz(),
+      fecha_vigencia: enQuinceDias,
+      haber_mensual_pactado: 6500.5,
+      numero_contrato: "ASC-0001",
+      notificado_en: "2026-11-23T14:00:00Z",
+      error_notificacion: null,
+      error_aplicacion: null,
+      ...cambios,
+    });
+    const formalizada = (cambios = {}) => ({
+      ...postulacion("Carlos Rojas", "APTO", { posicion: 1 }),
+      ascenso: ascenso(cambios),
+      cargo_destino: { nombre: "Supervisor de Cajas" },
+    });
+
+    const abrirFormulario = async () => {
+      const dialogo = await abrirPostulaciones();
+      await userEvent.click(await within(dialogo).findByRole("button", { name: "Formalizar el ascenso de Carlos Rojas" }));
+      return screen.findByRole("dialog", { name: "Formalizar ascenso de Carlos Rojas" });
+    };
+
+    it("criterios 1 y 3: formaliza con fecha de vigencia futura y haber, y muestra el ascenso programado", async () => {
+      formalizarAscenso.mockResolvedValue(formalizada());
+      const formulario = await abrirFormulario();
+      expect(within(formulario).getByText(/pasará de Cajero a/).textContent).toContain("Supervisor de Cajas en Sopocachi");
+
+      fireEvent.change(within(formulario).getByLabelText(/Fecha de vigencia/), { target: { value: enQuinceDias } });
+      expect(within(formulario).getByText(/El cargo cambiará automáticamente el/)).toBeTruthy();
+      await userEvent.type(within(formulario).getByLabelText(/Nuevo haber mensual/), "6500,50");
+      listarPostulaciones.mockResolvedValue({ ...ranking, ascenso_formalizado: formalizada() });
+      await userEvent.click(within(formulario).getByRole("button", { name: "Formalizar ascenso" }));
+
+      expect(formalizarAscenso).toHaveBeenCalledWith("c-9", "p-Carlos Rojas", { fecha_vigencia: enQuinceDias, haber_mensual_pactado: 6500.5 });
+      expect(await screen.findByText("Ascenso de Carlos Rojas formalizado")).toBeTruthy();
+      expect(screen.getByText(/El cargo cambiará el .* La convocatoria quedó cerrada\. Se le avisó por mensajería\./)).toBeTruthy();
+
+      const dialogo = screen.getByRole("dialog", { name: "Postulaciones: Asesor de Atención - Miraflores" });
+      expect(await within(dialogo).findByText("Ascenso formalizado: Carlos Rojas")).toBeTruthy();
+      expect(within(dialogo).getByText("Ascenso programado")).toBeTruthy();
+      expect(within(dialogo).getByText(new RegExp(`Se aplica el ${formatearFecha(enQuinceDias)}`)).textContent).toContain("Adenda ASC-0001");
+      expect(within(dialogo).queryByRole("button", { name: /Formalizar el ascenso/ })).toBeNull();
+    });
+
+    it("valida la fecha antes de enviar", async () => {
+      const formulario = await abrirFormulario();
+      fireEvent.change(within(formulario).getByLabelText(/Fecha de vigencia/), { target: { value: "2020-01-01" } });
+      await userEvent.click(within(formulario).getByRole("button", { name: "Formalizar ascenso" }));
+      expect(await within(formulario).findByText("No puede ser anterior a hoy.")).toBeTruthy();
+      expect(formalizarAscenso).not.toHaveBeenCalled();
+    });
+
+    it("muestra el rechazo del servidor", async () => {
+      formalizarAscenso.mockRejectedValue(
+        new ApiError("Esta convocatoria ya tiene un ascenso formalizado: cubre una sola vacante.", 409, { codigo: "CONVOCATORIA_RESUELTA" }),
+      );
+      const formulario = await abrirFormulario();
+      await userEvent.click(within(formulario).getByRole("button", { name: "Formalizar ascenso" }));
+      expect(await within(formulario).findByText(/cubre una sola vacante/)).toBeTruthy();
+    });
+
+    it("criterio 4: si el aviso al empleado no llegó, se puede reintentar", async () => {
+      listarPostulaciones.mockResolvedValue({
+        ...ranking,
+        ascenso_formalizado: formalizada({ estado: "APLICADO", notificado_en: null, error_notificacion: "NotificationService respondió 503" }),
+      });
+      reintentarAvisoAscenso.mockResolvedValue(formalizada({ estado: "APLICADO" }));
+      const dialogo = await abrirPostulaciones();
+
+      expect(await within(dialogo).findByText("Ascenso aplicado")).toBeTruthy();
+      expect(within(dialogo).getByText(/El aviso al empleado no llegó: NotificationService respondió 503/)).toBeTruthy();
+      await userEvent.click(within(dialogo).getByRole("button", { name: "Reintentar aviso" }));
+      await waitFor(() => expect(reintentarAvisoAscenso).toHaveBeenCalledWith("c-9", "p-Carlos Rojas"));
+      expect(await screen.findByText("Aviso enviado")).toBeTruthy();
+    });
   });
 });

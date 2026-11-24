@@ -1,0 +1,49 @@
+@startuml sec-06-kan82-ascensos-programados
+!include _estilo-secuencia.iuml
+title KAN-82 · Aplicar los ascensos con vigencia futura (RF-62, criterio 3)
+
+participant "ascensosProgramadosCron\n(00:10 diario)" as JOB EXTERNO
+participant "ascensos\nService" as SV SERVICIO
+participant "ascensos\nModel" as MD MODELO
+participant "asignaciones\nService" as AS SERVICIO
+database "EmployeeDB" as DB BD
+participant "CompensationService\n(planilla, épica 7)" as CS EXTERNO
+
+loop todos los días a las 00:10 (America/La_Paz)\n(CRON_ASCENSOS · CRON_ASCENSOS_ACTIVO)
+  JOB -> SV : aplicarProgramados()
+  activate SV
+  SV -> MD : listarProgramadosVencidos(db)
+  MD -> DB : estado_ascenso = PROGRAMADO\nAND fecha_vigencia_ascenso ≤ hoy
+  DB --> MD : ids de postulación
+  loop por cada ascenso (cada uno en su propia transacción)
+    SV -> DB : BEGIN
+    SV -> MD : bloquearPostulacion · bloquearConvocatoria
+    alt ya no está PROGRAMADO (otro proceso lo aplicó)
+      SV -> DB : COMMIT sin cambios
+    else
+      opt el empleado todavía no está en el cargo y la sucursal
+        SV -> AS : aplicarAsignacion(cargo, sucursal,\nfecha_inicio = fecha de vigencia)
+        AS -> DB : cierra la asignación vigente · inserta la nueva
+      end
+      SV -> MD : marcarAplicado (APLICADO · ascenso_aplicado_en)
+      SV -> DB : COMMIT
+    end
+    alt error (p. ej. el cargo se desactivó)
+      SV -> DB : ROLLBACK
+      SV -> MD : registrarErrorAplicacion(id, error)
+      note right of DB : sigue PROGRAMADO con el error:\nse reintenta en la siguiente corrida
+    end
+  end
+  SV --> JOB : { aplicados, fallidos }
+  deactivate SV
+end
+
+== Planilla del periodo ==
+CS -> DB : contrato vigente del empleado por tramos de vigencia
+note right of CS
+  La adenda ASCENSO ya rige desde su fecha de
+  vigencia: la planilla de ese periodo toma
+  el nuevo haber aunque el cargo se haya
+  aplicado con el job.
+end note
+@enduml

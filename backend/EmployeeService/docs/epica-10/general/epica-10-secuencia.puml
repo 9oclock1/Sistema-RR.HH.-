@@ -1,0 +1,109 @@
+@startuml epica-10-secuencia
+title Épica 10 · Seguimiento de ascensos y promoción interna\nDiagrama de secuencia (resumen de la épica)
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 260
+skinparam sequence {
+  LifeLineBorderColor #888888
+  ParticipantBorderColor #6C8EBF
+  ParticipantBackgroundColor #DAE8FC
+  ActorBorderColor #333333
+  ActorBackgroundColor #FFFFFF
+  GroupBorderColor #888888
+  GroupBackgroundColor #F5F5F5
+  DividerBackgroundColor #EEEEEE
+  DividerBorderColor #BBBBBB
+}
+autonumber "<b>00"
+
+actor "Administrador\nde RRHH" as RRHH
+actor "Empleado" as EMP
+boundary "Frontend\n(React)" as FE #D5E8D4
+participant "API Gateway\n(NGINX)" as GW #F5F5F5
+control "EmployeeService\n(controladores · servicios · modelos)" as ES
+database "EmployeeDB\n(PostgreSQL)" as DB #FFF2CC
+participant "PerformanceService" as PS #F8CECC
+participant "NotificationService" as NS #F8CECC
+
+== KAN-80 · Publicación de la convocatoria interna (RF-60) ==
+RRHH -> FE : cargo, sucursal, requisitos, antigüedad y nota\nmínimas, fechas de postulación
+FE -> GW : POST /api/empl/convocatorias [JWT]
+GW -> ES : reenvía
+activate ES
+alt cargo ocupado o ya hay una convocatoria vigente
+  ES --> FE : <color:#B85450>409 CARGO_OCUPADO / CONVOCATORIA_DUPLICADA</color>
+else vacante
+  ES -> DB : INSERT convocatoria + destinatarios elegibles\n(activos, otro cargo, antigüedad mínima al cierre)
+  loop por cada elegible (de 4 en 4)
+    ES -> NS : POST /comunicaciones/directa
+    NS ->> EMP : aviso de la convocatoria
+  end
+  ES -> DB : estado_notificacion ENTREGADA / FALLIDA
+  ES --> FE : 201 convocatoria y resultado de los avisos
+end
+deactivate ES
+note over ES, DB : todos los días a las 00:05 el job cierra las convocatorias vencidas
+
+== KAN-81 · Postulación y validación de méritos (RF-61) ==
+EMP -> FE : ve las convocatorias vigentes y se postula
+FE -> GW : POST /api/empl/convocatorias/{id}/postulaciones
+GW -> ES : reenvía [X-Empleado-Id]
+activate ES
+alt inactivo, convocatoria no vigente, mismo cargo o ya postulado
+  ES --> FE : <color:#B85450>403 / 409</color>
+else válido
+  ES -> DB : INSERT postulación PENDIENTE_VALIDACION
+  ES -> PS : GET /evaluaciones/historial/{idEmpleado}
+  PS --> ES : última evaluación cerrada (o error)
+  ES -> DB : APTO con puntaje o NO_APTO con motivos\n(si PerformanceService falla, queda pendiente)
+  ES --> FE : 201 postulación validada
+end
+deactivate ES
+RRHH -> GW : GET /api/empl/convocatorias/{id}/postulaciones
+GW -> ES : reenvía
+ES --> RRHH : ranking de aptos por puntaje de méritos\n(definitivo cuando la convocatoria cerró)
+
+== KAN-82 · Formalización del ascenso (RF-62) ==
+RRHH -> GW : POST …/postulaciones/{id}/formalizacion\n(fecha de vigencia, haber, observaciones)
+GW -> ES : reenvía [JWT]
+activate ES
+ES -> DB : BEGIN · bloquea convocatoria y postulación · valida
+ES -> DB : INSERT adenda ASCENSO en CONTRATOS (Kardex)
+alt vigencia hoy
+  ES -> DB : nueva asignación (cargo y sucursal) · APLICADO
+else vigencia futura
+  ES -> DB : PROGRAMADO
+end
+ES -> DB : cierra la convocatoria · COMMIT
+ES -> NS : aviso al empleado promovido
+NS ->> EMP : «Fue promovido a …»
+ES --> RRHH : 200 ascenso formalizado
+deactivate ES
+note over ES, DB : todos los días a las 00:10 el job aplica los ascensos PROGRAMADO\ncuya vigencia llegó; la planilla toma el nuevo haber de la adenda
+
+== KAN-83 · Plan de capacitación previo al ascenso (RF-63) ==
+RRHH -> GW : POST /api/empl/planes-ascenso (empleado, cargo destino)
+GW -> ES : reenvía [X-Rol]
+activate ES
+ES -> DB : el cargo destino tiene cursos requeridos · INSERT plan EN_CURSO
+ES --> RRHH : 201 plan con cursos PENDIENTE / CUMPLIDO
+deactivate ES
+RRHH -> GW : GET /api/empl/planes-ascenso
+GW -> ES : reenvía
+ES -> DB : cursos del plan contra el Kardex (certificados vigentes)
+ES --> RRHH : avance (%) de cada candidato
+RRHH -> GW : POST /api/empl/planes-ascenso/{id}/formalizacion
+GW -> ES : reenvía
+activate ES
+alt cursos pendientes sin confirmar
+  ES --> RRHH : <color:#B85450>409 CURSOS_PENDIENTES (advertencia)</color>
+else sin pendientes o confirmado
+  ES -> DB : nueva asignación · plan FORMALIZADO (con los pendientes)
+  ES --> RRHH : 200 ascenso formalizado
+end
+deactivate ES
+@enduml

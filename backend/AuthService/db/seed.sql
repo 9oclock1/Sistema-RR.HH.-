@@ -39,9 +39,9 @@ INSERT INTO USUARIOS (id_usuario, id_empleado, correo, hash_contrasena, rol, est
   -- Ana Torrez Villca, Cajero
   ('b0000000-0000-4000-8000-000000000035', 'f0000000-0000-4000-8000-000000000035', 'ana.torrez@correo.test',
    'scrypt$f31e9086c9aa357dcb790d92d14dc2a4$9be4e22f1304fc7719a434a23cad199f798d4601b79547c4f69af39c4b5dc187229a78e8e4a91d25645171818dbf2e7528d096dd6fdccb8d9303ba70c4268272', 'empleado', TRUE),
-  -- Mario Fernández Cruz, Asesor de Atención
+  -- Mario Fernández Cruz, Asesor de Atención; en el portal opera como Contador / Encargado de planillas
   ('b0000000-0000-4000-8000-000000000036', 'f0000000-0000-4000-8000-000000000036', 'mario.fernandez@correo.test',
-   'scrypt$c42da0bc0a45d28496c1daa744d2a320$462bd51e3c84f2adf3eaf1ef1b3e61b7b85ba4526a8d8000b413eee4c15caf9cbb46ad3f18502346b2245862f4f6d282eefade53517e335731b92972f98a1c05', 'empleado', TRUE),
+   'scrypt$c42da0bc0a45d28496c1daa744d2a320$462bd51e3c84f2adf3eaf1ef1b3e61b7b85ba4526a8d8000b413eee4c15caf9cbb46ad3f18502346b2245862f4f6d282eefade53517e335731b92972f98a1c05', 'contador', TRUE),
   -- Elena Paredes Gómez, Cajero (de baja: cuenta desactivada)
   ('b0000000-0000-4000-8000-000000000037', 'f0000000-0000-4000-8000-000000000037', 'elena.paredes@correo.test',
    'scrypt$cda485cb2cd7ceaa75b0a29cb9eda13c$f778913a0ea15bbf59f965750fd5663f98196a5b2178a38aa76ddcd1db95dcc43399a5715cadb065a2b9afc53603b93c9cea7f1511a1ccc22871a094648019b0', 'empleado', FALSE),
@@ -54,6 +54,30 @@ INSERT INTO USUARIOS (id_usuario, id_empleado, correo, hash_contrasena, rol, est
   -- Rodrigo Apaza Calle, Cajero (de baja: cuenta desactivada)
   ('b0000000-0000-4000-8000-000000000743', 'f0000000-0000-4000-8000-000000000743', 'rodrigo.apaza@correo.test',
    'scrypt$198c30ffd8af9454ab499ed4f45047bf$de9937b7dca047b9a7591ad2b110fb64766188ced852d9db2893f6e9ebdde266af9b197924bbf9640badf8ab9307c2760c862fc293019e72698c505994f7aed7', 'empleado', FALSE)
+ON CONFLICT DO NOTHING;
+
+COMMIT;
+
+-- Cuentas de ejemplo para el cierre definitivo de desvinculación y revocación de accesos (RF-59, KAN-79).
+-- Cargar en PowerShell siempre con UTF-8 para conservar tildes:
+--   Get-Content -Encoding UTF8 backend/AuthService/db/seed.sql | docker exec -i rrhh-postgres psql -U adminRRHH -d AuthDB -v ON_ERROR_STOP=1
+BEGIN;
+
+INSERT INTO USUARIOS (id_usuario, id_empleado, correo, hash_contrasena, rol, esta_activo) VALUES
+  -- Patricia Limachi Rojas (activa, lista para cerrar definitivamente)
+  ('b0000000-0000-4000-8000-000000000746', 'f0000000-0000-4000-8000-000000000746', 'patricia.limachi@correo.test',
+   'scrypt$217794500417ffd944910fc156b4d85a$d6ae52748b2200df1b35839eb1d8a33785e5b313342e0144988836cbf987c4b8b48234b3889aea7b01293eb1087ddf1bee0c552ce39abd2f564e7217a0107bef', 'empleado', TRUE),
+  -- Hugo Ticona Vargas (activo, con finiquito aprobado listo para cerrar)
+  ('b0000000-0000-4000-8000-000000000747', 'f0000000-0000-4000-8000-000000000747', 'hugo.ticona@correo.test',
+   'scrypt$819dbbe9219e36db2a5f53be9c14fc70$ae684213d22f4bb34d1e6660553e6f256a9ccf4e2d1728825b6a2adf7226560714a67506d54b7ade3e7e5f7d06dc90cfeaaa50a426ecd080d76a4ed86604ac7f', 'empleado', TRUE),
+  -- Daniela Cruz Huanca (ya cerrada con alertas: cuenta revocada)
+  ('b0000000-0000-4000-8000-000000000748', 'f0000000-0000-4000-8000-000000000748', 'daniela.cruz@correo.test',
+   'scrypt$568959efa6cc9d5e2ad8998a6dc100fe$917b8c1494d894cd5903cba1543216afcd7f86128457ef17e76801aa9924719f14fe0c8060ebdb5bcd654e5956a282665163bef4f0c6868ed9821140f533b0f0', 'empleado', FALSE)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO REVOCACIONES_ACCESO (id_revocacion, id_empleado, id_usuario, motivo, id_proceso, solicitado_por, revocado_en) VALUES
+  ('b0000000-0000-4000-8000-000000000901', 'f0000000-0000-4000-8000-000000000037', 'b0000000-0000-4000-8000-000000000037', 'DESVINCULACION', 'c0000000-0000-4000-8000-000000000741', 'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-10-18T11:10:00-04:00'),
+  ('b0000000-0000-4000-8000-000000000902', 'f0000000-0000-4000-8000-000000000748', 'b0000000-0000-4000-8000-000000000748', 'DESVINCULACION', 'c0000000-0000-4000-8000-000000000749', 'f0000000-0000-4000-8000-000000000023', TIMESTAMPTZ '2026-11-14T15:00:00-04:00')
 ON CONFLICT DO NOTHING;
 
 COMMIT;

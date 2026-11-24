@@ -14,6 +14,7 @@ const historialAsistenciaRoutes = require("./src/routes/historialAsistencia.rout
 const solicitudesVacacionRoutes = require("./src/routes/solicitudesVacacion.routes");
 const vacacionesRoutes = require("./src/routes/vacaciones.routes");
 const reportesRoutes = require("./src/routes/reportes.routes");
+const dashboardAsistenciaRoutes = require("./src/routes/dashboardAsistencia.routes");
 const miAsistenciaRoutes = require("./src/routes/miAsistencia.routes");
 const aprobacionesRoutes = require("./src/routes/aprobaciones.routes");
 const calendarioAusenciasRoutes = require("./src/routes/calendarioAusencias.routes");
@@ -66,6 +67,7 @@ app.use(historialAsistenciaRoutes);
 app.use(solicitudesVacacionRoutes);
 app.use(vacacionesRoutes);
 app.use(reportesRoutes);
+app.use(dashboardAsistenciaRoutes);
 app.use(miAsistenciaRoutes);
 app.use(aprobacionesRoutes);
 app.use(calendarioAusenciasRoutes);

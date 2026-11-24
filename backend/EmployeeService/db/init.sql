@@ -73,7 +73,7 @@ CREATE TABLE CONTRATOS (
     CONSTRAINT uq_contrato_numero UNIQUE (numero_contrato),
     CONSTRAINT uq_contrato_version_anterior UNIQUE (id_contrato_anterior),
     CONSTRAINT ck_contrato_tipo_modificacion CHECK (
-        tipo_modificacion IN ('CONTRATO_INICIAL', 'RENOVACION', 'CAMBIO_JORNADA', 'AJUSTE_SALARIAL', 'AJUSTE_CONDICIONES')
+        tipo_modificacion IN ('CONTRATO_INICIAL', 'RENOVACION', 'CAMBIO_JORNADA', 'AJUSTE_SALARIAL', 'AJUSTE_CONDICIONES', 'ASCENSO')
     ),
     CONSTRAINT ck_contrato_adenda_segun_tipo CHECK (
         es_adenda = (tipo_modificacion NOT IN ('CONTRATO_INICIAL', 'RENOVACION'))
@@ -241,7 +241,29 @@ CREATE TABLE POSTULACIONES_ASCENSO (
     error_validacion varchar(300) NULL,
     fecha_formalizacion_ascenso date NULL,
     observaciones_resolucion text NULL,
+    -- KAN-84: formalización del ascenso del postulante apto seleccionado.
+    fecha_vigencia_ascenso date NULL,
+    haber_ascenso numeric(12, 2) NULL,
+    id_contrato_ascenso UUID NULL REFERENCES CONTRATOS (id_contrato),
+    estado_ascenso varchar(12) NULL,
+    formalizado_por UUID NULL,
+    formalizado_en TIMESTAMPTZ NULL,
+    ascenso_aplicado_en TIMESTAMPTZ NULL,
+    error_aplicacion_ascenso varchar(300) NULL,
+    ascenso_notificado_en TIMESTAMPTZ NULL,
+    error_notificacion_ascenso varchar(300) NULL,
     CONSTRAINT POSTULACIONES_ASCENSO_pk PRIMARY KEY (id_postulacion),
+    CONSTRAINT chk_postulacion_estado_ascenso CHECK (estado_ascenso IN ('PROGRAMADO', 'APLICADO')),
+    CONSTRAINT chk_postulacion_formalizada CHECK (
+        (formalizado_en IS NULL) = (estado_ascenso IS NULL)
+        AND (formalizado_en IS NULL) = (fecha_formalizacion_ascenso IS NULL)
+        AND (formalizado_en IS NULL) = (fecha_vigencia_ascenso IS NULL)
+        AND (formalizado_en IS NULL) = (haber_ascenso IS NULL)
+        AND (formalizado_en IS NULL) = (id_contrato_ascenso IS NULL)
+        AND (formalizado_en IS NULL OR estado_postulacion = 'APTO')
+    ),
+    CONSTRAINT chk_postulacion_ascenso_aplicado CHECK ((estado_ascenso = 'APLICADO') = (ascenso_aplicado_en IS NOT NULL)),
+    CONSTRAINT chk_postulacion_haber_ascenso CHECK (haber_ascenso > 0),
     CONSTRAINT uq_postulacion_convocatoria_empleado UNIQUE (id_convocatoria, id_empleado),
     CONSTRAINT chk_postulacion_estado CHECK (estado_postulacion IN ('PENDIENTE_VALIDACION', 'APTO', 'NO_APTO')),
     CONSTRAINT chk_postulacion_validada CHECK (
@@ -252,6 +274,12 @@ CREATE TABLE POSTULACIONES_ASCENSO (
     )
 );
 CREATE INDEX IF NOT EXISTS ix_postulaciones_convocatoria_estado ON POSTULACIONES_ASCENSO (id_convocatoria, estado_postulacion);
+-- Una convocatoria cubre una vacante: a lo sumo un ascenso formalizado por convocatoria.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_postulacion_formalizada_convocatoria ON POSTULACIONES_ASCENSO (id_convocatoria)
+    WHERE formalizado_en IS NOT NULL;
+-- Ascensos con vigencia futura que el job diario aplica al llegar la fecha.
+CREATE INDEX IF NOT EXISTS ix_postulacion_ascenso_programado ON POSTULACIONES_ASCENSO (fecha_vigencia_ascenso)
+    WHERE estado_ascenso = 'PROGRAMADO';
 -- Table: DESTINATARIOS_CONVOCATORIA (KAN-80)
 -- Empleados elegibles a los que se avisa de una convocatoria: activos, que no ocupan el cargo ofertado y que cumplen
 -- la antigüedad mínima a la fecha de cierre. Un aviso por empleado; notificado_en queda en NULL mientras no se

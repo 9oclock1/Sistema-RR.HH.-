@@ -6,6 +6,8 @@ export const TIPOS_MODIFICACION = {
   CAMBIO_JORNADA: 'Cambio de jornada',
   AJUSTE_SALARIAL: 'Ajuste salarial',
   AJUSTE_CONDICIONES: 'Ajuste de condiciones',
+  // KAN-84: la registra el sistema al formalizar un ascenso por convocatoria interna; no se elige a mano.
+  ASCENSO: 'Ascenso',
 };
 
 export const DESCRIPCION_MODIFICACION = {

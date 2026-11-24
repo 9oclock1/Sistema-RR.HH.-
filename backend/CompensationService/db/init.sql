@@ -387,6 +387,11 @@ CREATE TABLE AGUINALDO_EMPLEADOS (
     id_empleado UUID NOT NULL,
     nombre_empleado varchar(150) NOT NULL,
     numero_documento varchar(20) NULL,
+    -- Copia de EmployeeService al generar (igual que PLANILLA_EMPLEADOS): centro de costo para el reporte
+    -- contable consolidado (RF-49, KAN-69).
+    cargo varchar(100) NULL,
+    area varchar(100) NULL,
+    sucursal varchar(100) NULL,
     fecha_ingreso date NOT NULL,
     meses_trabajados smallint NOT NULL,
     dias_trabajados smallint NOT NULL,
@@ -963,3 +968,590 @@ CREATE TABLE DETALLE_PROMEDIO_INDEMNIZABLE (
         REFERENCES PLANILLA_EMPLEADOS (id_planilla_empleado),
     CONSTRAINT chk_detalle_promedio_total_ganado CHECK (total_ganado >= 0)
 );
+
+-- Beneficios sociales: indemnización y desahucio (RF-56, KAN-76)
+
+-- Tabla: BENEFICIOS_SOCIALES
+-- Último cálculo de la indemnización por tiempo de servicio y del desahucio de cada proceso (1 a 1).
+-- Copia el sueldo promedio y las fechas usadas; si el promedio cambia después, el cálculo queda desactualizado.
+CREATE TABLE BENEFICIOS_SOCIALES (
+    id_proceso UUID NOT NULL,
+    promedio_base numeric(12,2) NOT NULL,
+    fecha_ingreso date NOT NULL,
+    fecha_retiro date NOT NULL,
+    dias_servicio integer NOT NULL,
+    anios_servicio smallint NOT NULL,
+    meses_servicio smallint NOT NULL,
+    dias_fraccion smallint NOT NULL,
+    corresponde_indemnizacion boolean NOT NULL,
+    motivo_indemnizacion varchar(250) NOT NULL,
+    monto_indemnizacion numeric(12,2) NOT NULL,
+    corresponde_desahucio boolean NOT NULL,
+    motivo_desahucio varchar(250) NOT NULL,
+    monto_desahucio numeric(12,2) NOT NULL,
+    total numeric(12,2) NOT NULL,
+    calculado_por UUID NULL,
+    calculado_por_rol varchar(20) NULL,
+    calculado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT BENEFICIOS_SOCIALES_pk PRIMARY KEY (id_proceso),
+    CONSTRAINT fk_beneficios_proceso FOREIGN KEY (id_proceso)
+        REFERENCES PROCESOS_DESVINCULACION (id_proceso) ON DELETE CASCADE,
+    CONSTRAINT chk_beneficios_fechas CHECK (fecha_retiro >= fecha_ingreso),
+    CONSTRAINT chk_beneficios_dias CHECK (dias_servicio > 0),
+    CONSTRAINT chk_beneficios_tiempo CHECK (
+        anios_servicio >= 0 AND meses_servicio BETWEEN 0 AND 11 AND dias_fraccion BETWEEN 0 AND 30
+    ),
+    CONSTRAINT chk_beneficios_montos CHECK (
+        promedio_base >= 0 AND monto_indemnizacion >= 0 AND monto_desahucio >= 0
+        AND total = monto_indemnizacion + monto_desahucio
+    ),
+    CONSTRAINT chk_beneficios_sin_monto CHECK (
+        (corresponde_indemnizacion OR monto_indemnizacion = 0)
+        AND (corresponde_desahucio OR monto_desahucio = 0)
+    )
+);
+
+-- Tabla: DETALLE_BENEFICIOS_SOCIALES
+-- Renglones del cálculo: monto = promedio_base × cantidad / divisor (años / 1, meses / 12, días / 360, sueldos / 1).
+CREATE TABLE DETALLE_BENEFICIOS_SOCIALES (
+    id_proceso UUID NOT NULL,
+    orden smallint NOT NULL,
+    codigo_concepto varchar(25) NOT NULL,
+    descripcion varchar(120) NOT NULL,
+    unidad varchar(10) NOT NULL,
+    cantidad smallint NOT NULL,
+    divisor smallint NOT NULL,
+    monto numeric(12,2) NOT NULL,
+    CONSTRAINT DETALLE_BENEFICIOS_SOCIALES_pk PRIMARY KEY (id_proceso, orden),
+    CONSTRAINT fk_detalle_beneficios FOREIGN KEY (id_proceso)
+        REFERENCES BENEFICIOS_SOCIALES (id_proceso) ON DELETE CASCADE,
+    CONSTRAINT chk_detalle_beneficios_concepto CHECK (codigo_concepto IN ('INDEMNIZACION', 'DESAHUCIO')),
+    CONSTRAINT chk_detalle_beneficios_unidad CHECK (unidad IN ('ANIO', 'MES', 'DIA', 'SUELDO')),
+    CONSTRAINT chk_detalle_beneficios_cantidad CHECK (cantidad > 0),
+    CONSTRAINT chk_detalle_beneficios_divisor CHECK (divisor IN (1, 12, 360)),
+    CONSTRAINT chk_detalle_beneficios_monto CHECK (monto >= 0)
+);
+
+-- Saldos proporcionales del finiquito (KAN-77)
+
+-- Tabla: SALDOS_PROPORCIONALES
+-- Último cálculo de las duodécimas de aguinaldo y las vacaciones truncas de un proceso de liquidación (1 a 1).
+-- Copia el sueldo promedio, el saldo de vacaciones y los tiempos al momento del cálculo; recalcular mientras el
+-- proceso está abierto reemplaza el registro.
+CREATE TABLE SALDOS_PROPORCIONALES (
+    id_proceso UUID NOT NULL,
+    promedio numeric(12,2) NOT NULL,
+    salario_diario numeric(12,2) NOT NULL,
+    -- Aguinaldo: gestión en curso al retiro (1 de diciembre al 30 de noviembre)
+    gestion_aguinaldo smallint NOT NULL,
+    aguinaldo_desde date NOT NULL,
+    aguinaldo_hasta date NOT NULL,
+    aguinaldo_meses smallint NOT NULL,
+    aguinaldo_dias smallint NOT NULL,
+    monto_aguinaldo numeric(12,2) NOT NULL,
+    -- Vacaciones: días no gozados del módulo de vacaciones (AttendanceService) y duodécima del año en curso
+    anios_servicio smallint NOT NULL,
+    dias_acumulados smallint NOT NULL,
+    dias_gozados smallint NOT NULL,
+    dias_pendientes smallint NOT NULL,
+    monto_vacaciones_pendientes numeric(12,2) NOT NULL,
+    anio_en_curso_desde date NOT NULL,
+    anio_en_curso_meses smallint NOT NULL,
+    anio_en_curso_dias smallint NOT NULL,
+    dias_escala smallint NOT NULL,
+    dias_duodecima numeric(6,2) NOT NULL,
+    monto_duodecima_vacaciones numeric(12,2) NOT NULL,
+    total numeric(12,2) NOT NULL,
+    observaciones text[] NOT NULL DEFAULT '{}',
+    calculado_por UUID NULL,
+    calculado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT SALDOS_PROPORCIONALES_pk PRIMARY KEY (id_proceso),
+    CONSTRAINT fk_saldos_proceso FOREIGN KEY (id_proceso)
+        REFERENCES PROCESOS_DESVINCULACION (id_proceso) ON DELETE CASCADE,
+    CONSTRAINT chk_saldos_montos CHECK (
+        promedio >= 0 AND salario_diario >= 0 AND monto_aguinaldo >= 0 AND monto_vacaciones_pendientes >= 0
+        AND monto_duodecima_vacaciones >= 0 AND total >= 0
+    ),
+    CONSTRAINT chk_saldos_tiempos CHECK (
+        aguinaldo_meses BETWEEN 0 AND 12 AND aguinaldo_dias BETWEEN 0 AND 30
+        AND anio_en_curso_meses BETWEEN 0 AND 12 AND anio_en_curso_dias BETWEEN 0 AND 30
+        AND dias_escala IN (15, 20, 30) AND dias_duodecima >= 0
+        AND dias_pendientes >= 0 AND dias_acumulados >= 0 AND dias_gozados >= 0
+    )
+);
+
+-- Tabla: PARAMETROS_TRIBUTARIOS
+CREATE TABLE PARAMETROS_TRIBUTARIOS (
+    id_parametro UUID NOT NULL DEFAULT gen_random_uuid(),
+    codigo varchar(30) NOT NULL,
+    nombre varchar(100) NOT NULL,
+    valor numeric(12,4) NOT NULL,
+    vigente_desde date NOT NULL,
+    vigente_hasta date NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PARAMETROS_TRIBUTARIOS_pk PRIMARY KEY (id_parametro),
+    CONSTRAINT chk_parametro_codigo CHECK (
+        codigo IN ('SALARIO_MINIMO_NACIONAL', 'MULTIPLO_MINIMO_NO_IMPONIBLE', 'ALICUOTA_RCIVA', 'ALICUOTA_CREDITO_FISCAL')
+    ),
+    CONSTRAINT chk_parametro_valor CHECK (valor > 0),
+    CONSTRAINT chk_parametro_fechas CHECK (vigente_hasta IS NULL OR vigente_hasta >= vigente_desde),
+    CONSTRAINT ex_parametro_sin_solapamiento EXCLUDE USING gist (
+        codigo WITH =,
+        daterange(vigente_desde, vigente_hasta, '[]') WITH &&
+    )
+);
+-- Tabla: VALORES_UFV
+CREATE TABLE VALORES_UFV (
+    fecha date NOT NULL,
+    valor numeric(10,5) NOT NULL,
+    CONSTRAINT VALORES_UFV_pk PRIMARY KEY (fecha),
+    CONSTRAINT chk_ufv_valor CHECK (valor > 0)
+);
+-- Tabla: ENTIDADES_APORTE
+CREATE TABLE ENTIDADES_APORTE (
+    codigo varchar(20) NOT NULL,
+    nombre varchar(100) NOT NULL,
+    formato_archivo varchar(4) NOT NULL,
+    orden smallint NOT NULL,
+    CONSTRAINT ENTIDADES_APORTE_pk PRIMARY KEY (codigo),
+    CONSTRAINT uq_entidad_aporte_orden UNIQUE (orden),
+    CONSTRAINT chk_entidad_aporte_formato CHECK (formato_archivo IN ('XLSX', 'TXT'))
+);
+-- Tabla: CONCEPTOS_ENTIDAD_APORTE
+CREATE TABLE CONCEPTOS_ENTIDAD_APORTE (
+    codigo_concepto varchar(20) NOT NULL,
+    codigo_entidad varchar(20) NOT NULL,
+    deduce_sueldo_neto boolean NOT NULL DEFAULT FALSE,
+    CONSTRAINT CONCEPTOS_ENTIDAD_APORTE_pk PRIMARY KEY (codigo_concepto),
+    CONSTRAINT fk_concepto_entidad_concepto FOREIGN KEY (codigo_concepto)
+        REFERENCES CONCEPTOS_PLANILLA (codigo),
+    CONSTRAINT fk_concepto_entidad_entidad FOREIGN KEY (codigo_entidad)
+        REFERENCES ENTIDADES_APORTE (codigo)
+);
+-- Tabla: CREDITOS_FISCALES_DECLARADOS
+CREATE TABLE CREDITOS_FISCALES_DECLARADOS (
+    id_credito UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    periodo char(7) NOT NULL,
+    monto_facturas numeric(12,2) NOT NULL DEFAULT 0,
+    saldo_inicial_favor numeric(12,2) NOT NULL DEFAULT 0,
+    declarado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT CREDITOS_FISCALES_DECLARADOS_pk PRIMARY KEY (id_credito),
+    CONSTRAINT uq_credito_empleado_periodo UNIQUE (id_empleado, periodo),
+    CONSTRAINT chk_credito_periodo CHECK (periodo ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
+    CONSTRAINT chk_credito_montos CHECK (monto_facturas >= 0 AND saldo_inicial_favor >= 0)
+);
+-- Tabla: PLANILLAS_TRIBUTARIAS
+CREATE TABLE PLANILLAS_TRIBUTARIAS (
+    id_planilla_tributaria UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla UUID NOT NULL,
+    periodo char(7) NOT NULL,
+    salario_minimo numeric(12,2) NOT NULL,
+    multiplo_minimo_no_imponible numeric(6,2) NOT NULL,
+    minimo_no_imponible numeric(12,2) NOT NULL,
+    alicuota_rciva numeric(7,4) NOT NULL,
+    alicuota_credito_fiscal numeric(7,4) NOT NULL,
+    computo_salarios_minimos numeric(12,2) NOT NULL,
+    periodo_saldo_anterior char(7) NULL,
+    ufv_inicial numeric(10,5) NULL,
+    ufv_final numeric(10,5) NULL,
+    cantidad_dependientes int NOT NULL DEFAULT 0,
+    total_sueldo_neto numeric(14,2) NOT NULL DEFAULT 0,
+    total_base_imponible numeric(14,2) NOT NULL DEFAULT 0,
+    total_impuesto_determinado numeric(14,2) NOT NULL DEFAULT 0,
+    total_computo_salarios_minimos numeric(14,2) NOT NULL DEFAULT 0,
+    total_credito_aplicado numeric(14,2) NOT NULL DEFAULT 0,
+    total_impuesto_retenido numeric(14,2) NOT NULL DEFAULT 0,
+    total_actualizacion_ufv numeric(14,2) NOT NULL DEFAULT 0,
+    advertencias text[] NOT NULL DEFAULT '{}',
+    generada_por UUID NULL,
+    generada_por_nombre varchar(150) NULL,
+    generada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PLANILLAS_TRIBUTARIAS_pk PRIMARY KEY (id_planilla_tributaria),
+    CONSTRAINT uq_planilla_tributaria_planilla UNIQUE (id_planilla),
+    CONSTRAINT fk_planilla_tributaria_planilla FOREIGN KEY (id_planilla)
+        REFERENCES PLANILLAS (id_planilla) ON DELETE CASCADE,
+    CONSTRAINT chk_planilla_tributaria_parametros CHECK (
+        salario_minimo > 0 AND multiplo_minimo_no_imponible > 0 AND minimo_no_imponible > 0
+        AND alicuota_rciva > 0 AND alicuota_credito_fiscal > 0 AND computo_salarios_minimos >= 0
+    ),
+    CONSTRAINT chk_planilla_tributaria_ufv CHECK (
+        (ufv_inicial IS NULL) = (ufv_final IS NULL) AND (ufv_inicial IS NULL OR (ufv_inicial > 0 AND ufv_final > 0))
+        AND (ufv_inicial IS NULL OR periodo_saldo_anterior IS NOT NULL)
+    ),
+    CONSTRAINT chk_planilla_tributaria_totales CHECK (
+        cantidad_dependientes >= 0 AND total_sueldo_neto >= 0 AND total_base_imponible >= 0
+        AND total_impuesto_determinado >= 0 AND total_computo_salarios_minimos >= 0 AND total_credito_aplicado >= 0
+        AND total_impuesto_retenido >= 0 AND total_actualizacion_ufv >= 0
+        AND total_impuesto_determinado = total_computo_salarios_minimos + total_credito_aplicado + total_impuesto_retenido
+    )
+);
+-- Tabla: RETENCIONES_RCIVA
+CREATE TABLE RETENCIONES_RCIVA (
+    id_retencion UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla_tributaria UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    nombre_empleado varchar(150) NOT NULL,
+    numero_documento varchar(20) NULL,
+    total_ganado numeric(12,2) NOT NULL,
+    aportes_laborales numeric(12,2) NOT NULL,
+    sueldo_neto numeric(12,2) NOT NULL,
+    base_imponible numeric(12,2) NOT NULL,
+    impuesto_determinado numeric(12,2) NOT NULL,
+    computo_salarios_minimos numeric(12,2) NOT NULL DEFAULT 0,
+    monto_facturas numeric(12,2) NOT NULL DEFAULT 0,
+    credito_fiscal_facturas numeric(12,2) NOT NULL DEFAULT 0,
+    origen_saldo varchar(15) NOT NULL,
+    saldo_mes_anterior numeric(12,2) NOT NULL DEFAULT 0,
+    actualizacion_ufv numeric(12,2) NOT NULL DEFAULT 0,
+    saldo_anterior_favor numeric(12,2) NOT NULL DEFAULT 0,
+    credito_aplicado numeric(12,2) NOT NULL,
+    impuesto_retenido numeric(12,2) NOT NULL,
+    saldo_favor_siguiente numeric(12,2) NOT NULL,
+    CONSTRAINT RETENCIONES_RCIVA_pk PRIMARY KEY (id_retencion),
+    CONSTRAINT uq_retencion_empleado UNIQUE (id_planilla_tributaria, id_empleado),
+    CONSTRAINT fk_retencion_planilla_tributaria FOREIGN KEY (id_planilla_tributaria)
+        REFERENCES PLANILLAS_TRIBUTARIAS (id_planilla_tributaria) ON DELETE CASCADE,
+    CONSTRAINT chk_retencion_montos CHECK (
+        total_ganado >= 0 AND aportes_laborales >= 0 AND sueldo_neto >= 0 AND base_imponible >= 0
+        AND impuesto_determinado >= 0 AND computo_salarios_minimos >= 0 AND monto_facturas >= 0
+        AND credito_fiscal_facturas >= 0 AND saldo_mes_anterior >= 0 AND actualizacion_ufv >= 0
+        AND saldo_anterior_favor >= 0 AND credito_aplicado >= 0 AND impuesto_retenido >= 0 AND saldo_favor_siguiente >= 0
+    ),
+    CONSTRAINT chk_retencion_origen_saldo CHECK (origen_saldo IN ('MES_ANTERIOR', 'SALDO_INICIAL')),
+    CONSTRAINT chk_retencion_balance CHECK (
+        impuesto_determinado = computo_salarios_minimos + credito_aplicado + impuesto_retenido
+        AND saldo_anterior_favor = saldo_mes_anterior + actualizacion_ufv
+        AND credito_fiscal_facturas + saldo_anterior_favor = credito_aplicado + saldo_favor_siguiente
+    )
+);
+-- Tabla: PLANILLAS_APORTES
+CREATE TABLE PLANILLAS_APORTES (
+    id_planilla_aportes UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla UUID NOT NULL,
+    periodo char(7) NOT NULL,
+    cantidad_empleados int NOT NULL DEFAULT 0,
+    total_laboral numeric(14,2) NOT NULL DEFAULT 0,
+    total_patronal numeric(14,2) NOT NULL DEFAULT 0,
+    advertencias text[] NOT NULL DEFAULT '{}',
+    generada_por UUID NULL,
+    generada_por_nombre varchar(150) NULL,
+    generada_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PLANILLAS_APORTES_pk PRIMARY KEY (id_planilla_aportes),
+    CONSTRAINT uq_planilla_aportes_planilla UNIQUE (id_planilla),
+    CONSTRAINT fk_planilla_aportes_planilla FOREIGN KEY (id_planilla)
+        REFERENCES PLANILLAS (id_planilla) ON DELETE CASCADE,
+    CONSTRAINT chk_planilla_aportes_totales CHECK (cantidad_empleados >= 0 AND total_laboral >= 0 AND total_patronal >= 0)
+);
+-- Tabla: DETALLE_APORTES
+CREATE TABLE DETALLE_APORTES (
+    id_detalle UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_planilla_aportes UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    nombre_empleado varchar(150) NOT NULL,
+    numero_documento varchar(20) NULL,
+    codigo_entidad varchar(20) NOT NULL,
+    tipo varchar(8) NOT NULL,
+    codigo_concepto varchar(20) NOT NULL,
+    nombre_concepto varchar(80) NOT NULL,
+    id_vigencia UUID NULL,
+    base numeric(12,2) NULL,
+    tasa numeric(12,4) NOT NULL,
+    monto numeric(12,2) NOT NULL,
+    CONSTRAINT DETALLE_APORTES_pk PRIMARY KEY (id_detalle),
+    CONSTRAINT fk_detalle_aportes_planilla FOREIGN KEY (id_planilla_aportes)
+        REFERENCES PLANILLAS_APORTES (id_planilla_aportes) ON DELETE CASCADE,
+    CONSTRAINT fk_detalle_aportes_entidad FOREIGN KEY (codigo_entidad) REFERENCES ENTIDADES_APORTE (codigo),
+    CONSTRAINT fk_detalle_aportes_vigencia FOREIGN KEY (id_vigencia) REFERENCES VIGENCIAS_CONCEPTO (id_vigencia),
+    CONSTRAINT chk_detalle_aportes_tipo CHECK (tipo IN ('LABORAL', 'PATRONAL')),
+    CONSTRAINT chk_detalle_aportes_valores CHECK (tasa > 0 AND monto >= 0 AND (base IS NULL OR base >= 0))
+);
+CREATE INDEX idx_detalle_aportes_entidad ON DETALLE_APORTES (id_planilla_aportes, codigo_entidad);
+
+-- Finiquito (RF-58, KAN-78)
+
+CREATE SEQUENCE seq_numero_finiquito;
+
+-- Tabla: FINIQUITOS
+-- Documento consolidado de liquidación final de un proceso de desvinculación (1 a 1).
+-- Ciclo de vida: BORRADOR -> APROBADO (genera PDF oficial, bloquea cálculos y publica a Pagos y Contabilidad)
+-- -> PAGADO (ambas confirmaciones llegaron, cierra el proceso y salda los préstamos aplicables).
+CREATE TABLE FINIQUITOS (
+    id_finiquito UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_proceso UUID NOT NULL,
+    numero_documento varchar(20) NULL,
+    estado varchar(10) NOT NULL DEFAULT 'BORRADOR',
+    fecha_retiro date NOT NULL,
+    codigo_causal varchar(25) NOT NULL,
+    promedio_base numeric(12,2) NOT NULL,
+    anios_servicio smallint NOT NULL,
+    meses_servicio smallint NOT NULL,
+    dias_fraccion smallint NOT NULL,
+    total_ingresos numeric(12,2) NOT NULL,
+    total_descuentos numeric(12,2) NOT NULL,
+    liquido_pagable numeric(12,2) NOT NULL,
+    estado_pagos varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    referencia_pagos varchar(60) NULL,
+    motivo_pagos varchar(255) NULL,
+    respondida_pagos_en TIMESTAMPTZ NULL,
+    estado_contabilidad varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    referencia_contabilidad varchar(60) NULL,
+    motivo_contabilidad varchar(255) NULL,
+    respondida_contabilidad_en TIMESTAMPTZ NULL,
+    generado_por UUID NULL,
+    generado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    aprobado_por UUID NULL,
+    aprobado_por_rol varchar(20) NULL,
+    aprobado_en TIMESTAMPTZ NULL,
+    pagado_en TIMESTAMPTZ NULL,
+    CONSTRAINT FINIQUITOS_pk PRIMARY KEY (id_finiquito),
+    CONSTRAINT uq_finiquito_proceso UNIQUE (id_proceso),
+    CONSTRAINT uq_finiquito_numero UNIQUE (numero_documento),
+    CONSTRAINT fk_finiquito_proceso FOREIGN KEY (id_proceso)
+        REFERENCES PROCESOS_DESVINCULACION (id_proceso),
+    CONSTRAINT chk_finiquito_estado CHECK (estado IN ('BORRADOR', 'APROBADO', 'PAGADO')),
+    CONSTRAINT chk_finiquito_tiempo CHECK (
+        promedio_base >= 0 AND anios_servicio >= 0 AND meses_servicio BETWEEN 0 AND 11 AND dias_fraccion BETWEEN 0 AND 30
+    ),
+    CONSTRAINT chk_finiquito_totales CHECK (
+        total_ingresos >= 0 AND total_descuentos >= 0 AND liquido_pagable >= 0
+        AND liquido_pagable = total_ingresos - total_descuentos
+    ),
+    CONSTRAINT chk_finiquito_integraciones CHECK (
+        estado_pagos IN ('PENDIENTE', 'CONFIRMADA', 'RECHAZADA')
+        AND estado_contabilidad IN ('PENDIENTE', 'CONFIRMADA', 'RECHAZADA')
+    ),
+    CONSTRAINT chk_finiquito_aprobacion CHECK (
+        (estado = 'BORRADOR') = (aprobado_en IS NULL)
+        AND (estado = 'BORRADOR') = (numero_documento IS NULL)
+    ),
+    CONSTRAINT chk_finiquito_pago CHECK (
+        (estado = 'PAGADO') = (pagado_en IS NOT NULL)
+        AND (estado <> 'PAGADO' OR (estado_pagos = 'CONFIRMADA' AND estado_contabilidad = 'CONFIRMADA'))
+    ),
+    CONSTRAINT chk_finiquito_respuestas CHECK (
+        (estado <> 'BORRADOR' OR (estado_pagos = 'PENDIENTE' AND estado_contabilidad = 'PENDIENTE'))
+        AND (estado_pagos = 'PENDIENTE') = (respondida_pagos_en IS NULL)
+        AND (estado_pagos = 'RECHAZADA') = (motivo_pagos IS NOT NULL)
+        AND (referencia_pagos IS NULL OR estado_pagos = 'CONFIRMADA')
+        AND (estado_contabilidad = 'PENDIENTE') = (respondida_contabilidad_en IS NULL)
+        AND (estado_contabilidad = 'RECHAZADA') = (motivo_contabilidad IS NOT NULL)
+        AND (referencia_contabilidad IS NULL OR estado_contabilidad = 'CONFIRMADA')
+    )
+);
+
+-- Tabla: DETALLE_FINIQUITO
+-- Renglones del formulario consolidado de finiquito (ingresos por beneficios sociales y descuentos por
+-- anticipos o préstamos activos). saldo_prestamo guarda el saldo_pendiente del préstamo al consolidar.
+CREATE TABLE DETALLE_FINIQUITO (
+    id_finiquito UUID NOT NULL,
+    orden smallint NOT NULL,
+    tipo varchar(10) NOT NULL,
+    codigo varchar(30) NOT NULL,
+    concepto varchar(120) NOT NULL,
+    detalle varchar(250) NULL,
+    monto numeric(12,2) NOT NULL,
+    id_prestamo UUID NULL,
+    saldo_prestamo numeric(12,2) NULL,
+    CONSTRAINT DETALLE_FINIQUITO_pk PRIMARY KEY (id_finiquito, orden),
+    CONSTRAINT fk_detalle_finiquito FOREIGN KEY (id_finiquito)
+        REFERENCES FINIQUITOS (id_finiquito) ON DELETE CASCADE,
+    CONSTRAINT fk_detalle_finiquito_prestamo FOREIGN KEY (id_prestamo)
+        REFERENCES PRESTAMOS (id_prestamo),
+    CONSTRAINT chk_detalle_finiquito_tipo CHECK (tipo IN ('INGRESO', 'DESCUENTO')),
+    CONSTRAINT chk_detalle_finiquito_monto CHECK (monto > 0),
+    CONSTRAINT chk_detalle_finiquito_prestamo CHECK ((tipo = 'DESCUENTO') = (id_prestamo IS NOT NULL)),
+    CONSTRAINT chk_detalle_finiquito_saldo CHECK (saldo_prestamo IS NULL OR saldo_prestamo >= monto)
+);
+
+-- Tabla: DOCUMENTOS_FINIQUITO
+-- PDF oficial del finiquito para firma (1 a 1 con FINIQUITOS). Se genera al aprobar y se guarda aparte.
+CREATE TABLE DOCUMENTOS_FINIQUITO (
+    id_finiquito UUID NOT NULL,
+    nombre_archivo varchar(255) NOT NULL,
+    contenido bytea NOT NULL,
+    tamano_bytes integer NOT NULL,
+    generado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT DOCUMENTOS_FINIQUITO_pk PRIMARY KEY (id_finiquito),
+    CONSTRAINT fk_documento_finiquito FOREIGN KEY (id_finiquito)
+        REFERENCES FINIQUITOS (id_finiquito) ON DELETE CASCADE,
+    CONSTRAINT chk_documento_finiquito_tamano CHECK (tamano_bytes > 0)
+);
+
+-- Tabla: EVENTOS_FINIQUITO
+-- Bandeja de salida propia de finiquitos (outbox): guarda envíos hacia Pagos y Contabilidad y las
+-- respuestas simuladas que pasan por el mismo tópico F. id_mensaje no es único para permitir duplicados.
+CREATE TABLE EVENTOS_FINIQUITO (
+    id_evento UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_mensaje varchar(100) NOT NULL,
+    id_finiquito UUID NOT NULL,
+    sentido varchar(20) NOT NULL,
+    destino varchar(15) NOT NULL,
+    tipo_evento varchar(60) NOT NULL,
+    topico varchar(60) NOT NULL,
+    carga JSONB NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    intentos smallint NOT NULL DEFAULT 0,
+    ultimo_error varchar(255) NULL,
+    proximo_intento_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id_pubsub varchar(100) NULL,
+    entregado_en TIMESTAMPTZ NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT EVENTOS_FINIQUITO_pk PRIMARY KEY (id_evento),
+    CONSTRAINT fk_evento_finiquito FOREIGN KEY (id_finiquito)
+        REFERENCES FINIQUITOS (id_finiquito),
+    CONSTRAINT chk_evento_finiquito_sentido CHECK (sentido IN ('SALIENTE', 'RESPUESTA_SIMULADA')),
+    CONSTRAINT chk_evento_finiquito_destino CHECK (destino IN ('PAGOS', 'CONTABILIDAD')),
+    CONSTRAINT chk_evento_finiquito_estado CHECK (estado IN ('PENDIENTE', 'ENTREGADO', 'FALLIDO')),
+    CONSTRAINT chk_evento_finiquito_intentos CHECK (intentos >= 0),
+    CONSTRAINT chk_evento_finiquito_entrega CHECK ((estado = 'ENTREGADO') = (entregado_en IS NOT NULL))
+);
+CREATE INDEX idx_eventos_finiquito_pendientes ON EVENTOS_FINIQUITO (estado, proximo_intento_en);
+CREATE INDEX idx_eventos_finiquito_destino ON EVENTOS_FINIQUITO (id_finiquito, destino, creado_en);
+
+-- Tabla: MENSAJES_FINIQUITO_ENTRANTES
+-- Bandeja de entrada y cola de errores (DLQ) de las confirmaciones de Pagos y Contabilidad para finiquitos.
+-- carga es text para registrar incluso JSON inválido. id_mensaje único descarta duplicados.
+CREATE TABLE MENSAJES_FINIQUITO_ENTRANTES (
+    id_entrante UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_mensaje varchar(100) NOT NULL,
+    origen varchar(10) NULL,
+    tipo_evento varchar(60) NULL,
+    id_finiquito UUID NULL,
+    destino varchar(15) NULL,
+    carga text NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'RECIBIDO',
+    intentos smallint NOT NULL DEFAULT 0,
+    ultimo_error varchar(255) NULL,
+    recibido_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    procesado_en TIMESTAMPTZ NULL,
+    CONSTRAINT MENSAJES_FINIQUITO_ENTRANTES_pk PRIMARY KEY (id_entrante),
+    CONSTRAINT uq_mensaje_finiquito_entrante UNIQUE (id_mensaje),
+    CONSTRAINT fk_mensaje_finiquito_entrante FOREIGN KEY (id_finiquito)
+        REFERENCES FINIQUITOS (id_finiquito),
+    CONSTRAINT chk_mensaje_finiquito_destino CHECK (destino IS NULL OR destino IN ('PAGOS', 'CONTABILIDAD')),
+    CONSTRAINT chk_mensaje_finiquito_estado CHECK (estado IN ('RECIBIDO', 'PROCESADO', 'IGNORADO', 'EN_DLQ')),
+    CONSTRAINT chk_mensaje_finiquito_intentos CHECK (intentos >= 0),
+    CONSTRAINT chk_mensaje_finiquito_procesado CHECK ((estado IN ('PROCESADO', 'IGNORADO')) = (procesado_en IS NOT NULL))
+);
+CREATE INDEX idx_mensajes_finiquito_entrantes_estado ON MENSAJES_FINIQUITO_ENTRANTES (estado, recibido_en);
+CREATE INDEX idx_mensajes_finiquito_entrantes_finiquito ON MENSAJES_FINIQUITO_ENTRANTES (id_finiquito, recibido_en);
+
+-- Cierre definitivo de desvinculación y bloqueo de accesos (RF-59, KAN-79)
+
+-- Tabla: CIERRES_DESVINCULACION
+-- Cierre definitivo manual de un proceso de desvinculación (1 a 1 con el proceso), cuando su finiquito está
+-- APROBADO o PAGADO. Registra la inactivación en EmployeeService, la revocación en AuthService y el avance
+-- consolidado de las revocaciones en Ventas/POS (E), Inventarios (I), Entregas (H) y CRM (B).
+CREATE TABLE CIERRES_DESVINCULACION (
+    id_cierre UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_proceso UUID NOT NULL,
+    id_finiquito UUID NOT NULL,
+    id_empleado UUID NOT NULL,
+    estado_finiquito_al_cerrar varchar(10) NOT NULL,
+    empleado_inactivado_en TIMESTAMPTZ NOT NULL,
+    cuenta_estado varchar(15) NOT NULL,
+    cuenta_revocada_en TIMESTAMPTZ NULL,
+    estado_revocaciones varchar(12) NOT NULL DEFAULT 'EN_PROCESO',
+    cerrado_por UUID NOT NULL,
+    cerrado_por_rol varchar(20) NOT NULL,
+    cerrado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completado_en TIMESTAMPTZ NULL,
+    CONSTRAINT CIERRES_DESVINCULACION_pk PRIMARY KEY (id_cierre),
+    CONSTRAINT uq_cierre_proceso UNIQUE (id_proceso),
+    CONSTRAINT fk_cierre_proceso FOREIGN KEY (id_proceso)
+        REFERENCES PROCESOS_DESVINCULACION (id_proceso),
+    CONSTRAINT fk_cierre_finiquito FOREIGN KEY (id_finiquito)
+        REFERENCES FINIQUITOS (id_finiquito),
+    CONSTRAINT chk_cierre_estado_finiquito CHECK (estado_finiquito_al_cerrar IN ('APROBADO', 'PAGADO')),
+    CONSTRAINT chk_cierre_cuenta_estado CHECK (cuenta_estado IN ('REVOCADA', 'SIN_CUENTA')),
+    CONSTRAINT chk_cierre_cuenta_fecha CHECK ((cuenta_estado = 'REVOCADA') = (cuenta_revocada_en IS NOT NULL)),
+    CONSTRAINT chk_cierre_estado_revocaciones CHECK (estado_revocaciones IN ('EN_PROCESO', 'COMPLETADO', 'CON_ALERTAS')),
+    CONSTRAINT chk_cierre_completado CHECK ((estado_revocaciones = 'COMPLETADO') = (completado_en IS NOT NULL))
+);
+
+-- Tabla: REVOCACIONES_SISTEMA
+-- Estado de la revocación de accesos en cada módulo operativo externo (4 filas por cierre).
+-- PENDIENTE: esperando publicación en Pub/Sub; ENVIADA: publicada, corre el plazo de confirmación;
+-- CONFIRMADA: módulo confirmó; RECHAZADA: módulo rechazó con motivo; VENCIDA: agotó los reenvíos por plazo.
+CREATE TABLE REVOCACIONES_SISTEMA (
+    id_revocacion UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_cierre UUID NOT NULL,
+    destino varchar(15) NOT NULL,
+    estado varchar(12) NOT NULL DEFAULT 'PENDIENTE',
+    plazo_vence_en TIMESTAMPTZ NULL,
+    reenvios_por_plazo smallint NOT NULL DEFAULT 0,
+    recursos_revocados JSONB NULL,
+    referencia varchar(60) NULL,
+    motivo varchar(255) NULL,
+    respondida_en TIMESTAMPTZ NULL,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT REVOCACIONES_SISTEMA_pk PRIMARY KEY (id_revocacion),
+    CONSTRAINT uq_rev_sistema_cierre_destino UNIQUE (id_cierre, destino),
+    CONSTRAINT fk_rev_sistema_cierre FOREIGN KEY (id_cierre)
+        REFERENCES CIERRES_DESVINCULACION (id_cierre) ON DELETE CASCADE,
+    CONSTRAINT chk_rev_sistema_destino CHECK (destino IN ('VENTAS', 'INVENTARIOS', 'ENTREGAS', 'CRM')),
+    CONSTRAINT chk_rev_sistema_estado CHECK (estado IN ('PENDIENTE', 'ENVIADA', 'CONFIRMADA', 'RECHAZADA', 'VENCIDA')),
+    CONSTRAINT chk_rev_sistema_reenvios CHECK (reenvios_por_plazo >= 0)
+);
+CREATE INDEX idx_rev_sistema_plazos ON REVOCACIONES_SISTEMA (estado, plazo_vence_en);
+
+-- Tabla: EVENTOS_CIERRE
+-- Bandeja de salida propia del cierre definitivo (outbox): guarda los envíos SALIENTE y las respuestas
+-- simuladas RESPUESTA_SIMULADA hacia/desde Ventas/POS, Inventarios, Entregas y CRM en el tópico F.
+-- id_mensaje no es único para permitir reenvíos y escenarios duplicados.
+CREATE TABLE EVENTOS_CIERRE (
+    id_evento UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_mensaje varchar(100) NOT NULL,
+    id_cierre UUID NOT NULL,
+    sentido varchar(20) NOT NULL,
+    destino varchar(15) NOT NULL,
+    tipo_evento varchar(60) NOT NULL,
+    topico varchar(60) NOT NULL,
+    carga JSONB NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'PENDIENTE',
+    intentos smallint NOT NULL DEFAULT 0,
+    ultimo_error varchar(255) NULL,
+    proximo_intento_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id_pubsub varchar(100) NULL,
+    entregado_en TIMESTAMPTZ NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT EVENTOS_CIERRE_pk PRIMARY KEY (id_evento),
+    CONSTRAINT fk_evento_cierre FOREIGN KEY (id_cierre)
+        REFERENCES CIERRES_DESVINCULACION (id_cierre),
+    CONSTRAINT chk_evento_cierre_sentido CHECK (sentido IN ('SALIENTE', 'RESPUESTA_SIMULADA')),
+    CONSTRAINT chk_evento_cierre_destino CHECK (destino IN ('VENTAS', 'INVENTARIOS', 'ENTREGAS', 'CRM')),
+    CONSTRAINT chk_evento_cierre_estado CHECK (estado IN ('PENDIENTE', 'ENTREGADO', 'FALLIDO')),
+    CONSTRAINT chk_evento_cierre_intentos CHECK (intentos >= 0),
+    CONSTRAINT chk_evento_cierre_entrega CHECK ((estado = 'ENTREGADO') = (entregado_en IS NOT NULL))
+);
+CREATE INDEX idx_eventos_cierre_pendientes ON EVENTOS_CIERRE (estado, proximo_intento_en);
+CREATE INDEX idx_eventos_cierre_destino ON EVENTOS_CIERRE (id_cierre, destino, creado_en);
+
+-- Tabla: MENSAJES_CIERRE_ENTRANTES
+-- Bandeja de entrada y cola de errores (DLQ) de las confirmaciones de revocación de los sistemas externos.
+-- carga es text para registrar incluso JSON inválido. id_mensaje único descarta duplicados.
+CREATE TABLE MENSAJES_CIERRE_ENTRANTES (
+    id_entrante UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_mensaje varchar(100) NOT NULL,
+    origen varchar(10) NULL,
+    tipo_evento varchar(60) NULL,
+    id_cierre UUID NULL,
+    destino varchar(15) NULL,
+    carga text NOT NULL,
+    estado varchar(10) NOT NULL DEFAULT 'RECIBIDO',
+    intentos smallint NOT NULL DEFAULT 0,
+    ultimo_error varchar(255) NULL,
+    recibido_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    procesado_en TIMESTAMPTZ NULL,
+    CONSTRAINT MENSAJES_CIERRE_ENTRANTES_pk PRIMARY KEY (id_entrante),
+    CONSTRAINT uq_mensaje_cierre_entrante UNIQUE (id_mensaje),
+    CONSTRAINT fk_mensaje_cierre_entrante FOREIGN KEY (id_cierre)
+        REFERENCES CIERRES_DESVINCULACION (id_cierre),
+    CONSTRAINT chk_mensaje_cierre_destino CHECK (destino IS NULL OR destino IN ('VENTAS', 'INVENTARIOS', 'ENTREGAS', 'CRM')),
+    CONSTRAINT chk_mensaje_cierre_estado CHECK (estado IN ('RECIBIDO', 'PROCESADO', 'IGNORADO', 'EN_DLQ')),
+    CONSTRAINT chk_mensaje_cierre_intentos CHECK (intentos >= 0),
+    CONSTRAINT chk_mensaje_cierre_procesado CHECK ((estado IN ('PROCESADO', 'IGNORADO')) = (procesado_en IS NOT NULL))
+);
+CREATE INDEX idx_mensajes_cierre_entrantes_estado ON MENSAJES_CIERRE_ENTRANTES (estado, recibido_en);
+CREATE INDEX idx_mensajes_cierre_entrantes_cierre ON MENSAJES_CIERRE_ENTRANTES (id_cierre, recibido_en);

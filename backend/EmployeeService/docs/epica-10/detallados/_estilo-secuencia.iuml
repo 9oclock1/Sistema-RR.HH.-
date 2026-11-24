@@ -1,0 +1,27 @@
+' Estilo común de los diagramas de secuencia detallados de la épica 10.
+' Colores: verde = controlador o pantalla · azul = servicio · morado = modelo
+'          naranja = middleware · rojo = job o sistema externo · amarillo = base de datos
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 240
+skinparam sequence {
+  LifeLineBorderColor #888888
+  ParticipantBorderColor #555555
+  ActorBorderColor #333333
+  ActorBackgroundColor #FFFFFF
+  GroupBorderColor #888888
+  GroupBackgroundColor #F5F5F5
+  DividerBackgroundColor #EEEEEE
+  DividerBorderColor #BBBBBB
+}
+autonumber "<b>00"
+!define PANTALLA #D5E8D4
+!define CONTROLADOR #D5E8D4
+!define SERVICIO #DAE8FC
+!define MODELO #E1D5E7
+!define MIDDLEWARE #FFE6CC
+!define EXTERNO #F8CECC
+!define BD #FFF2CC

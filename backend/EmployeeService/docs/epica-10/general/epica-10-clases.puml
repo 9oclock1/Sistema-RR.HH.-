@@ -1,0 +1,203 @@
+@startuml epica-10-clases
+!pragma layout smetana
+title Épica 10 · Seguimiento de ascensos y promoción interna\nDiagrama de clases (resumen de la épica)
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 70
+skinparam class {
+  BackgroundColor #DAE8FC
+  BorderColor #6C8EBF
+  ArrowColor #444444
+  StereotypeFontColor #555555
+}
+skinparam package {
+  BackgroundColor #FAFAFA
+  BorderColor #BBBBBB
+  FontColor #555555
+}
+
+package "Organización y expediente (contexto)" {
+  class Empleado {
+    id_empleado: UUID
+    nombres: String
+    fecha_ingreso: Date
+    /activo: Boolean
+    --
+    + mesesDePermanencia(hasta): Integer
+  }
+  class Cargo {
+    nombre: String
+    nivel_salarial: String
+    salario_base_referencial: Decimal
+    esta_activo: Boolean
+  }
+  class Sucursal {
+    nombre: String
+  }
+  class AsignacionEmpleado <<trayectoria>> {
+    fecha_inicio: Date
+    fecha_fin: Date [0..1]
+    es_vigente: Boolean
+    --
+    + aplicarAsignacion(cargo, sucursal, fecha)
+  }
+  class Contrato <<versión inmutable · Kardex>> {
+    numero_contrato: String
+    tipo_modificacion: ASCENSO | …
+    es_adenda: Boolean
+    haber_mensual_pactado: Decimal
+    fecha_vigencia: Date
+  }
+  class CapacitacionCertificacion <<Kardex>> {
+    fecha_emision: Date
+    fecha_vencimiento: Date [0..1]
+  }
+}
+
+package "KAN-80 · Convocatorias internas (RF-60)" {
+  class ConvocatoriaAscenso {
+    titulo: String
+    descripcion_requisitos: Text
+    meses_antiguedad_minima: Integer
+    nota_minima_desempeno: Decimal {0..100}
+    fecha_inicio_postulacion: Date
+    fecha_cierre_postulacion: Date
+    esta_abierta: Boolean
+    /estado: PROGRAMADA | ABIERTA | CERRADA
+    estado_notificacion: EstadoNotificacion
+    --
+    + publicar(): solo si el cargo está vacante
+    + notificarElegibles()
+    + cerrarVencidas()
+  }
+  class DestinatarioConvocatoria {
+    meses_antiguedad: Integer
+    notificado_en: DateTime [0..1]
+    ultimo_error: String [0..1]
+  }
+}
+
+package "KAN-81 · Postulación y méritos (RF-61)" {
+  class PostulacionAscenso {
+    fecha_postulacion: DateTime
+    estado_postulacion: EstadoPostulacion
+    meses_permanencia: Integer
+    nota_ultima_evaluacion: Decimal [0..1]
+    puntaje_meritos: Decimal [0..1]
+    motivos_no_apto: String [0..*]
+    /posicion_ranking: Integer
+    --
+    + postular(): una sola vez
+    + validar(): permanencia y nota
+  }
+}
+
+package "KAN-82 · Formalización del ascenso (RF-62)" {
+  class Ascenso <<datos en la postulación>> {
+    fecha_vigencia_ascenso: Date
+    haber_ascenso: Decimal
+    estado_ascenso: PROGRAMADO | APLICADO
+    formalizado_en: DateTime
+    ascenso_aplicado_en: DateTime [0..1]
+    ascenso_notificado_en: DateTime [0..1]
+    --
+    + formalizar(datos)
+    + aplicarProgramados(): job diario
+  }
+}
+
+package "KAN-83 · Plan de capacitación (RF-63)" {
+  class PlanAscenso {
+    estado: EN_CURSO | FORMALIZADO
+    observaciones: String [0..1]
+    cursos_pendientes_al_formalizar: Integer [0..1]
+    /avance: Porcentaje
+    --
+    + asignar(empleado, cargoDestino)
+    + formalizar(confirmarPendientes)
+  }
+  class RequisitoCapacitacionCargo {
+    es_obligatorio: Boolean
+    meses_validez_requerida: Integer [0..1]
+  }
+  class CursoPlan <<calculado>> {
+    /estado: CUMPLIDO | PENDIENTE
+    /motivo: String [0..1]
+  }
+}
+
+package "Enumeraciones" {
+  enum EstadoPostulacion #FFF2CC {
+    PENDIENTE_VALIDACION
+    APTO
+    NO_APTO
+  }
+  enum EstadoNotificacion #FFF2CC {
+    PENDIENTE
+    ENTREGADA
+    FALLIDA
+  }
+}
+
+package "Sistemas externos" {
+  class PerformanceService <<microservicio>> #F8CECC {
+    + historialEvaluaciones(idEmpleado)
+  }
+  class NotificationService <<microservicio>> #F8CECC {
+    + comunicacionDirecta(aviso)
+  }
+}
+
+Empleado "*" --> "1" Cargo : cargo actual
+Empleado "*" --> "1" Sucursal : sucursal actual
+Empleado "1" *-- "1..*" AsignacionEmpleado
+Empleado "1" *-- "1..*" Contrato
+Empleado "1" *-- "0..*" CapacitacionCertificacion
+
+ConvocatoriaAscenso "*" --> "1" Cargo : cargo vacante
+ConvocatoriaAscenso "*" --> "1" Sucursal
+ConvocatoriaAscenso "1" *-- "0..*" DestinatarioConvocatoria : elegibles
+DestinatarioConvocatoria "*" --> "1" Empleado
+ConvocatoriaAscenso ..> NotificationService : avisa a elegibles
+
+ConvocatoriaAscenso "1" *-- "0..*" PostulacionAscenso
+PostulacionAscenso "*" --> "1" Empleado : postulante
+PostulacionAscenso ..> PerformanceService : <<HTTP>> última nota
+
+PostulacionAscenso "1" -- "0..1" Ascenso
+Ascenso "1" --> "1" Contrato : adenda ASCENSO
+Ascenso ..> AsignacionEmpleado : nuevo cargo
+Ascenso ..> NotificationService : avisa al promovido
+
+PlanAscenso "*" --> "1" Empleado : candidato
+PlanAscenso "*" --> "1" Cargo : cargo destino
+Cargo "1" *-- "0..*" RequisitoCapacitacionCargo
+PlanAscenso "1" *-- "1..*" CursoPlan
+CursoPlan ..> RequisitoCapacitacionCargo : sale de
+CursoPlan ..> CapacitacionCertificacion : se cumple con
+PlanAscenso ..> AsignacionEmpleado : al formalizar
+
+note right of PostulacionAscenso
+  Puntaje de méritos (aptos):
+  70 % nota de la última evaluación
+  + 30 % antigüedad (tope 60 meses).
+end note
+
+note bottom of Ascenso
+  Una sola formalización por convocatoria.
+  Vigencia hoy → APLICADO; vigencia futura →
+  PROGRAMADO y el job diario cambia el cargo.
+end note
+
+note bottom of PlanAscenso
+  Un solo plan EN_CURSO por empleado.
+  Con cursos pendientes, formalizar pide
+  confirmar la advertencia.
+end note
+@enduml

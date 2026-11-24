@@ -1,0 +1,67 @@
+@startuml sec-03-kan81-postulacion-validacion
+!include _estilo-secuencia.iuml
+title KAN-81 · Postularse y validar los méritos (RF-61, criterios 1 a 3)
+
+actor "Empleado" as EMP
+participant "TarjetaConvocatoria\n(React)" as FE PANTALLA
+participant "identificarEmpleado" as MW MIDDLEWARE
+participant "postulaciones\nController" as CT CONTROLADOR
+participant "postulaciones\nService" as SV SERVICIO
+participant "utils/meritos" as UT SERVICIO
+participant "desempeno\nService" as DS SERVICIO
+participant "postulaciones\nModel" as MD MODELO
+database "EmployeeDB" as DB BD
+participant "PerformanceService" as PF EXTERNO
+
+EMP -> FE : «Postularme»
+FE -> MW : POST /convocatorias/{id}/postulaciones [X-Empleado-Id]
+MW -> CT : postular
+activate CT
+CT -> SV : postular(idConvocatoria, idEmpleado)
+activate SV
+SV -> MD : obtenerEmpleado(idEmpleado)
+alt no existe o está inactivo
+  SV --> CT : <color:#B85450>403 Solo los empleados activos pueden postularse</color>
+end
+SV -> DB : convocatoria (estado derivado)
+alt PROGRAMADA o CERRADA
+  SV --> CT : <color:#B85450>409 CONVOCATORIA_NO_VIGENTE</color>
+else ya ocupa el cargo convocado
+  SV --> CT : <color:#B85450>409 MISMO_CARGO</color>
+end
+SV -> MD : obtenerDeEmpleado(idConvocatoria, idEmpleado)
+alt ya se postuló
+  SV --> CT : <color:#B85450>409 YA_POSTULADO</color>
+end
+SV -> MD : insertar(postulación PENDIENTE_VALIDACION)
+note right of DB : uq_postulacion_convocatoria_empleado:\ndos envíos simultáneos → 23505 → 409
+SV -> SV : validar(postulación, convocatoria)
+SV -> DS : obtenerUltimaEvaluacion(idEmpleado)
+DS -> PF : GET /evaluaciones/historial/{id}\n[X-Empleado-Id, X-Rol: empleado] (timeout 5 s)
+alt PerformanceService no responde
+  PF --> DS : <color:#B85450>error / timeout</color>
+  DS --> SV : error
+  SV -> MD : registrarErrorValidacion (sigue PENDIENTE_VALIDACION)
+  note right of SV : no se marca NO_APTO por una\nfalla técnica: RRHH la revalida
+else responde
+  PF --> DS : ciclos cerrados (más reciente primero)
+  DS --> SV : { nota, ciclo } o null si nunca fue evaluado
+  SV -> UT : mesesCompletos(fecha_ingreso, día de postulación)
+  SV -> UT : evaluarRequisitos({ meses, ultimaEvaluacion }, convocatoria)
+  activate UT
+  UT -> UT : meses ≥ antigüedad mínima · nota ≥ nota mínima
+  alt cumple ambos
+    UT -> UT : puntajeMeritos = 0.7 × nota\n+ 0.3 × (min(meses, 60) / 60 × 100)
+    UT --> SV : APTO con puntaje
+  else falta algún requisito
+    UT --> SV : NO_APTO con un motivo por requisito incumplido
+  end
+  deactivate UT
+  SV -> MD : guardarValidacion(id, resultado)
+end
+SV --> CT : postulación con su resultado
+deactivate SV
+CT --> FE : 201
+deactivate CT
+FE --> EMP : «Apto» con puntaje, «No apto» con los motivos\no «Validación pendiente»
+@enduml
