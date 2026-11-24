@@ -282,8 +282,8 @@ async function prepararReenvioRevocacion(cliente, idCierre, destino) {
 async function actualizarEstadoCierre(cliente, idCierre, estadoRevocaciones) {
   await cliente.query(
     `UPDATE CIERRES_DESVINCULACION
-        SET estado_revocaciones = $2,
-            completado_en = CASE WHEN $2 = 'COMPLETADO' THEN COALESCE(completado_en, CURRENT_TIMESTAMP) ELSE NULL END
+        SET estado_revocaciones = $2::varchar(20),
+            completado_en = CASE WHEN $2::text = 'COMPLETADO' THEN COALESCE(completado_en, CURRENT_TIMESTAMP) ELSE NULL END
       WHERE id_cierre = $1`,
     [idCierre, estadoRevocaciones]
   );
