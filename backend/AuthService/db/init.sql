@@ -20,3 +20,20 @@ CREATE TABLE USUARIOS (
     CONSTRAINT chk_usuario_correo CHECK (correo = lower(correo) AND correo ~ '^[^@ ]+@[^@ ]+$'),
     CONSTRAINT chk_usuario_hash CHECK (hash_contrasena ~ '^scrypt\$[0-9a-f]{32}\$[0-9a-f]{128}$')
 );
+
+-- Tabla: REVOCACIONES_ACCESO
+-- Registro de cada revocación de credenciales del colaborador (KAN-79). id_usuario puede ser NULL si el
+-- colaborador nunca tuvo cuenta; todo JWT con iat anterior a revocado_en queda invalidado.
+CREATE TABLE REVOCACIONES_ACCESO (
+    id_revocacion UUID NOT NULL DEFAULT gen_random_uuid(),
+    id_empleado UUID NOT NULL,
+    id_usuario UUID NULL,
+    motivo varchar(40) NOT NULL,
+    id_proceso UUID NULL,
+    solicitado_por UUID NULL,
+    revocado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT REVOCACIONES_ACCESO_pk PRIMARY KEY (id_revocacion),
+    CONSTRAINT fk_revocacion_usuario FOREIGN KEY (id_usuario) REFERENCES USUARIOS (id_usuario),
+    CONSTRAINT chk_revocacion_motivo CHECK (motivo IN ('DESVINCULACION'))
+);
+CREATE INDEX idx_revocaciones_empleado_fecha ON REVOCACIONES_ACCESO (id_empleado, revocado_en DESC);
