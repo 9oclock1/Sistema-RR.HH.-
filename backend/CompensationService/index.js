@@ -17,6 +17,7 @@ const { iniciarConsumidor } = require("./src/services/confirmaciones.service");
 const ventasProductividadRoutes = require("./src/routes/ventasProductividad.routes");
 const boletasRoutes = require("./src/routes/boletas.routes");
 const desvinculacionesRoutes = require("./src/routes/desvinculacionesRoutes");
+const finiquitosRoutes = require("./src/routes/finiquitosRoutes");
 const rotacionRoutes = require("./src/routes/rotacion.routes");
 const manejadorErrores = require("./src/middlewares/manejadorErrores");
 const ventasProductividad = require("./src/services/ventasProductividad.service");
@@ -64,6 +65,7 @@ app.use(reporteContableRoutes);
 app.use(ventasProductividadRoutes);
 app.use(boletasRoutes);
 app.use(desvinculacionesRoutes);
+app.use(finiquitosRoutes);
 app.use(rotacionRoutes);
 app.use(manejadorErrores);
 
