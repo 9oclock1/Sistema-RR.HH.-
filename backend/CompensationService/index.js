@@ -17,6 +17,10 @@ const { iniciarConsumidor } = require("./src/services/confirmaciones.service");
 const { iniciarDespachadorFiniquitos } = require("./src/services/integracionFiniquitosService");
 const { reanudarRecibidos: reanudarMensajesFiniquito } = require("./src/services/confirmacionesFiniquitoService");
 const { iniciarDespachadorCierres } = require("./src/services/integracionCierresService");
+const {
+  reanudarRecibidos: reanudarMensajesCierre,
+  iniciarVigilantePlazos,
+} = require("./src/services/confirmacionesCierreService");
 const ventasProductividadRoutes = require("./src/routes/ventasProductividad.routes");
 const boletasRoutes = require("./src/routes/boletas.routes");
 const desvinculacionesRoutes = require("./src/routes/desvinculacionesRoutes");
@@ -82,6 +86,8 @@ app.listen(PORT, "0.0.0.0", () => {
   iniciarDespachadorFiniquitos();
   reanudarMensajesFiniquito();
   iniciarDespachadorCierres();
+  reanudarMensajesCierre();
+  iniciarVigilantePlazos();
 });
 
 // RF-51: se suscribe al cierre de ventas del periodo publicado por Ventas y Marketing (grupo E).

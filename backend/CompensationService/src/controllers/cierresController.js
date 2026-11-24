@@ -1,4 +1,5 @@
 const servicio = require("../services/cierresService");
+const confirmaciones = require("../services/confirmacionesCierreService");
 
 async function listar(req, res) {
   res.json(await servicio.listar(req.query, req.identidad));
@@ -24,4 +25,21 @@ async function configurarSinRespuesta(req, res) {
   res.json(await servicio.configurarSinRespuesta(req.body, req.identidad));
 }
 
-module.exports = { listar, obtener, cerrar, reenviar, simularRespuesta, configurarSinRespuesta };
+async function listarMensajesProceso(req, res) {
+  res.json(await confirmaciones.listarMensajesProceso(req.params.idProceso, req.identidad));
+}
+
+async function reprocesarMensaje(req, res) {
+  res.json(await confirmaciones.reprocesarMensaje(req.params.id, req.identidad));
+}
+
+module.exports = {
+  listar,
+  obtener,
+  cerrar,
+  reenviar,
+  simularRespuesta,
+  configurarSinRespuesta,
+  listarMensajesProceso,
+  reprocesarMensaje,
+};

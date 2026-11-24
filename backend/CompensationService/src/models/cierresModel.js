@@ -302,6 +302,256 @@ async function obtenerUltimaRespuestaEntrante(idCierre, destino, db = pool) {
   return rows[0] || null;
 }
 
+async function bloquearCierrePorId(cliente, idCierre) {
+  const { rows } = await cliente.query(
+    `SELECT c.id_cierre, c.id_proceso, c.id_finiquito, c.id_empleado,
+            c.estado_revocaciones, c.cerrado_por, c.cerrado_por_rol, c.cerrado_en, c.completado_en,
+            p.nombre_empleado, to_char(p.fecha_retiro, 'YYYY-MM-DD') AS fecha_retiro, p.codigo_causal
+       FROM CIERRES_DESVINCULACION c
+       JOIN PROCESOS_DESVINCULACION p ON p.id_proceso = c.id_proceso
+      WHERE c.id_cierre = $1
+      FOR UPDATE OF c`,
+    [idCierre]
+  );
+  return rows[0] || null;
+}
+
+async function listarEnviosSalientesDestino(idCierre, destino, db = pool) {
+  const { rows } = await db.query(
+    `SELECT id_evento, id_mensaje, estado, creado_en, carga
+       FROM EVENTOS_CIERRE
+      WHERE id_cierre = $1
+        AND destino = $2
+        AND sentido = 'SALIENTE'
+      ORDER BY creado_en DESC, id_evento DESC`,
+    [idCierre, destino]
+  );
+  return rows;
+}
+
+async function actualizarRevocacionConfirmada(cliente, idCierre, destino, { recursosRevocados, referencia }) {
+  await cliente.query(
+    `UPDATE REVOCACIONES_SISTEMA
+        SET estado = 'CONFIRMADA',
+            recursos_revocados = $3::jsonb,
+            referencia = $4,
+            motivo = NULL,
+            respondida_en = CURRENT_TIMESTAMP,
+            actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_cierre = $1
+        AND destino = $2`,
+    [idCierre, destino, JSON.stringify(recursosRevocados ?? []), referencia]
+  );
+}
+
+async function actualizarRevocacionRechazada(cliente, idCierre, destino, { motivo }) {
+  await cliente.query(
+    `UPDATE REVOCACIONES_SISTEMA
+        SET estado = 'RECHAZADA',
+            recursos_revocados = NULL,
+            referencia = NULL,
+            motivo = left($3, 255),
+            respondida_en = CURRENT_TIMESTAMP,
+            actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_cierre = $1
+        AND destino = $2`,
+    [idCierre, destino, motivo]
+  );
+}
+
+async function registrarMensajeEntrante({ idMensaje, origen, tipoEvento, idCierre, destino, carga }, db = pool) {
+  const { rows } = await db.query(
+    `INSERT INTO MENSAJES_CIERRE_ENTRANTES (
+       id_mensaje, origen, tipo_evento, id_cierre, destino, carga, estado
+     )
+     VALUES (
+       $1, $2, $3,
+       (SELECT id_cierre FROM CIERRES_DESVINCULACION WHERE id_cierre = $4),
+       $5, $6, 'RECIBIDO'
+     )
+     ON CONFLICT (id_mensaje) DO NOTHING
+     RETURNING id_entrante, id_mensaje, origen, tipo_evento, id_cierre, destino, carga, estado, intentos, ultimo_error, recibido_en, procesado_en`,
+    [idMensaje, origen, tipoEvento, idCierre, destino, carga]
+  );
+  if (rows[0]) return { fila: rows[0], duplicado: false };
+
+  const { rows: existentes } = await db.query(
+    `SELECT id_entrante, id_mensaje, origen, tipo_evento, id_cierre, destino, carga, estado, intentos, ultimo_error, recibido_en, procesado_en
+       FROM MENSAJES_CIERRE_ENTRANTES
+      WHERE id_mensaje = $1`,
+    [idMensaje]
+  );
+  return { fila: existentes[0], duplicado: true };
+}
+
+async function obtenerMensajeEntrante(idEntrante, db = pool) {
+  const { rows } = await db.query(
+    `SELECT id_entrante, id_mensaje, origen, tipo_evento, id_cierre, destino, carga, estado, intentos, ultimo_error, recibido_en, procesado_en
+       FROM MENSAJES_CIERRE_ENTRANTES
+      WHERE id_entrante = $1`,
+    [idEntrante]
+  );
+  return rows[0] || null;
+}
+
+async function bloquearMensajeEntrante(cliente, idEntrante) {
+  const { rows } = await cliente.query(
+    `SELECT id_entrante, id_mensaje, origen, tipo_evento, id_cierre, destino, carga, estado, intentos
+       FROM MENSAJES_CIERRE_ENTRANTES
+      WHERE id_entrante = $1
+      FOR UPDATE`,
+    [idEntrante]
+  );
+  return rows[0] || null;
+}
+
+async function marcarMensajeEntranteProcesado(cliente, idEntrante, idCierre, destino) {
+  await cliente.query(
+    `UPDATE MENSAJES_CIERRE_ENTRANTES
+        SET estado = 'PROCESADO',
+            id_cierre = $2,
+            destino = $3,
+            procesado_en = CURRENT_TIMESTAMP,
+            intentos = intentos + 1,
+            ultimo_error = NULL
+      WHERE id_entrante = $1
+        AND estado = 'RECIBIDO'`,
+    [idEntrante, idCierre, destino]
+  );
+}
+
+async function marcarMensajeEntranteIgnorado(cliente, idEntrante, idCierre, destino, motivo) {
+  await cliente.query(
+    `UPDATE MENSAJES_CIERRE_ENTRANTES
+        SET estado = 'IGNORADO',
+            id_cierre = $2,
+            destino = $3,
+            procesado_en = CURRENT_TIMESTAMP,
+            intentos = intentos + 1,
+            ultimo_error = left($4, 255)
+      WHERE id_entrante = $1
+        AND estado = 'RECIBIDO'`,
+    [idEntrante, idCierre, destino, motivo]
+  );
+}
+
+async function registrarFalloMensajeEntrante(idEntrante, error, db = pool) {
+  const { rows } = await db.query(
+    `UPDATE MENSAJES_CIERRE_ENTRANTES
+        SET intentos = intentos + 1,
+            ultimo_error = left($2, 255)
+      WHERE id_entrante = $1
+        AND estado = 'RECIBIDO'
+      RETURNING intentos`,
+    [idEntrante, error]
+  );
+  return rows[0]?.intentos ?? null;
+}
+
+async function enviarMensajeEntranteADlq(idEntrante, db = pool) {
+  await db.query(
+    `UPDATE MENSAJES_CIERRE_ENTRANTES
+        SET estado = 'EN_DLQ'
+      WHERE id_entrante = $1
+        AND estado = 'RECIBIDO'`,
+    [idEntrante]
+  );
+}
+
+async function reabrirMensajeEntrante(idEntrante, db = pool) {
+  const { rowCount } = await db.query(
+    `UPDATE MENSAJES_CIERRE_ENTRANTES
+        SET estado = 'RECIBIDO',
+            intentos = 0,
+            ultimo_error = NULL
+      WHERE id_entrante = $1
+        AND estado = 'EN_DLQ'`,
+    [idEntrante]
+  );
+  return rowCount > 0;
+}
+
+async function listarMensajesEntrantes({ estado = null, idCierre = null, limite = 100 } = {}, db = pool) {
+  const condiciones = [];
+  const params = [];
+  if (estado) {
+    params.push(estado);
+    condiciones.push(`m.estado = $${params.length}`);
+  }
+  if (idCierre) {
+    params.push(idCierre);
+    condiciones.push(`m.id_cierre = $${params.length}`);
+  }
+  params.push(limite);
+  const where = condiciones.length ? `WHERE ${condiciones.join(" AND ")}` : "";
+  const { rows } = await db.query(
+    `SELECT m.id_entrante, m.id_mensaje, m.origen, m.tipo_evento, m.id_cierre, m.destino,
+            m.carga, m.estado, m.intentos, m.ultimo_error, m.recibido_en, m.procesado_en
+       FROM MENSAJES_CIERRE_ENTRANTES m
+       ${where}
+      ORDER BY m.recibido_en DESC, m.id_entrante DESC
+      LIMIT $${params.length}`,
+    params
+  );
+  return rows;
+}
+
+async function listarRecibidosAntiguos(segundos = 30, db = pool) {
+  const { rows } = await db.query(
+    `SELECT id_entrante
+       FROM MENSAJES_CIERRE_ENTRANTES
+      WHERE estado = 'RECIBIDO'
+        AND recibido_en < CURRENT_TIMESTAMP - make_interval(secs => $1)
+      ORDER BY recibido_en ASC`,
+    [segundos]
+  );
+  return rows;
+}
+
+async function reservarRevocacionesVencidas(cliente, limite = 10) {
+  const { rows } = await cliente.query(
+    `SELECT r.id_revocacion, r.id_cierre, r.destino, r.estado, r.plazo_vence_en, r.reenvios_por_plazo,
+            c.id_proceso, c.id_empleado, c.cerrado_por, c.cerrado_en,
+            p.nombre_empleado, to_char(p.fecha_retiro, 'YYYY-MM-DD') AS fecha_retiro, p.codigo_causal
+       FROM REVOCACIONES_SISTEMA r
+       JOIN CIERRES_DESVINCULACION c ON c.id_cierre = r.id_cierre
+       JOIN PROCESOS_DESVINCULACION p ON p.id_proceso = c.id_proceso
+      WHERE r.estado = 'ENVIADA'
+        AND r.plazo_vence_en IS NOT NULL
+        AND r.plazo_vence_en < CURRENT_TIMESTAMP
+      ORDER BY r.plazo_vence_en ASC, r.id_revocacion ASC
+      LIMIT $1
+      FOR UPDATE OF r SKIP LOCKED`,
+    [limite]
+  );
+  return rows;
+}
+
+async function marcarRevocacionReenvioPorPlazo(cliente, idRevocacion) {
+  await cliente.query(
+    `UPDATE REVOCACIONES_SISTEMA
+        SET estado = 'PENDIENTE',
+            plazo_vence_en = NULL,
+            reenvios_por_plazo = reenvios_por_plazo + 1,
+            actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_revocacion = $1
+        AND estado = 'ENVIADA'`,
+    [idRevocacion]
+  );
+}
+
+async function marcarRevocacionVencida(cliente, idRevocacion, motivo) {
+  await cliente.query(
+    `UPDATE REVOCACIONES_SISTEMA
+        SET estado = 'VENCIDA',
+            motivo = left($2, 255),
+            actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_revocacion = $1
+        AND estado = 'ENVIADA'`,
+    [idRevocacion, motivo]
+  );
+}
+
 module.exports = {
   listarProcesosParaCierre,
   obtenerProcesoParaCierre,
@@ -321,4 +571,21 @@ module.exports = {
   prepararReenvioRevocacion,
   actualizarEstadoCierre,
   obtenerUltimaRespuestaEntrante,
+  bloquearCierrePorId,
+  listarEnviosSalientesDestino,
+  actualizarRevocacionConfirmada,
+  actualizarRevocacionRechazada,
+  registrarMensajeEntrante,
+  obtenerMensajeEntrante,
+  bloquearMensajeEntrante,
+  marcarMensajeEntranteProcesado,
+  marcarMensajeEntranteIgnorado,
+  registrarFalloMensajeEntrante,
+  enviarMensajeEntranteADlq,
+  reabrirMensajeEntrante,
+  listarMensajesEntrantes,
+  listarRecibidosAntiguos,
+  reservarRevocacionesVencidas,
+  marcarRevocacionReenvioPorPlazo,
+  marcarRevocacionVencida,
 };
