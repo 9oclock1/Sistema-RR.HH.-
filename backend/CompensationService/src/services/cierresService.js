@@ -1,6 +1,9 @@
+const { randomUUID } = require("node:crypto");
 const modelo = require("../models/cierresModel");
 const empleadosCliente = require("../clients/empleados.cliente");
 const authCliente = require("../clients/authCliente");
+const integracion = require("./integracionCierresService");
+const { topicoPropio } = require("./eventos.service");
 const { enTransaccion } = require("../config/transaccion");
 const { ErrorApp } = require("../utils/errores");
 const { UUID_RE } = require("../utils/formatos");
@@ -8,8 +11,15 @@ const { validarAdmin, validarConsulta, identidadRegistro, ESTADOS_ABIERTOS } = r
 const {
   CLAVES_DESTINO,
   DESTINOS_CIERRE,
+  simulacionCierreActiva,
   validarFiltroEstadoCierre,
+  validarDestinoCierre,
+  validarSimulacionEscenarioCierre,
+  validarSinRespuesta,
+  resumirEstadoCierre,
   evaluarRequisitosCierre,
+  armarMensajeDesvinculado,
+  armarRespuestaSimuladaCierre,
 } = require("../utils/cierres");
 
 const URL_EMPLEADOS = () => process.env.EMPLOYEE_SERVICE_URL || "http://employee-service:3002";
@@ -147,6 +157,8 @@ async function obtener(idProceso, identidad) {
     cierre,
     revocaciones,
     requisitos: evaluarRequisitosCierre({ proceso, finiquito, cierre, estadosAbiertos: ESTADOS_ABIERTOS }),
+    simulacion_activa: simulacionCierreActiva(),
+    destinos_sin_respuesta: integracion.obtenerDestinosSinRespuesta(),
   };
 }
 
@@ -158,7 +170,17 @@ function validarCondicionesCierre({ proceso, finiquito, cierre }) {
   }
 }
 
-// AC1: inactiva al colaborador en EmployeeService, revoca su cuenta y sesiones en AuthService y cierra el proceso.
+function datosEmpleadoDesdeFicha(ficha, proceso) {
+  return {
+    id_empleado: proceso.id_empleado,
+    codigo_empleado: ficha.numero_documento,
+    nombre_completo: ficha.nombre_completo || proceso.nombre_empleado,
+    cargo: ficha.asignacion_actual?.cargo?.nombre ?? null,
+    sucursal: ficha.asignacion_actual?.sucursal?.nombre ?? null,
+  };
+}
+
+// AC1, AC2: inactiva al colaborador, revoca cuenta y tokens, cierra el proceso y encola los 4 envíos SALIENTE.
 async function cerrar(idProceso, identidad) {
   validarAdmin(identidad);
   const id = normalizarIdProceso(idProceso);
@@ -171,7 +193,7 @@ async function cerrar(idProceso, identidad) {
   ]);
   validarCondicionesCierre({ proceso: procPrevio, finiquito: finPrevio, cierre: cierrePrevio });
 
-  await obtenerFichaEmpleado(procPrevio.id_empleado);
+  const ficha = await obtenerFichaEmpleado(procPrevio.id_empleado);
 
   await enTransaccion(async (cliente) => {
     const proceso = await modelo.obtenerProcesoParaCierre(id, cliente, { bloquear: true });
@@ -200,10 +222,205 @@ async function cerrar(idProceso, identidad) {
     });
 
     await modelo.crearRevocacionesIniciales(cliente, cierre.id_cierre, CLAVES_DESTINO);
+
+    const topico = topicoPropio();
+    const fechaEvento = new Date().toISOString();
+    const empleado = datosEmpleadoDesdeFicha(ficha, proceso);
+
+    for (const destino of CLAVES_DESTINO) {
+      const idMensaje = randomUUID();
+      const carga = armarMensajeDesvinculado({
+        idMensaje,
+        destino,
+        idCierre: cierre.id_cierre,
+        empleado,
+        fechaRetiro: proceso.fecha_retiro,
+        causal: proceso.codigo_causal,
+        cerradoEn: cierre.cerrado_en,
+        fecha: fechaEvento,
+      });
+      await modelo.registrarEvento(cliente, {
+        idMensaje,
+        idCierre: cierre.id_cierre,
+        sentido: "SALIENTE",
+        destino,
+        tipoEvento: carga.encabezado.tipo,
+        topico,
+        carga,
+      });
+    }
+
     await modelo.cerrarProcesoDesvinculacion(cliente, id);
   });
 
   return obtener(id, identidad);
 }
 
-module.exports = { listar, obtener, cerrar, obtenerFichaEmpleado };
+async function reenviar(idProceso, datos, identidad) {
+  validarAdmin(identidad);
+  const id = normalizarIdProceso(idProceso);
+  const destino = validarDestinoCierre(datos?.destino);
+
+  const procPrevio = await modelo.obtenerProcesoParaCierre(id);
+  if (!procPrevio) throw noEncontrado();
+  const cierrePrevio = await modelo.obtenerCierrePorProceso(id);
+  if (!cierrePrevio) {
+    throw new ErrorApp(409, "Aún no se cerró definitivamente este proceso.", undefined, "CIERRE_NO_INICIADO");
+  }
+
+  const ficha = await obtenerFichaEmpleado(procPrevio.id_empleado);
+
+  await enTransaccion(async (cliente) => {
+    const proceso = await modelo.obtenerProcesoParaCierre(id, cliente, { bloquear: true });
+    if (!proceso) throw noEncontrado();
+    const cierre = await modelo.obtenerCierrePorProceso(id, cliente, { bloquear: true });
+    if (!cierre) {
+      throw new ErrorApp(409, "Aún no se cerró definitivamente este proceso.", undefined, "CIERRE_NO_INICIADO");
+    }
+
+    const revocaciones = await modelo.bloquearRevocacionesCierre(cliente, cierre.id_cierre);
+    const revocacion = revocaciones.find((r) => r.destino === destino);
+    const envios = await modelo.ultimosEnviosPorDestino(cierre.id_cierre, cliente);
+    const ultimoEnvio = envios[destino];
+
+    const permitida =
+      revocacion?.estado === "RECHAZADA" ||
+      revocacion?.estado === "VENCIDA" ||
+      ultimoEnvio?.estado === "FALLIDO";
+    if (!permitida) {
+      throw new ErrorApp(
+        409,
+        `Solo puede reenviar a ${DESTINOS_CIERRE[destino].modulo} cuando la revocación fue rechazada, venció o el envío falló.`,
+        undefined,
+        "REENVIO_NO_PERMITIDO"
+      );
+    }
+
+    await modelo.prepararReenvioRevocacion(cliente, cierre.id_cierre, destino);
+    const actualizadas = revocaciones.map((r) => (r.destino === destino ? { ...r, estado: "PENDIENTE" } : r));
+    await modelo.actualizarEstadoCierre(cliente, cierre.id_cierre, resumirEstadoCierre(actualizadas));
+
+    const idMensaje = randomUUID();
+    const carga = armarMensajeDesvinculado({
+      idMensaje,
+      destino,
+      idCierre: cierre.id_cierre,
+      empleado: datosEmpleadoDesdeFicha(ficha, proceso),
+      fechaRetiro: proceso.fecha_retiro,
+      causal: proceso.codigo_causal,
+      cerradoEn: cierre.cerrado_en,
+    });
+    await modelo.registrarEvento(cliente, {
+      idMensaje,
+      idCierre: cierre.id_cierre,
+      sentido: "SALIENTE",
+      destino,
+      tipoEvento: carga.encabezado.tipo,
+      topico: topicoPropio(),
+      carga,
+    });
+  });
+
+  return obtener(id, identidad);
+}
+
+async function simularRespuesta(idProceso, datos, identidad) {
+  validarAdmin(identidad);
+  if (!simulacionCierreActiva()) {
+    throw new ErrorApp(403, "La simulación de respuestas de cierre está desactivada.");
+  }
+
+  const id = normalizarIdProceso(idProceso);
+  const { destino, escenario, referencia, motivo } = validarSimulacionEscenarioCierre(datos);
+
+  const proceso = await modelo.obtenerProcesoParaCierre(id);
+  if (!proceso) throw noEncontrado();
+  const cierre = await modelo.obtenerCierrePorProceso(id);
+  if (!cierre) {
+    throw new ErrorApp(409, "Ejecute el cierre definitivo antes de simular respuestas externas.", undefined, "CIERRE_NO_INICIADO");
+  }
+
+  const topico = topicoPropio();
+  let carga;
+  let idMensaje;
+
+  if (escenario === "DUPLICADO") {
+    const ultima = await modelo.obtenerUltimaRespuestaEntrante(cierre.id_cierre, destino);
+    if (!ultima) {
+      throw new ErrorApp(
+        409,
+        `Todavía no hay una respuesta recibida de ${DESTINOS_CIERRE[destino].modulo} para duplicar.`,
+        undefined,
+        "SIN_RESPUESTA_PREVIA"
+      );
+    }
+    try {
+      carga = JSON.parse(ultima.carga);
+    } catch {
+      throw new ErrorApp(409, "La última respuesta registrada no es un JSON reutilizable.", undefined, "RESPUESTA_NO_REUTILIZABLE");
+    }
+    idMensaje = carga.encabezado?.id_mensaje || ultima.id_mensaje;
+  } else {
+    const envios = await modelo.ultimosEnviosPorDestino(cierre.id_cierre);
+    const ultimoEnvio = envios[destino];
+    if (!ultimoEnvio && escenario !== "INVALIDO") {
+      throw new ErrorApp(
+        409,
+        `Aún no existe un envío saliente hacia ${DESTINOS_CIERRE[destino].modulo}.`,
+        undefined,
+        "SIN_ENVIO_SALIENTE"
+      );
+    }
+    idMensaje = randomUUID();
+    const datosEnvio = ultimoEnvio?.carga?.datos ?? {};
+    carga = armarRespuestaSimuladaCierre({
+      idMensaje,
+      destino,
+      idCierre: cierre.id_cierre,
+      idMensajeOrigen: ultimoEnvio?.id_mensaje ?? randomUUID(),
+      resultado: escenario === "INVALIDO" ? "DESCONOCIDO" : escenario,
+      accesosARevocar: datosEnvio.accesos_a_revocar ?? DESTINOS_CIERRE[destino].accesos,
+      codigoEmpleado: datosEnvio.empleado?.codigo_empleado ?? "",
+      referencia: escenario === "CONFIRMADA" ? referencia : null,
+      motivo: escenario === "RECHAZADA" ? motivo : null,
+    });
+  }
+
+  const idEvento = await modelo.registrarEvento(require("../config/db"), {
+    idMensaje,
+    idCierre: cierre.id_cierre,
+    sentido: "RESPUESTA_SIMULADA",
+    destino,
+    tipoEvento: carga.encabezado.tipo,
+    topico,
+    carga,
+  });
+
+  return {
+    id_evento: idEvento,
+    id_mensaje: idMensaje,
+    destino,
+    escenario,
+    topico,
+  };
+}
+
+async function configurarSinRespuesta(datos, identidad) {
+  validarAdmin(identidad);
+  if (!simulacionCierreActiva()) {
+    throw new ErrorApp(403, "La simulación de respuestas de cierre está desactivada.");
+  }
+  const { destino, activo } = validarSinRespuesta(datos);
+  const destinos = integracion.establecerSinRespuesta(destino, activo);
+  return { destinos_sin_respuesta: destinos };
+}
+
+module.exports = {
+  listar,
+  obtener,
+  cerrar,
+  reenviar,
+  simularRespuesta,
+  configurarSinRespuesta,
+  obtenerFichaEmpleado,
+};

@@ -169,7 +169,7 @@ async function ultimosEnviosPorDestino(idCierre, db = pool) {
   const { rows } = await db.query(
     `SELECT DISTINCT ON (destino)
             id_evento, id_mensaje, destino, estado, intentos, ultimo_error,
-            proximo_intento_en, entregado_en, creado_en
+            proximo_intento_en, entregado_en, creado_en, carga
        FROM EVENTOS_CIERRE
       WHERE id_cierre = $1
         AND sentido = 'SALIENTE'
@@ -177,6 +177,129 @@ async function ultimosEnviosPorDestino(idCierre, db = pool) {
     [idCierre]
   );
   return Object.fromEntries(rows.map((r) => [r.destino, r]));
+}
+
+async function registrarEvento(cliente, { idMensaje, idCierre, sentido, destino, tipoEvento, topico, carga, proximoIntentoEn = null }) {
+  const { rows } = await cliente.query(
+    `INSERT INTO EVENTOS_CIERRE (
+       id_mensaje, id_cierre, sentido, destino, tipo_evento, topico, carga, proximo_intento_en
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8::timestamptz, CURRENT_TIMESTAMP))
+     RETURNING id_evento`,
+    [idMensaje, idCierre, sentido, destino, tipoEvento, topico, carga, proximoIntentoEn]
+  );
+  return rows[0].id_evento;
+}
+
+async function reservarEventosPendientes(limite, segundosReserva, db = pool) {
+  const { rows } = await db.query(
+    `UPDATE EVENTOS_CIERRE
+        SET proximo_intento_en = CURRENT_TIMESTAMP + make_interval(secs => $2)
+      WHERE id_evento IN (
+        SELECT id_evento
+          FROM EVENTOS_CIERRE
+         WHERE estado = 'PENDIENTE'
+           AND proximo_intento_en <= CURRENT_TIMESTAMP
+         ORDER BY creado_en ASC, id_evento ASC
+         LIMIT $1
+         FOR UPDATE SKIP LOCKED
+      )
+      RETURNING id_evento, id_mensaje, id_cierre, sentido, destino, tipo_evento, topico, carga, intentos`,
+    [limite, segundosReserva]
+  );
+  return rows;
+}
+
+async function marcarEventoEntregado(idEvento, idPubSub, db = pool) {
+  await db.query(
+    `UPDATE EVENTOS_CIERRE
+        SET estado = 'ENTREGADO',
+            id_pubsub = left($2, 100),
+            entregado_en = CURRENT_TIMESTAMP,
+            intentos = intentos + 1,
+            ultimo_error = NULL
+      WHERE id_evento = $1
+        AND estado = 'PENDIENTE'`,
+    [idEvento, idPubSub ?? null]
+  );
+}
+
+async function marcarEventoError(idEvento, { error, esperaMs, fallido }, db = pool) {
+  await db.query(
+    `UPDATE EVENTOS_CIERRE
+        SET intentos = intentos + 1,
+            ultimo_error = left($2, 255),
+            proximo_intento_en = CURRENT_TIMESTAMP + make_interval(secs => $3),
+            estado = CASE WHEN $4 THEN 'FALLIDO' ELSE estado END
+      WHERE id_evento = $1
+        AND estado = 'PENDIENTE'`,
+    [idEvento, error, esperaMs / 1000, Boolean(fallido)]
+  );
+}
+
+async function marcarRevocacionEnviada(idCierre, destino, plazoSegundos, db = pool) {
+  await db.query(
+    `UPDATE REVOCACIONES_SISTEMA
+        SET estado = 'ENVIADA',
+            plazo_vence_en = CURRENT_TIMESTAMP + make_interval(secs => $3),
+            actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_cierre = $1
+        AND destino = $2
+        AND estado = 'PENDIENTE'`,
+    [idCierre, destino, plazoSegundos]
+  );
+}
+
+async function bloquearRevocacionesCierre(cliente, idCierre) {
+  const { rows } = await cliente.query(
+    `SELECT id_revocacion, id_cierre, destino, estado, plazo_vence_en, reenvios_por_plazo,
+            recursos_revocados, referencia, motivo, respondida_en, actualizado_en
+       FROM REVOCACIONES_SISTEMA
+      WHERE id_cierre = $1
+      FOR UPDATE`,
+    [idCierre]
+  );
+  return rows;
+}
+
+async function prepararReenvioRevocacion(cliente, idCierre, destino) {
+  await cliente.query(
+    `UPDATE REVOCACIONES_SISTEMA
+        SET estado = 'PENDIENTE',
+            plazo_vence_en = NULL,
+            reenvios_por_plazo = 0,
+            recursos_revocados = NULL,
+            referencia = NULL,
+            motivo = NULL,
+            respondida_en = NULL,
+            actualizado_en = CURRENT_TIMESTAMP
+      WHERE id_cierre = $1
+        AND destino = $2`,
+    [idCierre, destino]
+  );
+}
+
+async function actualizarEstadoCierre(cliente, idCierre, estadoRevocaciones) {
+  await cliente.query(
+    `UPDATE CIERRES_DESVINCULACION
+        SET estado_revocaciones = $2,
+            completado_en = CASE WHEN $2 = 'COMPLETADO' THEN COALESCE(completado_en, CURRENT_TIMESTAMP) ELSE NULL END
+      WHERE id_cierre = $1`,
+    [idCierre, estadoRevocaciones]
+  );
+}
+
+async function obtenerUltimaRespuestaEntrante(idCierre, destino, db = pool) {
+  const { rows } = await db.query(
+    `SELECT id_entrante, id_mensaje, carga, estado, recibido_en
+       FROM MENSAJES_CIERRE_ENTRANTES
+      WHERE id_cierre = $1
+        AND destino = $2
+      ORDER BY recibido_en DESC, id_entrante DESC
+      LIMIT 1`,
+    [idCierre, destino]
+  );
+  return rows[0] || null;
 }
 
 module.exports = {
@@ -189,4 +312,13 @@ module.exports = {
   cerrarProcesoDesvinculacion,
   listarRevocacionesCierre,
   ultimosEnviosPorDestino,
+  registrarEvento,
+  reservarEventosPendientes,
+  marcarEventoEntregado,
+  marcarEventoError,
+  marcarRevocacionEnviada,
+  bloquearRevocacionesCierre,
+  prepararReenvioRevocacion,
+  actualizarEstadoCierre,
+  obtenerUltimaRespuestaEntrante,
 };
