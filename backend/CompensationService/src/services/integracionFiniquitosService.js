@@ -48,7 +48,8 @@ async function conLimiteDeTiempo(promesa) {
   }
 }
 
-function entregarAlConsumidor(carga) {
+// La respuesta simulada ya se publicó en el tópico F: se entrega con el id real que devolvió Pub/Sub.
+function entregarAlConsumidor(carga, { topico, idPubSub } = {}) {
   let consumidor;
   try {
     consumidor = require("./confirmacionesFiniquitoService");
@@ -56,7 +57,7 @@ function entregarAlConsumidor(carga) {
     return;
   }
   if (typeof consumidor?.recibirMensaje !== "function") return;
-  consumidor.recibirMensaje(JSON.stringify(carga)).catch((err) => {
+  consumidor.recibirMensaje(JSON.stringify(carga), { topico, idPubSub }).catch((err) => {
     console.error("[finiquito] Error al entregar respuesta simulada al consumidor:", err.message);
   });
 }
@@ -164,7 +165,11 @@ async function publicarEvento(clientePubSub, evento) {
         });
       }
     } else if (evento.sentido === "RESPUESTA_SIMULADA") {
-      entregarAlConsumidor(evento.carga);
+      const { origen, destino } = evento.carga?.encabezado ?? {};
+      console.log(
+        `[finiquito] Respuesta simulada ${origen?.grupo ?? "?"} → ${destino?.grupo ?? "?"} (${origen?.modulo ?? "?"}) publicada en ${evento.topico} (mensaje ${idPubSub})`
+      );
+      entregarAlConsumidor(evento.carga, { topico: evento.topico, idPubSub });
     }
   } catch (error) {
     console.error(`[finiquito] Error al publicar evento ${evento.id_evento} en ${evento.topico}:`, error.message);

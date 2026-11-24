@@ -177,6 +177,7 @@ describe("integracionFiniquitosService (despachador y caída)", () => {
     await integracion.despacharFiniquitos();
     assert.deepEqual(ps.topicosLlamados, ["ucb-sis323-sub-f"]);
     assert.equal(recibido.mock.callCount(), 1);
+    assert.deepEqual(recibido.mock.calls[0].arguments[1], { topico: "ucb-sis323-sub-f", idPubSub: "pubsub-sim-1" });
   });
 
   test("caída simulada: no llama a publishMessage, reprograma a 5s y al expirar vuelve a publicar", async () => {
