@@ -1,0 +1,49 @@
+@startuml sec-02-kan80-consulta-y-cierre
+!include _estilo-secuencia.iuml
+title KAN-80 · Consulta solo para empleados activos y cierre automático (RF-60, criterios 1 y 3)
+
+actor "Empleado" as EMP
+participant "ConvocatoriasEmpleadoPage\n(React)" as FE PANTALLA
+participant "autenticar" as MW MIDDLEWARE
+participant "convocatorias\nController" as CT CONTROLADOR
+participant "convocatorias\nService" as SV SERVICIO
+participant "postulaciones\nService" as PS SERVICIO
+participant "convocatorias\nModel" as MD MODELO
+database "EmployeeDB" as DB BD
+participant "cierreConvocatoriasCron\n(00:05 diario)" as JOB EXTERNO
+
+EMP -> FE : abre «Convocatorias internas»
+FE -> MW : GET /convocatorias?estado=VIGENTES [JWT]
+MW -> CT : listarParaEmpleado
+activate CT
+CT -> SV : listarParaEmpleado(idEmpleado, query)
+activate SV
+SV -> MD : empleadoEstaActivo(idEmpleado)
+alt empleado inactivo
+  SV --> CT : <color:#B85450>403 Solo los empleados activos pueden consultar…</color>
+else activo
+  SV -> MD : listar({ estados: ABIERTA, PROGRAMADA })
+  MD -> DB : SELECT … CASE estado\n(CERRADA · PROGRAMADA · ABIERTA)
+  DB --> MD : convocatorias con días para el cierre
+  SV -> PS : adjuntarMisPostulaciones(convocatorias, idEmpleado)
+  PS --> SV : cada convocatoria con mi_postulacion (o null)
+  SV --> CT : { convocatorias, total }
+end
+deactivate SV
+CT --> FE : 200
+deactivate CT
+FE --> EMP : tarjetas con requisitos, días para el cierre\ny estado de su postulación
+
+== Cierre automático (criterio 3) ==
+loop todos los días a las 00:05 (America/La_Paz)
+  JOB -> SV : cerrarVencidas()
+  SV -> MD : cerrarVencidas(db)
+  MD -> DB : UPDATE CONVOCATORIAS_ASCENSO\nSET esta_abierta = FALSE, cerrada_en = now()\nWHERE fecha_cierre_postulacion < hoy
+  DB --> MD : ids cerradas
+end
+note right of DB
+  Aunque el job no corra, /estado ya se
+  calcula como CERRADA al pasar la fecha:
+  postular responde 409 CONVOCATORIA_NO_VIGENTE.
+end note
+@enduml

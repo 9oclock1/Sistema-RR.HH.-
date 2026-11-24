@@ -1,0 +1,190 @@
+@startuml clases-1-dominio
+!pragma layout smetana
+title Épica 10 · Modelo de dominio (EmployeeDB)
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam nodesep 50
+skinparam ranksep 60
+skinparam class {
+  BackgroundColor #DAE8FC
+  BorderColor #6C8EBF
+  ArrowColor #444444
+  StereotypeFontColor #555555
+}
+skinparam package {
+  BackgroundColor #FAFAFA
+  BorderColor #BBBBBB
+  FontColor #555555
+}
+
+package "Convocatorias (KAN-80)" {
+  class CONVOCATORIAS_ASCENSO {
+    id_convocatoria: UUID <<PK>>
+    id_cargo: UUID <<FK>>
+    id_sucursal: UUID <<FK>>
+    id_empleado_publicador: UUID [0..1]
+    {field} titulo: varchar(120)
+    descripcion_requisitos: text
+    meses_antiguedad_minima: int {0..600}
+    {field} nota_minima_desempeno: numeric(5,2) {0..100}
+    fecha_inicio_postulacion: date
+    fecha_cierre_postulacion: date
+    esta_abierta: boolean
+    publicada_en: timestamptz
+    cerrada_en: timestamptz [0..1]
+    estado_notificacion: EstadoNotificacion
+    destinatarios_notificados: int [0..1]
+    notificada_en: timestamptz [0..1]
+    {field} ultimo_error_notificacion: varchar(300) [0..1]
+    /estado: PROGRAMADA | ABIERTA | CERRADA
+  }
+  class DESTINATARIOS_CONVOCATORIA {
+    id_convocatoria, id_empleado <<PK>>
+    meses_antiguedad: int
+    notificado_en: timestamptz [0..1]
+    {field} ultimo_error: varchar(300) [0..1]
+  }
+}
+
+package "Postulaciones y ascensos (KAN-81 · KAN-82)" {
+  class POSTULACIONES_ASCENSO {
+    id_postulacion: UUID <<PK>>
+    id_convocatoria: UUID <<FK>>
+    id_empleado: UUID <<FK>>
+    fecha_postulacion: timestamptz
+    estado_postulacion: EstadoPostulacion
+    .. validación de méritos (KAN-81) ..
+    meses_permanencia: int [0..1]
+    cumple_antiguedad: boolean [0..1]
+    {field} nota_ultima_evaluacion: numeric(5,2) [0..1]
+    {field} ciclo_ultima_evaluacion: varchar(120) [0..1]
+    cumple_nota_evaluacion: boolean [0..1]
+    {field} puntaje_meritos: numeric(5,2) [0..1]
+    motivos_no_apto: text[] [0..1]
+    validada_en: timestamptz [0..1]
+    {field} error_validacion: varchar(300) [0..1]
+    .. formalización (KAN-82) ..
+    fecha_formalizacion_ascenso: date [0..1]
+    fecha_vigencia_ascenso: date [0..1]
+    {field} haber_ascenso: numeric(12,2) [0..1]
+    id_contrato_ascenso: UUID [0..1] <<FK>>
+    estado_ascenso: EstadoAscenso [0..1]
+    formalizado_por / formalizado_en [0..1]
+    ascenso_aplicado_en: timestamptz [0..1]
+    error_aplicacion_ascenso [0..1]
+    ascenso_notificado_en [0..1]
+    error_notificacion_ascenso [0..1]
+  }
+}
+
+package "Plan de capacitación (KAN-83)" {
+  class PLANES_ASCENSO {
+    id_plan: UUID <<PK>>
+    id_empleado: UUID <<FK>>
+    id_cargo_destino: UUID <<FK>>
+    estado: EN_CURSO | FORMALIZADO
+    {field} observaciones: varchar(500) [0..1]
+    asignado_por: UUID [0..1]
+    asignado_en: timestamptz
+    formalizado_en / formalizado_por [0..1]
+    cursos_pendientes_al_formalizar: int [0..1]
+    /avance: porcentaje de cursos cumplidos
+  }
+  class REQUISITOS_CAPACITACION_CARGO {
+    id_requisito_cargo: UUID <<PK>>
+    id_cargo, id_curso <<FK>> {único}
+    es_obligatorio: boolean
+    meses_validez_requerida: int [0..1]
+  }
+}
+
+package "Tablas de otras épicas que se usan" {
+  class EMPLEADOS #F5F5F5 {
+    fecha_ingreso: date
+    id_cargo_actual, id_sucursal_actual
+    id_estado_empleado
+  }
+  class CARGOS #F5F5F5 {
+    nombre, nivel_salarial
+    {field} salario_base_referencial: numeric(12,2)
+    id_cargo_jefe_directo [0..1]
+    esta_activo: boolean
+  }
+  class SUCURSALES #F5F5F5
+  class ASIGNACIONES_EMPLEADO #F5F5F5 {
+    fecha_inicio, fecha_fin [0..1]
+    es_vigente: boolean
+  }
+  class CONTRATOS #F5F5F5 {
+    numero_contrato, es_adenda
+    tipo_modificacion: … | ASCENSO
+    {field} haber_mensual_pactado: numeric(12,2)
+    id_contrato_anterior [0..1]
+  }
+  class CURSOS_CAPACITACION #F5F5F5
+  class CAPACITACIONES_CERTIFICACION #F5F5F5 {
+    fecha_emision, fecha_vencimiento [0..1]
+  }
+}
+
+package "Enumeraciones" {
+  enum EstadoNotificacion #FFF2CC {
+    PENDIENTE
+    ENTREGADA
+    FALLIDA
+  }
+  enum EstadoPostulacion #FFF2CC {
+    PENDIENTE_VALIDACION
+    APTO
+    NO_APTO
+  }
+  enum EstadoAscenso #FFF2CC {
+    PROGRAMADO
+    APLICADO
+  }
+}
+
+CONVOCATORIAS_ASCENSO "*" --> "1" CARGOS
+CONVOCATORIAS_ASCENSO "*" --> "1" SUCURSALES
+CONVOCATORIAS_ASCENSO "1" *-- "0..*" DESTINATARIOS_CONVOCATORIA
+DESTINATARIOS_CONVOCATORIA "*" --> "1" EMPLEADOS
+CONVOCATORIAS_ASCENSO "1" *-- "0..*" POSTULACIONES_ASCENSO
+POSTULACIONES_ASCENSO "*" --> "1" EMPLEADOS
+POSTULACIONES_ASCENSO "0..1" --> "0..1" CONTRATOS : adenda ASCENSO
+EMPLEADOS "1" *-- "1..*" ASIGNACIONES_EMPLEADO
+EMPLEADOS "1" *-- "1..*" CONTRATOS
+EMPLEADOS "1" *-- "0..*" CAPACITACIONES_CERTIFICACION
+CAPACITACIONES_CERTIFICACION "*" --> "1" CURSOS_CAPACITACION
+
+PLANES_ASCENSO "*" --> "1" EMPLEADOS
+PLANES_ASCENSO "*" --> "1" CARGOS : cargo destino
+CARGOS "1" *-- "0..*" REQUISITOS_CAPACITACION_CARGO
+REQUISITOS_CAPACITACION_CARGO "*" --> "1" CURSOS_CAPACITACION
+
+note bottom of POSTULACIONES_ASCENSO
+  uq (id_convocatoria, id_empleado): una postulación
+  por empleado y convocatoria.
+  Índice único parcial: a lo sumo una postulación
+  formalizada por convocatoria (una vacante).
+  APTO exige cumplir antigüedad y nota;
+  NO_APTO exige al menos un motivo.
+end note
+
+note bottom of PLANES_ASCENSO
+  Índice único parcial: un solo plan
+  EN_CURSO por empleado. El estado de
+  cada curso se calcula al consultar,
+  contra CAPACITACIONES_CERTIFICACION.
+end note
+
+note bottom of CONVOCATORIAS_ASCENSO
+  /estado se deriva: CERRADA si no está abierta o
+  pasó la fecha de cierre; PROGRAMADA si aún no
+  empieza; ABIERTA en otro caso.
+end note
+@enduml

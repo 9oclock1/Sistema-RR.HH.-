@@ -1,0 +1,69 @@
+@startuml sec-07-kan83-asignar-seguimiento-plan
+!include _estilo-secuencia.iuml
+title KAN-83 · Asignar el plan de capacitación y seguir su avance (RF-63, criterios 1, 2 y 4)
+
+actor "Administrador\nde RRHH" as RRHH
+actor "Gerente" as GER
+participant "PlanesAscensoPage ·\nAsignarPlanFormulario (React)" as FE PANTALLA
+participant "exigirRol" as MW MIDDLEWARE
+participant "planesAscenso\nController" as CT CONTROLADOR
+participant "planesAscenso\nService" as SV SERVICIO
+participant "utils/\nplanesAscenso" as UT SERVICIO
+participant "planesAscenso\nModel" as MD MODELO
+database "EmployeeDB" as DB BD
+
+== Asignar el plan (criterio 1) ==
+RRHH -> FE : candidato, cargo destino y observaciones
+FE -> MW : POST /planes-ascenso [X-Rol: admin]
+MW -> CT : asignar
+activate CT
+CT -> SV : asignar(datos, identidad)
+activate SV
+SV -> MD : obtenerEmpleado · obtenerCargo (con cursos requeridos)
+alt empleado o cargo inexistente
+  SV --> CT : <color:#B85450>404</color>
+else empleado inactivo / cargo inactivo / ya ocupa el cargo
+  SV --> CT : <color:#B85450>409 EMPLEADO_INACTIVO · CARGO_INACTIVO · MISMO_CARGO</color>
+else el cargo no tiene capacitaciones requeridas
+  SV --> CT : <color:#B85450>409 CARGO_SIN_CAPACITACIONES</color>
+end
+SV -> MD : obtenerPlanEnCurso(idEmpleado)
+alt ya tiene un plan EN_CURSO
+  SV --> CT : <color:#B85450>409 PLAN_EN_CURSO</color>
+end
+SV -> MD : insertar(plan EN_CURSO)
+note right of DB : uq_plan_ascenso_en_curso:\nasignaciones simultáneas → 23505 → 409
+SV -> SV : obtener(idPlan) → conCursos
+SV --> CT : plan con sus cursos y avance
+deactivate SV
+CT --> FE : 201
+deactivate CT
+
+== Seguimiento (criterios 2 y 4) ==
+GER -> FE : abre «Planes de ascenso»
+FE -> MW : GET /planes-ascenso?estado= [X-Rol: admin | gerente]
+MW -> CT : listar
+activate CT
+CT -> SV : listar({ estado })
+activate SV
+SV -> MD : listar(db, { estado })
+SV -> MD : listarCursos(db, idsPlan)
+MD -> DB : REQUISITOS_CAPACITACION_CARGO del cargo destino\nLEFT JOIN último certificado del curso en\nCAPACITACIONES_CERTIFICACION (Kardex)
+DB --> MD : cursos con su certificado (o sin él) y la fecha de hoy
+loop por cada curso
+  SV -> UT : estadoCurso(certificado, hoy)
+  UT --> SV : CUMPLIDO, o PENDIENTE con motivo\n(sin registro · vencido · más antiguo que la validez exigida)
+end
+SV -> UT : calcularAvance(cursos)
+UT --> SV : requeridos, cumplidos, pendientes y porcentaje\n(sobre los obligatorios si los hay)
+SV --> CT : { planes, total }
+deactivate SV
+CT --> FE : 200
+deactivate CT
+FE --> GER : porcentaje de avance de cada candidato\ny el detalle de sus cursos
+note over FE, DB
+  El estado no se guarda: se calcula en cada consulta contra el Kardex.
+  Una capacitación aprobada registrada en el Kardex (épica 6, KAN-60)
+  aparece como cumplida en la siguiente consulta.
+end note
+@enduml
