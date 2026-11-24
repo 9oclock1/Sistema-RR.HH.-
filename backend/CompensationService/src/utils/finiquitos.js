@@ -1,7 +1,34 @@
 const { ErrorApp } = require("./errores");
+const { ORIGEN, DESTINOS } = require("./integraciones");
 
 const ESTADOS_FINIQUITO = ["BORRADOR", "APROBADO", "PAGADO"];
 const FILTROS_ESTADO_FINIQUITO = ["SIN_GENERAR", ...ESTADOS_FINIQUITO];
+const DESTINOS_FINIQUITO = ["PAGOS", "CONTABILIDAD"];
+const ESCENARIOS_SIMULACION = ["CONFIRMADA", "RECHAZADA", "DUPLICADO", "INVALIDO"];
+
+const TIPO_FINIQUITO_ORDEN_PAGO = "FINIQUITO_APROBADO_ORDEN_PAGO";
+const TIPO_FINIQUITO_ASIENTO = "FINIQUITO_APROBADO_ASIENTO";
+const TIPO_CONFIRMACION_FINIQUITO_PAGOS = "CONFIRMACION_ORDEN_PAGO_FINIQUITO";
+const TIPO_CONFIRMACION_FINIQUITO_CONTABILIDAD = "CONFIRMACION_ASIENTO_FINIQUITO";
+const VERSION_ESQUEMA = 1;
+
+// Cuentas contables referenciales para la desafectación de provisiones del finiquito: ajustar al plan de cuentas de Contabilidad.
+const CUENTAS_FINIQUITO = {
+  PREVISION_INDEMNIZACIONES: { codigo: "2.1.5.01", nombre: "Previsión para indemnizaciones" },
+  PROVISION_AGUINALDOS: { codigo: "2.1.5.02", nombre: "Provisión para aguinaldos" },
+  PROVISION_VACACIONES: { codigo: "2.1.5.03", nombre: "Provisión para vacaciones" },
+  PRESTAMOS_AL_PERSONAL: { codigo: "1.1.4.01", nombre: "Préstamos y anticipos al personal" },
+  FINIQUITOS_POR_PAGAR: { codigo: "2.1.2.02", nombre: "Finiquitos por pagar" },
+};
+
+const simulacionFiniquitoActiva = () => process.env.SIMULAR_RESPUESTAS_FINIQUITO !== "false";
+
+const demoraSimulacionFiniquitoMs = () => {
+  const texto = process.env.SIMULAR_RESPUESTAS_FINIQUITO_DEMORA_MS;
+  if (texto === undefined || texto.trim() === "") return 3000;
+  const n = Number(texto);
+  return Number.isFinite(n) && n >= 0 ? n : 3000;
+};
 
 const aCentavos = (monto) => Math.round((Number(monto) + Number.EPSILON) * 100);
 const deCentavos = (centavos) => centavos / 100;
@@ -291,9 +318,209 @@ function montoEnLetras(monto) {
   return `${capitalizada} ${dec}/100 bolivianos`;
 }
 
+function armarSobreFiniquito({ idMensaje, origen, destino, tipo, fecha, datos }) {
+  return {
+    encabezado: {
+      id_mensaje: idMensaje,
+      origen,
+      destino,
+      tipo,
+      fecha,
+      version_esquema: VERSION_ESQUEMA,
+    },
+    datos,
+  };
+}
+
+// AC3: orden de pago urgente para Pagos y Facturación (grupo A).
+function armarMensajeOrdenPagoFiniquito({ idMensaje, fecha = new Date().toISOString(), proceso, finiquito, aprobadoPorNombre = null }) {
+  const ingresos = (finiquito.renglones ?? []).filter((r) => r.tipo === "INGRESO");
+  const descuentos = (finiquito.renglones ?? []).filter((r) => r.tipo === "DESCUENTO");
+  const destinoA = { grupo: DESTINOS.PAGOS.grupo, modulo: DESTINOS.PAGOS.modulo };
+  return armarSobreFiniquito({
+    idMensaje,
+    origen: ORIGEN,
+    destino: destinoA,
+    tipo: TIPO_FINIQUITO_ORDEN_PAGO,
+    fecha,
+    datos: {
+      id_finiquito: finiquito.id_finiquito,
+      numero_documento: finiquito.numero_documento,
+      id_proceso: proceso.id_proceso,
+      prioridad: "URGENTE",
+      moneda: "BOB",
+      colaborador: {
+        id_empleado: proceso.id_empleado,
+        nombre_completo: proceso.nombre_empleado,
+      },
+      fecha_retiro: finiquito.fecha_retiro,
+      causal: {
+        codigo: proceso.codigo_causal,
+        nombre: proceso.causal_nombre ?? proceso.causal?.nombre ?? proceso.codigo_causal,
+      },
+      conceptos: ingresos.map((r) => ({ codigo: r.codigo, concepto: r.concepto, monto: Number(r.monto) })),
+      descuentos: descuentos.map((r) => ({ codigo: r.codigo, concepto: r.concepto, monto: Number(r.monto) })),
+      total_ingresos: Number(finiquito.total_ingresos),
+      total_descuentos: Number(finiquito.total_descuentos),
+      liquido_pagable: Number(finiquito.liquido_pagable),
+      aprobado: {
+        por: { id_empleado: finiquito.aprobado_por, nombre_completo: aprobadoPorNombre },
+        en: new Date(finiquito.aprobado_en).toISOString(),
+      },
+    },
+  });
+}
+
+// AC3: asiento de liquidación y desafectación de provisiones para Contabilidad (grupo D).
+function armarAsientoFiniquito(finiquito) {
+  const sumaCodigos = (codigos) =>
+    (finiquito.renglones ?? [])
+      .filter((r) => codigos.includes(r.codigo))
+      .reduce((total, r) => total + aCentavos(r.monto), 0);
+
+  const indemnizacionCents = sumaCodigos(["INDEMNIZACION", "DESAHUCIO"]);
+  const aguinaldoCents = sumaCodigos(["AGUINALDO_DUODECIMAS"]);
+  const vacacionesCents = sumaCodigos(["VACACIONES_PENDIENTES", "VACACIONES_DUODECIMAS"]);
+  const descuentosCents = aCentavos(finiquito.total_descuentos);
+  const liquidoCents = aCentavos(finiquito.liquido_pagable);
+
+  const renglones = [];
+  const agregar = (cuenta, lado, cents, concepto) => {
+    if (cents <= 0) return;
+    renglones.push({
+      cuenta,
+      debe: lado === "debe" ? deCentavos(cents) : 0,
+      haber: lado === "haber" ? deCentavos(cents) : 0,
+      concepto,
+    });
+  };
+
+  agregar(CUENTAS_FINIQUITO.PREVISION_INDEMNIZACIONES, "debe", indemnizacionCents, "Desafectación de previsión para indemnizaciones y desahucio");
+  agregar(CUENTAS_FINIQUITO.PROVISION_AGUINALDOS, "debe", aguinaldoCents, "Desafectación de provisión para aguinaldos");
+  agregar(CUENTAS_FINIQUITO.PROVISION_VACACIONES, "debe", vacacionesCents, "Desafectación de provisión para vacaciones");
+  agregar(CUENTAS_FINIQUITO.PRESTAMOS_AL_PERSONAL, "haber", descuentosCents, "Descuento de préstamos y anticipos al personal");
+  agregar(CUENTAS_FINIQUITO.FINIQUITOS_POR_PAGAR, "haber", liquidoCents, "Finiquitos por pagar");
+
+  const totalDebeCents = renglones.reduce((t, r) => t + aCentavos(r.debe), 0);
+  const totalHaberCents = renglones.reduce((t, r) => t + aCentavos(r.haber), 0);
+
+  return {
+    renglones,
+    total_debe: deCentavos(totalDebeCents),
+    total_haber: deCentavos(totalHaberCents),
+  };
+}
+
+function armarMensajeAsientoFiniquito({ idMensaje, fecha = new Date().toISOString(), proceso, finiquito }) {
+  const destinoD = { grupo: DESTINOS.CONTABILIDAD.grupo, modulo: DESTINOS.CONTABILIDAD.modulo };
+  return armarSobreFiniquito({
+    idMensaje,
+    origen: ORIGEN,
+    destino: destinoD,
+    tipo: TIPO_FINIQUITO_ASIENTO,
+    fecha,
+    datos: {
+      id_finiquito: finiquito.id_finiquito,
+      numero_documento: finiquito.numero_documento,
+      id_proceso: proceso.id_proceso,
+      colaborador: {
+        id_empleado: proceso.id_empleado,
+        nombre_completo: proceso.nombre_empleado,
+      },
+      fecha: finiquito.fecha_retiro,
+      glosa: `Liquidación final de ${proceso.nombre_empleado} según finiquito ${finiquito.numero_documento}`,
+      asiento: armarAsientoFiniquito(finiquito),
+    },
+  });
+}
+
+function armarRespuestaSimulada({
+  idMensaje,
+  destino,
+  idFiniquito,
+  idMensajeOrigen,
+  resultado = "CONFIRMADA",
+  referencia = null,
+  motivo = null,
+  fecha = new Date().toISOString(),
+}) {
+  const cfg = DESTINOS[destino];
+  const tipo = destino === "PAGOS" ? TIPO_CONFIRMACION_FINIQUITO_PAGOS : TIPO_CONFIRMACION_FINIQUITO_CONTABILIDAD;
+  return armarSobreFiniquito({
+    idMensaje,
+    origen: { grupo: cfg.grupo, modulo: cfg.modulo },
+    destino: ORIGEN,
+    tipo,
+    fecha,
+    datos: {
+      id_finiquito: idFiniquito,
+      id_mensaje_origen: idMensajeOrigen,
+      resultado,
+      referencia,
+      motivo,
+    },
+  });
+}
+
+function validarDestinoFiniquito(destino) {
+  const normalizado = typeof destino === "string" ? destino.trim().toUpperCase() : "";
+  if (!DESTINOS_FINIQUITO.includes(normalizado)) {
+    throw new ErrorApp(400, "Destino inválido", [
+      { campo: "destino", mensaje: `Use uno de: ${DESTINOS_FINIQUITO.join(", ")}.` },
+    ]);
+  }
+  return normalizado;
+}
+
+function validarSimulacionEscenario(datos = {}) {
+  const errores = [];
+  const destino = typeof datos?.destino === "string" ? datos.destino.trim().toUpperCase() : "";
+  const escenario = typeof datos?.escenario === "string" ? datos.escenario.trim().toUpperCase() : "";
+
+  if (!DESTINOS_FINIQUITO.includes(destino)) {
+    errores.push({ campo: "destino", mensaje: `Use uno de: ${DESTINOS_FINIQUITO.join(", ")}.` });
+  }
+  if (!ESCENARIOS_SIMULACION.includes(escenario)) {
+    errores.push({ campo: "escenario", mensaje: `Use uno de: ${ESCENARIOS_SIMULACION.join(", ")}.` });
+  }
+  const motivo = typeof datos?.motivo === "string" ? datos.motivo.trim() : "";
+  if (escenario === "RECHAZADA" && !motivo) {
+    errores.push({ campo: "motivo", mensaje: "Indique el motivo del rechazo." });
+  }
+  if (errores.length > 0) {
+    throw new ErrorApp(400, "Datos de simulación inválidos", errores);
+  }
+  const referencia = typeof datos?.referencia === "string" ? datos.referencia.trim().slice(0, 60) : "";
+  return {
+    destino,
+    escenario,
+    referencia: referencia || null,
+    motivo: escenario === "RECHAZADA" ? motivo.slice(0, 255) : null,
+  };
+}
+
+function validarCaidaBroker(datos = {}) {
+  const segundos = Number(datos?.segundos);
+  if (!Number.isFinite(segundos) || !Number.isInteger(segundos) || segundos < 10 || segundos > 120) {
+    throw new ErrorApp(400, "Duración inválida", [
+      { campo: "segundos", mensaje: "Indique un tiempo entre 10 y 120 segundos." },
+    ]);
+  }
+  return segundos;
+}
+
 module.exports = {
   ESTADOS_FINIQUITO,
   FILTROS_ESTADO_FINIQUITO,
+  DESTINOS_FINIQUITO,
+  ESCENARIOS_SIMULACION,
+  TIPO_FINIQUITO_ORDEN_PAGO,
+  TIPO_FINIQUITO_ASIENTO,
+  TIPO_CONFIRMACION_FINIQUITO_PAGOS,
+  TIPO_CONFIRMACION_FINIQUITO_CONTABILIDAD,
+  CUENTAS_FINIQUITO,
+  simulacionFiniquitoActiva,
+  demoraSimulacionFiniquitoMs,
   aCentavos,
   deCentavos,
   validarFiltroEstadoFiniquito,
@@ -302,4 +529,11 @@ module.exports = {
   consolidarFiniquito,
   finiquitoCoincide,
   montoEnLetras,
+  armarMensajeOrdenPagoFiniquito,
+  armarAsientoFiniquito,
+  armarMensajeAsientoFiniquito,
+  armarRespuestaSimulada,
+  validarDestinoFiniquito,
+  validarSimulacionEscenario,
+  validarCaidaBroker,
 };

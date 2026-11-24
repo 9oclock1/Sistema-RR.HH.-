@@ -366,6 +366,104 @@ async function listarProcesos({ estado_finiquito } = {}, db = pool) {
   }));
 }
 
+async function registrarEvento(cliente, { idMensaje, idFiniquito, sentido, destino, tipoEvento, topico, carga, proximoIntentoEn = null }) {
+  const { rows } = await cliente.query(
+    `INSERT INTO EVENTOS_FINIQUITO (
+       id_mensaje, id_finiquito, sentido, destino, tipo_evento, topico, carga, proximo_intento_en
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8::timestamptz, CURRENT_TIMESTAMP))
+     RETURNING id_evento`,
+    [idMensaje, idFiniquito, sentido, destino, tipoEvento, topico, carga, proximoIntentoEn]
+  );
+  return rows[0].id_evento;
+}
+
+async function reservarEventosPendientes(limite, segundosReserva, db = pool) {
+  const { rows } = await db.query(
+    `UPDATE EVENTOS_FINIQUITO
+        SET proximo_intento_en = CURRENT_TIMESTAMP + make_interval(secs => $2)
+      WHERE id_evento IN (
+        SELECT id_evento
+          FROM EVENTOS_FINIQUITO
+         WHERE estado = 'PENDIENTE'
+           AND proximo_intento_en <= CURRENT_TIMESTAMP
+         ORDER BY creado_en ASC, id_evento ASC
+         LIMIT $1
+         FOR UPDATE SKIP LOCKED
+      )
+      RETURNING id_evento, id_mensaje, id_finiquito, sentido, destino, tipo_evento, topico, carga, intentos`,
+    [limite, segundosReserva]
+  );
+  return rows;
+}
+
+async function marcarEventoEntregado(idEvento, idPubSub, db = pool) {
+  await db.query(
+    `UPDATE EVENTOS_FINIQUITO
+        SET estado = 'ENTREGADO',
+            id_pubsub = left($2, 100),
+            entregado_en = CURRENT_TIMESTAMP,
+            intentos = intentos + 1,
+            ultimo_error = NULL
+      WHERE id_evento = $1
+        AND estado = 'PENDIENTE'`,
+    [idEvento, idPubSub ?? null]
+  );
+}
+
+async function marcarEventoError(idEvento, { error, esperaMs, fallido }, db = pool) {
+  await db.query(
+    `UPDATE EVENTOS_FINIQUITO
+        SET intentos = intentos + 1,
+            ultimo_error = left($2, 255),
+            proximo_intento_en = CURRENT_TIMESTAMP + make_interval(secs => $3),
+            estado = CASE WHEN $4 THEN 'FALLIDO' ELSE estado END
+      WHERE id_evento = $1
+        AND estado = 'PENDIENTE'`,
+    [idEvento, error, esperaMs / 1000, Boolean(fallido)]
+  );
+}
+
+async function ultimosEnviosPorDestino(idFiniquito, db = pool) {
+  const { rows } = await db.query(
+    `SELECT DISTINCT ON (destino)
+            id_evento, id_mensaje, destino, estado, intentos, ultimo_error,
+            proximo_intento_en, entregado_en, creado_en
+       FROM EVENTOS_FINIQUITO
+      WHERE id_finiquito = $1
+        AND sentido = 'SALIENTE'
+      ORDER BY destino, creado_en DESC, id_evento DESC`,
+    [idFiniquito]
+  );
+  return Object.fromEntries(rows.map((r) => [r.destino, r]));
+}
+
+async function limpiarRespuestaParaReenvio(cliente, idFiniquito, destino) {
+  const prefijo = destino === "PAGOS" ? "pagos" : "contabilidad";
+  await cliente.query(
+    `UPDATE FINIQUITOS
+        SET estado_${prefijo} = 'PENDIENTE',
+            referencia_${prefijo} = NULL,
+            motivo_${prefijo} = NULL,
+            respondida_${prefijo}_en = NULL
+      WHERE id_finiquito = $1`,
+    [idFiniquito]
+  );
+}
+
+async function obtenerUltimaRespuestaEntrante(idFiniquito, destino, db = pool) {
+  const { rows } = await db.query(
+    `SELECT id_entrante, id_mensaje, carga, estado, recibido_en
+       FROM MENSAJES_FINIQUITO_ENTRANTES
+      WHERE id_finiquito = $1
+        AND destino = $2
+      ORDER BY recibido_en DESC, id_entrante DESC
+      LIMIT 1`,
+    [idFiniquito, destino]
+  );
+  return rows[0] || null;
+}
+
 module.exports = {
   asegurarEditable,
   bloquearProceso,
@@ -378,4 +476,11 @@ module.exports = {
   guardarDocumento,
   obtenerDocumento,
   listarProcesos,
+  registrarEvento,
+  reservarEventosPendientes,
+  marcarEventoEntregado,
+  marcarEventoError,
+  ultimosEnviosPorDestino,
+  limpiarRespuestaParaReenvio,
+  obtenerUltimaRespuestaEntrante,
 };

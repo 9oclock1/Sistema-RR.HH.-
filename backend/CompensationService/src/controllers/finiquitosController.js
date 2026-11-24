@@ -17,6 +17,18 @@ async function aprobar(req, res) {
   res.json(await servicio.aprobar(req.params.idProceso, req.identidad));
 }
 
+async function reenviar(req, res) {
+  res.json(await servicio.reenviar(req.params.idProceso, req.body, req.identidad));
+}
+
+async function simularRespuesta(req, res) {
+  res.status(202).json(await servicio.simularRespuesta(req.params.idProceso, req.body, req.identidad));
+}
+
+async function simularCaidaBroker(req, res) {
+  res.json(await servicio.simularCaidaBroker(req.body, req.identidad));
+}
+
 async function descargarPdf(req, res) {
   const { nombre_archivo, contenido } = await servicio.descargarPdf(req.params.idProceso, req.identidad);
   res.set({
@@ -33,5 +45,8 @@ module.exports = {
   obtener,
   generar,
   aprobar,
+  reenviar,
+  simularRespuesta,
+  simularCaidaBroker,
   descargarPdf,
 };
