@@ -72,7 +72,7 @@ Solo se publica si el cargo está vacante en la sucursal y no hay otra convocato
 
 ### 3.2 KAN-80 · Consulta para empleados activos y cierre automático
 
-Un empleado inactivo recibe 403. El estado de la convocatoria se deriva de sus fechas y, todos los días a las 00:05, un job marca como cerradas las vencidas.
+Un empleado inactivo recibe 403. El estado de la convocatoria se deriva de sus fechas y, todos los días a las 00:05, un job marca como cerradas las vencidas. El "hoy" con el que se comparan las fechas es el de La Paz (`HOY_SQL` de `utils/fechas.js`, según `APP_TIMEZONE`), no el del servidor de base de datos: si Postgres está en UTC, una convocatoria que cierra hoy sigue abierta hasta la medianoche de La Paz y no desde las 20:00.
 
 ![Secuencia KAN-80: consulta y cierre automático](detallados/sec-02-kan80-consulta-y-cierre.png)
 
