@@ -87,6 +87,47 @@ async function encolarRespuestaSimulada(evento) {
   });
 }
 
+const aseguramientosTopico = new Map();
+
+async function asegurarTopicoEmulador(clientePubSub, topico) {
+  if (!process.env.PUBSUB_EMULATOR_HOST) return false;
+  if (!aseguramientosTopico.has(topico)) {
+    const promesa = (async () => {
+      if (await asegurarTopico(clientePubSub, topico)) return true;
+      try {
+        await clientePubSub.topic(topico).get();
+        return true;
+      } catch {
+        return false;
+      }
+    })().finally(() => {
+      aseguramientosTopico.delete(topico);
+    });
+    aseguramientosTopico.set(topico, promesa);
+  }
+  return aseguramientosTopico.get(topico);
+}
+
+async function publicarEnTopico(clientePubSub, evento, atributos) {
+  const publicar = () =>
+    conLimiteDeTiempo(
+      clientePubSub.topic(evento.topico).publishMessage({ json: evento.carga, attributes: atributos })
+    );
+  try {
+    return await publicar();
+  } catch (error) {
+    // El emulador de Pub/Sub guarda los tópicos en memoria; si se reinició, se vuelve a crear al publicar.
+    if (
+      process.env.PUBSUB_EMULATOR_HOST &&
+      error?.code === 5 &&
+      (await asegurarTopicoEmulador(clientePubSub, evento.topico))
+    ) {
+      return publicar();
+    }
+    throw error;
+  }
+}
+
 // AC3, AC5: publica en el tópico F de RRHH y maneja reintentos sin perder eventos.
 async function publicarEvento(clientePubSub, evento) {
   if (caidaActiva()) {
@@ -102,9 +143,7 @@ async function publicarEvento(clientePubSub, evento) {
 
   const atributos = atributosDe(evento.carga);
   try {
-    const idPubSub = await conLimiteDeTiempo(
-      clientePubSub.topic(evento.topico).publishMessage({ json: evento.carga, attributes: atributos })
-    );
+    const idPubSub = await publicarEnTopico(clientePubSub, evento, atributos);
     await modelo.marcarEventoEntregado(evento.id_evento, idPubSub);
 
     if (evento.sentido === "SALIENTE") {

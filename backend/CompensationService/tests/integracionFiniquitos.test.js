@@ -120,6 +120,45 @@ describe("integracionFiniquitosService (despachador y caída)", () => {
     assert.equal(errores[1].fallido, true);
   });
 
+  test("con emulador activo, NOT_FOUND recrea el tópico y completa la publicación", async () => {
+    const anterior = process.env.PUBSUB_EMULATOR_HOST;
+    process.env.PUBSUB_EMULATOR_HOST = "localhost:8085";
+    try {
+      let llamadasPublish = 0;
+      let llamadasAutoCreate = 0;
+      const psEmu = {
+        topic() {
+          return {
+            async get(opc) {
+              if (opc?.autoCreate) llamadasAutoCreate += 1;
+              return {};
+            },
+            async publishMessage() {
+              llamadasPublish += 1;
+              if (llamadasPublish === 1) {
+                throw Object.assign(new Error("Topic not found"), { code: 5 });
+              }
+              return "pubsub-emu-ok";
+            },
+          };
+        },
+      };
+      mock.method(pubsub, "obtenerCliente", () => psEmu);
+      mock.method(modelo, "reservarEventosPendientes", async () => [eventoSalienteBase("PAGOS")]);
+      const entregado = mock.method(modelo, "marcarEventoEntregado", async () => {});
+      mock.method(mensajesPublicados, "registrar", () => {});
+      mock.method(modelo, "registrarEvento", async () => "ev-sim-emu");
+
+      await integracion.despacharFiniquitos();
+      assert.equal(llamadasAutoCreate, 1);
+      assert.equal(llamadasPublish, 2);
+      assert.equal(entregado.mock.callCount(), 1);
+    } finally {
+      if (anterior === undefined) delete process.env.PUBSUB_EMULATOR_HOST;
+      else process.env.PUBSUB_EMULATOR_HOST = anterior;
+    }
+  });
+
   test("al publicar RESPUESTA_SIMULADA entrega al consumidor recibirMensaje", async () => {
     const ps = crearPubSubFalso(async () => "pubsub-sim-1");
     mock.method(pubsub, "obtenerCliente", () => ps);
