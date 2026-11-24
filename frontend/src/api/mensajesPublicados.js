@@ -15,17 +15,30 @@ const cursores = new Map();
 let iniciado = false;
 
 function mostrar(publicado) {
-  // Lo que RRHH publica sale hacia el tópico; la respuesta del CRM (simulada) llega desde el suyo.
-  const recibido = publicado.direccion === "recibido";
-  const tipo = publicado.atributos?.tipo ?? "mensaje";
+  const atributos = publicado.atributos ?? {};
+  const origen = atributos.origen ?? "?";
+  const destino = atributos.destino ?? "?";
+  const tipo = atributos.tipo ?? "mensaje";
+
+  if (publicado.direccion === "recibido") {
+    const origenModulo = atributos.origen_modulo || "sistema externo";
+    console.log(`Mensaje recibido exitosamente del sistema de ${origenModulo} (grupo ${origen})`);
+    console.groupCollapsed(`[Pub/Sub] Respuesta recibida · ${origen} → ${destino} · ${tipo}`);
+    console.log("Recibido en:", publicado.publicado_en);
+    console.log("ID Pub/Sub:", publicado.id_pubsub);
+    console.log("Atributos:", atributos);
+    console.log("Mensaje:", publicado.mensaje);
+    console.groupEnd();
+    return;
+  }
+
+  const destinoModulo = atributos.destino_modulo || "destino";
   console.groupCollapsed(
-    recibido
-      ? `[Pub/Sub] ${publicado.topico} → ${publicado.servicio} (respuesta simulada del CRM) · ${tipo}`
-      : `[Pub/Sub] ${publicado.servicio} → ${publicado.topico} · ${tipo}`,
+    `[Pub/Sub] Envío ${origen} → ${destino} (${destinoModulo}) · ${publicado.servicio} → ${publicado.topico} · ${tipo}`
   );
-  console.log(recibido ? "Recibido en:" : "Publicado en:", publicado.publicado_en);
+  console.log("Publicado en:", publicado.publicado_en);
   console.log("ID Pub/Sub:", publicado.id_pubsub);
-  console.log("Atributos:", publicado.atributos);
+  console.log("Atributos:", atributos);
   console.log("Mensaje:", publicado.mensaje);
   console.groupEnd();
 }

@@ -16,6 +16,7 @@ import { RUTA_DASHBOARD_QUEJAS } from "../features/dashboard-quejas/dashboardQue
 import { RUTA_DASHBOARD_DESEMPENO } from "../features/dashboard-desempeno/dashboardDesempeno";
 import DesempenoGlobalPage from "../features/desempeno-global/DesempenoGlobalPage";
 import DesvinculacionesPage from "../features/desvinculaciones/DesvinculacionesPage";
+import FiniquitosPage from "../features/finiquitos/FiniquitosPage";
 import RotacionPersonalPage from "../features/rotacion-personal/RotacionPersonalPage";
 import { RUTA_DESEMPENO_GLOBAL } from "../features/desempeno-global/desempenoGlobal";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
@@ -409,6 +410,15 @@ export const SECCIONES = [
         // El Contador consulta los procesos y el desglose del sueldo promedio en solo lectura (RF-55).
         roles: ["admin", "contador"],
         pagina: DesvinculacionesPage,
+      },
+      {
+        ruta: "/desvinculacion/finiquitos",
+        parametroOpcional: "idProceso",
+        etiqueta: "Finiquitos",
+        descripcion: "Formulario consolidado de liquidación, aprobación con el documento oficial para firma y estado de la orden de pago y del asiento contable.",
+        icono: FileSignature,
+        roles: ["admin", "contador"],
+        pagina: FiniquitosPage,
       },
     ],
   },
