@@ -171,7 +171,7 @@ export default function DesvinculacionFormulario({ empleados, causales, onGuarda
           onConfirmar={confirmarRegistro}
           onCancelar={() => !enviando && setConfirmacionAbierta(false)}
         >
-          Se iniciará el proceso de liquidación de {nombreConfirmacion} y quedará dado de baja en la lista de empleados.
+          Se iniciará el proceso de liquidación de {nombreConfirmacion}. El colaborador seguirá activo hasta el cierre definitivo de su desvinculación.
         </ModalConfirmacion>
       )}
     </>

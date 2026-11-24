@@ -3,7 +3,7 @@ import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react
 import { House, LogOut, Menu, Search } from "lucide-react";
 import { obtenerSesion } from "../api/auth";
 import { iniciarConsolaPubSub } from "../api/mensajesPublicados";
-import { Boton, ElementoNavegacion } from "../components/ui";
+import { Boton, ElementoNavegacion, useAvisos } from "../components/ui";
 import { abrirInicioSesion, fijarSesion, useFormularioSesion, useRol, useSesion } from "../context/sesion";
 import { useEmpleados } from "../features/Asignaciones/hooks/useEmpleados";
 import CampanaNotificaciones from "../features/notificaciones/CampanaNotificaciones";
@@ -68,6 +68,7 @@ export default function MainLayout() {
   const formularioSesion = useFormularioSesion();
   const { salir: salirDeSesion, cerrando: cerrandoSesion } = useCerrarSesion();
   const empleados = useEmpleados();
+  const avisar = useAvisos();
 
   const consulta = normalizar(busqueda.trim());
   const secciones = filtrarSecciones(seccionesPara(rol), consulta);
@@ -87,6 +88,36 @@ export default function MainLayout() {
       .then(({ usuario: activo }) => fijarSesion(activo))
       .catch(() => fijarSesion(null));
   }, []);
+
+  // AC1: mientras haya sesión abierta, valida cada 60 s y al volver el foco si fue revocada.
+  useEffect(() => {
+    if (!sesion) return undefined;
+    let vigente = true;
+    const verificarVigencia = () => {
+      obtenerSesion()
+        .then(({ usuario }) => {
+          if (!vigente || usuario) return;
+          vigente = false;
+          fijarSesion(null);
+          avisar({
+            tono: "aviso",
+            titulo: "Sesión finalizada",
+            mensaje: "Su sesión terminó. Si fue desvinculado, su acceso al ERP fue revocado.",
+          });
+        })
+        .catch(() => {});
+    };
+    const alCambiarVisibilidad = () => {
+      if (!document.hidden) verificarVigencia();
+    };
+    const id = setInterval(verificarVigencia, 60000);
+    document.addEventListener("visibilitychange", alCambiarVisibilidad);
+    return () => {
+      vigente = false;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", alCambiarVisibilidad);
+    };
+  }, [sesion, avisar]);
 
   // Las páginas que piden el inicio con abrirInicioSesion() llevan a la pantalla de inicio de sesión.
   useEffect(() => {

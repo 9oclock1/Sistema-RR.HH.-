@@ -1,4 +1,4 @@
-import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ChartLine, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, Gift, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, Landmark, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Scale, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus } from "lucide-react";
+import { AlarmClock, Award, Bell, BookOpenCheck, Briefcase, Building2, Calculator, CalendarCheck, CalendarClock, CalendarDays, CalendarRange, CalendarSearch, ChartColumn, ChartLine, ClipboardCheck, ClipboardList, ClipboardPenLine, FileChartColumn, FileCheck, FileSearch, FileSignature, FileSpreadsheet, FileText, FileUser, FileWarning, Fingerprint, Gauge, Gift, GraduationCap, HandCoins, History, Hourglass, IdCard, Inbox, Landmark, ListTree, Mail, Megaphone, MessageSquareWarning, MoonStar, Network, ReceiptText, Scale, Send, ShieldCheck, SquareKanban, Target, Timer, TreePalm, TrendingUp, UserCheck, UserMinus, UserPlus, UserX } from "lucide-react";
 import AlertasAsistenciaPage from "../features/alertas-asistencia/AlertasAsistenciaPage";
 import AnticiposPage from "../features/anticipos/AnticiposPage";
 import AntiguedadPage from "../features/antiguedad/AntiguedadPage";
@@ -17,6 +17,7 @@ import { RUTA_DASHBOARD_DESEMPENO } from "../features/dashboard-desempeno/dashbo
 import DesempenoGlobalPage from "../features/desempeno-global/DesempenoGlobalPage";
 import DesvinculacionesPage from "../features/desvinculaciones/DesvinculacionesPage";
 import FiniquitosPage from "../features/finiquitos/FiniquitosPage";
+import CierresPage from "../features/cierres/CierresPage";
 import RotacionPersonalPage from "../features/rotacion-personal/RotacionPersonalPage";
 import { RUTA_DESEMPENO_GLOBAL } from "../features/desempeno-global/desempenoGlobal";
 import EvaluacionesPage from "../features/evaluaciones/EvaluacionesPage";
@@ -419,6 +420,15 @@ export const SECCIONES = [
         icono: FileSignature,
         roles: ["admin", "contador"],
         pagina: FiniquitosPage,
+      },
+      {
+        ruta: "/desvinculacion/cierre",
+        parametroOpcional: "idProceso",
+        etiqueta: "Cierre y accesos",
+        descripcion: "Cierre definitivo de la desvinculación, inactivación del colaborador, revocación de su cuenta y bloqueo de accesos en los sistemas operativos.",
+        icono: UserX,
+        roles: ["admin", "contador"],
+        pagina: CierresPage,
       },
     ],
   },
